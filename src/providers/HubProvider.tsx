@@ -9,7 +9,6 @@ import React, {
 
 type OfferingType = "all" | "digital" | "commission" | "service";
 type VideoSubtype = "all" | "long-form" | "short-form";
-// category keys can be widened later; keep string for flexibility while prototyping
 type CategoryKey = "all" | string;
 
 export type HubFilters = {
