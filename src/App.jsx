@@ -11,7 +11,7 @@ import Listing from "./pages/Listing";
 import NotFound from "./pages/NotFound";
 import "./styles/App.css";
 
-export default function App() {
+const App = () => {
   return (
     <>
       <ScrollToTop />
@@ -29,3 +29,5 @@ export default function App() {
     </>
   );
 }
+
+export default App

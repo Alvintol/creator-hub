@@ -52,7 +52,7 @@ function reducer(state, action) {
     }
 }
 
-export function HubProvider({ children }) {
+const HubProvider = ({ children }) => {
     const [state, dispatch] = useReducer(reducer, initialState, initState);
 
     useEffect(() => {
@@ -89,3 +89,5 @@ export const useHubActions = () => {
     if (!v) throw new Error("useHubActions must be used within HubProvider");
     return v;
 };
+
+export default HubProvider

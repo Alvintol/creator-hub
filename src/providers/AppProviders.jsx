@@ -1,5 +1,7 @@
 import { HubProvider } from "./HubProvider";
 
-export default function AppProviders({ children }) {
+const AppProviders = ({ children }) => {
     return <HubProvider>{children}</HubProvider>;
 }
+
+export default AppProviders
