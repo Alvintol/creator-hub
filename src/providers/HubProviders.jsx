@@ -4,25 +4,26 @@ import React, {
     useMemo,
     useReducer,
     useEffect,
-} from "react";
+} from 'react';
 
 const HubStateContext = createContext(null);
 const HubActionsContext = createContext(null);
 
-const FAVORITES_KEY = "creatorhub:favorites:v1";
+const FAVORITES_KEY = 'creatorhub:favorites:v1';
 
 const initialState = {
     filters: {
-        q: "",
+        q: '',
         onlyLive: false,
         onlyOpen: false,
-        type: "all",
-        category: "all",
-        videoSubtype: "all",
-    }, favorites: { creators: {}, listings: {} },
+        type: 'all',
+        category: 'all',
+        videoSubtype: 'all',
+    },
+    favorites: { creators: {}, listings: {} },
 };
 
-function initState(base) {
+const initState = (base) => {
     try {
         const raw = localStorage.getItem(FAVORITES_KEY);
         if (!raw) return base;
@@ -31,23 +32,25 @@ function initState(base) {
     } catch {
         return base;
     }
-}
+};
 
-function reducer(state, action) {
+const reducer = (state, action) => {
     switch (action.type) {
-        case "filters/set":
+        case 'filters/set':
             return { ...state, filters: { ...state.filters, ...action.patch } };
 
-        case "filters/reset":
+        case 'filters/reset':
             return { ...state, filters: initialState.filters };
 
-        case "favorites/toggleCreator": {
+        case 'favorites/toggleCreator': {
             const next = { ...state.favorites.creators };
-            next[action.handle] ? delete next[action.handle] : (next[action.handle] = true);
+            next[action.handle]
+                ? delete next[action.handle]
+                : (next[action.handle] = true);
             return { ...state, favorites: { ...state.favorites, creators: next } };
         }
 
-        case "favorites/toggleListing": {
+        case 'favorites/toggleListing': {
             const next = { ...state.favorites.listings };
             next[action.id] ? delete next[action.id] : (next[action.id] = true);
             return { ...state, favorites: { ...state.favorites, listings: next } };
@@ -56,7 +59,7 @@ function reducer(state, action) {
         default:
             return state;
     }
-}
+};
 
 const HubProvider = ({ children }) => {
     const [state, dispatch] = useReducer(reducer, initialState, initState);
@@ -67,12 +70,14 @@ const HubProvider = ({ children }) => {
 
     const actions = useMemo(
         () => ({
-            setFilters: (patch) => dispatch({ type: "filters/set", patch }),
-            resetFilters: () => dispatch({ type: "filters/reset" }),
-            toggleFavoriteCreator: (handle) => dispatch({ type: "favorites/toggleCreator", handle }),
-            toggleFavoriteListing: (id) => dispatch({ type: "favorites/toggleListing", id }),
+            setFilters: (patch) => dispatch({ type: 'filters/set', patch }),
+            resetFilters: () => dispatch({ type: 'filters/reset' }),
+            toggleFavoriteCreator: (handle) =>
+                dispatch({ type: 'favorites/toggleCreator', handle }),
+            toggleFavoriteListing: (id) =>
+                dispatch({ type: 'favorites/toggleListing', id }),
         }),
-        []
+        [],
     );
 
     return (
@@ -82,18 +87,18 @@ const HubProvider = ({ children }) => {
             </HubActionsContext.Provider>
         </HubStateContext.Provider>
     );
-}
+};
 
 export const useHubState = () => {
     const v = useContext(HubStateContext);
-    if (!v) throw new Error("useHubState must be used within HubProvider");
+    if (!v) throw new Error('useHubState must be used within HubProvider');
     return v;
 };
 
 export const useHubActions = () => {
     const v = useContext(HubActionsContext);
-    if (!v) throw new Error("useHubActions must be used within HubProvider");
+    if (!v) throw new Error('useHubActions must be used within HubProvider');
     return v;
 };
 
-export default HubProvider
+export default HubProvider;
