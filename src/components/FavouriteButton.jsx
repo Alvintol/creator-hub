@@ -1,4 +1,4 @@
-import { useHubState, useHubActions } from '../providers/HubProviders';
+import { useHubState, useHubActions } from "../providers/HubProvider";
 
 const Heart = ({ filled }) => {
   return (

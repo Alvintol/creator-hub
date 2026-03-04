@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { creators } from '../data/mock';
 import CreatorCard from '../components/CreatorCard';
-import { useHubState, useHubActions } from '../providers/HubProviders';
+import { useHubState, useHubActions } from "../providers/HubProvider";
 
 const CreatorsPage = () => {
     const { filters } = useHubState();

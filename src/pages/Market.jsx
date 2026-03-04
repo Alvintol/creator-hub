@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { creators, listings, categories } from '../data/mock';
-import { useHubState, useHubActions } from '../providers/HubProviders';
+import { useHubState, useHubActions } from "../providers/HubProvider";
 
 const creatorByHandle = Object.fromEntries(creators.map((c) => [c.handle, c]));
 

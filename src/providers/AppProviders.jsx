@@ -1,7 +1,7 @@
-import { HubProvider } from "./HubProvider";
+import { HubProvider } from './HubProvider';
 
 const AppProviders = ({ children }) => {
-    return <HubProvider>{children}</HubProvider>;
-}
+  return <HubProvider>{children}</HubProvider>;
+};
 
-export default AppProviders
+export default AppProviders;

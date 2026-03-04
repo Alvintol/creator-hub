@@ -1,15 +1,12 @@
 const Footer = () => {
-    return (
-        <footer className="footer">
-            <div className="container footerInner">
-                <div>© {new Date().getFullYear()} CreatorHub</div>
-                <div className="footerLinks">
-                    <a href="#" onClick={(e) => e.preventDefault()}>Terms</a>
-                    <a href="#" onClick={(e) => e.preventDefault()}>Privacy</a>
-                </div>
-            </div>
-        </footer>
-    );
-}
+  return (
+    <footer className='container pt-0'>
+      <div className='border-t border-zinc-200 py-6 text-xs text-zinc-500'>
+        © {new Date().getFullYear()} CreatorHub • Marketplace for creator assets
+        & services
+      </div>
+    </footer>
+  );
+};
 
-export default Footer
+export default Footer;
