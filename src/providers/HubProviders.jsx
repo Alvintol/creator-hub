@@ -12,8 +12,14 @@ const HubActionsContext = createContext(null);
 const FAVORITES_KEY = "creatorhub:favorites:v1";
 
 const initialState = {
-    filters: { q: "", onlyLive: false, onlyOpen: false, type: "all", category: "all" },
-    favorites: { creators: {}, listings: {} },
+    filters: {
+        q: "",
+        onlyLive: false,
+        onlyOpen: false,
+        type: "all",
+        category: "all",
+        videoSubtype: "all",
+    }, favorites: { creators: {}, listings: {} },
 };
 
 function initState(base) {
