@@ -79,7 +79,7 @@ const Live = () => {
       .filter((c) => !!c.live?.isLive)
       .filter((c) => (platform === "all" ? true : c.live?.platform === platform))
       .filter((c) => (s ? getLiveSearchHaystack(c).includes(s) : true))
-      .sort(sortVerifiedFirst);
+      .sort(sortVerifiedFirst);2
   }, [q, platform]);
 
   const onPlatformChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
