@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { creators, type Creator, type PlatformName } from "../data/mock";
 import { CATEGORIES, type CategoryKey } from "../domain/catalog";
@@ -74,6 +74,8 @@ const Live = () => {
   const [streamsByLogin, setStreamsByLogin] = useState<Record<string, TwitchStream>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const REFRESH_MS = 60_000;
+  const FOCUS_COOLDOWN_MS = 15_000;
 
   const twitchLogins = useMemo(() => {
     const set = new Set<string>();
@@ -90,8 +92,21 @@ const Live = () => {
     if (twitchLogins.length === 0) return;
 
     const ctrl = new AbortController();
+    const lastRefreshRef = { current: 0 };
+    const inFlightRef = { current: false };
 
-    const run = async () => {
+    const refresh = async (opts?: { force?: boolean }) => {
+      const force = !!opts?.force;
+      const now = Date.now();
+
+      if (!force) {
+        if (inFlightRef.current) return;
+        if (now - lastRefreshRef.current < FOCUS_COOLDOWN_MS) return;
+      }
+
+      inFlightRef.current = true;
+      lastRefreshRef.current = now;
+
       try {
         setError(null);
         setLoading(true);
@@ -120,12 +135,30 @@ const Live = () => {
         if (name === "AbortError") return;
         setError("Failed to load Twitch live status.");
       } finally {
+        inFlightRef.current = false;
         setLoading(false);
       }
     };
 
-    run();
-    return () => ctrl.abort();
+    // initial load (always runs)
+    refresh({ force: true });
+
+    // refresh every 60s
+    const intervalId = window.setInterval(() => {
+      refresh();
+    }, REFRESH_MS);
+
+    // refresh when tab regains focus (cooldown prevents spam)
+    const onFocus = () => {
+      refresh();
+    };
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
+      ctrl.abort();
+    };
   }, [twitchLogins]);
 
   const liveNow = useMemo(() => {
