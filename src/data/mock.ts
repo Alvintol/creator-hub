@@ -1,15 +1,27 @@
-import { CATEGORIES, type CategoryKey } from "../domain/catalog";
+import { CATEGORIES, type CategoryKey, DeliverableKey } from "../domain/catalog";
 
 export const categories = CATEGORIES;
 
-export type Platform = "twitch" | "youtube";
+export type PlatformName = "twitch" | "youtube";
 export type CommissionStatus = "open" | "limited" | "closed" | (string & {});
+
+export type CreatorPlatforms = {
+    twitch?: {
+        login: string;
+        userId?: string;
+    };
+    youtube?: {
+        channelId: string;
+        handle?: string;
+    };
+};
 
 export type Creator = {
     handle: string;
     displayName: string;
     verified: boolean;
     bio: string;
+    platforms?: CreatorPlatforms;
     tags?: string[];
     specialties?: CategoryKey[];
     commissionStatus: CommissionStatus;
@@ -22,7 +34,7 @@ export type Creator = {
     live?: {
         isLive: boolean;
         title?: string;
-        platform?: Platform;
+        platform?: PlatformName;
     };
 };
 
@@ -44,7 +56,7 @@ export type Listing = {
     priceMin: number;
     priceMax: number | null;
 
-    deliverables: string[];
+    deliverables: DeliverableKey[];
     featured?: boolean;
 
     videoSubtype?: VideoSubtype;
@@ -59,6 +71,9 @@ export const creators: Creator[] = [
         tags: ["emotes", "overlays", "cute", "pixel"],
         specialties: ["emotes", "overlays"],
         commissionStatus: "open",
+        platforms: {
+            twitch: { login: "monzterman" }
+        },
         links: {
             twitch: "https://twitch.tv/pixelpiper",
             youtube: "https://youtube.com/@pixelpiper",
@@ -77,14 +92,17 @@ export const creators: Creator[] = [
         live: { isLive: false, title: "", platform: "youtube" },
     },
     {
-        handle: "cutsceneedits",
-        displayName: "Cutscene Edits",
+        handle: "monzterman",
+        displayName: "MonzterMan",
         verified: true,
         bio: "Clips/VOD/Short-form editing + captions + pacing.",
         tags: ["editing", "shorts", "captions"],
         specialties: ["video-editing"],
         commissionStatus: "open",
-        links: { youtube: "https://youtube.com/@cutsceneedits" },
+        platforms: {
+            twitch: { login: "monzterman" }
+        },
+        links: { twitch: "https://twitch.tv/monzterman" },
         live: { isLive: true, title: "Editing shorts", platform: "youtube" },
     },
     {

@@ -1,9 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
-import { creators, type Creator, type Platform } from "../data/mock";
-import { CATEGORIES, CategoryKey } from "../domain/catalog";
+import { creators, type Creator, type PlatformName } from "../data/mock";
+import { CATEGORIES, type CategoryKey } from "../domain/catalog";
+import { useHubActions, useHubState } from "../providers/HubProvider";
+import { normalizeTwitchLogin, type TwitchStream } from "../domain/twitch";
 
-type PlatformFilter = "all" | Platform;
+type PlatformFilter = "all" | PlatformName;
+
+const REFRESH_MS = 60_000;
+const FOCUS_COOLDOWN_MS = 15_000;
 
 const classes = {
   page: "space-y-5",
@@ -29,69 +34,152 @@ const classes = {
   topRow: "flex flex-wrap items-center gap-2",
   name: "text-base font-extrabold tracking-tight",
 
-  badgeBase: "rounded-full border bg-white px-2 py-0.5 text-xs font-semibold",
-  badgeDefault: "border-zinc-200",
-  badgeLive: "border-[rgb(var(--ink)/0.22)] bg-[rgb(var(--brand)/0.26)] text-zinc-900",
-  badgePlatform: "border-[rgb(var(--ink)/0.18)] text-zinc-700",
+  badgeLive: "badge badgeLive",
 
   title: "mt-2 text-sm text-zinc-600",
+  meta: "mt-2 text-xs text-zinc-500",
 
   specialtiesRow: "mt-3 flex flex-wrap gap-2",
   specPill: "chip px-2 py-0.5 text-xs",
 } as const;
 
-const categoryLabel = (key: CategoryKey): string => {
-  return CATEGORIES.find((c) => c.key === key)?.label ?? key;
-}
+const categoryLabel = (key: CategoryKey): string =>
+  CATEGORIES.find((c) => c.key === key)?.label ?? key;
 
-const getLiveSearchHaystack = (c: Creator): string => {
-  return [
-    c.displayName,
-    c.handle,
-    c.bio,
-    ...(c.tags ?? []),
-    ...(c.specialties ?? []).map(categoryLabel),
-    c.live?.title ?? "",
+const getSearchHaystack = (creator: Creator, stream?: TwitchStream): string =>
+  [
+    creator.displayName,
+    creator.handle,
+    creator.bio,
+    ...(creator.tags ?? []),
+    ...(creator.specialties ?? []).map(categoryLabel),
+    stream?.title ?? "",
+    stream?.gameName ?? "",
   ]
     .join(" ")
     .toLowerCase();
-}
-
-const sortVerifiedFirst = (a: Creator, b: Creator): number => {
-  if (a.verified === b.verified) return 0;
-  return a.verified ? -1 : 1;
-}
-
-const getBadgeClassName = (variant: "default" | "live" | "platform"): string => {
-  if (variant === "live") return `${classes.badgeBase} ${classes.badgeLive}`;
-  if (variant === "platform") return `${classes.badgeBase} ${classes.badgePlatform}`;
-  return `${classes.badgeBase} ${classes.badgeDefault}`;
-}
 
 const Live = () => {
-  const [q, setQ] = useState<string>("");
+  const [q, setQ] = useState("");
   const [platform, setPlatform] = useState<PlatformFilter>("all");
 
-  const liveNow = useMemo<Creator[]>(() => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { streams } = useHubState();
+  const { setTwitchStreams } = useHubActions();
+
+  const twitchLogins = useMemo(() => {
+    const set = new Set<string>();
+
+    creators.forEach((c) => {
+      const login = c.platforms?.twitch?.login;
+      if (!login) return;
+      set.add(normalizeTwitchLogin(login));
+    });
+
+    return Array.from(set).sort();
+  }, []);
+
+  useEffect(() => {
+    if (twitchLogins.length === 0) return;
+
+    const ctrl = new AbortController();
+    const lastRefreshRef = { current: 0 };
+    const inFlightRef = { current: false };
+
+    const refresh = async (opts?: { force?: boolean }) => {
+      const force = !!opts?.force;
+      const now = Date.now();
+
+      if (!force) {
+        if (inFlightRef.current) return;
+        if (now - lastRefreshRef.current < FOCUS_COOLDOWN_MS) return;
+      }
+
+      inFlightRef.current = true;
+      lastRefreshRef.current = now;
+
+      try {
+        setError(null);
+        setLoading(true);
+
+        const url = `/api/twitch/streams?logins=${encodeURIComponent(
+          twitchLogins.join(","),
+        )}`;
+
+        const r = await fetch(url, { signal: ctrl.signal });
+        const json = (await r.json()) as { data: TwitchStream[]; error?: string };
+
+        if (!r.ok) {
+          setError(json?.error || "Failed to load Twitch live status.");
+          setTwitchStreams({});
+          return;
+        }
+
+        const map: Record<string, TwitchStream> = {};
+        (json.data ?? []).forEach((s) => {
+          map[normalizeTwitchLogin(s.login)] = s;
+        });
+
+        setTwitchStreams(map);
+      } catch (err) {
+        const name = (err as { name?: string } | null)?.name;
+        if (name === "AbortError") return;
+        setError("Failed to load Twitch live status.");
+      } finally {
+        inFlightRef.current = false;
+        setLoading(false);
+      }
+    };
+
+    refresh({ force: true });
+
+    const intervalId = window.setInterval(() => {
+      refresh();
+    }, REFRESH_MS);
+
+    const onFocus = () => {
+      refresh();
+    };
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", onFocus);
+      ctrl.abort();
+    };
+  }, [twitchLogins, setTwitchStreams]);
+
+  const liveNow = useMemo(() => {
     const s = q.trim().toLowerCase();
 
     return creators
-      .filter((c) => !!c.live?.isLive)
-      .filter((c) => (platform === "all" ? true : c.live?.platform === platform))
-      .filter((c) => (s ? getLiveSearchHaystack(c).includes(s) : true))
-      .sort(sortVerifiedFirst);2
-  }, [q, platform]);
+      .map((c) => {
+        const login = c.platforms?.twitch?.login
+          ? normalizeTwitchLogin(c.platforms.twitch.login)
+          : undefined;
 
-  const onPlatformChange = (e: React.ChangeEvent<HTMLSelectElement>): void => {
+        const stream = login ? streams.twitchByLogin[login] : undefined;
+
+        return { creator: c, stream };
+      })
+      .filter(({ stream }) => !!stream)
+      .filter(() => (platform === "all" ? true : platform === "twitch"))
+      .filter(({ creator, stream }) =>
+        s ? getSearchHaystack(creator, stream).includes(s) : true,
+      );
+  }, [q, platform, streams.twitchByLogin]);
+
+  const onPlatformChange = (e: ChangeEvent<HTMLSelectElement>) =>
     setPlatform(e.currentTarget.value as PlatformFilter);
-  }
 
   return (
     <div className={classes.page}>
       <div className={classes.headerWrap}>
         <h1 className={classes.h1}>Live now</h1>
         <p className={classes.subtitle}>
-          Creators currently live on their channels. (Mock data for now.)
+          Real-time Twitch live status. {loading ? "Refreshing…" : ""}
         </p>
       </div>
 
@@ -106,15 +194,24 @@ const Live = () => {
         <select className={classes.select} value={platform} onChange={onPlatformChange}>
           <option value="all">All platforms</option>
           <option value="twitch">Twitch</option>
-          <option value="youtube">YouTube</option>
+          <option value="youtube" disabled>
+            YouTube (next)
+          </option>
         </select>
       </div>
+
+      {error && (
+        <div className="card p-4 border border-[rgb(var(--ink)/0.18)] bg-[rgb(var(--accent)/0.20)]">
+          <div className="text-sm font-semibold text-zinc-900">Live status unavailable</div>
+          <div className="mt-1 text-sm text-zinc-700">{error}</div>
+        </div>
+      )}
 
       {liveNow.length === 0 ? (
         <div className={classes.emptyCard}>
           <div className={classes.emptyTitle}>No one is live right now</div>
           <p className={classes.emptyText}>
-            Once Twitch/YouTube integrations are added, this will update in real time.
+            Add creator.platforms.twitch.login values and/or wait until they go live.
           </p>
 
           <div className={classes.emptyActions}>
@@ -128,35 +225,44 @@ const Live = () => {
         </div>
       ) : (
         <div className={classes.grid}>
-          {liveNow.map((c) => (
-            <Link key={c.handle} to={`/creator/${c.handle}`} className={classes.card}>
-              <div className={classes.topRow}>
-                <div className={classes.name}>{c.displayName}</div>
+          {liveNow.map(({ creator, stream }) => {
+            const thumb =
+              stream?.thumbnailUrl?.replace("{width}", "640").replace("{height}", "360") ??
+              "";
 
-                {c.verified && (
-                  <span className={getBadgeClassName("default")}>Verified</span>
+            return (
+              <Link key={creator.handle} to={`/creator/${creator.handle}`} className={classes.card}>
+                {!!thumb && (
+                  <img
+                    src={thumb}
+                    alt=""
+                    className="mb-3 h-40 w-full rounded-2xl object-cover"
+                    loading="lazy"
+                  />
                 )}
 
-                <span className={getBadgeClassName("live")}>Live</span>
-
-                {!!c.live?.platform && (
-                  <span className={getBadgeClassName("platform")}>{c.live.platform}</span>
-                )}
-              </div>
-
-              <p className={classes.title}>{c.live?.title ?? ""}</p>
-
-              {!!c.specialties?.length && (
-                <div className={classes.specialtiesRow}>
-                  {c.specialties.slice(0, 4).map((k) => (
-                    <span key={k} className={classes.specPill}>
-                      {categoryLabel(k)}
-                    </span>
-                  ))}
+                <div className={classes.topRow}>
+                  <div className={classes.name}>{creator.displayName}</div>
+                  <span className={classes.badgeLive}>Live</span>
                 </div>
-              )}
-            </Link>
-          ))}
+
+                <p className={classes.title}>{stream?.title ?? ""}</p>
+                <p className={classes.meta}>
+                  {stream?.gameName ?? ""} • {stream?.viewerCount ?? 0} viewers
+                </p>
+
+                {!!creator.specialties?.length && (
+                  <div className={classes.specialtiesRow}>
+                    {creator.specialties.slice(0, 4).map((k) => (
+                      <span key={k} className={classes.specPill}>
+                        {categoryLabel(k)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>
