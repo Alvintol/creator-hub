@@ -1,20 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { creators, type Creator, type PlatformName } from "../data/mock";
 import { CATEGORIES, type CategoryKey } from "../domain/catalog";
+import { useHubActions, useHubState } from "../providers/HubProvider";
+import { normalizeTwitchLogin, type TwitchStream } from "../domain/twitch";
 
 type PlatformFilter = "all" | PlatformName;
 
-type TwitchStream = {
-  login: string;
-  displayName: string;
-  isLive: true;
-  title: string;
-  gameName: string;
-  viewerCount: number;
-  startedAt: string;
-  thumbnailUrl: string; // contains {width}x{height}
-};
+const REFRESH_MS = 60_000;
+const FOCUS_COOLDOWN_MS = 15_000;
 
 const classes = {
   page: "space-y-5",
@@ -40,7 +34,6 @@ const classes = {
   topRow: "flex flex-wrap items-center gap-2",
   name: "text-base font-extrabold tracking-tight",
 
-  badgeBase: "badge",
   badgeLive: "badge badgeLive",
 
   title: "mt-2 text-sm text-zinc-600",
@@ -66,23 +59,23 @@ const getSearchHaystack = (creator: Creator, stream?: TwitchStream): string =>
     .join(" ")
     .toLowerCase();
 
-
 const Live = () => {
   const [q, setQ] = useState("");
   const [platform, setPlatform] = useState<PlatformFilter>("all");
 
-  const [streamsByLogin, setStreamsByLogin] = useState<Record<string, TwitchStream>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const REFRESH_MS = 60_000;
-  const FOCUS_COOLDOWN_MS = 15_000;
+
+  const { streams } = useHubState();
+  const { setTwitchStreams } = useHubActions();
 
   const twitchLogins = useMemo(() => {
     const set = new Set<string>();
 
     creators.forEach((c) => {
-      const login = c.platforms?.twitch?.login?.trim().toLowerCase();
-      if (login) set.add(login);
+      const login = c.platforms?.twitch?.login;
+      if (!login) return;
+      set.add(normalizeTwitchLogin(login));
     });
 
     return Array.from(set).sort();
@@ -120,16 +113,16 @@ const Live = () => {
 
         if (!r.ok) {
           setError(json?.error || "Failed to load Twitch live status.");
-          setStreamsByLogin({});
+          setTwitchStreams({});
           return;
         }
 
         const map: Record<string, TwitchStream> = {};
         (json.data ?? []).forEach((s) => {
-          map[s.login.toLowerCase()] = s;
+          map[normalizeTwitchLogin(s.login)] = s;
         });
 
-        setStreamsByLogin(map);
+        setTwitchStreams(map);
       } catch (err) {
         const name = (err as { name?: string } | null)?.name;
         if (name === "AbortError") return;
@@ -140,15 +133,12 @@ const Live = () => {
       }
     };
 
-    // initial load (always runs)
     refresh({ force: true });
 
-    // refresh every 60s
     const intervalId = window.setInterval(() => {
       refresh();
     }, REFRESH_MS);
 
-    // refresh when tab regains focus (cooldown prevents spam)
     const onFocus = () => {
       refresh();
     };
@@ -159,23 +149,27 @@ const Live = () => {
       window.removeEventListener("focus", onFocus);
       ctrl.abort();
     };
-  }, [twitchLogins]);
+  }, [twitchLogins, setTwitchStreams]);
 
   const liveNow = useMemo(() => {
     const s = q.trim().toLowerCase();
 
     return creators
       .map((c) => {
-        const login = c.platforms?.twitch?.login?.toLowerCase();
-        const stream = login ? streamsByLogin[login] : undefined;
+        const login = c.platforms?.twitch?.login
+          ? normalizeTwitchLogin(c.platforms.twitch.login)
+          : undefined;
+
+        const stream = login ? streams.twitchByLogin[login] : undefined;
+
         return { creator: c, stream };
       })
       .filter(({ stream }) => !!stream)
       .filter(() => (platform === "all" ? true : platform === "twitch"))
       .filter(({ creator, stream }) =>
-        s ? getSearchHaystack(creator, stream).includes(s) : true
+        s ? getSearchHaystack(creator, stream).includes(s) : true,
       );
-  }, [q, platform, streamsByLogin]);
+  }, [q, platform, streams.twitchByLogin]);
 
   const onPlatformChange = (e: ChangeEvent<HTMLSelectElement>) =>
     setPlatform(e.currentTarget.value as PlatformFilter);
@@ -233,16 +227,11 @@ const Live = () => {
         <div className={classes.grid}>
           {liveNow.map(({ creator, stream }) => {
             const thumb =
-              stream?.thumbnailUrl
-                ?.replace("{width}", "640")
-                .replace("{height}", "360") ?? "";
+              stream?.thumbnailUrl?.replace("{width}", "640").replace("{height}", "360") ??
+              "";
 
             return (
-              <Link
-                key={creator.handle}
-                to={`/creator/${creator.handle}`}
-                className={classes.card}
-              >
+              <Link key={creator.handle} to={`/creator/${creator.handle}`} className={classes.card}>
                 {!!thumb && (
                   <img
                     src={thumb}

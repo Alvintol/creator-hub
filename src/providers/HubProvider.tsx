@@ -6,6 +6,7 @@ import React, {
     useEffect,
     ReactNode
 } from "react";
+import type { TwitchStream } from "../domain/twitch";
 
 export type OfferingType = "all" | "digital" | "commission" | "service";
 export type VideoSubtype = "all" | "long-form" | "short-form";
@@ -25,22 +26,30 @@ export type FavoritesState = {
     listings: Record<string, true>;
 };
 
+export type StreamsState = {
+    twitchByLogin: Record<string, TwitchStream>;
+};
+
 export type HubState = {
     filters: HubFilters;
     favorites: FavoritesState;
+    streams: StreamsState;
 };
+
 
 type Action =
     | { type: "filters/set"; patch: Partial<HubFilters> }
     | { type: "filters/reset" }
     | { type: "favorites/toggleCreator"; handle: string }
-    | { type: "favorites/toggleListing"; id: string };
+    | { type: "favorites/toggleListing"; id: string }
+    | { type: "streams/twitchSet"; map: Record<string, TwitchStream> };
 
 export type HubActions = {
     setFilters: (patch: Partial<HubFilters>) => void;
     resetFilters: () => void;
     toggleFavoriteCreator: (handle: string) => void;
     toggleFavoriteListing: (id: string) => void;
+    setTwitchStreams: (map: Record<string, TwitchStream>) => void;
 };
 
 const HubStateContext = createContext<HubState | null>(null);
@@ -58,6 +67,7 @@ const initialState: HubState = {
         videoSubtype: "all",
     },
     favorites: { creators: {}, listings: {} },
+    streams: { twitchByLogin: {} },
 };
 
 const safeParseFavorites = (raw: string | null): FavoritesState | null => {
@@ -120,6 +130,12 @@ const reducer = (state: HubState, action: Action): HubState => {
             return { ...state, favorites: { ...state.favorites, listings: next } };
         }
 
+        case "streams/twitchSet":
+            return {
+                ...state,
+                streams: { ...state.streams, twitchByLogin: action.map },
+            };
+
         default:
             return state;
     }
@@ -144,6 +160,7 @@ const HubProvider = ({ children }: HubProviderProps) => {
                 dispatch({ type: "favorites/toggleCreator", handle }),
             toggleFavoriteListing: (id) =>
                 dispatch({ type: "favorites/toggleListing", id }),
+            setTwitchStreams: (map) => dispatch({ type: "streams/twitchSet", map }),
         }),
         []
     );
