@@ -9,7 +9,6 @@ import CreatorProfile from './pages/CreatorProfile';
 import Market from './pages/Market';
 import Listing from './pages/Listing';
 import NotFound from './pages/NotFound';
-import './styles/App.css';
 
 const App = () => {
   return (

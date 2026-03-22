@@ -1,17 +1,68 @@
-import { CATEGORIES } from "../domain/catalog";
+import { CATEGORIES, type CategoryKey } from "../domain/catalog";
 
 export const categories = CATEGORIES;
 
-export const creators = [
+export type Platform = "twitch" | "youtube";
+export type CommissionStatus = "open" | "limited" | "closed" | (string & {});
+
+export type Creator = {
+    handle: string;
+    displayName: string;
+    verified: boolean;
+    bio: string;
+    tags?: string[];
+    specialties?: CategoryKey[];
+    commissionStatus: CommissionStatus;
+    links?: {
+        twitch?: string;
+        youtube?: string;
+        discord?: string;
+        website?: string;
+    };
+    live?: {
+        isLive: boolean;
+        title?: string;
+        platform?: Platform;
+    };
+};
+
+export type OfferingType = "digital" | "commission" | "service";
+export type PriceType = "fixed" | "starting_at" | "range";
+export type VideoSubtype = "long-form" | "short-form";
+
+export type Listing = {
+    id: string;
+    creatorHandle: string;
+    offeringType: OfferingType;
+    category: string;
+
+    title: string;
+    short: string;
+    preview: string;
+
+    priceType: PriceType;
+    priceMin: number;
+    priceMax: number | null;
+
+    deliverables: string[];
+    featured?: boolean;
+
+    videoSubtype?: VideoSubtype;
+};
+
+export const creators: Creator[] = [
     {
         handle: "pixelpiper",
         displayName: "Pixel Piper",
         verified: true,
         bio: "Emotes + overlays with clean licensing and fast turnaround.",
         tags: ["emotes", "overlays", "cute", "pixel"],
-        specialties: ["emotes", "overlays"], // category keys
+        specialties: ["emotes", "overlays"],
         commissionStatus: "open",
-        links: { twitch: "https://twitch.tv/pixelpiper", youtube: "https://youtube.com/@pixelpiper" },
+        links: {
+            twitch: "https://twitch.tv/pixelpiper",
+            youtube: "https://youtube.com/@pixelpiper",
+        },
         live: { isLive: true, title: "Drawing emotes ✨", platform: "twitch" },
     },
     {
@@ -20,7 +71,7 @@ export const creators = [
         verified: true,
         bio: "PNG-tuber + VTuber model workflow and rigging support.",
         tags: ["pngtuber", "vtuber", "rigging"],
-        specialties: ["pngtuber-models", "vtuber-models", "vtuber-rigging"], // NEW
+        specialties: ["pngtuber-models", "vtuber-models", "vtuber-rigging"],
         commissionStatus: "limited",
         links: { youtube: "https://youtube.com/@rigmancer" },
         live: { isLive: false, title: "", platform: "youtube" },
@@ -49,11 +100,11 @@ export const creators = [
     },
 ];
 
-export const listings = [
+export const listings: Listing[] = [
     {
         id: "l1",
         creatorHandle: "pixelpiper",
-        offeringType: "digital",     // digital | commission | service
+        offeringType: "digital",
         category: "emotes",
         title: "Cozy Emote Pack (12)",
         priceType: "fixed",
@@ -97,7 +148,7 @@ export const listings = [
         creatorHandle: "cutsceneedits",
         offeringType: "service",
         category: "video-editing",
-        videoSubtype: "short-form", // clips | vods | short-form
+        videoSubtype: "short-form",
         title: "Short-form Edit (1–3 videos)",
         priceType: "starting_at",
         priceMin: 90,

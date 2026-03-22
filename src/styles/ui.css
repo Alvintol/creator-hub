@@ -2,25 +2,52 @@
 
 @layer base {
   :root {
-    --bg: 250 249 246;
-    --surface: 255 255 255;
-    --ink: 24 24 27;
-    --muted: 82 82 91;
+    /* Pastel palette */
+    --brand: 255 174 173; /* pink */
+    --accent: 255 214 166; /* peach */
+    --lemon: 253 255 182; /* yellow */
+    --mint: 203 255 191; /* green */
 
-    --brand: 244 92 44;
-    --accent: 142 121 255;
+    --ink: 24 24 27; /* zinc-900 */
+    --paper: 255 255 255; /* white */
   }
 
   body {
     color: rgb(var(--ink));
-    background: rgb(var(--bg));
+    background:
+      radial-gradient(
+        900px 480px at 10% 0%,
+        rgb(var(--lemon) / 0.6),
+        transparent 60%
+      ),
+      radial-gradient(
+        900px 480px at 90% 10%,
+        rgb(var(--mint) / 0.5),
+        transparent 60%
+      ),
+      radial-gradient(
+        900px 520px at 15% 95%,
+        rgb(var(--accent) / 0.4),
+        transparent 60%
+      ),
+      rgb(var(--paper));
+  }
+
+  a,
+  a:visited {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  button,
+  [role='button'] {
+    cursor: pointer;
   }
 }
 
 @layer components {
   .appShell {
     @apply min-h-screen;
-    background: rgb(var(--bg));
   }
 
   .container {
@@ -28,27 +55,144 @@
   }
 
   .topbar {
-    @apply sticky top-0 z-50 border-b border-zinc-200 bg-white/80 backdrop-blur;
+    @apply sticky top-0 z-50 border-b border-zinc-200/60 backdrop-blur shadow-sm;
+    background: linear-gradient(
+      90deg,
+      rgb(var(--lemon) / 0.22),
+      rgb(var(--paper) / 0.85),
+      rgb(var(--mint) / 0.2)
+    );
   }
 
   .subbar {
-    @apply border-b border-zinc-100 bg-white;
+    @apply border-b border-zinc-200/60;
+    background: rgb(var(--accent) / 0.22);
   }
 
   .card {
-    @apply rounded-2xl border border-zinc-200 bg-white shadow-sm;
+    @apply block rounded-3xl bg-white shadow-sm ring-1 ring-zinc-200/70 transition;
+  }
+  .card:hover {
+    @apply ring-zinc-300/70;
+    box-shadow: 0 18px 45px -20px rgb(0 0 0 / 0.28);
   }
 
-  .chip {
-    @apply rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-200;
-  }
-
+  /* Buttons */
   .btnPrimary {
-    @apply rounded-full px-4 py-2 text-sm font-bold text-white;
+    @apply inline-flex items-center justify-center gap-2 select-none
+      rounded-xl px-4 py-2 text-sm font-semibold transition
+      ring-1 border active:translate-y-[1px]
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+
     background: rgb(var(--brand));
+    color: rgb(var(--ink));
+
+    border-color: rgb(var(--ink) / 0.18);
+    --tw-ring-color: rgb(var(--ink) / 0.14);
+
+    box-shadow: 0 14px 28px -20px rgb(0 0 0 / 0.45);
+  }
+  .btnPrimary:hover {
+    filter: brightness(0.98);
+    border-color: rgb(var(--ink) / 0.26);
   }
 
+  .btnOutline {
+    @apply inline-flex items-center justify-center gap-2 select-none
+      rounded-xl px-4 py-2 text-sm font-semibold transition
+      ring-1 border active:translate-y-[1px]
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+
+    background: rgb(var(--paper));
+    color: rgb(var(--ink));
+
+    border-color: rgb(var(--ink) / 0.18);
+    --tw-ring-color: rgb(var(--ink) / 0.12);
+
+    box-shadow: 0 10px 22px -20px rgb(0 0 0 / 0.3);
+  }
+  .btnOutline:hover {
+    background: rgb(var(--accent) / 0.22);
+    border-color: rgb(var(--ink) / 0.26);
+  }
+
+  /* Inputs */
   .searchInput {
-    @apply w-full rounded-full border border-zinc-300 bg-zinc-50 px-4 py-2 text-sm outline-none;
+    @apply w-full rounded-xl bg-white px-4 py-2 text-sm outline-none transition ring-1
+      focus-visible:ring-2 focus-visible:outline-none;
+
+    --tw-ring-color: rgb(var(--ink) / 0.14);
+  }
+  .searchInput:focus-visible {
+    --tw-ring-color: rgb(var(--ink) / 0.28);
+  }
+
+  /* Site-wide chips (page chips) */
+  .chip {
+    @apply inline-flex items-center justify-center select-none
+      rounded-full px-3 py-1 text-xs font-semibold transition ring-1
+      active:translate-y-[1px]
+      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+
+    background: rgb(var(--lemon) / 0.55);
+    color: rgb(var(--ink));
+    --tw-ring-color: rgb(var(--ink) / 0.16);
+    box-shadow: 0 10px 22px -22px rgb(0 0 0 / 0.35);
+  }
+  .chip:hover {
+    background: rgb(var(--accent) / 0.45);
+    --tw-ring-color: rgb(var(--ink) / 0.22);
+    transform: translateY(-1px);
+  }
+
+  /* NAV browsing rail */
+  .categoryBar {
+    @apply border-b border-zinc-200/70;
+    background: rgb(var(--paper) / 0.7);
+  }
+  .categoryBarInner {
+    @apply mx-auto w-full max-w-6xl px-4 py-3;
+  }
+  .categoryRow {
+    @apply flex items-center gap-2 overflow-x-auto;
+    overflow-y: visible;
+    padding-top: 2px;
+    padding-bottom: 2px;
+  }
+  .categoryTitle {
+    @apply mr-1 shrink-0 text-xs font-extrabold tracking-wide uppercase;
+    color: rgb(var(--ink) / 0.7);
+  }
+
+  .navChip {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold transition;
+    background: rgb(var(--paper));
+    color: rgb(var(--ink));
+    border: 1px solid rgb(var(--ink) / 0.22);
+    box-shadow: 0 10px 22px -18px rgb(0 0 0 / 0.3);
+    position: relative;
+  }
+  .navChip:hover {
+    background: rgb(var(--accent) / 0.2);
+    border-color: rgb(var(--ink) / 0.3);
+    transform: translateY(-1px);
+    z-index: 10;
+  }
+  .navChipActive {
+    background: rgb(var(--brand) / 0.26);
+    border-color: rgb(var(--ink) / 0.32);
+  }
+
+  .linkPill {
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-extrabold transition;
+    background: rgb(var(--paper) / 0.78);
+    color: rgb(var(--ink));
+    border: 1px solid rgb(var(--ink) / 0.22);
+    box-shadow: 0 10px 22px -20px rgb(0 0 0 / 0.3);
+  }
+  .linkPill:hover {
+    background: rgb(var(--paper) / 0.92);
+    border-color: rgb(var(--ink) / 0.3);
+    transform: translateY(-1px);
   }
 }

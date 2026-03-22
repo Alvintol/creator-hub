@@ -7,9 +7,9 @@ import React, {
     ReactNode
 } from "react";
 
-type OfferingType = "all" | "digital" | "commission" | "service";
-type VideoSubtype = "all" | "long-form" | "short-form";
-type CategoryKey = "all" | string;
+export type OfferingType = "all" | "digital" | "commission" | "service";
+export type VideoSubtype = "all" | "long-form" | "short-form";
+export type CategoryKey = "all" | (string & {});
 
 export type HubFilters = {
     q: string;
@@ -65,7 +65,6 @@ const safeParseFavorites = (raw: string | null): FavoritesState | null => {
     try {
         const parsed = JSON.parse(raw) as unknown;
 
-        // light validation so we don't crash on corrupted storage
         if (
             typeof parsed === "object" &&
             parsed !== null &&
@@ -81,7 +80,10 @@ const safeParseFavorites = (raw: string | null): FavoritesState | null => {
                     ? (parsed as any).listings
                     : {};
 
-            return { creators, listings };
+            return {
+                creators: Object.fromEntries(Object.keys(creators).map((k) => [k, true])),
+                listings: Object.fromEntries(Object.keys(listings).map((k) => [k, true])),
+            };
         }
 
         return null;

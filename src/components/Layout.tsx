@@ -5,7 +5,7 @@ import Footer from './Footer';
 const classes = {
   shell: 'appShell',
   main: 'container',
-};
+} as const;
 
 const Layout = () => {
   return (
