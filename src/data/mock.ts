@@ -72,10 +72,10 @@ export const creators: Creator[] = [
         specialties: ["emotes", "overlays"],
         commissionStatus: "open",
         platforms: {
-            twitch: { login: "ArchmageFreya" }
+            twitch: { login: "Cheebiez" }
         },
         links: {
-            twitch: "https://twitch.tv/ArchmageFreya",
+            twitch: "https://twitch.tv/Cheebiez",
             youtube: "https://youtube.com/@pixelpiper",
         },
         live: { isLive: true, title: "Drawing emotes ✨", platform: "twitch" },

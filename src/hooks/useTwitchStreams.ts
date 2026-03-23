@@ -23,8 +23,6 @@ export const useTwitchStreams = () => {
     enabled: logins.length > 0,
 
     queryFn: async () => {
-      // If VITE_API_BASE is set, we hit the API server directly (no proxy required).
-      // Otherwise we rely on Vite proxy + same-origin.
       const base = (import.meta.env.VITE_API_BASE as string | undefined)?.trim();
       const origin = base && base.length > 0 ? base : window.location.origin;
 

@@ -195,4 +195,53 @@
     border-color: rgb(var(--ink) / 0.3);
     transform: translateY(-1px);
   }
+
+  /* TOP NAV pills (Market / Creators / Live) */
+  .navPill {
+    @apply inline-flex items-center select-none
+    rounded-xl px-3 py-1 text-sm font-semibold transition
+    active:translate-y-[1px]
+    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+    background: rgb(var(--paper) / 0.78);
+    color: rgb(var(--ink));
+    border: 1px solid rgb(var(--ink) / 0.22);
+    box-shadow: 0 10px 22px -20px rgb(0 0 0 / 0.28);
+    position: relative;
+  }
+
+  .navPill:hover {
+    background: rgb(var(--accent) / 0.18);
+    border-color: rgb(var(--ink) / 0.3);
+    transform: translateY(-1px);
+    z-index: 10;
+  }
+
+  .navPillActive {
+    background: rgb(var(--paper) / 0.92);
+    border-color: rgb(var(--ink) / 0.34);
+  }
+
+  .navPillHot {
+    background: rgb(var(--brand) / 0.24);
+    border-color: rgb(var(--ink) / 0.34);
+  }
+
+  .navPillCount {
+    @apply inline-flex items-center justify-center;
+    height: 18px;
+    min-width: 18px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgb(var(--brand));
+    color: rgb(var(--ink));
+    font-size: 11px;
+    font-weight: 900;
+    border: 1px solid rgb(var(--ink) / 0.22);
+  }
+
+  .navPillDot {
+    @apply h-2 w-2 rounded-full;
+    background: rgb(var(--brand));
+    opacity: 0.7;
+  }
 }
