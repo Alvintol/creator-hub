@@ -7,6 +7,7 @@ import {
 } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { CATEGORIES } from "../domain/catalog";
+import { useTwitchStreams } from "../hooks/useTwitchStreams";
 
 type CategoryLink = { key: string; label: string };
 
@@ -21,7 +22,7 @@ const classes = {
   searchInput: "searchInput",
   searchButton: "btnPrimary hidden sm:inline-flex",
 
-  nav: "hidden md:flex items-center gap-4",
+  nav: "hidden md:flex items-center gap-1",
   navLinkBase: "text-sm font-semibold",
   navLinkActive: "text-zinc-900",
   navLinkInactive: "text-zinc-700 hover:text-zinc-900",
@@ -42,8 +43,7 @@ const classes = {
 } as const;
 
 const navLinkClass: NavLinkProps["className"] = ({ isActive }) =>
-  `${classes.navLinkBase} ${
-    isActive ? classes.navLinkActive : classes.navLinkInactive
+  `${classes.navLinkBase} ${isActive ? classes.navLinkActive : classes.navLinkInactive
   }`;
 
 const getMarketUrl = (q: string) => {
@@ -56,10 +56,25 @@ const Nav = () => {
   const { search } = useLocation();
   const [q, setQ] = useState("");
 
+  const { twitchByLogin, isFetching } = useTwitchStreams();
+
+  const liveCount = useMemo(() => {
+    return Object.keys(twitchByLogin).length;
+  }, [twitchByLogin]);
+
   const activeCat = useMemo(() => {
     const p = new URLSearchParams(search);
     return p.get("cat") ?? "";
   }, [search]);
+
+  const pillClass = (isActive: boolean) => {
+    return `navPill ${isActive ? "navPillActive" : ""}`.trim();
+  };
+
+  const livePillClass = (isActive: boolean) => {
+    if (isActive) return "navPill navPillActive";
+    return `navPill ${liveCount > 0 ? "navPillHot" : ""}`.trim();
+  };
 
   const categoryLinks = useMemo<CategoryLink[]>(
     () => CATEGORIES.map((c: any) => ({ key: String(c.key), label: String(c.label) })),
@@ -98,9 +113,23 @@ const Nav = () => {
         </form>
 
         <nav className={classes.nav}>
-          <NavLink to="/market" className={navLinkClass}>Market</NavLink>
-          <NavLink to="/creators" className={navLinkClass}>Creators</NavLink>
-          <NavLink to="/live" className={navLinkClass}>Live</NavLink>
+          <NavLink to="/market" className={({ isActive }) => pillClass(isActive)}>
+            Market
+          </NavLink>
+
+          <NavLink to="/creators" className={({ isActive }) => pillClass(isActive)}>
+            Creators
+          </NavLink>
+
+          <NavLink to="/live" className={({ isActive }) => livePillClass(isActive)}>
+            <span className="inline-flex items-center gap-2">
+              <span>Live</span>
+
+              {liveCount > 0 && <span className="navPillCount">{liveCount}</span>}
+
+              {isFetching && <span className="navPillDot animate-pulse" />}
+            </span>
+          </NavLink>
         </nav>
       </div>
 

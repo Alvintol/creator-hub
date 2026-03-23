@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import FavouriteButton from "./FavouriteButton";
 import type { Creator } from "../data/mock";
-import { useHubState } from "../providers/HubProvider";
 import { normalizeTwitchLogin } from "../domain/twitch";
+import { useTwitchStreams } from "../hooks/useTwitchStreams";
 
 const classes = {
   card: "group relative rounded-2xl border border-zinc-200 bg-white p-4 hover:bg-zinc-50",
@@ -37,11 +37,10 @@ type CreatorCardProps = {
 const CreatorCard = (props: CreatorCardProps) => {
   const { creator } = props;
 
-  const { streams } = useHubState();
-
-  const twitchLoginRaw = creator.platforms?.twitch?.login;
-  const twitchLogin = twitchLoginRaw ? normalizeTwitchLogin(twitchLoginRaw) : null;
-  const isLive = !!(twitchLogin && streams.twitchByLogin[twitchLogin]);
+  const { twitchByLogin } = useTwitchStreams();
+  const loginRaw = creator.platforms?.twitch?.login;
+  const login = loginRaw ? normalizeTwitchLogin(loginRaw) : null;
+  const isLive = !!(login && twitchByLogin[login]);
 
   const commissionClass = `${classes.statusBase} ${getCommissionStatusClass(
     creator.commissionStatus

@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { creators, type Creator, type PlatformName } from "../data/mock";
 import { CATEGORIES, type CategoryKey } from "../domain/catalog";
-import { useHubActions, useHubState } from "../providers/HubProvider";
 import { normalizeTwitchLogin, type TwitchStream } from "../domain/twitch";
+import { useTwitchStreams } from "../hooks/useTwitchStreams";
 
 type PlatformFilter = "all" | PlatformName;
-
-const REFRESH_MS = 60_000;
-const FOCUS_COOLDOWN_MS = 15_000;
 
 const classes = {
   page: "space-y-5",
@@ -63,105 +60,16 @@ const Live = () => {
   const [q, setQ] = useState("");
   const [platform, setPlatform] = useState<PlatformFilter>("all");
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const { streams } = useHubState();
-  const { setTwitchStreams } = useHubActions();
-
-  const twitchLogins = useMemo(() => {
-    const set = new Set<string>();
-
-    creators.forEach((c) => {
-      const login = c.platforms?.twitch?.login;
-      if (!login) return;
-      set.add(normalizeTwitchLogin(login));
-    });
-
-    return Array.from(set).sort();
-  }, []);
-
-  useEffect(() => {
-    if (twitchLogins.length === 0) return;
-
-    const ctrl = new AbortController();
-    const lastRefreshRef = { current: 0 };
-    const inFlightRef = { current: false };
-
-    const refresh = async (opts?: { force?: boolean }) => {
-      const force = !!opts?.force;
-      const now = Date.now();
-
-      if (!force) {
-        if (inFlightRef.current) return;
-        if (now - lastRefreshRef.current < FOCUS_COOLDOWN_MS) return;
-      }
-
-      inFlightRef.current = true;
-      lastRefreshRef.current = now;
-
-      try {
-        setError(null);
-        setLoading(true);
-
-        const url = `/api/twitch/streams?logins=${encodeURIComponent(
-          twitchLogins.join(","),
-        )}`;
-
-        const r = await fetch(url, { signal: ctrl.signal });
-        const json = (await r.json()) as { data: TwitchStream[]; error?: string };
-
-        if (!r.ok) {
-          setError(json?.error || "Failed to load Twitch live status.");
-          setTwitchStreams({});
-          return;
-        }
-
-        const map: Record<string, TwitchStream> = {};
-        (json.data ?? []).forEach((s) => {
-          map[normalizeTwitchLogin(s.login)] = s;
-        });
-
-        setTwitchStreams(map);
-      } catch (err) {
-        const name = (err as { name?: string } | null)?.name;
-        if (name === "AbortError") return;
-        setError("Failed to load Twitch live status.");
-      } finally {
-        inFlightRef.current = false;
-        setLoading(false);
-      }
-    };
-
-    refresh({ force: true });
-
-    const intervalId = window.setInterval(() => {
-      refresh();
-    }, REFRESH_MS);
-
-    const onFocus = () => {
-      refresh();
-    };
-    window.addEventListener("focus", onFocus);
-
-    return () => {
-      window.clearInterval(intervalId);
-      window.removeEventListener("focus", onFocus);
-      ctrl.abort();
-    };
-  }, [twitchLogins, setTwitchStreams]);
+  const { twitchByLogin, isFetching, error } = useTwitchStreams();
 
   const liveNow = useMemo(() => {
     const s = q.trim().toLowerCase();
 
     return creators
       .map((c) => {
-        const login = c.platforms?.twitch?.login
-          ? normalizeTwitchLogin(c.platforms.twitch.login)
-          : undefined;
-
-        const stream = login ? streams.twitchByLogin[login] : undefined;
-
+        const loginRaw = c.platforms?.twitch?.login;
+        const login = loginRaw ? normalizeTwitchLogin(loginRaw) : undefined;
+        const stream = login ? twitchByLogin[login] : undefined;
         return { creator: c, stream };
       })
       .filter(({ stream }) => !!stream)
@@ -169,17 +77,24 @@ const Live = () => {
       .filter(({ creator, stream }) =>
         s ? getSearchHaystack(creator, stream).includes(s) : true,
       );
-  }, [q, platform, streams.twitchByLogin]);
+  }, [q, platform, twitchByLogin]);
 
   const onPlatformChange = (e: ChangeEvent<HTMLSelectElement>) =>
     setPlatform(e.currentTarget.value as PlatformFilter);
+
+  const errorMsg =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message: unknown }).message)
+      : error
+        ? String(error)
+        : null;
 
   return (
     <div className={classes.page}>
       <div className={classes.headerWrap}>
         <h1 className={classes.h1}>Live now</h1>
         <p className={classes.subtitle}>
-          Real-time Twitch live status. {loading ? "Refreshing…" : ""}
+          Real-time Twitch live status. {isFetching ? "Refreshing…" : ""}
         </p>
       </div>
 
@@ -200,10 +115,12 @@ const Live = () => {
         </select>
       </div>
 
-      {error && (
+      {errorMsg && (
         <div className="card p-4 border border-[rgb(var(--ink)/0.18)] bg-[rgb(var(--accent)/0.20)]">
-          <div className="text-sm font-semibold text-zinc-900">Live status unavailable</div>
-          <div className="mt-1 text-sm text-zinc-700">{error}</div>
+          <div className="text-sm font-semibold text-zinc-900">
+            Live status unavailable
+          </div>
+          <div className="mt-1 text-sm text-zinc-700">{errorMsg}</div>
         </div>
       )}
 
