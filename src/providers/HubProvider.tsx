@@ -28,6 +28,9 @@ export type FavoritesState = {
 
 export type StreamsState = {
     twitchByLogin: Record<string, TwitchStream>;
+    twitchLoading: boolean;
+    twitchError: string | null;
+    twitchUpdatedAt: number | null;
 };
 
 export type HubState = {
@@ -36,20 +39,24 @@ export type HubState = {
     streams: StreamsState;
 };
 
-
 type Action =
     | { type: "filters/set"; patch: Partial<HubFilters> }
     | { type: "filters/reset" }
     | { type: "favorites/toggleCreator"; handle: string }
     | { type: "favorites/toggleListing"; id: string }
-    | { type: "streams/twitchSet"; map: Record<string, TwitchStream> };
+    | { type: "streams/twitchSet"; map: Record<string, TwitchStream> }
+    | { type: "streams/twitchMeta"; patch: Partial<Omit<StreamsState, "twitchByLogin">> };
 
 export type HubActions = {
     setFilters: (patch: Partial<HubFilters>) => void;
     resetFilters: () => void;
     toggleFavoriteCreator: (handle: string) => void;
     toggleFavoriteListing: (id: string) => void;
+
     setTwitchStreams: (map: Record<string, TwitchStream>) => void;
+    setTwitchStreamsMeta: (
+        patch: Partial<Omit<StreamsState, "twitchByLogin">>
+    ) => void;
 };
 
 const HubStateContext = createContext<HubState | null>(null);
@@ -67,7 +74,12 @@ const initialState: HubState = {
         videoSubtype: "all",
     },
     favorites: { creators: {}, listings: {} },
-    streams: { twitchByLogin: {} },
+    streams: {
+        twitchByLogin: {},
+        twitchLoading: false,
+        twitchError: null,
+        twitchUpdatedAt: null,
+    },
 };
 
 const safeParseFavorites = (raw: string | null): FavoritesState | null => {
@@ -136,6 +148,12 @@ const reducer = (state: HubState, action: Action): HubState => {
                 streams: { ...state.streams, twitchByLogin: action.map },
             };
 
+        case "streams/twitchMeta":
+            return {
+                ...state,
+                streams: { ...state.streams, ...action.patch },
+            };
+
         default:
             return state;
     }
@@ -160,7 +178,10 @@ const HubProvider = ({ children }: HubProviderProps) => {
                 dispatch({ type: "favorites/toggleCreator", handle }),
             toggleFavoriteListing: (id) =>
                 dispatch({ type: "favorites/toggleListing", id }),
+
             setTwitchStreams: (map) => dispatch({ type: "streams/twitchSet", map }),
+            setTwitchStreamsMeta: (patch) =>
+                dispatch({ type: "streams/twitchMeta", patch }),
         }),
         []
     );

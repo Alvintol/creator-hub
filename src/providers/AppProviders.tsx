@@ -1,13 +1,21 @@
 import type { ReactNode } from "react";
 import HubProvider from "./HubProvider";
+import { useTwitchStreamsRefresh } from "../hooks/useTwitchStreamsRefresh";
 
-type AppProvidersProps = {
-  children: ReactNode;
+type Props = { children: ReactNode };
+
+const ProviderEffects = () => {
+  useTwitchStreamsRefresh();
+  return null;
 };
 
-const AppProviders = (props: AppProvidersProps) => {
-  const { children } = props;
-  return <HubProvider>{children}</HubProvider>;
+const AppProviders = ({ children }: Props) => {
+  return (
+    <HubProvider>
+      <ProviderEffects />
+      {children}
+    </HubProvider>
+  );
 };
 
 export default AppProviders;
