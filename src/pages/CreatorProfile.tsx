@@ -1,5 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { creators, listings, type Creator, type Listing } from "../data/mock";
+import { normalizeTwitchLogin } from "../domain/twitch";
+import { useTwitchStreams } from "../hooks/useTwitchStreams";
 
 const classes = {
   container: "space-y-8",
@@ -46,7 +48,7 @@ const getCreatorByHandle = (handle: string): Creator | undefined => {
 
 const getListingsByCreatorHandle = (handle: string): Listing[] => {
   return listings.filter((l) => l.creatorHandle === handle);
-}
+};
 
 type CreatorLinkButtonProps = {
   href: string;
@@ -100,6 +102,7 @@ const CreatorNotFound = () => {
 
 const CreatorProfile = () => {
   const { handle } = useParams<{ handle: string }>();
+  const { twitchByLogin } = useTwitchStreams();
 
   if (!handle) return <CreatorNotFound />;
 
@@ -107,6 +110,15 @@ const CreatorProfile = () => {
   if (!creator) return <CreatorNotFound />;
 
   const creatorListings = getListingsByCreatorHandle(handle);
+
+  const twitchLoginRaw = creator.platforms?.twitch?.login;
+  const twitchLogin = twitchLoginRaw ? normalizeTwitchLogin(twitchLoginRaw) : null;
+  const stream = twitchLogin ? twitchByLogin[twitchLogin] : undefined;
+  const isLive = !!stream;
+
+  const watchUrl =
+    creator.links?.twitch ??
+    (twitchLogin ? `https://twitch.tv/${encodeURIComponent(twitchLogin)}` : undefined);
 
   return (
     <div className={classes.container}>
@@ -120,15 +132,20 @@ const CreatorProfile = () => {
 
           {!!creator.verified && <span className={classes.badgeVerified}>Verified</span>}
 
-          {!!creator.live?.isLive && <span className={classes.badgeLive}>Live</span>}
+          {isLive && <span className={classes.badgeLive}>Live</span>}
         </div>
 
         <p className={classes.bio}>{creator.bio}</p>
 
         <div className={classes.linksRow}>
-          {creator.links?.twitch && (
-            <CreatorLinkButton href={creator.links.twitch} label="Twitch" variant="primary" />
+          {watchUrl && (
+            <CreatorLinkButton
+              href={watchUrl}
+              label={isLive ? "Watch live on Twitch" : "Twitch"}
+              variant="primary"
+            />
           )}
+
           {creator.links?.youtube && (
             <CreatorLinkButton href={creator.links.youtube} label="YouTube" />
           )}
@@ -140,9 +157,11 @@ const CreatorProfile = () => {
           )}
         </div>
 
-        {!!creator.live?.isLive && !!creator.live?.title && (
+        {isLive && (
           <p className={classes.liveLine}>
-            <span className={classes.liveLabel}>Live:</span> {creator.live.title}
+            <span className={classes.liveLabel}>Live:</span> {stream?.title ?? ""}{" "}
+            <span className="text-zinc-400">•</span> {stream?.gameName ?? ""}{" "}
+            <span className="text-zinc-400">•</span> {stream?.viewerCount ?? 0} viewers
           </p>
         )}
       </section>
