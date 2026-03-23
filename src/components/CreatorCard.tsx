@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import FavouriteButton from "./FavouriteButton";
 import type { Creator } from "../data/mock";
+import { useHubState } from "../providers/HubProvider";
+import { normalizeTwitchLogin } from "../domain/twitch";
 
 const classes = {
   card: "group relative rounded-2xl border border-zinc-200 bg-white p-4 hover:bg-zinc-50",
@@ -26,7 +28,7 @@ const getCommissionStatusClass = (status: Creator["commissionStatus"]): string =
   if (status === "open") return "text-emerald-600";
   if (status === "limited") return "text-amber-700";
   return "text-rose-700";
-}
+};
 
 type CreatorCardProps = {
   creator: Creator;
@@ -34,6 +36,12 @@ type CreatorCardProps = {
 
 const CreatorCard = (props: CreatorCardProps) => {
   const { creator } = props;
+
+  const { streams } = useHubState();
+
+  const twitchLoginRaw = creator.platforms?.twitch?.login;
+  const twitchLogin = twitchLoginRaw ? normalizeTwitchLogin(twitchLoginRaw) : null;
+  const isLive = !!(twitchLogin && streams.twitchByLogin[twitchLogin]);
 
   const commissionClass = `${classes.statusBase} ${getCommissionStatusClass(
     creator.commissionStatus
@@ -49,12 +57,10 @@ const CreatorCard = (props: CreatorCardProps) => {
         <h3 className={classes.h3}>{creator.displayName}</h3>
 
         {!!creator.verified && (
-          <span className={`${classes.badgeBase} ${classes.badgeVerified}`}>
-            Verified
-          </span>
+          <span className={`${classes.badgeBase} ${classes.badgeVerified}`}>Verified</span>
         )}
 
-        {!!creator.live?.isLive && (
+        {isLive && (
           <span className={`${classes.badgeBase} ${classes.badgeLive}`}>Live</span>
         )}
       </div>
@@ -62,9 +68,7 @@ const CreatorCard = (props: CreatorCardProps) => {
       <p className={classes.bio}>{creator.bio}</p>
 
       <div className={classes.metaRow}>
-        <span className={commissionClass}>
-          Commissions: {creator.commissionStatus}
-        </span>
+        <span className={commissionClass}>Commissions: {creator.commissionStatus}</span>
 
         <div className={classes.tagsWrap}>
           {(creator.tags ?? []).slice(0, 4).map((t) => (
