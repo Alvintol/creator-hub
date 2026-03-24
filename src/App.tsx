@@ -10,6 +10,7 @@ import Market from './pages/Market';
 import Listing from './pages/Listing';
 import NotFound from './pages/NotFound';
 import About from "./pages/About";
+import SignIn from "./pages/SignIn";
 
 const App = () => {
   return (
@@ -18,6 +19,7 @@ const App = () => {
       <Routes>
         <Route element={<Layout />}>
           <Route path='/' element={<Home />} />
+          <Route path="/signin" element={<SignIn />} />
           <Route path='/about' element={<About />} />
           <Route path='/live' element={<Live />} />
           <Route path='/creators' element={<Creators />} />
