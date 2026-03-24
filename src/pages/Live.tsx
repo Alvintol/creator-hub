@@ -148,36 +148,69 @@ const Live = () => {
               "";
 
             return (
-              <Link key={creator.handle} to={`/creator/${creator.handle}`} className={classes.card}>
-                {!!thumb && (
-                  <img
-                    src={thumb}
-                    alt=""
-                    className="mb-3 h-40 w-full rounded-2xl object-cover"
-                    loading="lazy"
-                  />
-                )}
+              <div key={creator.handle} className={classes.card}>
+                {/* Make only the media/content area clickable to profile */}
+                <Link to={`/creator/${creator.handle}`} className="block">
+                  {!!thumb && (
+                    <img
+                      src={thumb}
+                      alt=""
+                      className="mb-3 h-40 w-full rounded-2xl object-cover"
+                      loading="lazy"
+                    />
+                  )}
 
-                <div className={classes.topRow}>
-                  <div className={classes.name}>{creator.displayName}</div>
-                  <span className={classes.badgeLive}>Live</span>
-                </div>
-
-                <p className={classes.title}>{stream?.title ?? ""}</p>
-                <p className={classes.meta}>
-                  {stream?.gameName ?? ""} • {stream?.viewerCount ?? 0} viewers
-                </p>
-
-                {!!creator.specialties?.length && (
-                  <div className={classes.specialtiesRow}>
-                    {creator.specialties.slice(0, 4).map((k) => (
-                      <span key={k} className={classes.specPill}>
-                        {categoryLabel(k)}
-                      </span>
-                    ))}
+                  <div className={classes.topRow}>
+                    <div className={classes.name}>{creator.displayName}</div>
+                    <span className={classes.badgeLive}>Live</span>
                   </div>
-                )}
-              </Link>
+
+                  <p className={classes.title}>{stream?.title ?? ""}</p>
+                  <p className={classes.meta}>
+                    {stream?.gameName ?? ""} • {stream?.viewerCount ?? 0} viewers
+                  </p>
+
+                  {!!creator.specialties?.length && (
+                    <div className={classes.specialtiesRow}>
+                      {creator.specialties.slice(0, 4).map((k) => (
+                        <span key={k} className={classes.specPill}>
+                          {categoryLabel(k)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </Link>
+
+                {/* Actions row (separate from the Link above) */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link to={`/creator/${creator.handle}`} className="btnOutline">
+                    View profile
+                  </Link>
+
+                  <a
+                    className="btnPrimary"
+                    href={
+                      creator.links?.twitch ??
+                      (creator.platforms?.twitch?.login
+                        ? `https://twitch.tv/${encodeURIComponent(
+                          normalizeTwitchLogin(creator.platforms.twitch.login),
+                        )}`
+                        : "#")
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Watch ${creator.displayName} live on Twitch`}
+                    onClick={(e) => {
+                      // If no twitch info, prevent weird navigation
+                      if (!creator.links?.twitch && !creator.platforms?.twitch?.login) {
+                        e.preventDefault();
+                      }
+                    }}
+                  >
+                    Watch live
+                  </a>
+                </div>
+              </div>
             );
           })}
         </div>

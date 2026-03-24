@@ -158,11 +158,26 @@ const CreatorProfile = () => {
         </div>
 
         {isLive && (
-          <p className={classes.liveLine}>
-            <span className={classes.liveLabel}>Live:</span> {stream?.title ?? ""}{" "}
-            <span className="text-zinc-400">•</span> {stream?.gameName ?? ""}{" "}
-            <span className="text-zinc-400">•</span> {stream?.viewerCount ?? 0} viewers
-          </p>
+          <div className="mt-4 overflow-hidden rounded-3xl border border-zinc-200 bg-white">
+            <img
+              src={
+                (stream?.thumbnailUrl ?? "")
+                  .replace("{width}", "960")
+                  .replace("{height}", "540")
+              }
+              alt=""
+              className="h-56 w-full object-cover"
+              loading="lazy"
+            />
+            <div className="p-4">
+              <div className="text-sm font-extrabold text-zinc-900">
+                {stream?.gameName ?? ""}
+                <span className="text-zinc-400"> • </span>
+                {stream?.viewerCount ?? 0} viewers
+              </div>
+              {!!stream?.title && <p className="mt-1 text-sm text-zinc-600">{stream.title}</p>}
+            </div>
+          </div>
         )}
       </section>
 
