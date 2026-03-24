@@ -1,6 +1,9 @@
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { creators, listings, type Creator, type Listing } from "../data/mock";
 import { CATEGORIES } from "../domain/catalog";
+import { normalizeTwitchLogin, type TwitchStream } from "../domain/twitch";
+import { useTwitchStreams } from "../hooks/useTwitchStreams";
 
 const classes = {
   page: "space-y-10",
@@ -55,38 +58,31 @@ const classes = {
 
 const categoryLabel = (key: string): string => {
   return CATEGORIES.find((c: any) => c.key === key)?.label ?? key;
-}
+};
 
 const offeringPill = (offeringType: Listing["offeringType"]): string => {
   if (offeringType === "digital") return "Digital";
   if (offeringType === "commission") return "Commission";
   if (offeringType === "service") return "Service";
   return String(offeringType ?? "");
-}
+};
 
 const priceText = (l: Listing): string => {
   if (l.priceType === "fixed") return `$${l.priceMin}`;
   if (l.priceType === "starting_at") return `From $${l.priceMin}`;
   if (l.priceType === "range") return `$${l.priceMin}–$${l.priceMax ?? l.priceMin}`;
   return "";
-}
+};
 
 const getBadgeClassName = (variant: "default" | "featured" | "live"): string => {
   if (variant === "featured") return `${classes.badgeBase} ${classes.badgeFeatured}`;
   if (variant === "live") return `${classes.badgeBase} ${classes.badgeLive}`;
   return `${classes.badgeBase} ${classes.badgeDefault}`;
-}
-
-const byHandle = Object.fromEntries(creators.map((c) => [c.handle, c])) as Record<
-  string,
-  Creator
->;
-
-type SectionHeaderProps = {
-  title: string;
-  to: string;
-  linkText: string;
 };
+
+const byHandle = Object.fromEntries(creators.map((c) => [c.handle, c])) as Record<string, Creator>;
+
+type SectionHeaderProps = { title: string; to: string; linkText: string };
 
 const SectionHeader = (props: SectionHeaderProps) => {
   const { title, to, linkText } = props;
@@ -105,9 +101,7 @@ const HeroSection = () => {
   return (
     <section className={classes.cardLg}>
       <div className={classes.heroMax}>
-        <h1 className={classes.heroH1}>
-          CreatorHub — assets & services, in one trusted place.
-        </h1>
+        <h1 className={classes.heroH1}>CreatorHub — assets & services, in one trusted place.</h1>
         <p className={classes.heroP}>
           Find emote artists, overlay designers, PNG/VTuber creators, riggers, editors, and audio help —
           with clear categories and “Live now” discovery.
@@ -182,10 +176,7 @@ const FeaturedListingCard = (props: FeaturedListingCardProps) => {
         <p className={classes.featuredShort}>{listing.short}</p>
 
         <div className={classes.featuredBy}>
-          by{" "}
-          <span className={classes.featuredByName}>
-            {c?.displayName ?? listing.creatorHandle}
-          </span>
+          by <span className={classes.featuredByName}>{c?.displayName ?? listing.creatorHandle}</span>
         </div>
       </div>
     </Link>
@@ -210,41 +201,73 @@ const FeaturedSection = (props: FeaturedSectionProps) => {
   );
 };
 
-type LiveCreatorCardProps = { creator: Creator };
+type LiveNowItem = { creator: Creator; stream: TwitchStream };
+
+type LiveCreatorCardProps = LiveNowItem;
 
 const LiveCreatorCard = (props: LiveCreatorCardProps) => {
-  const { creator } = props;
+  const { creator, stream } = props;
+
+  const thumb =
+    stream.thumbnailUrl
+      ?.replace("{width}", "640")
+      .replace("{height}", "360") ?? "";
 
   return (
     <Link to={`/creator/${creator.handle}`} className={classes.card}>
+      {!!thumb && (
+        <img
+          src={thumb}
+          alt=""
+          className="mb-3 h-40 w-full rounded-2xl object-cover"
+          loading="lazy"
+        />
+      )}
+
       <div className={classes.liveRow}>
         <div className={classes.liveTitle}>{creator.displayName}</div>
 
-        {creator.verified && <span className={getBadgeClassName("default")}>Verified</span>}
+        {!!creator.verified && <span className={getBadgeClassName("default")}>Verified</span>}
         <span className={getBadgeClassName("live")}>Live</span>
       </div>
 
-      <p className={classes.liveDesc}>{creator.live?.title ?? ""}</p>
-      <p className={classes.liveMeta}>Platform: {creator.live?.platform ?? ""}</p>
+      <p className={classes.liveDesc}>{stream.title ?? ""}</p>
+
+      <p className={classes.liveMeta}>
+        Twitch • {stream.viewerCount ?? 0} viewers{stream.gameName ? ` • ${stream.gameName}` : ""}
+      </p>
     </Link>
   );
 };
 
-type LiveNowSectionProps = { liveNow: Creator[] };
+type LiveNowSectionProps = {
+  liveNow: LiveNowItem[];
+  isFetching: boolean;
+  errorMsg: string | null;
+};
 
 const LiveNowSection = (props: LiveNowSectionProps) => {
-  const { liveNow } = props;
+  const { liveNow, isFetching, errorMsg } = props;
 
   return (
     <section className={classes.section}>
       <SectionHeader title="Live now" to="/live" linkText="View all →" />
 
+      {errorMsg && (
+        <div className="card p-4 border border-[rgb(var(--ink)/0.18)] bg-[rgb(var(--accent)/0.20)]">
+          <div className="text-sm font-semibold text-zinc-900">Live status unavailable</div>
+          <div className="mt-1 text-sm text-zinc-700">{errorMsg}</div>
+        </div>
+      )}
+
       {liveNow.length === 0 ? (
-        <p className={classes.emptyText}>No one is live right now.</p>
+        <p className={classes.emptyText}>
+          {isFetching ? "Checking live status…" : "No one is live right now."}
+        </p>
       ) : (
         <div className={classes.grid}>
-          {liveNow.slice(0, 6).map((c) => (
-            <LiveCreatorCard key={c.handle} creator={c} />
+          {liveNow.slice(0, 6).map(({ creator, stream }) => (
+            <LiveCreatorCard key={creator.handle} creator={creator} stream={stream} />
           ))}
         </div>
       )}
@@ -253,7 +276,26 @@ const LiveNowSection = (props: LiveNowSectionProps) => {
 };
 
 const Home = () => {
-  const liveNow = creators.filter((c) => !!c.live?.isLive);
+  const { twitchByLogin, isFetching, error } = useTwitchStreams();
+
+  const errorMsg =
+    error && typeof error === "object" && "message" in error
+      ? String((error as { message: unknown }).message)
+      : error
+        ? String(error)
+        : null;
+
+  const liveNow = useMemo<LiveNowItem[]>(() => {
+    return creators
+      .map((creator) => {
+        const loginRaw = creator.platforms?.twitch?.login;
+        const login = loginRaw ? normalizeTwitchLogin(loginRaw) : null;
+        const stream = login ? twitchByLogin[login] : undefined;
+        return stream ? { creator, stream } : null;
+      })
+      .filter((v): v is LiveNowItem => !!v)
+      .sort((a, b) => (b.stream.viewerCount ?? 0) - (a.stream.viewerCount ?? 0));
+  }, [twitchByLogin]);
 
   const featured = listings.filter((l) => !!l.featured);
   const featuredListings = featured.length ? featured.slice(0, 6) : listings.slice(0, 6);
@@ -262,7 +304,7 @@ const Home = () => {
     <div className={classes.page}>
       <HeroSection />
       <FeaturedSection featuredListings={featuredListings} />
-      <LiveNowSection liveNow={liveNow} />
+      <LiveNowSection liveNow={liveNow} isFetching={isFetching} errorMsg={errorMsg} />
     </div>
   );
 };

@@ -64,21 +64,20 @@ export type Listing = {
 
 export const creators: Creator[] = [
     {
-        handle: "pixelpiper",
-        displayName: "Pixel Piper",
+        handle: "Amatrine",
+        displayName: "Amatrine",
         verified: true,
-        bio: "Emotes + overlays with clean licensing and fast turnaround.",
-        tags: ["emotes", "overlays", "cute", "pixel"],
+        bio: "I'm a freelance artist from Ottawa, Canada who works on emote and other Twitch asset design, film editing, video game design, painting and probably other things",
+        tags: ["emotes", "overlays", "cute", "asset design", "film editing", "video game design", "painting"],
         specialties: ["emotes", "overlays"],
         commissionStatus: "open",
         platforms: {
-            twitch: { login: "Cheebiez" }
+            twitch: { login: "Amatrine" }
         },
         links: {
-            twitch: "https://twitch.tv/Cheebiez",
-            youtube: "https://youtube.com/@pixelpiper",
+            twitch: "https://twitch.tv/Amatrine",
+            youtube: "https://youtube.com/@Amatrine",
         },
-        live: { isLive: true, title: "Drawing emotes ✨", platform: "twitch" },
     },
     {
         handle: "rigmancer",
@@ -89,21 +88,19 @@ export const creators: Creator[] = [
         specialties: ["pngtuber-models", "vtuber-models", "vtuber-rigging"],
         commissionStatus: "limited",
         links: { youtube: "https://youtube.com/@rigmancer" },
-        live: { isLive: false, title: "", platform: "youtube" },
     },
     {
-        handle: "monzterman",
-        displayName: "MonzterMan",
+        handle: "jaQUILLyn",
+        displayName: "jaQUILLyn",
         verified: true,
         bio: "Clips/VOD/Short-form editing + captions + pacing.",
         tags: ["editing", "shorts", "captions"],
         specialties: ["video-editing"],
         commissionStatus: "open",
         platforms: {
-            twitch: { login: "monzterman" }
+            twitch: { login: "jaQUILLyn" }
         },
-        links: { twitch: "https://twitch.tv/monzterman" },
-        live: { isLive: true, title: "Editing shorts", platform: "youtube" },
+        links: { twitch: "https://twitch.tv/jaQUILLyn" },
     },
     {
         handle: "audionerd",
@@ -114,7 +111,6 @@ export const creators: Creator[] = [
         specialties: ["audio-tech-help"],
         commissionStatus: "open",
         links: { twitch: "https://twitch.tv/audionerd" },
-        live: { isLive: false, title: "", platform: "twitch" },
     },
 ];
 
