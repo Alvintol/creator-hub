@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import crypto from "crypto";
+import { createClient } from "@supabase/supabase-js";
 
 const app = express();
 
@@ -8,12 +10,28 @@ const PORT = Number(process.env.PORT || 8787);
 const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID || "";
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET || "";
 
+const TWITCH_REDIRECT_URI = process.env.TWITCH_REDIRECT_URI || "";
+const APP_ORIGIN = process.env.APP_ORIGIN || "http://localhost:5173";
+
+const SUPABASE_URL = process.env.SUPABASE_URL || "";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const OAUTH_STATE_SECRET = process.env.OAUTH_STATE_SECRET || "";
+
+const supabaseAdmin =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    : null;
+
 // Allow local dev. If you use Vite proxy, CORS won’t matter much.
 app.use(
   cors({
     origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    methods: ["GET", "POST"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
@@ -109,6 +127,118 @@ const getOrSetInflight = async (cache, inflight, key, ttlMs, maxEntries, fetcher
   } finally {
     inflight.delete(key);
   }
+};
+
+const getBearerToken = (req) => {
+  const h = String(req.headers.authorization || "");
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  return m ? m[1] : null;
+};
+
+const requireSupabaseUserId = async (req) => {
+  if (!supabaseAdmin) throw new Error("Supabase admin not configured");
+
+  const token = getBearerToken(req);
+  if (!token) throw new Error("Missing Authorization bearer token");
+
+  const { data, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !data?.user?.id) throw new Error("Invalid session");
+
+  return data.user.id;
+};
+
+const signState = (payload) => {
+  if (!OAUTH_STATE_SECRET) throw new Error("OAUTH_STATE_SECRET missing");
+
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const sig = crypto
+    .createHmac("sha256", OAUTH_STATE_SECRET)
+    .update(data)
+    .digest("base64url");
+
+  return `${data}.${sig}`;
+};
+
+const verifyState = (state) => {
+  if (!OAUTH_STATE_SECRET) throw new Error("OAUTH_STATE_SECRET missing");
+
+  const [data, sig] = String(state || "").split(".");
+  if (!data || !sig) throw new Error("Bad state");
+
+  const expected = crypto
+    .createHmac("sha256", OAUTH_STATE_SECRET)
+    .update(data)
+    .digest("base64url");
+
+  if (sig !== expected) throw new Error("State signature mismatch");
+
+  const payload = JSON.parse(Buffer.from(data, "base64url").toString("utf8"));
+  if (!payload?.uid || !payload?.exp) throw new Error("Bad state payload");
+  if (Date.now() > payload.exp) throw new Error("State expired");
+
+  return payload;
+};
+
+const isAtLeastOneYearOld = (createdAtIso) => {
+  const createdMs = Date.parse(String(createdAtIso || ""));
+  if (!Number.isFinite(createdMs)) return false;
+
+  const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+  return Date.now() - createdMs >= ONE_YEAR_MS;
+};
+
+const getTwitchAuthorizeUrl = (state) => {
+  if (!TWITCH_CLIENT_ID || !TWITCH_REDIRECT_URI) {
+    throw new Error("Missing TWITCH_CLIENT_ID or TWITCH_REDIRECT_URI");
+  }
+
+  const url = new URL("https://id.twitch.tv/oauth2/authorize");
+  url.searchParams.set("client_id", TWITCH_CLIENT_ID);
+  url.searchParams.set("redirect_uri", TWITCH_REDIRECT_URI);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", "user:read:email");
+  url.searchParams.set("state", state);
+
+  return url.toString();
+};
+
+const exchangeCodeForToken = async (code) => {
+  if (!TWITCH_CLIENT_SECRET) throw new Error("Missing TWITCH_CLIENT_SECRET");
+
+  const url = new URL("https://id.twitch.tv/oauth2/token");
+  url.searchParams.set("client_id", TWITCH_CLIENT_ID);
+  url.searchParams.set("client_secret", TWITCH_CLIENT_SECRET);
+  url.searchParams.set("code", String(code || ""));
+  url.searchParams.set("grant_type", "authorization_code");
+  url.searchParams.set("redirect_uri", TWITCH_REDIRECT_URI);
+
+  const r = await fetch(url.toString(), { method: "POST" });
+  const text = await r.text();
+
+  if (!r.ok) throw new Error(`Token exchange failed (${r.status}): ${text}`);
+
+  const json = JSON.parse(text);
+  if (!json?.access_token) throw new Error("No access_token from Twitch");
+
+  return json.access_token;
+};
+
+const fetchTwitchMe = async (userAccessToken) => {
+  const r = await fetch("https://api.twitch.tv/helix/users", {
+    headers: {
+      "Client-ID": TWITCH_CLIENT_ID,
+      Authorization: `Bearer ${userAccessToken}`,
+    },
+  });
+
+  const text = await r.text();
+  if (!r.ok) throw new Error(`Twitch users failed (${r.status}): ${text}`);
+
+  const json = JSON.parse(text);
+  const u = (json.data || [])[0];
+  if (!u?.id || !u?.login) throw new Error("No Twitch user returned");
+
+  return u; // includes created_at
 };
 
 const getAppAccessToken = async () => {
@@ -255,6 +385,66 @@ app.get("/api/twitch/users", async (req, res) => {
     return res.json({ data });
   } catch (err) {
     return res.status(500).json({ error: String(err?.message || err) });
+  }
+});
+
+// POST /api/twitch/connect/start
+app.post("/api/twitch/connect/start", async (req, res) => {
+  try {
+    const uid = await requireSupabaseUserId(req);
+
+    const state = signState({
+      uid,
+      exp: Date.now() + 10 * 60 * 1000, // 10 min
+    });
+
+    const url = getTwitchAuthorizeUrl(state);
+    return res.json({ url });
+  } catch (err) {
+    return res.status(401).json({ error: String(err?.message || err) });
+  }
+});
+
+// GET /api/twitch/connect/callback
+app.get("/api/twitch/connect/callback", async (req, res) => {
+  try {
+    if (!supabaseAdmin) throw new Error("Supabase admin not configured");
+
+    const code = String(req.query.code || "");
+    const state = String(req.query.state || "");
+    if (!code) throw new Error("Missing code");
+
+    const { uid } = verifyState(state);
+
+    const token = await exchangeCodeForToken(code);
+    const me = await fetchTwitchMe(token);
+
+    const ageOk = isAtLeastOneYearOld(me.created_at);
+
+    const patch = {
+      user_id: uid,
+      twitch_login: me.login,
+      twitch_user_id: me.id,
+      twitch_created_at: me.created_at,
+      twitch_age_ok: ageOk,
+      twitch_connected_at: new Date().toISOString(),
+    };
+
+    const { error } = await supabaseAdmin.from("profiles").upsert(patch, {
+      onConflict: "user_id",
+    });
+
+    if (error) throw new Error(error.message);
+
+    const next = new URL("/settings/profile", APP_ORIGIN);
+    next.searchParams.set("twitch", "connected");
+    next.searchParams.set("age_ok", ageOk ? "1" : "0");
+    return res.redirect(next.toString());
+  } catch (err) {
+    const next = new URL("/settings/profile", APP_ORIGIN);
+    next.searchParams.set("twitch", "error");
+    next.searchParams.set("msg", String(err?.message || err));
+    return res.redirect(next.toString());
   }
 });
 

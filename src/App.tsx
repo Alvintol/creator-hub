@@ -11,6 +11,8 @@ import Listing from './pages/Listing';
 import NotFound from './pages/NotFound';
 import About from "./pages/About";
 import SignIn from "./pages/SignIn";
+import ProfileSettings from "./pages/ProfileSettings";
+
 
 const App = () => {
   return (
@@ -22,10 +24,11 @@ const App = () => {
           <Route path="/signin" element={<SignIn />} />
           <Route path='/about' element={<About />} />
           <Route path='/live' element={<Live />} />
-          <Route path='/creators' element={<Creators />} />
-          <Route path='/creator/:handle' element={<CreatorProfile />} />
           <Route path='/market' element={<Market />} />
+          <Route path='/creators' element={<Creators />} />
           <Route path='/listing/:id' element={<Listing />} />
+          <Route path='/creator/:handle' element={<CreatorProfile />} />
+          <Route path="/settings/profile" element={<ProfileSettings />} />
           <Route path='*' element={<NotFound />} />
         </Route>
       </Routes>

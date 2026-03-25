@@ -9,7 +9,7 @@ import { useMemo, useState } from "react";
 import { CATEGORIES } from "../domain/catalog";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
 import { supabase } from "../lib/supabaseClient";
-import { useAuth } from "../providers/AuthProviders";
+import { useAuth } from "../providers/AuthProvider";
 
 type CategoryLink = { key: string; label: string };
 
@@ -138,6 +138,16 @@ const Nav = () => {
               {isFetching && <span className="navPillDot animate-pulse" />}
             </span>
           </NavLink>
+          {!loading && user && (
+            <NavLink
+              to="/settings/profile"
+              className={({ isActive }) =>
+                `navPill ${isActive ? "navPillActive" : "navPillIdle"}`
+              }
+            >
+              Settings
+            </NavLink>
+          )}
           {!loading && !user && (
             <NavLink to="/signin" className={({ isActive }) => (isActive ? "navPill navPillActive px-3 py-1" : "navPill navPillIdle px-3 py-1")}>
               Sign in

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import { useAuth } from "../providers/AuthProviders";
+import { useAuth } from "../providers/AuthProvider";
 
 const classes = {
   page: "space-y-6",
