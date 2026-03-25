@@ -8,13 +8,15 @@ import {
 import { useMemo, useState } from "react";
 import { CATEGORIES } from "../domain/catalog";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
+import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../providers/AuthProviders";
 
 type CategoryLink = { key: string; label: string };
 
 const classes = {
   header: "topbar",
 
-  topRow: "mx-auto flex max-w-6xl items-center gap-3 px-4 py-3",
+  topRow: "mx-auto flex max-w-6xl items-center gap-3 px-4 py-2",
   brandLink: "shrink-0 text-lg font-black tracking-tight",
   brandAccent: "text-[rgb(var(--brand))]",
 
@@ -57,6 +59,12 @@ const Nav = () => {
   const [q, setQ] = useState("");
 
   const { twitchByLogin, isFetching } = useTwitchStreams();
+
+  const { user, loading } = useAuth();
+
+  const onSignOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   const liveCount = useMemo(() => {
     return Object.keys(twitchByLogin).length;
@@ -130,6 +138,17 @@ const Nav = () => {
               {isFetching && <span className="navPillDot animate-pulse" />}
             </span>
           </NavLink>
+          {!loading && !user && (
+            <NavLink to="/signin" className={({ isActive }) => (isActive ? "navPill navPillActive px-3 py-1" : "navPill navPillIdle px-3 py-1")}>
+              Sign in
+            </NavLink>
+          )}
+
+          {!loading && user && (
+            <button type="button" className="navPill navPillIdle" onClick={onSignOut}>
+              Sign out
+            </button>
+          )}
         </nav>
       </div>
 

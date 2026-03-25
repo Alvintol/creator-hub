@@ -79,10 +79,10 @@
 
   /* Buttons */
   .btnPrimary {
-    @apply inline-flex items-center justify-center gap-2 select-none
-      rounded-xl px-4 py-2 text-sm font-semibold transition
-      ring-1 border active:translate-y-[1px]
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+    @apply inline-flex h-10 items-center justify-center gap-2 select-none
+    rounded-xl px-4 text-sm font-semibold leading-none transition
+    ring-1 border active:translate-y-[1px]
+    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
 
     background: rgb(var(--brand));
     color: rgb(var(--ink));
@@ -92,6 +92,7 @@
 
     box-shadow: 0 14px 28px -20px rgb(0 0 0 / 0.45);
   }
+
   .btnPrimary:hover {
     filter: brightness(0.98);
     border-color: rgb(var(--ink) / 0.26);
@@ -102,7 +103,7 @@
       rounded-xl px-4 py-2 text-sm font-semibold transition
       ring-1 border active:translate-y-[1px]
       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
-
+    @apply border ring-1 focus-visible:outline-none focus-visible:ring-2;
     background: rgb(var(--paper));
     color: rgb(var(--ink));
 
@@ -118,11 +119,12 @@
 
   /* Inputs */
   .searchInput {
-    @apply w-full rounded-xl bg-white px-4 py-2 text-sm outline-none transition ring-1
-      focus-visible:ring-2 focus-visible:outline-none;
+    @apply h-10 w-full rounded-xl bg-white px-4 text-sm leading-none outline-none transition ring-1
+    focus-visible:ring-2 focus-visible:outline-none;
 
     --tw-ring-color: rgb(var(--ink) / 0.14);
   }
+
   .searchInput:focus-visible {
     --tw-ring-color: rgb(var(--ink) / 0.28);
   }
@@ -198,10 +200,11 @@
 
   /* TOP NAV pills (Market / Creators / Live) */
   .navPill {
-    @apply inline-flex items-center select-none
-    rounded-xl px-3 py-1 text-sm font-semibold transition
+    @apply inline-flex h-10 items-center gap-2 select-none
+    rounded-xl px-3 text-sm font-semibold leading-none transition whitespace-nowrap
     active:translate-y-[1px]
     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
+
     background: rgb(var(--paper) / 0.78);
     color: rgb(var(--ink));
     border: 1px solid rgb(var(--ink) / 0.22);
@@ -218,16 +221,17 @@
 
   .navPillActive {
     background: rgb(var(--paper) / 0.92);
-    border-color: rgb(var(--ink) / 0.34);
+    border-color: rgb(var(--ink) / 0.28);
   }
 
   .navPillHot {
     background: rgb(var(--brand) / 0.24);
-    border-color: rgb(var(--ink) / 0.34);
+    border-color: rgb(var(--ink) / 0.28);
   }
 
   .navPillCount {
-    @apply inline-flex items-center justify-center;
+    @apply inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-black leading-none;
+
     height: 18px;
     min-width: 18px;
     padding: 0 6px;
