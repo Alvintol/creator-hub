@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "../lib/supabaseClient";
-import { useAuth } from "../providers/AuthProviders";
+import { useAuth } from "../providers/AuthProvider";
 
 export const useEnsureProfile = () => {
   const { user, loading } = useAuth();
