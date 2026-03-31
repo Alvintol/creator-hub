@@ -9,5 +9,9 @@ export type TwitchStream = {
   thumbnailUrl: string;
 };
 
-export const normalizeTwitchLogin = (login: string): string =>
-  login.trim().toLowerCase();
+// Normalizes a Twitch login for consistent lookups
+// - trims surrounding whitespace
+// - lowercases the value
+// - removes a leading @ if present
+export const normalizeTwitchLogin = (value: string): string =>
+  value.trim().toLowerCase().replace(/^@+/, "");

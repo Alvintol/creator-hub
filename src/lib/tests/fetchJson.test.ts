@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fetchJson } from './fetchJson';
+import { fetchJson } from '../fetchJson';
 
 describe('fetchJson', () => {
   it('throws a helpful error when response is HTML', async () => {
@@ -8,6 +8,6 @@ describe('fetchJson', () => {
       text: async () => '<!doctype html><html><body>...</body></html>',
     } as any)));
 
-    await expect(fetchJson('/api/health')).rejects.toThrow('/non-JSON/i');
+    await expect(fetchJson('/api/health')).rejects.toThrow(/non-JSON/i);
   });
 });
