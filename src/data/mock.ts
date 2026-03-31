@@ -5,6 +5,8 @@ export const categories = CATEGORIES;
 export type PlatformName = "twitch" | "youtube";
 export type CommissionStatus = "open" | "limited" | "closed" | (string & {});
 
+// Linked third-party platform data for a creator
+// These are external identities, not CreatorHub primary keys
 export type CreatorPlatforms = {
     twitch?: {
         login: string;
@@ -16,7 +18,11 @@ export type CreatorPlatforms = {
     };
 };
 
+// Main creator model used by the app
+// id = stable internal app id for DB relationships and favourites
+// handle = public-facing route slug for URLs like /creator/:handle
 export type Creator = {
+    id: string;
     handle: string;
     displayName: string;
     verified: boolean;
@@ -42,9 +48,11 @@ export type OfferingType = "digital" | "commission" | "service";
 export type PriceType = "fixed" | "starting_at" | "range";
 export type VideoSubtype = "long-form" | "short-form";
 
+// Listing model used by the marketplace
+// creatorId should point to Creator.id
 export type Listing = {
     id: string;
-    creatorHandle: string;
+    creatorId: string;
     offeringType: OfferingType;
     category: string;
 
@@ -62,17 +70,33 @@ export type Listing = {
     videoSubtype?: VideoSubtype;
 };
 
+// Mock creator seed data
 export const creators: Creator[] = [
     {
+        id: "creator-amatrine",
         handle: "Amatrine",
         displayName: "Amatrine",
         verified: true,
         bio: "I'm a freelance artist from Ottawa, Canada who works on emote and other Twitch asset design, film editing, video game design, painting and probably other things",
-        tags: ["emotes", "overlays", "cute", "asset design", "film editing", "video game design", "painting"],
+        tags: [
+            "emotes",
+            "overlays",
+            "cute",
+            "asset design",
+            "film editing",
+            "video game design",
+            "painting",
+        ],
         specialties: ["emotes", "overlays"],
         commissionStatus: "open",
         platforms: {
-            twitch: { login: "Amatrine" }
+            twitch: {
+                login: "Amatrine",
+            },
+            youtube: {
+                channelId: "youtube-amatrine",
+                handle: "@Amatrine",
+            },
         },
         links: {
             twitch: "https://twitch.tv/Amatrine",
@@ -80,6 +104,7 @@ export const creators: Creator[] = [
         },
     },
     {
+        id: "creator-rigmancer",
         handle: "rigmancer",
         displayName: "Rigmancer",
         verified: true,
@@ -87,9 +112,18 @@ export const creators: Creator[] = [
         tags: ["pngtuber", "vtuber", "rigging"],
         specialties: ["pngtuber-models", "vtuber-models", "vtuber-rigging"],
         commissionStatus: "limited",
-        links: { youtube: "https://youtube.com/@rigmancer" },
+        platforms: {
+            youtube: {
+                channelId: "youtube-rigmancer",
+                handle: "@rigmancer",
+            },
+        },
+        links: {
+            youtube: "https://youtube.com/@rigmancer",
+        },
     },
     {
+        id: "creator-jaquillyn",
         handle: "jaQUILLyn",
         displayName: "jaQUILLyn",
         verified: true,
@@ -98,11 +132,16 @@ export const creators: Creator[] = [
         specialties: ["video-editing"],
         commissionStatus: "open",
         platforms: {
-            twitch: { login: "jaQUILLyn" }
+            twitch: {
+                login: "jaQUILLyn",
+            },
         },
-        links: { twitch: "https://twitch.tv/jaQUILLyn" },
+        links: {
+            twitch: "https://twitch.tv/jaQUILLyn",
+        },
     },
     {
+        id: "creator-audionerd",
         handle: "audionerd",
         displayName: "Audio Nerd",
         verified: false,
@@ -110,14 +149,18 @@ export const creators: Creator[] = [
         tags: ["audio", "obs", "filters", "routing"],
         specialties: ["audio-tech-help"],
         commissionStatus: "open",
-        links: { twitch: "https://twitch.tv/audionerd" },
+        links: {
+            twitch: "https://twitch.tv/audionerd",
+        },
     },
 ];
 
+// Mock listing seed data
+// Each listing now points to a stable creatorId instead of a creator handle
 export const listings: Listing[] = [
     {
-        id: "l1",
-        creatorHandle: "pixelpiper",
+        id: "listing-emotes-01",
+        creatorId: "creator-amatrine",
         offeringType: "digital",
         category: "emotes",
         title: "Cozy Emote Pack (12)",
@@ -126,12 +169,12 @@ export const listings: Listing[] = [
         priceMax: 18,
         deliverables: ["png"],
         preview: "https://picsum.photos/seed/emotes/960/540",
-        short: "12 emotes + variants. Includes PNG + license notes.",
+        short: "12 emotes + variants. Includes PNG + licence notes.",
         featured: true,
     },
     {
-        id: "l2",
-        creatorHandle: "pixelpiper",
+        id: "listing-overlays-01",
+        creatorId: "creator-amatrine",
         offeringType: "commission",
         category: "overlays",
         title: "Custom Stream Overlay Package",
@@ -144,8 +187,8 @@ export const listings: Listing[] = [
         featured: false,
     },
     {
-        id: "l3",
-        creatorHandle: "rigmancer",
+        id: "listing-pngtuber-01",
+        creatorId: "creator-rigmancer",
         offeringType: "commission",
         category: "pngtuber-models",
         title: "PNG-tuber Model (Full Set)",
@@ -158,8 +201,8 @@ export const listings: Listing[] = [
         featured: true,
     },
     {
-        id: "l4",
-        creatorHandle: "cutsceneedits",
+        id: "listing-shortform-01",
+        creatorId: "creator-jaquillyn",
         offeringType: "service",
         category: "video-editing",
         videoSubtype: "short-form",
@@ -173,8 +216,8 @@ export const listings: Listing[] = [
         featured: false,
     },
     {
-        id: "l5",
-        creatorHandle: "audionerd",
+        id: "listing-audio-01",
+        creatorId: "creator-audionerd",
         offeringType: "service",
         category: "audio-tech-help",
         title: "Audio Troubleshooting Call (45 min)",
@@ -187,8 +230,8 @@ export const listings: Listing[] = [
         featured: true,
     },
     {
-        id: "l6",
-        creatorHandle: "rigmancer",
+        id: "listing-rigging-01",
+        creatorId: "creator-rigmancer",
         offeringType: "service",
         category: "vtuber-rigging",
         title: "PNG/VTuber Rigging Help (Live Session)",

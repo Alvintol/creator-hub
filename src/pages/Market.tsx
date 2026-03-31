@@ -1,6 +1,12 @@
 import { useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { creators, listings, categories, type Creator, type Listing } from "../data/mock";
+import {
+  creators,
+  listings,
+  categories,
+  type Creator,
+  type Listing,
+} from "../data/mock";
 import {
   useHubActions,
   useHubState,
@@ -8,7 +14,7 @@ import {
   type OfferingType,
   type VideoSubtype,
   type CategoryKey,
-} from "../providers/HubProvider";
+} from "../providers/hub";
 
 const classes = {
   page: "space-y-5",
@@ -39,23 +45,28 @@ const classes = {
   creator: "text-zinc-600",
 } as const;
 
-const creatorByHandle = Object.fromEntries(creators.map((c) => [c.handle, c])) as Record<
-  string,
-  Creator
->;
+// Fast lookup map for creators by stable internal creator id
+const creatorById = Object.fromEntries(
+  creators.map((creator) => [creator.id, creator])
+) as Record<string, Creator>;
 
+// Formats listing price text for UI display
 const priceText = (listing: Listing): string => {
   if (listing.priceType === "fixed") return `$${listing.priceMin}`;
   if (listing.priceType === "starting_at") return `From $${listing.priceMin}`;
+
   if (listing.priceType === "range") {
     const max = listing.priceMax ?? listing.priceMin;
     return `$${listing.priceMin}–$${max}`;
   }
-  return "";
-}
 
-const getListingHaystack = (listing: Listing, creator?: Creator): string => {
-  return [
+  return "";
+};
+
+// Builds a search string for listing filtering
+// This lets the search box match across listing fields and creator fields
+const getListingHaystack = (listing: Listing, creator?: Creator): string =>
+  [
     listing.title,
     listing.short,
     listing.category,
@@ -67,7 +78,6 @@ const getListingHaystack = (listing: Listing, creator?: Creator): string => {
   ]
     .join(" ")
     .toLowerCase();
-}
 
 type MarketListingCardProps = {
   listing: Listing;
@@ -84,7 +94,6 @@ const MarketListingCard = (props: MarketListingCardProps) => {
       <div className={classes.body}>
         <div className={classes.topRow}>
           <div className={classes.title}>{listing.title}</div>
-          {/* FIX: use offeringType */}
           <span className={classes.badge}>{listing.offeringType}</span>
         </div>
 
@@ -93,7 +102,7 @@ const MarketListingCard = (props: MarketListingCardProps) => {
         <div className={classes.bottomRow}>
           <span className={classes.price}>{priceText(listing)}</span>
           <span className={classes.creator}>
-            {creator?.displayName ?? listing.creatorHandle}
+            {creator?.displayName ?? "Unknown creator"}
           </span>
         </div>
       </div>
@@ -101,65 +110,103 @@ const MarketListingCard = (props: MarketListingCardProps) => {
   );
 };
 
+// Reads filter values from the current URL query string
+// supported params:
+// ?q=...
+// ?cat=...
+// ?type=...
+// ?video=...
 const parseFromUrl = (search: string): Partial<HubFilters> => {
-  const p = new URLSearchParams(search);
+  const params = new URLSearchParams(search);
 
-  const q = p.get("q") ?? "";
-  const cat = p.get("cat") ?? "all";
-  const type = p.get("type") ?? "all";
-  const video = p.get("video") ?? "all";
+  const q = params.get("q") ?? "";
+  const category = params.get("cat") ?? "all";
+  const type = params.get("type") ?? "all";
+  const videoSubtype = params.get("video") ?? "all";
 
-  const patch: Partial<HubFilters> = {};
-
-  patch.q = q;
-
-  patch.category = cat as CategoryKey;
-  patch.type = type as OfferingType;
-  patch.videoSubtype = video as VideoSubtype;
-
-  return patch;
-}
+  return {
+    q,
+    category: category as CategoryKey,
+    type: type as OfferingType,
+    videoSubtype: videoSubtype as VideoSubtype,
+  };
+};
 
 const Market = () => {
   const { filters } = useHubState();
   const { setFilters } = useHubActions();
   const { search } = useLocation();
 
+  // Syncs supported URL params into Hub filter state
+  // Only updates values that are actually different
   useEffect(() => {
     const fromUrl = parseFromUrl(search);
-
     const patch: Partial<HubFilters> = {};
 
-    if (fromUrl.q !== undefined && fromUrl.q !== filters.q) patch.q = fromUrl.q;
-    if (fromUrl.type !== undefined && fromUrl.type !== filters.type) patch.type = fromUrl.type;
-    if (fromUrl.category !== undefined && fromUrl.category !== filters.category)
+    if (fromUrl.q !== undefined && fromUrl.q !== filters.q) {
+      patch.q = fromUrl.q;
+    }
+
+    if (fromUrl.type !== undefined && fromUrl.type !== filters.type) {
+      patch.type = fromUrl.type;
+    }
+
+    if (
+      fromUrl.category !== undefined &&
+      fromUrl.category !== filters.category
+    ) {
       patch.category = fromUrl.category;
+    }
+
     if (
       fromUrl.videoSubtype !== undefined &&
       fromUrl.videoSubtype !== filters.videoSubtype
-    )
+    ) {
       patch.videoSubtype = fromUrl.videoSubtype;
+    }
 
-    if (Object.keys(patch).length) setFilters(patch);
-  }, [search, filters.q, filters.type, filters.category, filters.videoSubtype, setFilters]);
+    if (Object.keys(patch).length > 0) {
+      setFilters(patch);
+    }
+  }, [
+    search,
+    filters.q,
+    filters.type,
+    filters.category,
+    filters.videoSubtype,
+    setFilters,
+  ]);
 
+  // Applies the current Hub filters to all marketplace listings
   const filtered = useMemo((): Listing[] => {
-    const s = filters.q.trim().toLowerCase();
+    const searchValue = filters.q.trim().toLowerCase();
 
-    return listings.filter((l) => {
-      if (filters.type !== "all" && l.offeringType !== filters.type) return false;
-
-      if (filters.category !== "all" && l.category !== filters.category) return false;
-
-      if (filters.videoSubtype !== "all") {
-        if (l.category !== "video-editing") return false;
-        if ((l.videoSubtype ?? "all") !== filters.videoSubtype) return false;
+    return listings.filter((listing) => {
+      if (
+        filters.type !== "all" &&
+        listing.offeringType !== filters.type
+      ) {
+        return false;
       }
 
-      if (!s) return true;
+      if (
+        filters.category !== "all" &&
+        listing.category !== filters.category
+      ) {
+        return false;
+      }
 
-      const c = creatorByHandle[l.creatorHandle];
-      return getListingHaystack(l, c).includes(s);
+      if (filters.videoSubtype !== "all") {
+        if (listing.category !== "video-editing") return false;
+        if ((listing.videoSubtype ?? "all") !== filters.videoSubtype) {
+          return false;
+        }
+      }
+
+      if (!searchValue) return true;
+
+      const creator = creatorById[listing.creatorId];
+      return getListingHaystack(listing, creator).includes(searchValue);
     });
   }, [filters]);
 
@@ -174,14 +221,16 @@ const Market = () => {
         <input
           className={classes.input}
           value={filters.q}
-          onChange={(e) => setFilters({ q: e.currentTarget.value })}
+          onChange={(event) => setFilters({ q: event.currentTarget.value })}
           placeholder="Search listings..."
         />
 
         <select
           className={classes.select}
           value={filters.type}
-          onChange={(e) => setFilters({ type: e.currentTarget.value as OfferingType })}
+          onChange={(event) =>
+            setFilters({ type: event.currentTarget.value as OfferingType })
+          }
         >
           <option value="all">All types</option>
           <option value="digital">Digital</option>
@@ -192,21 +241,31 @@ const Market = () => {
         <select
           className={classes.select}
           value={filters.category}
-          onChange={(e) => setFilters({ category: e.currentTarget.value as CategoryKey })}
+          onChange={(event) =>
+            setFilters({ category: event.currentTarget.value as CategoryKey })
+          }
         >
           <option value="all">All categories</option>
-          {categories.map((c) => (
-            <option key={c.key} value={c.key}>
-              {c.label}
+
+          {categories.map((category) => (
+            <option key={category.key} value={category.key}>
+              {category.label}
             </option>
           ))}
         </select>
       </div>
 
       <div className={classes.grid}>
-        {filtered.map((l) => {
-          const c = creatorByHandle[l.creatorHandle];
-          return <MarketListingCard key={l.id} listing={l} creator={c} />;
+        {filtered.map((listing) => {
+          const creator = creatorById[listing.creatorId];
+
+          return (
+            <MarketListingCard
+              key={listing.id}
+              listing={listing}
+              creator={creator}
+            />
+          );
         })}
       </div>
     </div>

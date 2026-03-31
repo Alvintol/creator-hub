@@ -6,7 +6,7 @@ import {
   useHubActions,
   type HubFilters,
   type HubActions,
-} from "../providers/HubProvider";
+} from "../providers/hub";
 
 const classes = {
   container: "space-y-5",
@@ -25,32 +25,36 @@ const classes = {
   cardsGrid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
 } as const;
 
-const  getFilteredCreators = (list: Creator[], filters: HubFilters): Creator[] => {
-  const s = filters.q.trim().toLowerCase();
+// Filters creators using the current Hub filter state
+const getFilteredCreators = (list: Creator[], filters: HubFilters): Creator[] => {
+  const searchValue = filters.q.trim().toLowerCase();
 
-  return list.filter((c) => {
-    if (filters.onlyLive && !c.live?.isLive) return false;
-    if (filters.onlyOpen && c.commissionStatus !== "open") return false;
-    if (!s) return true;
+  return list.filter((creator) => {
+    if (filters.onlyLive && !creator.live?.isLive) return false;
+    if (filters.onlyOpen && creator.commissionStatus !== "open") return false;
+    if (!searchValue) return true;
 
-    const hay = [c.displayName, c.handle, c.bio, ...(c.tags ?? [])]
+    const haystack = [
+      creator.displayName,
+      creator.handle,
+      creator.bio,
+      ...(creator.tags ?? []),
+    ]
       .join(" ")
       .toLowerCase();
 
-    return hay.includes(s);
+    return haystack.includes(searchValue);
   });
-}
-
-const PageHeader = () => {
-  return (
-    <div className={classes.headerWrap}>
-      <h1 className={classes.h1}>Creators</h1>
-      <p className={classes.subtitle}>
-        Find artists, editors, and VTuber asset creators.
-      </p>
-    </div>
-  );
 };
+
+const PageHeader = () => (
+  <div className={classes.headerWrap}>
+    <h1 className={classes.h1}>Creators</h1>
+    <p className={classes.subtitle}>
+      Find artists, editors, and VTuber asset creators.
+    </p>
+  </div>
+);
 
 type FiltersRowProps = {
   filters: HubFilters;
@@ -65,7 +69,7 @@ const FiltersRow = (props: FiltersRowProps) => {
       <input
         className={classes.input}
         value={filters.q}
-        onChange={(e) => setFilters({ q: e.currentTarget.value })}
+        onChange={(event) => setFilters({ q: event.currentTarget.value })}
         placeholder="Search creators (emotes, vtuber, editing, style tags...)"
       />
 
@@ -75,7 +79,9 @@ const FiltersRow = (props: FiltersRowProps) => {
             className={classes.checkbox}
             type="checkbox"
             checked={filters.onlyLive}
-            onChange={(e) => setFilters({ onlyLive: e.currentTarget.checked })}
+            onChange={(event) =>
+              setFilters({ onlyLive: event.currentTarget.checked })
+            }
           />
           Live
         </label>
@@ -85,7 +91,9 @@ const FiltersRow = (props: FiltersRowProps) => {
             className={classes.checkbox}
             type="checkbox"
             checked={filters.onlyOpen}
-            onChange={(e) => setFilters({ onlyOpen: e.currentTarget.checked })}
+            onChange={(event) =>
+              setFilters({ onlyOpen: event.currentTarget.checked })
+            }
           />
           Open
         </label>
@@ -98,9 +106,10 @@ const CreatorsPage = () => {
   const { filters } = useHubState();
   const { setFilters } = useHubActions();
 
-  const filtered = useMemo(() => {
-    return getFilteredCreators(creators, filters);
-  }, [filters]);
+  const filtered = useMemo(
+    () => getFilteredCreators(creators, filters),
+    [filters]
+  );
 
   return (
     <div className={classes.container}>
@@ -108,8 +117,8 @@ const CreatorsPage = () => {
       <FiltersRow filters={filters} setFilters={setFilters} />
 
       <div className={classes.cardsGrid}>
-        {filtered.map((c) => (
-          <CreatorCard key={c.handle} creator={c} />
+        {filtered.map((creator) => (
+          <CreatorCard key={creator.id} creator={creator} />
         ))}
       </div>
     </div>
