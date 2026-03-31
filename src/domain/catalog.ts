@@ -31,14 +31,14 @@ export const VIDEO_SUBTYPES = [
     { key: "short-form", label: "Short Form (Shorts / TikTok / Reels)" },
 ] as const;
 
-/** Derived union types */
+// Derived union types  
 export type OfferingTypeKey = (typeof OFFERING_TYPES)[number]["key"]; // digital | commission | service
 export type CategoryKey = (typeof CATEGORIES)[number]["key"];
 export type CategoryKind = (typeof CATEGORIES)[number]["kind"];
 export type DeliverableKey = (typeof DELIVERABLES)[number]["key"];
 export type VideoSubtypeKey = (typeof VIDEO_SUBTYPES)[number]["key"];
 
-/** Useful maps/helpers */
+// Maps/Helpers
 export const categoryByKey: Record<CategoryKey, (typeof CATEGORIES)[number]> =
     Object.fromEntries(CATEGORIES.map((c) => [c.key, c])) as Record<
         CategoryKey,

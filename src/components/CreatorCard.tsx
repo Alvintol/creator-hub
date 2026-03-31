@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
-import FavouriteButton from "./FavouriteButton";
 import type { Creator } from "../data/mock";
+import FavouriteButton from "./FavouriteButton";
 import { normalizeTwitchLogin } from "../domain/twitch";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
 
@@ -24,11 +24,15 @@ const classes = {
   tag: "rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700",
 } as const;
 
-const getCommissionStatusClass = (status: Creator["commissionStatus"]): string => {
-  if (status === "open") return "text-emerald-600";
-  if (status === "limited") return "text-amber-700";
-  return "text-rose-700";
-};
+// Maps commission status to its matching text colour
+const getCommissionStatusClass = (
+  status: Creator["commissionStatus"]
+): string =>
+  status === "open"
+    ? "text-emerald-600"
+    : status === "limited"
+      ? "text-amber-700"
+      : "text-rose-700";
 
 type CreatorCardProps = {
   creator: Creator;
@@ -38,9 +42,12 @@ const CreatorCard = (props: CreatorCardProps) => {
   const { creator } = props;
 
   const { twitchByLogin } = useTwitchStreams();
+
+  // Live state is still derived from Twitch login data for display purposes
+  // This is separate from favourites, which should use the internal creator id
   const loginRaw = creator.platforms?.twitch?.login;
   const login = loginRaw ? normalizeTwitchLogin(loginRaw) : null;
-  const isLive = !!(login && twitchByLogin[login]);
+  const isLive = Boolean(login && twitchByLogin[login]);
 
   const commissionClass = `${classes.statusBase} ${getCommissionStatusClass(
     creator.commissionStatus
@@ -49,30 +56,37 @@ const CreatorCard = (props: CreatorCardProps) => {
   return (
     <Link to={`/creator/${creator.handle}`} className={classes.card}>
       <div className={classes.favWrap}>
-        <FavouriteButton kind="creator" idOrHandle={creator.handle} />
+        {/* Favourites must use the stable internal creator id, not the handle */}
+        <FavouriteButton kind="creator" targetId={creator.id} />
       </div>
 
       <div className={classes.titleRow}>
         <h3 className={classes.h3}>{creator.displayName}</h3>
 
-        {!!creator.verified && (
-          <span className={`${classes.badgeBase} ${classes.badgeVerified}`}>Verified</span>
+        {Boolean(creator.verified) && (
+          <span className={`${classes.badgeBase} ${classes.badgeVerified}`}>
+            Verified
+          </span>
         )}
 
         {isLive && (
-          <span className={`${classes.badgeBase} ${classes.badgeLive}`}>Live</span>
+          <span className={`${classes.badgeBase} ${classes.badgeLive}`}>
+            Live
+          </span>
         )}
       </div>
 
       <p className={classes.bio}>{creator.bio}</p>
 
       <div className={classes.metaRow}>
-        <span className={commissionClass}>Commissions: {creator.commissionStatus}</span>
+        <span className={commissionClass}>
+          Commissions: {creator.commissionStatus}
+        </span>
 
         <div className={classes.tagsWrap}>
-          {(creator.tags ?? []).slice(0, 4).map((t) => (
-            <span key={t} className={classes.tag}>
-              {t}
+          {(creator.tags ?? []).slice(0, 4).map((tag) => (
+            <span key={tag} className={classes.tag}>
+              {tag}
             </span>
           ))}
         </div>

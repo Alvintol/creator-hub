@@ -3,7 +3,6 @@ import {
   NavLink,
   useNavigate,
   useLocation,
-  type NavLinkProps,
 } from "react-router-dom";
 import { useMemo, useState } from "react";
 import { CATEGORIES } from "../domain/catalog";
@@ -12,6 +11,11 @@ import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 
 type CategoryLink = { key: string; label: string };
+
+const brand = {
+  markSrc: "/logo-mark.png",
+  alt: "CreatorHub",
+} as const;
 
 const classes = {
   header: "topbar",
@@ -43,10 +47,6 @@ const classes = {
   chip: "navChip whitespace-nowrap",
   chipActive: "navChip navChipActive whitespace-nowrap",
 } as const;
-
-const navLinkClass: NavLinkProps["className"] = ({ isActive }) =>
-  `${classes.navLinkBase} ${isActive ? classes.navLinkActive : classes.navLinkInactive
-  }`;
 
 const getMarketUrl = (q: string) => {
   const s = q.trim();
@@ -104,7 +104,17 @@ const Nav = () => {
     <header className={classes.header}>
       <div className={classes.topRow}>
         <Link to="/" className={classes.brandLink}>
-          <span className={classes.brandAccent}>Creator</span>Hub
+          <span className="inline-flex items-center gap-2">
+            <img
+              src={brand.markSrc}
+              alt={brand.alt}
+              className="h-8 w-8 shrink-0"
+              draggable={false}
+            />
+            <span className="text-lg font-black tracking-tight">
+              <span className={classes.brandAccent}>Creator</span>Hub
+            </span>
+          </span>
         </Link>
 
         <form className={classes.form} onSubmit={onSubmit}>

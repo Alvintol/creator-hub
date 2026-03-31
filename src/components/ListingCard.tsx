@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
 import FavouriteButton from "./FavouriteButton";
 import type { Listing } from "../data/mock";
+import { Link } from "react-router-dom";
 
 const classes = {
   card: "group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:bg-zinc-50",
@@ -22,15 +22,18 @@ const classes = {
   creator: "text-sm text-zinc-600",
 } as const;
 
+// Formats display text for the listing price model
 const priceText = (listing: Listing): string => {
   if (listing.priceType === "fixed") return `$${listing.priceMin}`;
   if (listing.priceType === "starting_at") return `From $${listing.priceMin}`;
+
   if (listing.priceType === "range") {
     const max = listing.priceMax ?? listing.priceMin;
     return `$${listing.priceMin}–$${max}`;
   }
+
   return "";
-}
+};
 
 type ListingCardProps = {
   listing: Listing;
@@ -43,7 +46,8 @@ const ListingCard = (props: ListingCardProps) => {
   return (
     <Link to={`/listing/${listing.id}`} className={classes.card}>
       <div className={classes.favWrap}>
-        <FavouriteButton kind="listing" idOrHandle={listing.id} />
+        {/* Listings already use the stable internal listing id */}
+        <FavouriteButton kind="listing" targetId={listing.id} />
       </div>
 
       <img src={listing.preview} alt="" className={classes.img} loading="lazy" />

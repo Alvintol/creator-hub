@@ -31,35 +31,33 @@ const classes = {
   ctaLink: "btnPrimary mt-3 inline-flex",
 } as const;
 
-const priceText = (listing: Listing): string => {
-  if (listing.priceType === "fixed") return `$${listing.priceMin}`;
-  if (listing.priceType === "starting_at") return `From $${listing.priceMin}`;
-  if (listing.priceType === "range") {
-    const max = listing.priceMax ?? listing.priceMin;
-    return `$${listing.priceMin}–$${max}`;
-  }
-  return "";
-}
+// Formats the listing price for display
+const priceText = (listing: Listing): string =>
+  listing.priceType === "fixed"
+    ? `$${listing.priceMin}`
+    : listing.priceType === "starting_at"
+      ? `From $${listing.priceMin}`
+      : listing.priceType === "range"
+        ? `$${listing.priceMin}–$${listing.priceMax ?? listing.priceMin}`
+        : "";
 
-const ListingNotFound = () =>
-(
+const ListingNotFound = () => (
   <div className={classes.notFoundWrap}>
     <h1 className={classes.h1}>Listing not found</h1>
+
     <Link to="/market" className={classes.backBtn}>
       Back to market
     </Link>
   </div>
 );
 
+// Finds a listing by route id
+const findListing = (id: string | undefined): Listing | undefined =>
+  id ? listings.find((listing) => listing.id === id) : undefined;
 
-const findListing = (id: string | undefined): Listing | undefined => {
-  if (!id) return undefined;
-  return listings.find((l) => l.id === id);
-}
-
-const findCreator = (handle: string): Creator | undefined => (
-  creators.find((c) => c.handle === handle)
-)
+// Finds the creator that owns a listing using the stable internal creator id
+const findCreator = (creatorId: string): Creator | undefined =>
+  creators.find((creator) => creator.id === creatorId);
 
 const ListingPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -67,7 +65,7 @@ const ListingPage = () => {
   const listing = findListing(id);
   if (!listing) return <ListingNotFound />;
 
-  const creator = findCreator(listing.creatorHandle);
+  const creator = findCreator(listing.creatorId);
 
   return (
     <div className={classes.page}>
@@ -99,19 +97,20 @@ const ListingPage = () => {
           <div className={classes.chips}>
             <span className={classes.chip}>{listing.category}</span>
 
-            {!!listing.videoSubtype && (
+            {Boolean(listing.videoSubtype) && (
               <span className={classes.chip}>{listing.videoSubtype}</span>
             )}
 
-            {listing.deliverables.map((d) => (
-              <span key={d} className={classes.chip}>
-                {d}
+            {listing.deliverables.map((deliverable) => (
+              <span key={deliverable} className={classes.chip}>
+                {deliverable}
               </span>
             ))}
           </div>
 
           <div className={classes.ctaBox}>
             <div className={classes.ctaTitle}>Checkout coming soon</div>
+
             <p className={classes.ctaText}>
               v0 focuses on discovery. Payments + safe delivery will come after.
             </p>

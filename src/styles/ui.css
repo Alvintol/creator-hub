@@ -2,35 +2,41 @@
 
 @layer base {
   :root {
-    /* Pastel palette */
-    --brand: 255 174 173; /* pink */
-    --accent: 255 214 166; /* peach */
-    --lemon: 253 255 182; /* yellow */
-    --mint: 203 255 191; /* green */
-
+    /* Core neutrals — warm + clean */
+    --bg: 255 252 248; /* warm off-white */
+    --surface: 255 255 255; /* cards */
     --ink: 24 24 27; /* zinc-900 */
-    --paper: 255 255 255; /* white */
+    --muted: 82 82 91; /* zinc-600-ish */
+
+    /* Brand palette — from logo */
+    --brand: 244 92 44; /* orange */
+    --accent: 123 72 255; /* purple */
+    --info: 59 130 246; /* blue */
+
+    /* Borders/shadows */
+    --border: 24 24 27; /* zinc-900 */
+    --shadow: 0 0 0 / 0.1; /* for subtle shadows, can be layered with opacity */
   }
 
   body {
     color: rgb(var(--ink));
     background:
       radial-gradient(
-        900px 480px at 10% 0%,
-        rgb(var(--lemon) / 0.6),
+        1100px 520px at 10% 0%,
+        rgb(var(--brand) / 0.14),
         transparent 60%
       ),
       radial-gradient(
-        900px 480px at 90% 10%,
-        rgb(var(--mint) / 0.5),
+        900px 520px at 90% 10%,
+        rgb(var(--accent) / 0.12),
         transparent 60%
       ),
       radial-gradient(
-        900px 520px at 15% 95%,
-        rgb(var(--accent) / 0.4),
-        transparent 60%
+        900px 600px at 50% 100%,
+        rgb(var(--info) / 0.1),
+        transparent 65%
       ),
-      rgb(var(--paper));
+      rgb(var(--bg));
   }
 
   a,
@@ -58,93 +64,120 @@
     @apply sticky top-0 z-50 border-b border-zinc-200/60 backdrop-blur shadow-sm;
     background: linear-gradient(
       90deg,
-      rgb(var(--lemon) / 0.22),
-      rgb(var(--paper) / 0.85),
-      rgb(var(--mint) / 0.2)
+      rgb(var(--brand) / 0.14),
+      rgb(var(--accent) / 0.1),
+      rgb(var(--info) / 0.08)
     );
   }
 
   .subbar {
-    @apply border-b border-zinc-200/60;
-    background: rgb(var(--accent) / 0.22);
+    @apply border-b;
+    border-color: rgb(var(--border) / 0.08);
+    background: rgb(var(--surface) / 0.7);
   }
 
+  /* Cards */
   .card {
-    @apply block rounded-3xl bg-white shadow-sm ring-1 ring-zinc-200/70 transition;
+    @apply rounded-2xl bg-white transition;
+    border: 1px solid rgb(var(--border) / 0.1);
+    box-shadow:
+      0 1px 0 rgb(0 0 0 / 0.02),
+      0 14px 30px -24px rgb(0 0 0 / 0.35);
   }
+
   .card:hover {
-    @apply ring-zinc-300/70;
-    box-shadow: 0 18px 45px -20px rgb(0 0 0 / 0.28);
+    border-color: rgb(var(--border) / 0.14);
+    box-shadow:
+      0 1px 0 rgb(0 0 0 / 0.02),
+      0 18px 44px -28px rgb(0 0 0 / 0.42);
   }
 
   /* Buttons */
   .btnPrimary {
-    @apply inline-flex h-10 items-center justify-center gap-2 select-none
-    rounded-xl px-4 text-sm font-semibold leading-none transition
-    ring-1 border active:translate-y-[1px]
-    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
-
+    @apply inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-extrabold transition;
     background: rgb(var(--brand));
-    color: rgb(var(--ink));
-
-    border-color: rgb(var(--ink) / 0.18);
-    --tw-ring-color: rgb(var(--ink) / 0.14);
-
-    box-shadow: 0 14px 28px -20px rgb(0 0 0 / 0.45);
+    color: rgb(255 255 255);
+    border: 1px solid rgb(var(--border) / 0.18);
+    box-shadow: 0 14px 28px -22px rgb(0 0 0 / 0.45);
   }
 
   .btnPrimary:hover {
     filter: brightness(0.98);
-    border-color: rgb(var(--ink) / 0.26);
+    box-shadow: 0 18px 36px -26px rgb(0 0 0 / 0.55);
+  }
+
+  .btnPrimary:focus-visible {
+    outline: none;
+    box-shadow:
+      0 18px 36px -26px rgb(0 0 0 / 0.55),
+      0 0 0 4px rgb(var(--brand) / 0.18);
   }
 
   .btnOutline {
-    @apply inline-flex items-center justify-center gap-2 select-none
-      rounded-xl px-4 py-2 text-sm font-semibold transition
-      ring-1 border active:translate-y-[1px]
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
-    @apply border ring-1 focus-visible:outline-none focus-visible:ring-2;
-    background: rgb(var(--paper));
+    @apply inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-extrabold transition;
+    background: rgb(var(--surface));
     color: rgb(var(--ink));
-
-    border-color: rgb(var(--ink) / 0.18);
-    --tw-ring-color: rgb(var(--ink) / 0.12);
-
-    box-shadow: 0 10px 22px -20px rgb(0 0 0 / 0.3);
+    border: 1px solid rgb(var(--border) / 0.18);
+    box-shadow: 0 10px 22px -24px rgb(0 0 0 / 0.3);
   }
+
   .btnOutline:hover {
-    background: rgb(var(--accent) / 0.22);
-    border-color: rgb(var(--ink) / 0.26);
+    background: rgb(var(--brand) / 0.08);
+    border-color: rgb(var(--border) / 0.22);
+  }
+
+  .btnOutline:focus-visible {
+    outline: none;
+    box-shadow:
+      0 10px 22px -24px rgb(0 0 0 / 0.3),
+      0 0 0 4px rgb(var(--info) / 0.16);
   }
 
   /* Inputs */
   .searchInput {
-    @apply h-10 w-full rounded-xl bg-white px-4 text-sm leading-none outline-none transition ring-1
-    focus-visible:ring-2 focus-visible:outline-none;
-
-    --tw-ring-color: rgb(var(--ink) / 0.14);
+    @apply w-full rounded-full bg-white px-4 py-2 text-sm outline-none transition;
+    border: 1px solid rgb(var(--border) / 0.14);
+    box-shadow: 0 8px 18px -20px rgb(0 0 0 / 0.25);
   }
 
   .searchInput:focus-visible {
-    --tw-ring-color: rgb(var(--ink) / 0.28);
+    border-color: rgb(var(--accent) / 0.55);
+    box-shadow:
+      0 10px 22px -22px rgb(0 0 0 / 0.25),
+      0 0 0 4px rgb(var(--accent) / 0.18);
   }
 
   /* Site-wide chips (page chips) */
   .chip {
-    @apply inline-flex items-center justify-center select-none
-      rounded-full px-3 py-1 text-xs font-semibold transition ring-1
-      active:translate-y-[1px]
-      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
-
-    background: rgb(var(--lemon) / 0.55);
+    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-extrabold transition;
+    background: rgb(var(--surface));
     color: rgb(var(--ink));
-    --tw-ring-color: rgb(var(--ink) / 0.16);
-    box-shadow: 0 10px 22px -22px rgb(0 0 0 / 0.35);
+    border: 1px solid rgb(var(--border) / 0.16);
+    box-shadow: 0 10px 20px -26px rgb(0 0 0 / 0.3);
   }
+
   .chip:hover {
-    background: rgb(var(--accent) / 0.45);
-    --tw-ring-color: rgb(var(--ink) / 0.22);
-    transform: translateY(-1px);
+    background: rgb(var(--accent) / 0.08);
+    border-color: rgb(var(--border) / 0.22);
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-extrabold;
+    background: rgb(var(--surface));
+    color: rgb(var(--ink));
+    border: 1px solid rgb(var(--border) / 0.14);
+  }
+
+  .badgeLive {
+    background: rgb(var(--info) / 0.12);
+    border-color: rgb(var(--info) / 0.32);
+    color: rgb(var(--ink));
+  }
+
+  .badgeFeatured {
+    background: rgb(var(--accent) / 0.12);
+    border-color: rgb(var(--accent) / 0.32);
+    color: rgb(var(--ink));
   }
 
   /* NAV browsing rail */
@@ -187,41 +220,24 @@
 
   .linkPill {
     @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-extrabold transition;
-    background: rgb(var(--paper) / 0.78);
-    color: rgb(var(--ink));
-    border: 1px solid rgb(var(--ink) / 0.22);
-    box-shadow: 0 10px 22px -20px rgb(0 0 0 / 0.3);
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--border) / 0.18);
   }
   .linkPill:hover {
-    background: rgb(var(--paper) / 0.92);
-    border-color: rgb(var(--ink) / 0.3);
-    transform: translateY(-1px);
+    background: rgb(var(--brand) / 0.08);
   }
 
-  /* TOP NAV pills (Market / Creators / Live) */
   .navPill {
-    @apply inline-flex h-10 items-center gap-2 select-none
-    rounded-xl px-3 text-sm font-semibold leading-none transition whitespace-nowrap
-    active:translate-y-[1px]
-    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2;
-
-    background: rgb(var(--paper) / 0.78);
-    color: rgb(var(--ink));
-    border: 1px solid rgb(var(--ink) / 0.22);
-    box-shadow: 0 10px 22px -20px rgb(0 0 0 / 0.28);
-    position: relative;
+    @apply inline-flex items-center gap-2 rounded-full px-3 py-1 text-sm font-extrabold transition;
+    border: 1px solid rgb(var(--border) / 0.18);
+    background: rgb(var(--surface));
   }
-
-  .navPill:hover {
-    background: rgb(var(--accent) / 0.18);
-    border-color: rgb(var(--ink) / 0.3);
-    transform: translateY(-1px);
-    z-index: 10;
+  .navPillIdle:hover {
+    background: rgb(var(--accent) / 0.08);
   }
-
   .navPillActive {
-    background: rgb(var(--paper) / 0.92);
-    border-color: rgb(var(--ink) / 0.28);
+    background: rgb(var(--brand) / 0.14);
+    border-color: rgb(var(--brand) / 0.3);
   }
 
   .navPillHot {
