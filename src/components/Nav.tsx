@@ -10,7 +10,10 @@ import { useTwitchStreams } from "../hooks/useTwitchStreams";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 
-type CategoryLink = { key: string; label: string };
+type CategoryLink = {
+  key: string;
+  label: string;
+};
 
 const brand = {
   markSrc: "/logo-mark.png",
@@ -22,16 +25,24 @@ const classes = {
 
   topRow: "mx-auto flex max-w-6xl items-center gap-3 px-4 py-2",
   brandLink: "shrink-0 text-lg font-black tracking-tight",
+  brandWrap: "inline-flex items-center gap-2",
+  brandImg: "h-8 w-8 shrink-0",
+  brandText: "text-lg font-black tracking-tight",
   brandAccent: "text-[rgb(var(--brand))]",
 
   form: "flex w-full items-center gap-2",
   searchInput: "searchInput",
   searchButton: "btnPrimary hidden sm:inline-flex",
 
-  nav: "hidden md:flex items-center gap-1",
-  navLinkBase: "text-sm font-semibold",
-  navLinkActive: "text-zinc-900",
-  navLinkInactive: "text-zinc-700 hover:text-zinc-900",
+  nav: "hidden items-center gap-1 md:flex",
+  navPillBase: "navPill",
+  navPillActive: "navPillActive",
+  navPillHot: "navPillHot",
+  navPillIdle: "navPillIdle",
+  navPillAuth: "navPill px-3 py-1",
+  navPillCount: "navPillCount",
+  navPillDot: "navPillDot animate-pulse",
+  navLabelWrap: "inline-flex items-center gap-2",
 
   subbar: "subbar",
   subbarRow:
@@ -48,10 +59,24 @@ const classes = {
   chipActive: "navChip navChipActive whitespace-nowrap",
 } as const;
 
-const getMarketUrl = (q: string) => {
-  const s = q.trim();
-  return s ? `/market?q=${encodeURIComponent(s)}` : "/market";
-};
+// Builds a market search URL from the current nav search field
+const getMarketUrl = (query: string): string =>
+  query.trim() ? `/market?q=${encodeURIComponent(query.trim())}` : "/market";
+
+// Builds a standard nav pill class for normal nav links
+const getPillClass = (isActive: boolean): string =>
+  `${classes.navPillBase} ${isActive ? classes.navPillActive : ""}`.trim();
+
+// Builds the live nav pill class
+// Adds a "hot" state when someone is live
+const getLivePillClass = (isActive: boolean, liveCount: number): string =>
+  isActive
+    ? `${classes.navPillBase} ${classes.navPillActive}`
+    : `${classes.navPillBase} ${liveCount > 0 ? classes.navPillHot : ""}`.trim();
+
+// Builds the auth/settings pill class
+const getAuthPillClass = (isActive: boolean): string =>
+  `${classes.navPillAuth} ${isActive ? classes.navPillActive : classes.navPillIdle}`.trim();
 
 const Nav = () => {
   const navigate = useNavigate();
@@ -59,59 +84,55 @@ const Nav = () => {
   const [q, setQ] = useState("");
 
   const { twitchByLogin, isFetching } = useTwitchStreams();
-
   const { user, loading } = useAuth();
 
-  const onSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  const liveCount = useMemo(() => {
-    return Object.keys(twitchByLogin).length;
-  }, [twitchByLogin]);
+  const liveCount = useMemo(
+    () => Object.keys(twitchByLogin).length,
+    [twitchByLogin]
+  );
 
   const activeCat = useMemo(() => {
-    const p = new URLSearchParams(search);
-    return p.get("cat") ?? "";
+    const params = new URLSearchParams(search);
+    return params.get("cat") ?? "";
   }, [search]);
 
-  const pillClass = (isActive: boolean) => {
-    return `navPill ${isActive ? "navPillActive" : ""}`.trim();
-  };
-
-  const livePillClass = (isActive: boolean) => {
-    if (isActive) return "navPill navPillActive";
-    return `navPill ${liveCount > 0 ? "navPillHot" : ""}`.trim();
-  };
-
   const categoryLinks = useMemo<CategoryLink[]>(
-    () => CATEGORIES.map((c: any) => ({ key: String(c.key), label: String(c.label) })),
+    () =>
+      CATEGORIES.map((category) => ({
+        key: String(category.key),
+        label: String(category.label),
+      })),
     []
   );
 
-  const onSubmit: React.FormEventHandler<HTMLFormElement> = (e) => {
-    e.preventDefault();
-    navigate(getMarketUrl(q));
-  };
-
-  const chipClass = (key: string | null) => {
+  const chipClass = (key: string | null): string => {
     const isAll = key === null;
     const isActive = isAll ? !activeCat : activeCat === key;
     return isActive ? classes.chipActive : classes.chip;
+  };
+
+  const onSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
+    event.preventDefault();
+    navigate(getMarketUrl(q));
+  };
+
+  const onSignOut = async () => {
+    await supabase.auth.signOut();
   };
 
   return (
     <header className={classes.header}>
       <div className={classes.topRow}>
         <Link to="/" className={classes.brandLink}>
-          <span className="inline-flex items-center gap-2">
+          <span className={classes.brandWrap}>
             <img
               src={brand.markSrc}
               alt={brand.alt}
-              className="h-8 w-8 shrink-0"
+              className={classes.brandImg}
               draggable={false}
             />
-            <span className="text-lg font-black tracking-tight">
+
+            <span className={classes.brandText}>
               <span className={classes.brandAccent}>Creator</span>Hub
             </span>
           </span>
@@ -122,50 +143,63 @@ const Nav = () => {
             className={classes.searchInput}
             aria-label="Search marketplace"
             value={q}
-            onChange={(e) => setQ(e.currentTarget.value)}
+            onChange={(event) => setQ(event.currentTarget.value)}
             placeholder="Search emotes, overlays, VTuber models, editors, riggers…"
           />
+
           <button type="submit" className={classes.searchButton}>
             Search
           </button>
         </form>
 
         <nav className={classes.nav}>
-          <NavLink to="/market" className={({ isActive }) => pillClass(isActive)}>
+          <NavLink to="/market" className={({ isActive }) => getPillClass(isActive)}>
             Market
           </NavLink>
 
-          <NavLink to="/creators" className={({ isActive }) => pillClass(isActive)}>
+          <NavLink to="/creators" className={({ isActive }) => getPillClass(isActive)}>
             Creators
           </NavLink>
 
-          <NavLink to="/live" className={({ isActive }) => livePillClass(isActive)}>
-            <span className="inline-flex items-center gap-2">
+          <NavLink
+            to="/live"
+            className={({ isActive }) => getLivePillClass(isActive, liveCount)}
+          >
+            <span className={classes.navLabelWrap}>
               <span>Live</span>
 
-              {liveCount > 0 && <span className="navPillCount">{liveCount}</span>}
+              {liveCount > 0 && (
+                <span className={classes.navPillCount}>{liveCount}</span>
+              )}
 
-              {isFetching && <span className="navPillDot animate-pulse" />}
+              {isFetching && <span className={classes.navPillDot} />}
             </span>
           </NavLink>
+
           {!loading && user && (
             <NavLink
               to="/settings/profile"
-              className={({ isActive }) =>
-                `navPill ${isActive ? "navPillActive" : "navPillIdle"}`
-              }
+              className={({ isActive }) => getAuthPillClass(isActive)}
             >
               Settings
             </NavLink>
           )}
+
           {!loading && !user && (
-            <NavLink to="/signin" className={({ isActive }) => (isActive ? "navPill navPillActive px-3 py-1" : "navPill navPillIdle px-3 py-1")}>
+            <NavLink
+              to="/signin"
+              className={({ isActive }) => getAuthPillClass(isActive)}
+            >
               Sign in
             </NavLink>
           )}
 
           {!loading && user && (
-            <button type="button" className="navPill navPillIdle" onClick={onSignOut}>
+            <button
+              type="button"
+              className={`${classes.navPillBase} ${classes.navPillIdle}`}
+              onClick={onSignOut}
+            >
               Sign out
             </button>
           )}
@@ -177,6 +211,7 @@ const Nav = () => {
           <div className={classes.statement}>
             Human-made only • No generative AI listings
           </div>
+
           <Link to="/about" className={classes.aboutLink}>
             Learn more →
           </Link>
@@ -188,15 +223,17 @@ const Nav = () => {
           <div className={classes.categoryRow}>
             <span className={classes.categoryTitle}>Browse categories</span>
 
-            <Link to="/market" className={chipClass(null)}>All</Link>
+            <Link to="/market" className={chipClass(null)}>
+              All
+            </Link>
 
-            {categoryLinks.map((c) => (
+            {categoryLinks.map((category) => (
               <Link
-                key={c.key}
-                to={`/market?cat=${encodeURIComponent(c.key)}`}
-                className={chipClass(c.key)}
+                key={category.key}
+                to={`/market?cat=${encodeURIComponent(category.key)}`}
+                className={chipClass(category.key)}
               >
-                {c.label}
+                {category.label}
               </Link>
             ))}
           </div>
