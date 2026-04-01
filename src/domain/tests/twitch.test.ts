@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeTwitchLogin } from './twitch';
+import { normalizeTwitchLogin } from '../twitch';
 
 describe('normalizeTwitchLogin', () => {
   it('lowercase and trims', () => {
