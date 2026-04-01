@@ -9,13 +9,8 @@ export type ProfileRow = {
   display_name_auto: boolean;
   bio: string | null;
 
-  creator_enabled: boolean;
-
-  twitch_login: string | null;
-  twitch_user_id: string | null;
-  twitch_created_at: string | null;
-  twitch_age_ok: boolean;
-  twitch_connected_at: string | null;
+  profile_setup_seen: boolean;
+  auth_provider_last_used: string | null;
 };
 
 export const useMyProfile = () => {
