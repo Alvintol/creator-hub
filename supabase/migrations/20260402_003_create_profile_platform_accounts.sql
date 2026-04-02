@@ -1,5 +1,5 @@
 -- Linked external platform identities for a CreatorHub profile
--- This replaces the long-term need for Twitch-specific columns on profiles
+-- One row per platform per user in v1
 create table if not exists public.profile_platform_accounts (
   id uuid primary key default gen_random_uuid(),
   profile_user_id uuid not null references public.profiles(user_id) on delete cascade,
@@ -24,3 +24,9 @@ create table if not exists public.profile_platform_accounts (
 create index if not exists profile_platform_accounts_profile_user_id_idx on public.profile_platform_accounts (profile_user_id);
 
 create index if not exists profile_platform_accounts_platform_idx on public.profile_platform_accounts (platform);
+
+drop trigger if exists set_profile_platform_accounts_updated_at on public.profile_platform_accounts;
+
+create trigger set_profile_platform_accounts_updated_at before
+update
+  on public.profile_platform_accounts for each row execute function public.set_updated_at();

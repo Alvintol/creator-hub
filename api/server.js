@@ -422,17 +422,26 @@ app.get("/api/twitch/connect/callback", async (req, res) => {
     const ageOk = isAtLeastOneYearOld(me.created_at);
 
     const patch = {
-      user_id: uid,
-      twitch_login: me.login,
-      twitch_user_id: me.id,
-      twitch_created_at: me.created_at,
-      twitch_age_ok: ageOk,
-      twitch_connected_at: new Date().toISOString(),
+      profile_user_id: uid,
+      platform: "twitch",
+      platform_user_id: me.id,
+      platform_login: me.login,
+      platform_display_name: me.display_name ?? me.login,
+      profile_url: `https://twitch.tv/${me.login}`,
+      account_created_at: me.created_at,
+      connected_at: new Date().toISOString(),
+      metadata: {
+        age_ok: ageOk,
+        email: me.email ?? null,
+      },
+      updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabaseAdmin.from("profiles").upsert(patch, {
-      onConflict: "user_id",
-    });
+    const { error } = await supabaseAdmin
+      .from("profile_platform_accounts")
+      .upsert(patch, {
+        onConflict: "profile_user_id,platform",
+      });
 
     if (error) throw new Error(error.message);
 
