@@ -1,60 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import { useMyProfile, type ProfileRow } from "../hooks/useMyProfile";
-
-type PlatformKey = "twitch" | "youtube";
-
-type ProfilePlatformAccountRow = {
-  id: string;
-  profile_user_id: string;
-
-  platform: PlatformKey;
-  platform_user_id: string;
-
-  platform_login: string | null;
-  platform_display_name: string | null;
-  profile_url: string | null;
-
-  account_created_at: string | null;
-  connected_at: string;
-
-  last_activity_at: string | null;
-  activity_checked_at: string | null;
-  is_active_recently: boolean | null;
-
-  metadata: Record<string, unknown>;
-
-  created_at: string;
-  updated_at: string;
-};
-
-type SellerApplicationStatus =
-  | "draft"
-  | "submitted"
-  | "under_review"
-  | "approved"
-  | "rejected"
-  | "needs_changes"
-  | "suspended";
-
-type SellerApplicationRow = {
-  id: string;
-  profile_user_id: string;
-
-  status: SellerApplicationStatus;
-
-  submitted_at: string | null;
-  reviewed_at: string | null;
-
-  reviewer_notes: string | null;
-  rejection_reason: string | null;
-
-  created_at: string;
-  updated_at: string;
-};
+import {
+  useProfilePlatformAccounts,
+  type ProfilePlatformAccountRow
+} from "../hooks/useProfilePlatformAccounts";
+import {
+  useMySellerApplication,
+  type SellerApplicationRow,
+} from "../hooks/useMySellerApplication";
 
 const classes = {
   page: "space-y-6",
@@ -208,29 +164,13 @@ const ProfileSettings = () => {
     isLoading: isLoadingPlatforms,
     error: platformAccountsError,
     refetch: refetchPlatformAccounts,
-  } = useQuery<ProfilePlatformAccountRow[]>({
-    queryKey: ["profilePlatformAccounts", user?.id],
-    enabled: !loading && Boolean(user?.id),
-    staleTime: 30_000,
-    queryFn: () =>
-      user?.id
-        ? fetchProfilePlatformAccounts(user.id)
-        : Promise.resolve([]),
-  });
+  } = useProfilePlatformAccounts();
 
   const {
     data: sellerApplication,
     isLoading: isLoadingSellerApplication,
     error: sellerApplicationError,
-  } = useQuery<SellerApplicationRow | null>({
-    queryKey: ["mySellerApplication", user?.id],
-    enabled: !loading && Boolean(user?.id),
-    staleTime: 30_000,
-    queryFn: () =>
-      user?.id
-        ? fetchMySellerApplication(user.id)
-        : Promise.resolve(null),
-  });
+  } = useMySellerApplication();
 
   const [handle, setHandle] = useState("");
   const [displayName, setDisplayName] = useState("");
