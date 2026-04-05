@@ -238,7 +238,7 @@ const fetchTwitchMe = async (userAccessToken) => {
   const u = (json.data || [])[0];
   if (!u?.id || !u?.login) throw new Error("No Twitch user returned");
 
-  return u; // includes created_at
+  return u;
 };
 
 const getAppAccessToken = async () => {
@@ -422,23 +422,47 @@ app.get("/api/twitch/connect/callback", async (req, res) => {
     const ageOk = isAtLeastOneYearOld(me.created_at);
 
     const patch = {
-      user_id: uid,
-      twitch_login: me.login,
-      twitch_user_id: me.id,
-      twitch_created_at: me.created_at,
-      twitch_age_ok: ageOk,
-      twitch_connected_at: new Date().toISOString(),
+      profile_user_id: uid,
+      platform: "twitch",
+      platform_user_id: me.id,
+      platform_login: me.login,
+      platform_display_name: me.display_name ?? me.login,
+      profile_url: `https://twitch.tv/${me.login}`,
+      account_created_at: me.created_at,
+      connected_at: new Date().toISOString(),
+      metadata: {
+        age_ok: ageOk,
+        email: me.email ?? null,
+        profile_image_url: me.profile_image_url ?? null,
+      },
+      updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabaseAdmin.from("profiles").upsert(patch, {
-      onConflict: "user_id",
-    });
+    const { error } = await supabaseAdmin
+      .from("profile_platform_accounts")
+      .upsert(patch, {
+        onConflict: "profile_user_id,platform",
+      });
 
     if (error) throw new Error(error.message);
 
+    const twitchAvatarUrl =
+      typeof me.profile_image_url === "string" && me.profile_image_url.trim()
+        ? me.profile_image_url
+        : null;
+
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        avatar_url: twitchAvatarUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", uid);
+
+    if (profileError) throw new Error(profileError.message);
+
     const next = new URL("/settings/profile", APP_ORIGIN);
     next.searchParams.set("twitch", "connected");
-    next.searchParams.set("age_ok", ageOk ? "1" : "0");
     return res.redirect(next.toString());
   } catch (err) {
     const next = new URL("/settings/profile", APP_ORIGIN);
