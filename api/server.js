@@ -238,7 +238,7 @@ const fetchTwitchMe = async (userAccessToken) => {
   const u = (json.data || [])[0];
   if (!u?.id || !u?.login) throw new Error("No Twitch user returned");
 
-  return u; // includes created_at
+  return u;
 };
 
 const getAppAccessToken = async () => {
@@ -433,6 +433,7 @@ app.get("/api/twitch/connect/callback", async (req, res) => {
       metadata: {
         age_ok: ageOk,
         email: me.email ?? null,
+        profile_image_url: me.profile_image_url ?? null,
       },
       updated_at: new Date().toISOString(),
     };
@@ -445,9 +446,23 @@ app.get("/api/twitch/connect/callback", async (req, res) => {
 
     if (error) throw new Error(error.message);
 
+    const twitchAvatarUrl =
+      typeof me.profile_image_url === "string" && me.profile_image_url.trim()
+        ? me.profile_image_url
+        : null;
+
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        avatar_url: twitchAvatarUrl,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", uid);
+
+    if (profileError) throw new Error(profileError.message);
+
     const next = new URL("/settings/profile", APP_ORIGIN);
     next.searchParams.set("twitch", "connected");
-    next.searchParams.set("age_ok", ageOk ? "1" : "0");
     return res.redirect(next.toString());
   } catch (err) {
     const next = new URL("/settings/profile", APP_ORIGIN);

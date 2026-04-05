@@ -67,7 +67,7 @@ const fetchMyProfile = async (userId: string): Promise<ProfileRow | null> => {
     .maybeSingle();
 
   if (error) throw error;
-
+  console.log({ profileData: data })
   return (data as ProfileRow | null) ?? null;
 };
 

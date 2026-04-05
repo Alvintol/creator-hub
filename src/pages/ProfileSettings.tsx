@@ -3,14 +3,13 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import { useMyProfile, type ProfileRow } from "../hooks/useMyProfile";
-import {
-  useProfilePlatformAccounts,
-  type ProfilePlatformAccountRow
-} from "../hooks/useProfilePlatformAccounts";
+import { useProfilePlatformAccounts } from "../hooks/useProfilePlatformAccounts";
 import {
   useMySellerApplication,
   type SellerApplicationRow,
 } from "../hooks/useMySellerApplication";
+import { useUpsertMySellerApplication } from "../hooks/useUpsertMySellerApplication";
+import { getProfileAvatarUrl } from "../domain/profileMedia";
 
 const classes = {
   page: "space-y-6",
@@ -64,6 +63,21 @@ const classes = {
   pill: "chip",
 
   loadingText: "text-sm text-zinc-600",
+
+  avatarSection: "flex items-start gap-4",
+  avatarPreview:
+    "h-16 w-16 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100",
+  avatarImage: "h-full w-full object-cover",
+  avatarFallback:
+    "flex h-full w-full items-center justify-center text-xs font-bold text-zinc-500",
+  avatarActions: "flex min-w-[220px] flex-col items-start gap-2",
+  avatarHelp: "text-xs text-zinc-500",
+
+  mediaGrid: "mt-4 grid items-stretch gap-4 md:grid-cols-2",
+  mediaCard: "rounded-2xl border border-zinc-200 bg-white p-4",
+  mediaTitle: "text-sm font-extrabold text-zinc-900",
+  mediaBody: "mt-3 min-h-[92px]",
+  mediaHelp: "mt-2 text-xs text-zinc-500",
 } as const;
 
 // Pulls a readable error message from an unknown thrown value
@@ -76,81 +90,25 @@ const getErrorMessage = (error: unknown): string =>
 const isValidHandle = (value: string): boolean =>
   /^[a-z0-9][a-z0-9_-]{2,24}$/i.test(value);
 
-// Maps seller application state into a readable label
-const getSellerStatusLabel = (
-  sellerApplication: SellerApplicationRow | null | undefined
+// Maps creator application state into a readable label
+const getCreatorStatusLabel = (
+  creatorApplication: SellerApplicationRow | null | undefined
 ): string =>
-  !sellerApplication
+  !creatorApplication
     ? "Not started"
-    : sellerApplication.status === "approved"
-      ? "Approved seller"
-      : sellerApplication.status === "under_review"
+    : creatorApplication.status === "approved"
+      ? "Approved creator"
+      : creatorApplication.status === "under_review"
         ? "Under review"
-        : sellerApplication.status === "submitted"
+        : creatorApplication.status === "submitted"
           ? "Submitted"
-          : sellerApplication.status === "needs_changes"
+          : creatorApplication.status === "needs_changes"
             ? "Needs changes"
-            : sellerApplication.status === "rejected"
+            : creatorApplication.status === "rejected"
               ? "Rejected"
-              : sellerApplication.status === "suspended"
+              : creatorApplication.status === "suspended"
                 ? "Suspended"
                 : "Draft";
-
-// Loads linked platform accounts for the signed-in user
-const fetchProfilePlatformAccounts = async (
-  userId: string
-): Promise<ProfilePlatformAccountRow[]> => {
-  const { data, error } = await supabase
-    .from("profile_platform_accounts")
-    .select(`
-      id,
-      profile_user_id,
-      platform,
-      platform_user_id,
-      platform_login,
-      platform_display_name,
-      profile_url,
-      account_created_at,
-      connected_at,
-      last_activity_at,
-      activity_checked_at,
-      is_active_recently,
-      metadata,
-      created_at,
-      updated_at
-    `)
-    .eq("profile_user_id", userId)
-    .order("connected_at", { ascending: false });
-
-  if (error) throw error;
-
-  return (data ?? []) as ProfilePlatformAccountRow[];
-};
-
-// Loads the signed-in user's seller application
-const fetchMySellerApplication = async (
-  userId: string
-): Promise<SellerApplicationRow | null> => {
-  const { data, error } = await supabase
-    .from("seller_applications")
-    .select(`
-      id,
-      profile_user_id,
-      status,
-      submitted_at,
-      reviewed_at,
-      reviewer_notes,
-      rejection_reason,
-      created_at,
-      updated_at
-    `)
-    .eq("profile_user_id", userId)
-    .maybeSingle();
-
-  if (error) throw error;
-
-  return (data as SellerApplicationRow | null) ?? null;
-};
 
 const ProfileSettings = () => {
   const navigate = useNavigate();
@@ -172,6 +130,8 @@ const ProfileSettings = () => {
     error: sellerApplicationError,
   } = useMySellerApplication();
 
+  const sellerApplicationMutation = useUpsertMySellerApplication();
+
   const [handle, setHandle] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
@@ -191,7 +151,7 @@ const ProfileSettings = () => {
     if (twitch === "connected") {
       setOkMsg("Twitch connected successfully.");
       setErrMsg(null);
-      void refetchPlatformAccounts();
+      void Promise.all([refetch(), refetchPlatformAccounts()]);
     }
 
     if (twitch === "error") {
@@ -244,8 +204,10 @@ const ProfileSettings = () => {
   }, [error, platformAccountsError, sellerApplicationError]);
 
   const twitchAccount = useMemo(
-    () =>
-      platformAccounts.find((account) => account.platform === "twitch") ?? null,
+    () => {
+      console.log({ platformAccounts })
+      return platformAccounts.find((account) => account.platform === "twitch") ?? null
+    },
     [platformAccounts]
   );
 
@@ -260,13 +222,21 @@ const ProfileSettings = () => {
     [twitchAccount]
   );
 
+  const isTwitchConnected = useMemo(
+    () => {
+      console.log({ twitchAccount })
+      return Boolean(twitchAccount?.platform_user_id)
+    },
+    [twitchAccount]
+  );
+
   const youtubeStatus = useMemo(
     () => (youtubeAccount ? "Connected" : "Not connected"),
     [youtubeAccount]
   );
 
-  const sellerStatus = useMemo(
-    () => getSellerStatusLabel(sellerApplication),
+  const creatorStatus = useMemo(
+    () => getCreatorStatusLabel(sellerApplication),
     [sellerApplication]
   );
 
@@ -274,6 +244,77 @@ const ProfileSettings = () => {
     const nextHandle = (profile?.handle ?? "").trim();
     return nextHandle ? `/creator/${nextHandle}` : "/creators";
   }, [profile]);
+
+  const hasLinkedCreatorPlatform = useMemo(
+    () =>
+      platformAccounts.some(
+        (account) =>
+          account.platform === "twitch" || account.platform === "youtube"
+      ),
+    [platformAccounts]
+  );
+
+  const avatarUrl = useMemo(() => {
+    const profileAvatarUrl = getProfileAvatarUrl(profile);
+
+    if (typeof profileAvatarUrl === "string" && profileAvatarUrl.trim()) {
+      return profileAvatarUrl;
+    }
+
+    const twitchProfileImageUrl = twitchAccount?.metadata?.profile_image_url;
+
+    return typeof twitchProfileImageUrl === "string" &&
+      twitchProfileImageUrl.trim()
+      ? twitchProfileImageUrl
+      : null;
+  }, [profile, twitchAccount]);
+
+  const canStartCreatorApplication = Boolean(profile?.handle?.trim()) &&
+    Boolean(profile?.display_name?.trim());
+
+  const canSubmitCreatorApplication =
+    canStartCreatorApplication && hasLinkedCreatorPlatform;
+
+  // Starts a draft creator application for the current user
+  const onStartCreatorApplication = async () => {
+    setOkMsg(null);
+    setErrMsg(null);
+    setInfoMsg(null);
+
+    try {
+      await sellerApplicationMutation.mutateAsync({
+        status: "draft",
+      });
+
+      setOkMsg("Creator application draft created.");
+    } catch (error) {
+      setErrMsg(getErrorMessage(error));
+    }
+  };
+
+  // Submits the creator application for manual review
+  const onSubmitCreatorApplication = async () => {
+    setOkMsg(null);
+    setErrMsg(null);
+    setInfoMsg(null);
+
+    if (!canSubmitCreatorApplication) {
+      setErrMsg(
+        "Complete your basic profile and link at least one creator platform before submitting."
+      );
+      return;
+    }
+
+    try {
+      await sellerApplicationMutation.mutateAsync({
+        status: "submitted",
+      });
+
+      setOkMsg("Creator application submitted for review.");
+    } catch (error) {
+      setErrMsg(getErrorMessage(error));
+    }
+  };
 
   const onSave = async () => {
     if (!user?.id) return;
@@ -330,6 +371,11 @@ const ProfileSettings = () => {
     setErrMsg(null);
     setInfoMsg(null);
 
+    if (isTwitchConnected) {
+      setInfoMsg("Your Twitch account is already connected.");
+      return;
+    }
+
     const token = session?.access_token;
 
     if (!token) {
@@ -355,7 +401,9 @@ const ProfileSettings = () => {
       const json = (await response.json()) as { url?: string; error?: string };
 
       if (!response.ok || !json.url) {
-        throw new Error(json.error || `Twitch connect failed (${response.status})`);
+        throw new Error(
+          json.error || `Twitch connect failed (${response.status})`
+        );
       }
 
       window.location.assign(json.url);
@@ -395,7 +443,8 @@ const ProfileSettings = () => {
         <h1 className={classes.h1}>Profile settings</h1>
 
         <p className={classes.sub}>
-          Set up your account, connect platforms, and prepare for future seller application steps.
+          Set up your account, connect platforms, and prepare for future creator
+          application steps.
         </p>
       </div>
 
@@ -427,6 +476,48 @@ const ProfileSettings = () => {
           These fields help other users recognise you and build trust.
         </p>
 
+        <div className={classes.mediaGrid}>
+          <div className={classes.mediaCard}>
+            <div className={classes.mediaTitle}>Profile image</div>
+
+            <div className={classes.mediaBody}>
+              <div className={classes.avatarSection}>
+                <div className={classes.avatarPreview}>
+                  {avatarUrl ? (
+                    <img src={avatarUrl} alt="" className={classes.avatarImage} />
+                  ) : (
+                    <div className={classes.avatarFallback}>No avatar</div>
+                  )}
+                </div>
+
+                <div className={classes.avatarActions}>
+                  <button className={classes.btnOutline} type="button" disabled>
+                    Upload profile image soon
+                  </button>
+
+                  <div className={classes.avatarHelp}>
+                    For now, CreatorHub uses your linked Twitch profile image when available.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={classes.mediaCard}>
+            <div className={classes.mediaTitle}>Profile banner</div>
+
+            <div className={classes.mediaBody}>
+              <button className={classes.btnOutline} type="button" disabled>
+                Banner uploads coming soon
+              </button>
+
+              <div className={classes.mediaHelp}>
+                Custom image uploads will open once media storage is expanded.
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className={classes.grid}>
           <div className={classes.field}>
             <div className={classes.label}>Handle</div>
@@ -439,7 +530,9 @@ const ProfileSettings = () => {
               autoComplete="off"
             />
 
-            <div className={classes.fieldHelp}>3–25 chars, letters/numbers/_/-</div>
+            <div className={classes.fieldHelp}>
+              3–25 chars, letters/numbers/_/-
+            </div>
           </div>
 
           <div className={classes.field}>
@@ -495,7 +588,8 @@ const ProfileSettings = () => {
         <div className={classes.title}>Connected platforms</div>
 
         <p className={classes.help}>
-          Linking platforms is optional, but it helps with trust, profile richness, and future seller review.
+          Linking platforms is optional, but it helps with trust, profile
+          richness, and future creator review.
         </p>
 
         <div className={classes.platformGrid}>
@@ -503,7 +597,8 @@ const ProfileSettings = () => {
             <div className={classes.platformHeader}>
               <div className={classes.platformTitle}>Twitch</div>
               <div className={classes.platformHelp}>
-                Useful for community trust, live status, and future seller review.
+                Useful for community trust, live status, and future creator
+                review.
               </div>
             </div>
 
@@ -512,9 +607,18 @@ const ProfileSettings = () => {
               <div className={classes.platformValue}>{twitchStatus}</div>
 
               {twitchAccount?.platform_login && (
-                <div className={classes.platformMuted}>
-                  @{twitchAccount.platform_login}
-                </div>
+                <div className={classes.platformMuted}>@{twitchAccount.platform_login}</div>
+              )}
+
+              {twitchAccount?.profile_url && (
+                <a
+                  href={twitchAccount.profile_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={classes.platformMuted}
+                >
+                  View Twitch profile
+                </a>
               )}
             </div>
 
@@ -523,9 +627,13 @@ const ProfileSettings = () => {
                 className={classes.btnOutline}
                 type="button"
                 onClick={onConnectTwitch}
-                disabled={busy || isLoading || isLoadingPlatforms}
+                disabled={busy || isLoading || isLoadingPlatforms || isTwitchConnected}
               >
-                {twitchAccount ? "Reconnect Twitch" : "Connect Twitch"}
+                {isLoadingPlatforms
+                  ? "Checking Twitch…"
+                  : isTwitchConnected
+                    ? "Connected"
+                    : "Connect Twitch"}
               </button>
             </div>
           </div>
@@ -534,7 +642,8 @@ const ProfileSettings = () => {
             <div className={classes.platformHeader}>
               <div className={classes.platformTitle}>YouTube</div>
               <div className={classes.platformHelp}>
-                YouTube linking will be added next so users can show creator activity outside Twitch.
+                YouTube linking will be added next so users can show creator
+                activity outside Twitch.
               </div>
             </div>
 
@@ -550,11 +659,7 @@ const ProfileSettings = () => {
             </div>
 
             <div className={classes.platformActions}>
-              <button
-                className={classes.btnOutline}
-                type="button"
-                disabled
-              >
+              <button className={classes.btnOutline} type="button" disabled>
                 YouTube linking soon
               </button>
             </div>
@@ -563,43 +668,124 @@ const ProfileSettings = () => {
       </div>
 
       <div className={classes.card}>
-        <div className={classes.title}>Seller application</div>
+        <div className={classes.title}>Creator application</div>
 
         <p className={classes.help}>
-          Selling will be reviewed manually. Linking platforms and keeping your profile complete now will make that process easier later.
+          Creator access is reviewed manually. Linking platforms and keeping
+          your profile complete now will make that process smoother.
         </p>
 
         <div className={classes.applicationCard}>
           <div className={classes.applicationTitle}>Current status</div>
-          <div className={classes.applicationStatus}>{sellerStatus}</div>
+          <div className={classes.applicationStatus}>{creatorStatus}</div>
 
           <div className={classes.applicationText}>
-            Seller access will not be self-serve. Applications will be reviewed manually to reduce spam, stolen work, and low-trust accounts.
+            Creator applications are reviewed manually to reduce spam, bots, and
+            low-trust accounts.
           </div>
 
           <div className={classes.applicationList}>
-            <div>• At least one linked creator platform</div>
-            <div>• Recent public activity on Twitch or YouTube</div>
-            <div>• Profile and identity that appear consistent and human-made</div>
+            <div>• Complete your public profile</div>
+            <div>• Link at least one creator platform</div>
+            <div>• Show recent public activity on Twitch or YouTube</div>
+            <div>• Pass manual CreatorHub review</div>
           </div>
 
           <div className={classes.pills}>
             <span className={classes.pill}>Human-made only</span>
             <span className={classes.pill}>Manual review</span>
-            <span className={classes.pill}>No instant seller activation</span>
+            <span className={classes.pill}>No instant activation</span>
           </div>
 
           <div className={classes.row}>
-            <button className={classes.btnOutline} type="button" disabled>
-              Applications coming soon
-            </button>
+            {!sellerApplication && (
+              <button
+                className={classes.btnOutline}
+                type="button"
+                onClick={onStartCreatorApplication}
+                disabled={
+                  busy ||
+                  sellerApplicationMutation.isPending ||
+                  !canStartCreatorApplication
+                }
+              >
+                Start Application
+              </button>
+            )}
+
+            {sellerApplication?.status === "draft" && (
+              <button
+                className={classes.btnPrimary}
+                type="button"
+                onClick={onSubmitCreatorApplication}
+                disabled={busy || sellerApplicationMutation.isPending}
+              >
+                Submit for Review
+              </button>
+            )}
+
+            {sellerApplication?.status === "needs_changes" && (
+              <button
+                className={classes.btnPrimary}
+                type="button"
+                onClick={onSubmitCreatorApplication}
+                disabled={busy || sellerApplicationMutation.isPending}
+              >
+                Re-submit for Review
+              </button>
+            )}
+
+            {sellerApplication?.status === "submitted" && (
+              <button className={classes.btnOutline} type="button" disabled>
+                Awaiting Review
+              </button>
+            )}
+
+            {sellerApplication?.status === "under_review" && (
+              <button className={classes.btnOutline} type="button" disabled>
+                Under Review
+              </button>
+            )}
+
+            {sellerApplication?.status === "approved" && (
+              <button className={classes.btnOutline} type="button" disabled>
+                Creator Approved
+              </button>
+            )}
+
+            {sellerApplication?.status === "rejected" && (
+              <button className={classes.btnOutline} type="button" disabled>
+                Application Rejected
+              </button>
+            )}
+
+            {sellerApplication?.status === "suspended" && (
+              <button className={classes.btnOutline} type="button" disabled>
+                Creator Suspended
+              </button>
+            )}
           </div>
+
+          {!canStartCreatorApplication && (
+            <div className={classes.fieldHelp}>
+              Add a display name and handle before starting your application.
+            </div>
+          )}
+
+          {sellerApplication?.status === "draft" && !hasLinkedCreatorPlatform && (
+            <div className={classes.fieldHelp}>
+              Link Twitch or YouTube before submitting for review.
+            </div>
+          )}
         </div>
       </div>
 
-      {(loading || isLoading || isLoadingPlatforms || isLoadingSellerApplication) && (
-        <div className={classes.loadingText}>Loading…</div>
-      )}
+      {(loading ||
+        isLoading ||
+        isLoadingPlatforms ||
+        isLoadingSellerApplication) && (
+          <div className={classes.loadingText}>Loading…</div>
+        )}
     </div>
   );
 };

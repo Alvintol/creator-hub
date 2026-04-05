@@ -4,26 +4,26 @@ import { useAuth } from "../providers/AuthProvider";
 
 export type PlatformKey = "twitch" | "youtube";
 
+export type ProfilePlatformAccountMetadata = {
+  age_ok?: boolean;
+  email?: string | null;
+  profile_image_url?: string | null;
+};
+
 export type ProfilePlatformAccountRow = {
   id: string;
   profile_user_id: string;
-
   platform: PlatformKey;
   platform_user_id: string;
-
   platform_login: string | null;
   platform_display_name: string | null;
   profile_url: string | null;
-
   account_created_at: string | null;
   connected_at: string;
-
   last_activity_at: string | null;
   activity_checked_at: string | null;
   is_active_recently: boolean | null;
-
-  metadata: Record<string, unknown>;
-
+  metadata: ProfilePlatformAccountMetadata | null;
   created_at: string;
   updated_at: string;
 };
