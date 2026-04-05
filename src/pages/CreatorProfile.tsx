@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
-import { creators, listings, type Creator, type Listing } from "../data/mock";
 import { normalizeTwitchLogin } from "../domain/twitch";
+import { usePublicCreatorProfile } from "../hooks/usePublicCreatorProfile";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
 
 const classes = {
@@ -17,7 +17,6 @@ const classes = {
   titleRow: "flex flex-wrap items-center gap-2",
   bio: "mt-2 text-zinc-600",
 
-  badgeVerified: "badge",
   badgeLive: "badge badgeLive",
 
   linksRow: "mt-4 flex flex-wrap gap-2",
@@ -26,10 +25,11 @@ const classes = {
 
   listingsSection: "space-y-3",
   emptyText: "text-sm text-zinc-600",
+  loadingText: "text-sm text-zinc-600",
   grid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
 
   listingCard: "card overflow-hidden",
-  listingImg: "h-40 w-full object-cover",
+  listingImg: "h-40 w-full object-cover bg-zinc-100",
   listingBody: "p-4",
   listingTitle: "text-base font-extrabold tracking-tight",
   listingDesc: "mt-1 text-sm text-zinc-600",
@@ -43,58 +43,81 @@ const classes = {
   liveMeta: "text-sm font-extrabold text-zinc-900",
   liveDot: "text-zinc-400",
   liveTitle: "mt-1 text-sm text-zinc-600",
+
+  platformSection: "mt-6 space-y-3",
+  platformSectionTitle: "text-sm font-extrabold text-zinc-900",
+  platformList: "space-y-2",
+  platformItem:
+    "flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3",
+  platformItemLeft: "space-y-1",
+  platformItemTitle: "text-sm font-semibold text-zinc-900",
+  platformItemValue: "text-sm text-zinc-600",
+  platformItemLink: "text-sm font-semibold text-zinc-600 hover:text-zinc-900",
+  platformBtnBase:
+    "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold shadow-[0_3px_10px_rgba(0,0,0,0.08)] transition-all duration-200 hover:-translate-y-[1px]",
+  platformBtnTwitch:
+    "border-[#9146FF] bg-[#9146FF] text-white hover:brightness-110 hover:shadow-[0_8px_22px_rgba(145,70,255,0.30)]",
+  platformBtnYouTube:
+    "border-[#FF0000] bg-[#FF0000] text-white hover:brightness-105 hover:shadow-[0_8px_22px_rgba(255,0,0,0.24)]",
+  platformBtnGeneric:
+    "border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-50 hover:border-zinc-400",
+  platformBtnIcon: "h-4 w-4 shrink-0",
 } as const;
-
-// Finds a creator by their public route handle
-const getCreatorByHandle = (handle: string): Creator | undefined =>
-  creators.find((creator) => creator.handle === handle);
-
-// Finds all listings owned by a creator using the stable internal creator id
-const getListingsByCreatorId = (creatorId: string): Listing[] =>
-  listings.filter((listing) => listing.creatorId === creatorId);
 
 type CreatorLinkButtonProps = {
   href: string;
   label: string;
-  variant?: "primary" | "outline";
+  platform?: "twitch" | "youtube" | "generic";
 };
 
-const CreatorLinkButton = (props: CreatorLinkButtonProps) => {
-  const { href, label, variant = "outline" } = props;
+const TwitchLogo = () => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    className={classes.platformBtnIcon}
+    fill="currentColor"
+  >
+    <path d="M4 3h16v11l-4 4h-4l-2 2H7v-2H4V3Zm14 10V5H6v11h3v2l2-2h4l3-3Z" />
+    <path d="M10 8h2v5h-2V8Zm5 0h2v5h-2V8Z" />
+  </svg>
+);
 
-  const className =
-    variant === "primary" ? classes.btnPrimary : classes.btnOutline;
+const YouTubeLogo = () => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    className={classes.platformBtnIcon}
+    fill="currentColor"
+  >
+    <path d="M23 12.001s0-3.068-.389-4.548a2.965 2.965 0 0 0-2.084-2.1C18.691 4.85 12 4.85 12 4.85s-6.691 0-8.527.503a2.965 2.965 0 0 0-2.084 2.1C1 8.933 1 12.001 1 12.001s0 3.068.389 4.548a2.965 2.965 0 0 0 2.084 2.1c1.836.503 8.527.503 8.527.503s6.691 0 8.527-.503a2.965 2.965 0 0 0 2.084-2.1c.389-1.48.389-4.548.389-4.548ZM10 15.5v-7l6 3.5-6 3.5Z" />
+  </svg>
+);
 
-  return (
-    <a className={className} target="_blank" rel="noreferrer" href={href}>
-      {label}
-    </a>
-  );
-};
+const getPlatformButtonClass = (
+  platform: CreatorLinkButtonProps["platform"]
+): string =>
+  platform === "twitch"
+    ? `${classes.platformBtnBase} ${classes.platformBtnTwitch}`
+    : platform === "youtube"
+      ? `${classes.platformBtnBase} ${classes.platformBtnYouTube}`
+      : `${classes.platformBtnBase} ${classes.platformBtnGeneric}`;
 
-type CreatorListingLinkProps = {
-  listing: Listing;
-};
-
-const CreatorListingLink = (props: CreatorListingLinkProps) => {
-  const { listing } = props;
-
-  return (
-    <Link to={`/listing/${listing.id}`} className={classes.listingCard}>
-      <img src={listing.preview} alt="" className={classes.listingImg} />
-
-      <div className={classes.listingBody}>
-        <div className={classes.listingTitle}>{listing.title}</div>
-        <p className={classes.listingDesc}>{listing.short}</p>
-
-        <div className={classes.listingMeta}>
-          <span className={classes.listingMetaLeft}>{listing.offeringType}</span>
-          <span className={classes.listingMetaRight}>{listing.category}</span>
-        </div>
-      </div>
-    </Link>
-  );
-};
+const CreatorLinkButton = ({
+  href,
+  label,
+  platform = "generic",
+}: CreatorLinkButtonProps) => (
+  <a
+    className={getPlatformButtonClass(platform)}
+    target="_blank"
+    rel="noreferrer"
+    href={href}
+  >
+    {platform === "twitch" && <TwitchLogo />}
+    {platform === "youtube" && <YouTubeLogo />}
+    <span>{label}</span>
+  </a>
+);
 
 const CreatorNotFound = () => (
   <div className={classes.notFoundWrap}>
@@ -110,22 +133,38 @@ const CreatorProfile = () => {
   const { handle } = useParams<{ handle: string }>();
   const { twitchByLogin } = useTwitchStreams();
 
+  const { data, isLoading, error } = usePublicCreatorProfile(handle ?? null);
+
   if (!handle) return <CreatorNotFound />;
 
-  const creator = getCreatorByHandle(handle);
-  if (!creator) return <CreatorNotFound />;
+  if (isLoading) {
+    return (
+      <div className={classes.container}>
+        <div className={classes.loadingText}>Loading…</div>
+      </div>
+    );
+  }
 
-  const creatorListings = getListingsByCreatorId(creator.id);
+  if (error || !data?.profile) return <CreatorNotFound />;
 
-  // Twitch login is only used for platform display/live lookup
-  // Internal app relationships should still use creator.id
-  const twitchLoginRaw = creator.platforms?.twitch?.login;
-  const twitchLogin = twitchLoginRaw ? normalizeTwitchLogin(twitchLoginRaw) : null;
+  const { profile, platformAccounts, listings } = data;
+
+  const twitchAccount =
+    platformAccounts.find((account) => account.platform === "twitch") ?? null;
+
+  const youtubeAccount =
+    platformAccounts.find((account) => account.platform === "youtube") ?? null;
+
+  const twitchLoginRaw = twitchAccount?.platform_login ?? null;
+  const twitchLogin = twitchLoginRaw
+    ? normalizeTwitchLogin(twitchLoginRaw)
+    : null;
+
   const stream = twitchLogin ? twitchByLogin[twitchLogin] : undefined;
   const isLive = Boolean(stream);
 
   const watchUrl =
-    creator.links?.twitch ??
+    twitchAccount?.profile_url ??
     (twitchLogin
       ? `https://twitch.tv/${encodeURIComponent(twitchLogin)}`
       : undefined);
@@ -138,43 +177,37 @@ const CreatorProfile = () => {
 
       <section className={classes.card}>
         <div className={classes.titleRow}>
-          <h1 className={classes.h1}>{creator.displayName}</h1>
-
-          {Boolean(creator.verified) && (
-            <span className={classes.badgeVerified}>Verified</span>
-          )}
+          <h1 className={classes.h1}>
+            {profile.display_name ?? profile.handle ?? "Creator"}
+          </h1>
 
           {isLive && <span className={classes.badgeLive}>Live</span>}
         </div>
 
-        <p className={classes.bio}>{creator.bio}</p>
+        {profile.bio && <p className={classes.bio}>{profile.bio}</p>}
 
         <div className={classes.linksRow}>
           {watchUrl && (
             <CreatorLinkButton
               href={watchUrl}
               label={isLive ? "Watch live on Twitch" : "Twitch"}
-              variant="primary"
+              platform="twitch"
             />
           )}
 
-          {creator.links?.youtube && (
-            <CreatorLinkButton href={creator.links.youtube} label="YouTube" />
-          )}
-
-          {creator.links?.discord && (
-            <CreatorLinkButton href={creator.links.discord} label="Discord" />
-          )}
-
-          {creator.links?.website && (
-            <CreatorLinkButton href={creator.links.website} label="Website" />
+          {youtubeAccount?.profile_url && (
+            <CreatorLinkButton
+              href={youtubeAccount.profile_url}
+              label="YouTube"
+              platform="youtube"
+            />
           )}
         </div>
 
-        {isLive && (
+        {isLive && stream?.thumbnailUrl && (
           <div className={classes.liveCard}>
             <img
-              src={(stream?.thumbnailUrl ?? "")
+              src={stream.thumbnailUrl
                 .replace("{width}", "960")
                 .replace("{height}", "540")}
               alt=""
@@ -184,13 +217,13 @@ const CreatorProfile = () => {
 
             <div className={classes.liveBody}>
               <div className={classes.liveMeta}>
-                {stream?.gameName ?? ""}
+                {stream.gameName ?? ""}
                 <span className={classes.liveDot}> • </span>
-                {stream?.viewerCount ?? 0} viewers
+                {stream.viewerCount ?? 0} viewers
               </div>
 
-              {Boolean(stream?.title) && (
-                <p className={classes.liveTitle}>{stream?.title}</p>
+              {stream.title && (
+                <p className={classes.liveTitle}>{stream.title}</p>
               )}
             </div>
           </div>
@@ -200,12 +233,42 @@ const CreatorProfile = () => {
       <section className={classes.listingsSection}>
         <h2 className={classes.h2}>Listings</h2>
 
-        {creatorListings.length === 0 ? (
+        {listings.length === 0 ? (
           <p className={classes.emptyText}>No listings yet.</p>
         ) : (
           <div className={classes.grid}>
-            {creatorListings.map((listing) => (
-              <CreatorListingLink key={listing.id} listing={listing} />
+            {listings.map((listing) => (
+              <Link
+                key={listing.id}
+                to={`/listing/${listing.id}`}
+                className={classes.listingCard}
+              >
+                {listing.preview_url ? (
+                  <img
+                    src={listing.preview_url}
+                    alt=""
+                    className={classes.listingImg}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className={classes.listingImg} />
+                )}
+
+                <div className={classes.listingBody}>
+                  <div className={classes.listingTitle}>{listing.title}</div>
+                  <p className={classes.listingDesc}>{listing.short}</p>
+
+                  <div className={classes.listingMeta}>
+                    <span className={classes.listingMetaLeft}>
+                      {listing.offering_type}
+                    </span>
+
+                    <span className={classes.listingMetaRight}>
+                      {listing.category}
+                    </span>
+                  </div>
+                </div>
+              </Link>
             ))}
           </div>
         )}

@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { creators, listings, type Creator, type Listing } from "../data/mock";
 import { CATEGORIES } from "../domain/catalog";
 import { normalizeTwitchLogin, type TwitchStream } from "../domain/twitch";
+import { useMarketListings, type MarketListingItem } from "../hooks/useMarketListings";
+import { usePublicCreators, type PublicCreatorItem } from "../hooks/usePublicCreators";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
 
 const classes = {
@@ -35,7 +36,7 @@ const classes = {
   grid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
 
   featuredMedia: "relative",
-  featuredImg: "h-40 w-full object-cover",
+  featuredImg: "h-40 w-full object-cover bg-zinc-100",
   featuredBadges: "absolute left-3 top-3 flex gap-2",
 
   featuredBody: "p-4",
@@ -59,6 +60,7 @@ const classes = {
   liveErrorTitle: "text-sm font-semibold text-zinc-900",
   liveErrorBody: "mt-1 text-sm text-zinc-700",
 
+  loadingText: "text-sm text-zinc-600",
   emptyText: "text-sm text-zinc-600",
 } as const;
 
@@ -67,32 +69,27 @@ const categoryLabels = Object.fromEntries(
   CATEGORIES.map((category) => [category.key, category.label])
 ) as Record<string, string>;
 
-// Fast lookup map for creators by stable internal creator id
-const byId = Object.fromEntries(
-  creators.map((creator) => [creator.id, creator])
-) as Record<string, Creator>;
-
 // Converts a category key into its display label
 const categoryLabel = (key: string): string => categoryLabels[key] ?? key;
 
 // Converts offering type into a small display pill label
-const offeringPill = (offeringType: Listing["offeringType"]): string =>
+const offeringPill = (offeringType: string): string =>
   offeringType === "digital"
     ? "Digital"
     : offeringType === "commission"
       ? "Commission"
       : offeringType === "service"
         ? "Service"
-        : String(offeringType ?? "");
+        : offeringType;
 
 // Formats listing price text for display
-const priceText = (listing: Listing): string =>
-  listing.priceType === "fixed"
-    ? `$${listing.priceMin}`
-    : listing.priceType === "starting_at"
-      ? `From $${listing.priceMin}`
-      : listing.priceType === "range"
-        ? `$${listing.priceMin}–$${listing.priceMax ?? listing.priceMin}`
+const priceText = (item: MarketListingItem["listing"]): string =>
+  item.price_type === "fixed"
+    ? `$${item.price_min}`
+    : item.price_type === "starting_at"
+      ? `From $${item.price_min}`
+      : item.price_type === "range"
+        ? `$${item.price_min}–$${item.price_max ?? item.price_min}`
         : "";
 
 // Builds a badge class string from the chosen badge variant
@@ -109,19 +106,15 @@ type SectionHeaderProps = {
   linkText: string;
 };
 
-const SectionHeader = (props: SectionHeaderProps) => {
-  const { title, to, linkText } = props;
+const SectionHeader = ({ title, to, linkText }: SectionHeaderProps) => (
+  <div className={classes.headerRow}>
+    <h2 className={classes.h2}>{title}</h2>
 
-  return (
-    <div className={classes.headerRow}>
-      <h2 className={classes.h2}>{title}</h2>
-
-      <Link to={to} className={classes.linkSubtle}>
-        {linkText}
-      </Link>
-    </div>
-  );
-};
+    <Link to={to} className={classes.linkSubtle}>
+      {linkText}
+    </Link>
+  </div>
+);
 
 const HeroSection = () => (
   <section className={classes.cardLg}>
@@ -172,33 +165,36 @@ const HeroSection = () => (
 );
 
 type FeaturedListingCardProps = {
-  listing: Listing;
+  item: MarketListingItem;
 };
 
-const FeaturedListingCard = (props: FeaturedListingCardProps) => {
-  const { listing } = props;
+const FeaturedListingCard = ({ item }: FeaturedListingCardProps) => {
+  const { listing, creator } = item;
 
-  const creator = byId[listing.creatorId];
-
-  // Adds a readable subtype suffix for video-editing listings
   const videoSuffix =
-    listing.category === "video-editing" && listing.videoSubtype
-      ? ` • ${listing.videoSubtype === "long-form" ? "Long Form" : "Short Form"}`
+    listing.category === "video-editing" && listing.video_subtype
+      ? ` • ${listing.video_subtype === "long-form" ? "Long Form" : "Short Form"}`
       : "";
+
+  const creatorName = creator?.display_name ?? creator?.handle ?? "Unknown creator";
 
   return (
     <Link to={`/listing/${listing.id}`} className={classes.cardLink}>
       <div className={classes.featuredMedia}>
-        <img
-          src={listing.preview}
-          alt=""
-          className={classes.featuredImg}
-          loading="lazy"
-        />
+        {listing.preview_url ? (
+          <img
+            src={listing.preview_url}
+            alt=""
+            className={classes.featuredImg}
+            loading="lazy"
+          />
+        ) : (
+          <div className={classes.featuredImg} />
+        )}
 
         <div className={classes.featuredBadges}>
           <span className={getBadgeClassName("default")}>
-            {offeringPill(listing.offeringType)}
+            {offeringPill(listing.offering_type)}
           </span>
 
           <span className={getBadgeClassName("featured")}>Featured</span>
@@ -222,10 +218,7 @@ const FeaturedListingCard = (props: FeaturedListingCardProps) => {
         <p className={classes.featuredShort}>{listing.short}</p>
 
         <div className={classes.featuredBy}>
-          by{" "}
-          <span className={classes.featuredByName}>
-            {creator?.displayName ?? "Unknown creator"}
-          </span>
+          by <span className={classes.featuredByName}>{creatorName}</span>
         </div>
       </div>
     </Link>
@@ -233,35 +226,37 @@ const FeaturedListingCard = (props: FeaturedListingCardProps) => {
 };
 
 type FeaturedSectionProps = {
-  featuredListings: Listing[];
+  featuredListings: MarketListingItem[];
+  isLoading: boolean;
 };
 
-const FeaturedSection = (props: FeaturedSectionProps) => {
-  const { featuredListings } = props;
+const FeaturedSection = ({ featuredListings, isLoading }: FeaturedSectionProps) => (
+  <section className={classes.section}>
+    <SectionHeader title="Featured" to="/market" linkText="Browse market →" />
 
-  return (
-    <section className={classes.section}>
-      <SectionHeader title="Featured" to="/market" linkText="Browse market →" />
-
+    {isLoading ? (
+      <p className={classes.loadingText}>Loading featured listings…</p>
+    ) : featuredListings.length === 0 ? (
+      <p className={classes.emptyText}>No listings available yet.</p>
+    ) : (
       <div className={classes.grid}>
-        {featuredListings.map((listing) => (
-          <FeaturedListingCard key={listing.id} listing={listing} />
+        {featuredListings.map((item) => (
+          <FeaturedListingCard key={item.listing.id} item={item} />
         ))}
       </div>
-    </section>
-  );
-};
+    )}
+  </section>
+);
 
 type LiveNowItem = {
-  creator: Creator;
+  creator: PublicCreatorItem["profile"];
+  verified: boolean;
   stream: TwitchStream;
 };
 
 type LiveCreatorCardProps = LiveNowItem;
 
-const LiveCreatorCard = (props: LiveCreatorCardProps) => {
-  const { creator, stream } = props;
-
+const LiveCreatorCard = ({ creator, verified, stream }: LiveCreatorCardProps) => {
   const thumb =
     stream.thumbnailUrl
       ?.replace("{width}", "640")
@@ -279,9 +274,11 @@ const LiveCreatorCard = (props: LiveCreatorCardProps) => {
       )}
 
       <div className={classes.liveRow}>
-        <div className={classes.liveTitle}>{creator.displayName}</div>
+        <div className={classes.liveTitle}>
+          {creator.display_name ?? creator.handle ?? "Creator"}
+        </div>
 
-        {Boolean(creator.verified) && (
+        {verified && (
           <span className={getBadgeClassName("default")}>Verified</span>
         )}
 
@@ -304,37 +301,45 @@ type LiveNowSectionProps = {
   errorMsg: string | null;
 };
 
-const LiveNowSection = (props: LiveNowSectionProps) => {
-  const { liveNow, isFetching, errorMsg } = props;
+const LiveNowSection = ({ liveNow, isFetching, errorMsg }: LiveNowSectionProps) => (
+  <section className={classes.section}>
+    <SectionHeader title="Live now" to="/live" linkText="View all →" />
 
-  return (
-    <section className={classes.section}>
-      <SectionHeader title="Live now" to="/live" linkText="View all →" />
+    {errorMsg && (
+      <div className={classes.liveErrorCard}>
+        <div className={classes.liveErrorTitle}>Live status unavailable</div>
+        <div className={classes.liveErrorBody}>{errorMsg}</div>
+      </div>
+    )}
 
-      {errorMsg && (
-        <div className={classes.liveErrorCard}>
-          <div className={classes.liveErrorTitle}>Live status unavailable</div>
-          <div className={classes.liveErrorBody}>{errorMsg}</div>
-        </div>
-      )}
-
-      {liveNow.length === 0 ? (
-        <p className={classes.emptyText}>
-          {isFetching ? "Checking live status…" : "No one is live right now."}
-        </p>
-      ) : (
-        <div className={classes.grid}>
-          {liveNow.slice(0, 6).map(({ creator, stream }) => (
-            <LiveCreatorCard key={creator.id} creator={creator} stream={stream} />
-          ))}
-        </div>
-      )}
-    </section>
-  );
-};
+    {liveNow.length === 0 ? (
+      <p className={classes.emptyText}>
+        {isFetching ? "Checking live status…" : "No one is live right now."}
+      </p>
+    ) : (
+      <div className={classes.grid}>
+        {liveNow.slice(0, 6).map(({ creator, verified, stream }) => (
+          <LiveCreatorCard
+            key={creator.user_id}
+            creator={creator}
+            verified={verified}
+            stream={stream}
+          />
+        ))}
+      </div>
+    )}
+  </section>
+);
 
 const Home = () => {
   const { twitchByLogin, isFetching, error } = useTwitchStreams();
+  const {
+    data: marketItems = [],
+    isLoading: isLoadingMarket,
+  } = useMarketListings();
+  const {
+    data: creatorItems = [],
+  } = usePublicCreators();
 
   const errorMsg =
     error && typeof error === "object" && "message" in error
@@ -343,32 +348,41 @@ const Home = () => {
         ? String(error)
         : null;
 
-  // Builds the live creator list by matching creators with current Twitch stream data
   const liveNow = useMemo<LiveNowItem[]>(
     () =>
-      creators
-        .map((creator) => {
-          const loginRaw = creator.platforms?.twitch?.login;
+      creatorItems
+        .map((item) => {
+          const twitchAccount =
+            item.platformAccounts.find((account) => account.platform === "twitch") ?? null;
+
+          const loginRaw = twitchAccount?.platform_login ?? null;
           const login = loginRaw ? normalizeTwitchLogin(loginRaw) : null;
           const stream = login ? twitchByLogin[login] : undefined;
 
-          return stream ? { creator, stream } : null;
+          return stream
+            ? {
+              creator: item.profile,
+              verified: false,
+              stream,
+            }
+            : null;
         })
         .filter((value): value is LiveNowItem => Boolean(value))
         .sort((a, b) => (b.stream.viewerCount ?? 0) - (a.stream.viewerCount ?? 0)),
-    [twitchByLogin]
+    [creatorItems, twitchByLogin]
   );
 
-  // Prefer explicitly featured listings, otherwise fall back to the first few listings
-  const featured = listings.filter((listing) => Boolean(listing.featured));
-  const featuredListings = featured.length
-    ? featured.slice(0, 6)
-    : listings.slice(0, 6);
+  // Until listings have a dedicated featured flag in the db,
+  // use the first public listings returned by the market query.
+  const featuredListings = marketItems.slice(0, 6);
 
   return (
     <div className={classes.page}>
       <HeroSection />
-      <FeaturedSection featuredListings={featuredListings} />
+      <FeaturedSection
+        featuredListings={featuredListings}
+        isLoading={isLoadingMarket}
+      />
       <LiveNowSection
         liveNow={liveNow}
         isFetching={isFetching}

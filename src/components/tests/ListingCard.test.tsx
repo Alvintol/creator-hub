@@ -1,13 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import ListingCard from "../ListingCard";
+import type { ReactNode } from "react";
+import ListingCard, {
+  type ListingCardListing,
+  type ListingCardCreator,
+} from "../ListingCard";
 import {
   HubActionsContext,
   HubStateContext,
 } from "../../providers/hub/HubProvider";
 import type { HubActions, HubState } from "../../providers/hub";
-import type { Listing } from "../../data/mock";
 
 // Mock Hub actions used by FavouriteButton inside ListingCard
 const mockSetFilters = vi.fn();
@@ -45,7 +48,7 @@ const createActions = (): HubActions => ({
 
 // Renders the component inside the providers it depends on
 const renderWithProviders = (
-  ui: React.ReactNode,
+  ui: ReactNode,
   stateOverrides?: Partial<HubState>
 ) => {
   const state = createState(stateOverrides);
@@ -63,19 +66,26 @@ const renderWithProviders = (
 };
 
 // Small reusable listing factory for tests
-const createListing = (overrides?: Partial<Listing>): Listing => ({
+const createListing = (
+  overrides?: Partial<ListingCardListing>
+): ListingCardListing => ({
   id: "listing-emotes-01",
-  creatorId: "creator-amatrine",
-  offeringType: "digital",
-  category: "emotes",
   title: "Cozy Emote Pack (12)",
   short: "12 emotes + variants. Includes PNG + licence notes.",
-  preview: "https://picsum.photos/seed/emotes/960/540",
-  priceType: "fixed",
-  priceMin: 18,
-  priceMax: 18,
-  deliverables: ["png"],
-  featured: true,
+  offering_type: "digital",
+  price_type: "fixed",
+  price_min: 18,
+  price_max: 18,
+  preview_url: "https://picsum.photos/seed/emotes/960/540",
+  ...overrides,
+});
+
+// Small reusable creator factory for tests
+const createCreator = (
+  overrides?: Partial<ListingCardCreator>
+): ListingCardCreator => ({
+  name: "Amatrine",
+  isLive: false,
   ...overrides,
 });
 
@@ -86,10 +96,9 @@ describe("ListingCard", () => {
 
   it("renders the listing title and short description", () => {
     const listing = createListing();
+    const creator = createCreator();
 
-    renderWithProviders(
-      <ListingCard listing={listing} creatorName="Amatrine" />
-    );
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
 
     expect(screen.getByText("Cozy Emote Pack (12)")).toBeInTheDocument();
     expect(
@@ -99,64 +108,88 @@ describe("ListingCard", () => {
 
   it("renders the offering type badge", () => {
     const listing = createListing({
-      offeringType: "service",
+      offering_type: "service",
     });
+    const creator = createCreator();
 
-    renderWithProviders(
-      <ListingCard listing={listing} creatorName="Amatrine" />
-    );
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
 
     expect(screen.getByText("service")).toBeInTheDocument();
   });
 
   it("renders the creator name", () => {
     const listing = createListing();
+    const creator = createCreator({
+      name: "Rigmancer",
+    });
 
-    renderWithProviders(
-      <ListingCard listing={listing} creatorName="Rigmancer" />
-    );
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
 
     expect(screen.getByText("Rigmancer")).toBeInTheDocument();
   });
 
-  it("renders a fixed price correctly", () => {
-    const listing = createListing({
-      priceType: "fixed",
-      priceMin: 18,
-      priceMax: 18,
+  it("renders the live label in the creator text when live", () => {
+    const listing = createListing();
+    const creator = createCreator({
+      name: "Rigmancer",
+      isLive: true,
     });
 
-    renderWithProviders(
-      <ListingCard listing={listing} creatorName="Amatrine" />
-    );
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
+
+    expect(screen.getByText("Rigmancer • Live")).toBeInTheDocument();
+  });
+
+  it("renders the live badge when the creator is live", () => {
+    const listing = createListing();
+    const creator = createCreator({
+      isLive: true,
+    });
+
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
+
+    expect(screen.getByText("Live")).toBeInTheDocument();
+  });
+
+  it("renders a fixed price correctly", () => {
+    const listing = createListing({
+      price_type: "fixed",
+      price_min: 18,
+      price_max: 18,
+    });
+    const creator = createCreator();
+
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
 
     expect(screen.getByText("$18")).toBeInTheDocument();
   });
 
   it("renders a starting_at price correctly", () => {
     const listing = createListing({
-      priceType: "starting_at",
-      priceMin: 90,
-      priceMax: null,
+      price_type: "starting_at",
+      price_min: 90,
+      price_max: null,
+    });
+    const creator = createCreator({
+      name: "jaQUILLyn",
     });
 
-    renderWithProviders(
-      <ListingCard listing={listing} creatorName="jaQUILLyn" />
-    );
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
 
     expect(screen.getByText("From $90")).toBeInTheDocument();
   });
 
   it("renders a range price correctly", () => {
     const listing = createListing({
-      priceType: "range",
-      priceMin: 120,
-      priceMax: 420,
+      price_type: "range",
+      price_min: 120,
+      price_max: 420,
+    });
+    const creator = createCreator({
+      name: "Rigmancer",
     });
 
-    renderWithProviders(
-      <ListingCard listing={listing} creatorName="Rigmancer" />
-    );
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
 
     expect(screen.getByText("$120–$420")).toBeInTheDocument();
   });
@@ -165,10 +198,11 @@ describe("ListingCard", () => {
     const listing = createListing({
       id: "listing-rigging-01",
     });
+    const creator = createCreator({
+      name: "Rigmancer",
+    });
 
-    renderWithProviders(
-      <ListingCard listing={listing} creatorName="Rigmancer" />
-    );
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
 
     const link = screen.getByRole("link");
 
@@ -177,10 +211,9 @@ describe("ListingCard", () => {
 
   it("renders the favourite button inside the card", () => {
     const listing = createListing();
+    const creator = createCreator();
 
-    renderWithProviders(
-      <ListingCard listing={listing} creatorName="Amatrine" />
-    );
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
 
     expect(
       screen.getByRole("button", { name: "Add favourite" })

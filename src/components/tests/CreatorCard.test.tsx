@@ -150,27 +150,14 @@ describe("CreatorCard", () => {
     expect(screen.queryByText("Verified")).not.toBeInTheDocument();
   });
 
-  it("shows the live badge when the creator has a live Twitch stream", () => {
+  it("shows the live badge when the creator is live", () => {
     const creator = createCreator({
-      platforms: {
-        twitch: {
-          login: "Amatrine",
-        },
+      live: {
+        isLive: true,
+        title: "Grinding ranked",
+        platform: "twitch",
       },
     });
-
-    mockUseTwitchStreams.mockReturnValue(
-      createTwitchStreamsResult({
-        twitchByLogin: {
-          amatrine: createStream({
-            title: "Live right now",
-            viewerCount: 42,
-            gameName: "Just Chatting",
-            thumbnailUrl: "https://example.com/{width}x{height}.jpg",
-          }),
-        },
-      })
-    );
 
     renderWithProviders(<CreatorCard creator={creator} />);
 

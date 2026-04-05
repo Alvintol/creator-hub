@@ -1,12 +1,9 @@
 import { useEffect, useMemo } from "react";
-import { Link, useLocation } from "react-router-dom";
-import {
-  creators,
-  listings,
-  categories,
-  type Creator,
-  type Listing,
-} from "../data/mock";
+import { useLocation } from "react-router-dom";
+import ListingCard from "../components/ListingCard";
+import { normalizeTwitchLogin } from "../domain/twitch";
+import { useTwitchStreams } from "../hooks/useTwitchStreams";
+import { useMarketListings, type MarketListingItem } from "../hooks/useMarketListings";
 import {
   useHubActions,
   useHubState,
@@ -28,94 +25,47 @@ const classes = {
   select: "searchInput",
 
   grid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
-
-  card: "card overflow-hidden hover:bg-zinc-50",
-  img: "h-40 w-full object-cover",
-  body: "p-4",
-
-  topRow: "flex flex-wrap items-center justify-between gap-2",
-  title: "text-base font-extrabold tracking-tight",
-  badge:
-    "rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-xs font-semibold",
-
-  desc: "mt-1 text-sm text-zinc-600",
-
-  bottomRow: "mt-3 flex items-center justify-between text-sm",
-  price: "font-extrabold",
-  creator: "text-zinc-600",
+  loadingText: "text-sm text-zinc-600",
+  emptyText: "text-sm text-zinc-600",
 } as const;
 
-// Fast lookup map for creators by stable internal creator id
-const creatorById = Object.fromEntries(
-  creators.map((creator) => [creator.id, creator])
-) as Record<string, Creator>;
-
-// Formats listing price text for UI display
-const priceText = (listing: Listing): string => {
-  if (listing.priceType === "fixed") return `$${listing.priceMin}`;
-  if (listing.priceType === "starting_at") return `From $${listing.priceMin}`;
-
-  if (listing.priceType === "range") {
-    const max = listing.priceMax ?? listing.priceMin;
-    return `$${listing.priceMin}–$${max}`;
-  }
-
-  return "";
-};
+// Temporary category list until categories move to db/config
+const categoryOptions = [
+  { key: "all", label: "All categories" },
+  { key: "emotes", label: "Emotes" },
+  { key: "overlays", label: "Overlays" },
+  { key: "pngtuber-models", label: "PNG-tuber models" },
+  { key: "vtuber-models", label: "VTuber models" },
+  { key: "vtuber-rigging", label: "VTuber rigging" },
+  { key: "video-editing", label: "Video editing" },
+  { key: "audio-tech-help", label: "Audio tech help" },
+] as const;
 
 // Builds a search string for listing filtering
-// This lets the search box match across listing fields and creator fields
-const getListingHaystack = (listing: Listing, creator?: Creator): string =>
-  [
+const getListingHaystack = (item: MarketListingItem): string => {
+  const { listing, creator, platformAccounts } = item;
+
+  const twitchAccount =
+    platformAccounts.find((account) => account.platform === "twitch") ?? null;
+
+  return [
     listing.title,
     listing.short,
     listing.category,
-    listing.offeringType,
-    listing.videoSubtype ?? "",
+    listing.offering_type,
+    listing.video_subtype ?? "",
     ...(listing.deliverables ?? []),
-    creator?.displayName ?? "",
+    ...(listing.tags ?? []),
+    creator?.display_name ?? "",
     creator?.handle ?? "",
+    twitchAccount?.platform_login ?? "",
+    twitchAccount?.platform_display_name ?? "",
   ]
     .join(" ")
     .toLowerCase();
-
-type MarketListingCardProps = {
-  listing: Listing;
-  creator?: Creator;
 };
 
-const MarketListingCard = (props: MarketListingCardProps) => {
-  const { listing, creator } = props;
-
-  return (
-    <Link to={`/listing/${listing.id}`} className={classes.card}>
-      <img src={listing.preview} alt="" className={classes.img} />
-
-      <div className={classes.body}>
-        <div className={classes.topRow}>
-          <div className={classes.title}>{listing.title}</div>
-          <span className={classes.badge}>{listing.offeringType}</span>
-        </div>
-
-        <p className={classes.desc}>{listing.short}</p>
-
-        <div className={classes.bottomRow}>
-          <span className={classes.price}>{priceText(listing)}</span>
-          <span className={classes.creator}>
-            {creator?.displayName ?? "Unknown creator"}
-          </span>
-        </div>
-      </div>
-    </Link>
-  );
-};
-
-// Reads filter values from the current URL query string
-// supported params:
-// ?q=...
-// ?cat=...
-// ?type=...
-// ?video=...
+// Reads supported filter values from the current URL query string
 const parseFromUrl = (search: string): Partial<HubFilters> => {
   const params = new URLSearchParams(search);
 
@@ -136,9 +86,11 @@ const Market = () => {
   const { filters } = useHubState();
   const { setFilters } = useHubActions();
   const { search } = useLocation();
+  const { twitchByLogin } = useTwitchStreams();
+
+  const { data: items = [], isLoading, error } = useMarketListings();
 
   // Syncs supported URL params into Hub filter state
-  // Only updates values that are actually different
   useEffect(() => {
     const fromUrl = parseFromUrl(search);
     const patch: Partial<HubFilters> = {};
@@ -177,14 +129,16 @@ const Market = () => {
     setFilters,
   ]);
 
-  // Applies the current Hub filters to all marketplace listings
-  const filtered = useMemo((): Listing[] => {
+  // Applies the current Hub filters to public marketplace listings
+  const filtered = useMemo((): MarketListingItem[] => {
     const searchValue = filters.q.trim().toLowerCase();
 
-    return listings.filter((listing) => {
+    return items.filter((item) => {
+      const { listing } = item;
+
       if (
         filters.type !== "all" &&
-        listing.offeringType !== filters.type
+        listing.offering_type !== filters.type
       ) {
         return false;
       }
@@ -198,17 +152,16 @@ const Market = () => {
 
       if (filters.videoSubtype !== "all") {
         if (listing.category !== "video-editing") return false;
-        if ((listing.videoSubtype ?? "all") !== filters.videoSubtype) {
+        if ((listing.video_subtype ?? "all") !== filters.videoSubtype) {
           return false;
         }
       }
 
       if (!searchValue) return true;
 
-      const creator = creatorById[listing.creatorId];
-      return getListingHaystack(listing, creator).includes(searchValue);
+      return getListingHaystack(item).includes(searchValue);
     });
-  }, [filters]);
+  }, [filters, items]);
 
   return (
     <div className={classes.page}>
@@ -245,9 +198,7 @@ const Market = () => {
             setFilters({ category: event.currentTarget.value as CategoryKey })
           }
         >
-          <option value="all">All categories</option>
-
-          {categories.map((category) => (
+          {categoryOptions.map((category) => (
             <option key={category.key} value={category.key}>
               {category.label}
             </option>
@@ -255,15 +206,49 @@ const Market = () => {
         </select>
       </div>
 
+      {isLoading && <div className={classes.loadingText}>Loading…</div>}
+
+      {error && !isLoading && (
+        <div className={classes.loadingText}>
+          Could not load marketplace listings.
+        </div>
+      )}
+
+      {!isLoading && !error && filtered.length === 0 && (
+        <div className={classes.emptyText}>No listings found.</div>
+      )}
+
       <div className={classes.grid}>
-        {filtered.map((listing) => {
-          const creator = creatorById[listing.creatorId];
+        {filtered.map((item) => {
+          const { listing, creator, platformAccounts } = item;
+
+          const twitchAccount =
+            platformAccounts.find((account) => account.platform === "twitch") ?? null;
+
+          const twitchLoginRaw = twitchAccount?.platform_login ?? null;
+          const twitchLogin = twitchLoginRaw
+            ? normalizeTwitchLogin(twitchLoginRaw)
+            : null;
+
+          const isLive = twitchLogin ? Boolean(twitchByLogin[twitchLogin]) : false;
 
           return (
-            <MarketListingCard
+            <ListingCard
               key={listing.id}
-              listing={listing}
-              creator={creator}
+              listing={{
+                id: listing.id,
+                title: listing.title,
+                short: listing.short,
+                offering_type: listing.offering_type,
+                price_type: listing.price_type,
+                price_min: listing.price_min,
+                price_max: listing.price_max,
+                preview_url: listing.preview_url,
+              }}
+              creator={{
+                name: creator?.display_name ?? creator?.handle ?? "Unknown creator",
+                isLive,
+              }}
             />
           );
         })}

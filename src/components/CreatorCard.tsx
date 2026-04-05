@@ -1,8 +1,5 @@
 import { Link } from "react-router-dom";
-import type { Creator } from "../data/mock";
 import FavouriteButton from "./FavouriteButton";
-import { normalizeTwitchLogin } from "../domain/twitch";
-import { useTwitchStreams } from "../hooks/useTwitchStreams";
 
 const classes = {
   card: "group relative rounded-2xl border border-zinc-200 bg-white p-4 hover:bg-zinc-50",
@@ -24,10 +21,38 @@ const classes = {
   tag: "rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700",
 } as const;
 
+export type CreatorCardModel = {
+  id: string;
+  handle: string;
+  displayName: string;
+  verified: boolean;
+  bio: string;
+  tags?: string[];
+  specialties?: string[];
+  commissionStatus: string;
+  platforms?: {
+    twitch?: {
+      login: string;
+      userId?: string;
+    };
+    youtube?: {
+      channelId: string;
+      handle?: string;
+    };
+  };
+  links?: {
+    twitch?: string;
+    youtube?: string;
+  };
+  live?: {
+    isLive: boolean;
+    title?: string;
+    platform?: "twitch" | "youtube";
+  };
+};
+
 // Maps commission status to its matching text colour
-const getCommissionStatusClass = (
-  status: Creator["commissionStatus"]
-): string =>
+const getCommissionStatusClass = (status: CreatorCardModel["commissionStatus"]): string =>
   status === "open"
     ? "text-emerald-600"
     : status === "limited"
@@ -35,19 +60,11 @@ const getCommissionStatusClass = (
       : "text-rose-700";
 
 type CreatorCardProps = {
-  creator: Creator;
+  creator: CreatorCardModel;
 };
 
-const CreatorCard = (props: CreatorCardProps) => {
-  const { creator } = props;
-
-  const { twitchByLogin } = useTwitchStreams();
-
-  // Live state is still derived from Twitch login data for display purposes
-  // This is separate from favourites, which should use the internal creator id
-  const loginRaw = creator.platforms?.twitch?.login;
-  const login = loginRaw ? normalizeTwitchLogin(loginRaw) : null;
-  const isLive = Boolean(login && twitchByLogin[login]);
+const CreatorCard = ({ creator }: CreatorCardProps) => {
+  const isLive = Boolean(creator.live?.isLive);
 
   const commissionClass = `${classes.statusBase} ${getCommissionStatusClass(
     creator.commissionStatus
@@ -63,7 +80,7 @@ const CreatorCard = (props: CreatorCardProps) => {
       <div className={classes.titleRow}>
         <h3 className={classes.h3}>{creator.displayName}</h3>
 
-        {Boolean(creator.verified) && (
+        {creator.verified && (
           <span className={`${classes.badgeBase} ${classes.badgeVerified}`}>
             Verified
           </span>
