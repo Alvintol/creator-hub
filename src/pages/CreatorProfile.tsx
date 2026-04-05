@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { creators, listings, type Creator, type Listing } from "../data/mock";
 import { normalizeTwitchLogin } from "../domain/twitch";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
+import { usePublicCreatorProfile } from '../hooks/usePublicCreatorProfile';
 
 const classes = {
   container: "space-y-8",
@@ -110,22 +111,31 @@ const CreatorProfile = () => {
   const { handle } = useParams<{ handle: string }>();
   const { twitchByLogin } = useTwitchStreams();
 
+  const {
+    data,
+    isLoading,
+    error,
+  } = usePublicCreatorProfile(handle ?? null);
+
   if (!handle) return <CreatorNotFound />;
+  if (isLoading) return <div className={classes.container}>Loading…</div>;
+  if (error || !data?.profile) return <CreatorNotFound />;
 
-  const creator = getCreatorByHandle(handle);
-  if (!creator) return <CreatorNotFound />;
+  const { profile, platformAccounts, listings } = data;
 
-  const creatorListings = getListingsByCreatorId(creator.id);
+  const twitchAccount =
+    platformAccounts.find((account) => account.platform === "twitch") ?? null;
 
-  // Twitch login is only used for platform display/live lookup
-  // Internal app relationships should still use creator.id
-  const twitchLoginRaw = creator.platforms?.twitch?.login;
+  const youtubeAccount =
+    platformAccounts.find((account) => account.platform === "youtube") ?? null;
+
+  const twitchLoginRaw = twitchAccount?.platform_login ?? null;
   const twitchLogin = twitchLoginRaw ? normalizeTwitchLogin(twitchLoginRaw) : null;
   const stream = twitchLogin ? twitchByLogin[twitchLogin] : undefined;
   const isLive = Boolean(stream);
 
   const watchUrl =
-    creator.links?.twitch ??
+    twitchAccount?.profile_url ??
     (twitchLogin
       ? `https://twitch.tv/${encodeURIComponent(twitchLogin)}`
       : undefined);
@@ -138,16 +148,14 @@ const CreatorProfile = () => {
 
       <section className={classes.card}>
         <div className={classes.titleRow}>
-          <h1 className={classes.h1}>{creator.displayName}</h1>
-
-          {Boolean(creator.verified) && (
-            <span className={classes.badgeVerified}>Verified</span>
-          )}
+          <h1 className={classes.h1}>
+            {profile.display_name || profile.handle || "Creator"}
+          </h1>
 
           {isLive && <span className={classes.badgeLive}>Live</span>}
         </div>
 
-        <p className={classes.bio}>{creator.bio}</p>
+        {profile.bio && <p className={classes.bio}>{profile.bio}</p>}
 
         <div className={classes.linksRow}>
           {watchUrl && (
@@ -158,16 +166,11 @@ const CreatorProfile = () => {
             />
           )}
 
-          {creator.links?.youtube && (
-            <CreatorLinkButton href={creator.links.youtube} label="YouTube" />
-          )}
-
-          {creator.links?.discord && (
-            <CreatorLinkButton href={creator.links.discord} label="Discord" />
-          )}
-
-          {creator.links?.website && (
-            <CreatorLinkButton href={creator.links.website} label="Website" />
+          {youtubeAccount?.profile_url && (
+            <CreatorLinkButton
+              href={youtubeAccount.profile_url}
+              label="YouTube"
+            />
           )}
         </div>
 
@@ -189,8 +192,8 @@ const CreatorProfile = () => {
                 {stream?.viewerCount ?? 0} viewers
               </div>
 
-              {Boolean(stream?.title) && (
-                <p className={classes.liveTitle}>{stream?.title}</p>
+              {stream?.title && (
+                <p className={classes.liveTitle}>{stream.title}</p>
               )}
             </div>
           </div>
@@ -200,12 +203,37 @@ const CreatorProfile = () => {
       <section className={classes.listingsSection}>
         <h2 className={classes.h2}>Listings</h2>
 
-        {creatorListings.length === 0 ? (
+        {listings.length === 0 ? (
           <p className={classes.emptyText}>No listings yet.</p>
         ) : (
           <div className={classes.grid}>
-            {creatorListings.map((listing) => (
-              <CreatorListingLink key={listing.id} listing={listing} />
+            {listings.map((listing) => (
+              <Link
+                key={listing.id}
+                to={`/listing/${listing.id}`}
+                className={classes.listingCard}
+              >
+                {listing.preview_url && (
+                  <img src={listing.preview_url} alt="" className={classes.listingImg} />
+                )}
+
+                <div className={classes.listingBody}>
+                  <div className={classes.listingTitle}>{listing.title}</div>
+                  <p className={classes.listingDesc}>
+                    {listing.short_description ?? ""}
+                  </p>
+
+                  <div className={classes.listingMeta}>
+                    <span className={classes.listingMetaLeft}>
+                      {listing.offering_type ?? ""}
+                    </span>
+
+                    <span className={classes.listingMetaRight}>
+                      {listing.category ?? ""}
+                    </span>
+                  </div>
+                </div>
+              </Link>
             ))}
           </div>
         )}

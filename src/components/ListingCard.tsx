@@ -1,12 +1,11 @@
 import FavouriteButton from "./FavouriteButton";
-import type { Listing } from "../data/mock";
 import { Link } from "react-router-dom";
 
 const classes = {
   card: "group relative overflow-hidden rounded-2xl border border-zinc-200 bg-white hover:bg-zinc-50",
   favWrap: "absolute right-3 top-3 z-10",
 
-  img: "h-40 w-full object-cover",
+  img: "h-40 w-full object-cover bg-zinc-100",
 
   body: "p-4",
   titleRow: "flex flex-wrap items-center gap-2",
@@ -14,6 +13,7 @@ const classes = {
 
   badge:
     "rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-xs font-semibold",
+  liveBadge: "badge badgeLive",
 
   desc: "mt-2 text-sm text-zinc-600",
 
@@ -22,48 +22,66 @@ const classes = {
   creator: "text-sm text-zinc-600",
 } as const;
 
-// Formats display text for the listing price model
-const priceText = (listing: Listing): string => {
-  if (listing.priceType === "fixed") return `$${listing.priceMin}`;
-  if (listing.priceType === "starting_at") return `From $${listing.priceMin}`;
+export type ListingCardListing = {
+  id: string;
+  title: string;
+  short: string;
+  offering_type: string;
+  price_type: "fixed" | "starting_at" | "range";
+  price_min: number;
+  price_max: number | null;
+  preview_url: string | null;
+};
 
-  if (listing.priceType === "range") {
-    const max = listing.priceMax ?? listing.priceMin;
-    return `$${listing.priceMin}–$${max}`;
-  }
-
-  return "";
+export type ListingCardCreator = {
+  name: string;
+  isLive?: boolean;
 };
 
 type ListingCardProps = {
-  listing: Listing;
-  creatorName: string;
+  listing: ListingCardListing;
+  creator: ListingCardCreator;
 };
 
-const ListingCard = (props: ListingCardProps) => {
-  const { listing, creatorName } = props;
+const priceText = (listing: ListingCardListing): string =>
+  listing.price_type === "fixed"
+    ? `$${listing.price_min}`
+    : listing.price_type === "starting_at"
+      ? `From $${listing.price_min}`
+      : listing.price_type === "range"
+        ? `$${listing.price_min}–$${listing.price_max ?? listing.price_min}`
+        : "";
+
+const ListingCard = ({ listing, creator }: ListingCardProps) => {
+  const creatorLabel = creator.isLive ? `${creator.name} • Live` : creator.name;
 
   return (
     <Link to={`/listing/${listing.id}`} className={classes.card}>
       <div className={classes.favWrap}>
-        {/* Listings already use the stable internal listing id */}
         <FavouriteButton kind="listing" targetId={listing.id} />
       </div>
 
-      <img src={listing.preview} alt="" className={classes.img} loading="lazy" />
+      <img
+        src={listing.preview_url ?? ""}
+        alt=""
+        className={classes.img}
+        loading="lazy"
+      />
 
       <div className={classes.body}>
         <div className={classes.titleRow}>
           <h3 className={classes.h3}>{listing.title}</h3>
 
-          <span className={classes.badge}>{listing.offeringType}</span>
+          <span className={classes.badge}>{listing.offering_type}</span>
+
+          {creator.isLive && <span className={classes.liveBadge}>Live</span>}
         </div>
 
         <p className={classes.desc}>{listing.short}</p>
 
         <div className={classes.bottomRow}>
           <span className={classes.price}>{priceText(listing)}</span>
-          <span className={classes.creator}>{creatorName}</span>
+          <span className={classes.creator}>{creatorLabel}</span>
         </div>
       </div>
     </Link>
