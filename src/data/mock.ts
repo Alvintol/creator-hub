@@ -104,9 +104,71 @@ export const creators: Creator[] = [
         },
     },
     {
-        id: "creator-rigmancer",
-        handle: "rigmancer",
-        displayName: "Rigmancer",
+        id: "creator-Guffball",
+        handle: "Guffball",
+        displayName: "Guffball",
+        verified: true,
+        bio: "I'm a freelance artist from the UK, who works on emote and other Twitch asset design, film editing, video game design, painting and probably other things",
+        tags: [
+            "emotes",
+            "overlays",
+            "cute",
+            "asset design",
+            "film editing",
+            "video game design",
+            "painting",
+        ],
+        specialties: ["emotes", "overlays"],
+        commissionStatus: "open",
+        platforms: {
+            twitch: {
+                login: "Guffball",
+            },
+            youtube: {
+                channelId: "youtube-Guffball",
+                handle: "@Guffball",
+            },
+        },
+        links: {
+            twitch: "https://twitch.tv/Guffball",
+            youtube: "https://youtube.com/@Guffball",
+        },
+    },
+    {
+        id: "creator-byrinth",
+        handle: "byrinth",
+        displayName: "byrinth",
+        verified: true,
+        bio: "I'm a freelance artist from America, who works on emote and other Twitch asset design, film editing, video game design, painting and probably other things",
+        tags: [
+            "emotes",
+            "overlays",
+            "cute",
+            "asset design",
+            "film editing",
+            "video game design",
+            "painting",
+        ],
+        specialties: ["emotes", "overlays"],
+        commissionStatus: "open",
+        platforms: {
+            twitch: {
+                login: "byrinth",
+            },
+            youtube: {
+                channelId: "youtube-byrinth",
+                handle: "@byrinth",
+            },
+        },
+        links: {
+            twitch: "https://twitch.tv/byrinth",
+            youtube: "https://youtube.com/@byrinth",
+        },
+    },
+    {
+        id: "creator-horrorhourlore",
+        handle: "horrorhourlore",
+        displayName: "horrorhourlore",
         verified: true,
         bio: "PNG-tuber + VTuber model workflow and rigging support.",
         tags: ["pngtuber", "vtuber", "rigging"],
@@ -115,17 +177,17 @@ export const creators: Creator[] = [
         platforms: {
             youtube: {
                 channelId: "youtube-rigmancer",
-                handle: "@rigmancer",
+                handle: "@horrorhourlore",
             },
         },
         links: {
-            youtube: "https://youtube.com/@rigmancer",
+            youtube: "https://youtube.com/@horrorhourlore",
         },
     },
     {
-        id: "creator-jaquillyn",
-        handle: "jaQUILLyn",
-        displayName: "jaQUILLyn",
+        id: "creator-What_Up_Duck",
+        handle: "What_Up_Duck",
+        displayName: "What_Up_Duck",
         verified: true,
         bio: "Clips/VOD/Short-form editing + captions + pacing.",
         tags: ["editing", "shorts", "captions"],
@@ -133,24 +195,24 @@ export const creators: Creator[] = [
         commissionStatus: "open",
         platforms: {
             twitch: {
-                login: "jaQUILLyn",
+                login: "What_Up_Duck",
             },
         },
         links: {
-            twitch: "https://twitch.tv/jaQUILLyn",
+            twitch: "https://twitch.tv/What_Up_Duck",
         },
     },
     {
-        id: "creator-audionerd",
-        handle: "audionerd",
-        displayName: "Audio Nerd",
+        id: "creator-LeSqueech",
+        handle: "LeSqueech",
+        displayName: "LeSqueech",
         verified: false,
         bio: "Mic chain, OBS filters, routing, noise, Discord/Twitch setup.",
         tags: ["audio", "obs", "filters", "routing"],
         specialties: ["audio-tech-help"],
         commissionStatus: "open",
         links: {
-            twitch: "https://twitch.tv/audionerd",
+            twitch: "https://twitch.tv/LeSqueech",
         },
     },
 ];

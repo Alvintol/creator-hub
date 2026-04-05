@@ -1,8 +1,7 @@
 import { Link, useParams } from "react-router-dom";
-import { creators, listings, type Creator, type Listing } from "../data/mock";
 import { normalizeTwitchLogin } from "../domain/twitch";
+import { usePublicCreatorProfile } from "../hooks/usePublicCreatorProfile";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
-import { usePublicCreatorProfile } from '../hooks/usePublicCreatorProfile';
 
 const classes = {
   container: "space-y-8",
@@ -18,7 +17,6 @@ const classes = {
   titleRow: "flex flex-wrap items-center gap-2",
   bio: "mt-2 text-zinc-600",
 
-  badgeVerified: "badge",
   badgeLive: "badge badgeLive",
 
   linksRow: "mt-4 flex flex-wrap gap-2",
@@ -27,10 +25,11 @@ const classes = {
 
   listingsSection: "space-y-3",
   emptyText: "text-sm text-zinc-600",
+  loadingText: "text-sm text-zinc-600",
   grid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
 
   listingCard: "card overflow-hidden",
-  listingImg: "h-40 w-full object-cover",
+  listingImg: "h-40 w-full object-cover bg-zinc-100",
   listingBody: "p-4",
   listingTitle: "text-base font-extrabold tracking-tight",
   listingDesc: "mt-1 text-sm text-zinc-600",
@@ -46,23 +45,17 @@ const classes = {
   liveTitle: "mt-1 text-sm text-zinc-600",
 } as const;
 
-// Finds a creator by their public route handle
-const getCreatorByHandle = (handle: string): Creator | undefined =>
-  creators.find((creator) => creator.handle === handle);
-
-// Finds all listings owned by a creator using the stable internal creator id
-const getListingsByCreatorId = (creatorId: string): Listing[] =>
-  listings.filter((listing) => listing.creatorId === creatorId);
-
 type CreatorLinkButtonProps = {
   href: string;
   label: string;
   variant?: "primary" | "outline";
 };
 
-const CreatorLinkButton = (props: CreatorLinkButtonProps) => {
-  const { href, label, variant = "outline" } = props;
-
+const CreatorLinkButton = ({
+  href,
+  label,
+  variant = "outline",
+}: CreatorLinkButtonProps) => {
   const className =
     variant === "primary" ? classes.btnPrimary : classes.btnOutline;
 
@@ -70,30 +63,6 @@ const CreatorLinkButton = (props: CreatorLinkButtonProps) => {
     <a className={className} target="_blank" rel="noreferrer" href={href}>
       {label}
     </a>
-  );
-};
-
-type CreatorListingLinkProps = {
-  listing: Listing;
-};
-
-const CreatorListingLink = (props: CreatorListingLinkProps) => {
-  const { listing } = props;
-
-  return (
-    <Link to={`/listing/${listing.id}`} className={classes.listingCard}>
-      <img src={listing.preview} alt="" className={classes.listingImg} />
-
-      <div className={classes.listingBody}>
-        <div className={classes.listingTitle}>{listing.title}</div>
-        <p className={classes.listingDesc}>{listing.short}</p>
-
-        <div className={classes.listingMeta}>
-          <span className={classes.listingMetaLeft}>{listing.offeringType}</span>
-          <span className={classes.listingMetaRight}>{listing.category}</span>
-        </div>
-      </div>
-    </Link>
   );
 };
 
@@ -111,14 +80,18 @@ const CreatorProfile = () => {
   const { handle } = useParams<{ handle: string }>();
   const { twitchByLogin } = useTwitchStreams();
 
-  const {
-    data,
-    isLoading,
-    error,
-  } = usePublicCreatorProfile(handle ?? null);
+  const { data, isLoading, error } = usePublicCreatorProfile(handle ?? null);
 
   if (!handle) return <CreatorNotFound />;
-  if (isLoading) return <div className={classes.container}>Loading…</div>;
+
+  if (isLoading) {
+    return (
+      <div className={classes.container}>
+        <div className={classes.loadingText}>Loading…</div>
+      </div>
+    );
+  }
+
   if (error || !data?.profile) return <CreatorNotFound />;
 
   const { profile, platformAccounts, listings } = data;
@@ -130,7 +103,10 @@ const CreatorProfile = () => {
     platformAccounts.find((account) => account.platform === "youtube") ?? null;
 
   const twitchLoginRaw = twitchAccount?.platform_login ?? null;
-  const twitchLogin = twitchLoginRaw ? normalizeTwitchLogin(twitchLoginRaw) : null;
+  const twitchLogin = twitchLoginRaw
+    ? normalizeTwitchLogin(twitchLoginRaw)
+    : null;
+
   const stream = twitchLogin ? twitchByLogin[twitchLogin] : undefined;
   const isLive = Boolean(stream);
 
@@ -149,7 +125,7 @@ const CreatorProfile = () => {
       <section className={classes.card}>
         <div className={classes.titleRow}>
           <h1 className={classes.h1}>
-            {profile.display_name || profile.handle || "Creator"}
+            {profile.display_name ?? profile.handle ?? "Creator"}
           </h1>
 
           {isLive && <span className={classes.badgeLive}>Live</span>}
@@ -174,10 +150,10 @@ const CreatorProfile = () => {
           )}
         </div>
 
-        {isLive && (
+        {isLive && stream?.thumbnailUrl && (
           <div className={classes.liveCard}>
             <img
-              src={(stream?.thumbnailUrl ?? "")
+              src={stream.thumbnailUrl
                 .replace("{width}", "960")
                 .replace("{height}", "540")}
               alt=""
@@ -187,12 +163,12 @@ const CreatorProfile = () => {
 
             <div className={classes.liveBody}>
               <div className={classes.liveMeta}>
-                {stream?.gameName ?? ""}
+                {stream.gameName ?? ""}
                 <span className={classes.liveDot}> • </span>
-                {stream?.viewerCount ?? 0} viewers
+                {stream.viewerCount ?? 0} viewers
               </div>
 
-              {stream?.title && (
+              {stream.title && (
                 <p className={classes.liveTitle}>{stream.title}</p>
               )}
             </div>
@@ -213,23 +189,28 @@ const CreatorProfile = () => {
                 to={`/listing/${listing.id}`}
                 className={classes.listingCard}
               >
-                {listing.preview_url && (
-                  <img src={listing.preview_url} alt="" className={classes.listingImg} />
+                {listing.preview_url ? (
+                  <img
+                    src={listing.preview_url}
+                    alt=""
+                    className={classes.listingImg}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className={classes.listingImg} />
                 )}
 
                 <div className={classes.listingBody}>
                   <div className={classes.listingTitle}>{listing.title}</div>
-                  <p className={classes.listingDesc}>
-                    {listing.short_description ?? ""}
-                  </p>
+                  <p className={classes.listingDesc}>{listing.short}</p>
 
                   <div className={classes.listingMeta}>
                     <span className={classes.listingMetaLeft}>
-                      {listing.offering_type ?? ""}
+                      {listing.offering_type}
                     </span>
 
                     <span className={classes.listingMetaRight}>
-                      {listing.category ?? ""}
+                      {listing.category}
                     </span>
                   </div>
                 </div>

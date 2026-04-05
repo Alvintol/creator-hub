@@ -61,12 +61,16 @@ const ListingCard = ({ listing, creator }: ListingCardProps) => {
         <FavouriteButton kind="listing" targetId={listing.id} />
       </div>
 
-      <img
-        src={listing.preview_url ?? ""}
-        alt=""
-        className={classes.img}
-        loading="lazy"
-      />
+      {listing.preview_url ? (
+        <img
+          src={listing.preview_url}
+          alt=""
+          className={classes.img}
+          loading="lazy"
+        />
+      ) : (
+        <div className={classes.img} />
+      )}
 
       <div className={classes.body}>
         <div className={classes.titleRow}>

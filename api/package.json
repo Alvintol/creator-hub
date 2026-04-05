@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "seed:dev:data": "node scripts/seed-dev-data.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",

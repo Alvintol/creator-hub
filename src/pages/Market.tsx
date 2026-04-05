@@ -34,10 +34,11 @@ const categoryOptions = [
   { key: "all", label: "All categories" },
   { key: "emotes", label: "Emotes" },
   { key: "overlays", label: "Overlays" },
-  { key: "png-tuber-models", label: "PNG tuber models" },
+  { key: "pngtuber-models", label: "PNG-tuber models" },
   { key: "vtuber-models", label: "VTuber models" },
   { key: "vtuber-rigging", label: "VTuber rigging" },
   { key: "video-editing", label: "Video editing" },
+  { key: "audio-tech-help", label: "Audio tech help" },
 ] as const;
 
 // Builds a search string for listing filtering
