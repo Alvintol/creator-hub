@@ -34,6 +34,23 @@ const avatarUrl = (seed) =>
 // Current creator seed data, aligned to your latest creator list
 const creators = [
   {
+    key: "creator-sadine",
+    email: "dev+sadine@creatorhub.local",
+    handle: "Sadine",
+    displayName: "Sadine",
+    bio: "mom, gamer",
+    platforms: {
+      twitch: {
+        login: "Sadine",
+        profileUrl: "https://twitch.tv/Sadine",
+      },
+      youtube: {
+        handle: "@Sadine",
+        profileUrl: "https://youtube.com/@Sadine",
+      },
+    },
+  },
+  {
     key: "creator-amatrine",
     email: "dev+amatrine@creatorhub.local",
     handle: "Amatrine",

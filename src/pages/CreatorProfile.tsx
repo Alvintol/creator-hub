@@ -43,28 +43,81 @@ const classes = {
   liveMeta: "text-sm font-extrabold text-zinc-900",
   liveDot: "text-zinc-400",
   liveTitle: "mt-1 text-sm text-zinc-600",
+
+  platformSection: "mt-6 space-y-3",
+  platformSectionTitle: "text-sm font-extrabold text-zinc-900",
+  platformList: "space-y-2",
+  platformItem:
+    "flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-3",
+  platformItemLeft: "space-y-1",
+  platformItemTitle: "text-sm font-semibold text-zinc-900",
+  platformItemValue: "text-sm text-zinc-600",
+  platformItemLink: "text-sm font-semibold text-zinc-600 hover:text-zinc-900",
+  platformBtnBase:
+    "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold shadow-[0_3px_10px_rgba(0,0,0,0.08)] transition-all duration-200 hover:-translate-y-[1px]",
+  platformBtnTwitch:
+    "border-[#9146FF] bg-[#9146FF] text-white hover:brightness-110 hover:shadow-[0_8px_22px_rgba(145,70,255,0.30)]",
+  platformBtnYouTube:
+    "border-[#FF0000] bg-[#FF0000] text-white hover:brightness-105 hover:shadow-[0_8px_22px_rgba(255,0,0,0.24)]",
+  platformBtnGeneric:
+    "border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-50 hover:border-zinc-400",
+  platformBtnIcon: "h-4 w-4 shrink-0",
 } as const;
 
 type CreatorLinkButtonProps = {
   href: string;
   label: string;
-  variant?: "primary" | "outline";
+  platform?: "twitch" | "youtube" | "generic";
 };
+
+const TwitchLogo = () => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    className={classes.platformBtnIcon}
+    fill="currentColor"
+  >
+    <path d="M4 3h16v11l-4 4h-4l-2 2H7v-2H4V3Zm14 10V5H6v11h3v2l2-2h4l3-3Z" />
+    <path d="M10 8h2v5h-2V8Zm5 0h2v5h-2V8Z" />
+  </svg>
+);
+
+const YouTubeLogo = () => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    className={classes.platformBtnIcon}
+    fill="currentColor"
+  >
+    <path d="M23 12.001s0-3.068-.389-4.548a2.965 2.965 0 0 0-2.084-2.1C18.691 4.85 12 4.85 12 4.85s-6.691 0-8.527.503a2.965 2.965 0 0 0-2.084 2.1C1 8.933 1 12.001 1 12.001s0 3.068.389 4.548a2.965 2.965 0 0 0 2.084 2.1c1.836.503 8.527.503 8.527.503s6.691 0 8.527-.503a2.965 2.965 0 0 0 2.084-2.1c.389-1.48.389-4.548.389-4.548ZM10 15.5v-7l6 3.5-6 3.5Z" />
+  </svg>
+);
+
+const getPlatformButtonClass = (
+  platform: CreatorLinkButtonProps["platform"]
+): string =>
+  platform === "twitch"
+    ? `${classes.platformBtnBase} ${classes.platformBtnTwitch}`
+    : platform === "youtube"
+      ? `${classes.platformBtnBase} ${classes.platformBtnYouTube}`
+      : `${classes.platformBtnBase} ${classes.platformBtnGeneric}`;
 
 const CreatorLinkButton = ({
   href,
   label,
-  variant = "outline",
-}: CreatorLinkButtonProps) => {
-  const className =
-    variant === "primary" ? classes.btnPrimary : classes.btnOutline;
-
-  return (
-    <a className={className} target="_blank" rel="noreferrer" href={href}>
-      {label}
-    </a>
-  );
-};
+  platform = "generic",
+}: CreatorLinkButtonProps) => (
+  <a
+    className={getPlatformButtonClass(platform)}
+    target="_blank"
+    rel="noreferrer"
+    href={href}
+  >
+    {platform === "twitch" && <TwitchLogo />}
+    {platform === "youtube" && <YouTubeLogo />}
+    <span>{label}</span>
+  </a>
+);
 
 const CreatorNotFound = () => (
   <div className={classes.notFoundWrap}>
@@ -138,7 +191,7 @@ const CreatorProfile = () => {
             <CreatorLinkButton
               href={watchUrl}
               label={isLive ? "Watch live on Twitch" : "Twitch"}
-              variant="primary"
+              platform="twitch"
             />
           )}
 
@@ -146,6 +199,7 @@ const CreatorProfile = () => {
             <CreatorLinkButton
               href={youtubeAccount.profile_url}
               label="YouTube"
+              platform="youtube"
             />
           )}
         </div>
