@@ -1,13 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import CreatorCard from "../CreatorCard";
+import CreatorCard, { type CreatorCardModel } from "../CreatorCard";
 import {
   HubActionsContext,
   HubStateContext,
 } from "../../providers/hub/HubProvider";
 import type { HubActions, HubState } from "../../providers/hub";
-import type { Creator } from "../../data/mock";
 import type { TwitchStream } from "../../domain/twitch";
 
 // Mock the Twitch streams hook so the test controls live status
@@ -99,18 +98,30 @@ const renderWithProviders = (
 };
 
 // Small reusable creator factory for tests
-const createCreator = (overrides?: Partial<Creator>): Creator => ({
+const createCreator = (
+  overrides?: Partial<CreatorCardModel>
+): CreatorCardModel => ({
   id: "creator-amatrine",
   handle: "Amatrine",
   displayName: "Amatrine",
   verified: true,
   bio: "Freelance artist for emotes and overlays.",
-  commissionStatus: "open",
   tags: ["emotes", "overlays"],
+  specialties: ["emotes", "overlays"],
+  commissionStatus: "open",
   platforms: {
     twitch: {
       login: "Amatrine",
+      userId: "twitch-amatrine",
     },
+  },
+  links: {
+    twitch: "https://twitch.tv/Amatrine",
+  },
+  live: {
+    isLive: false,
+    title: undefined,
+    platform: "twitch",
   },
   ...overrides,
 });
