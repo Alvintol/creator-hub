@@ -1,0 +1,156 @@
+import { useMemo } from "react";
+import { useAuth } from "../providers/AuthProvider";
+import { useMyAdminAccess } from "./useMyAdminAccess";
+import { useMyProfile } from "./useMyProfile";
+import { useMySellerApplication } from "./useMySellerApplication";
+import { useProfilePlatformAccounts } from "./useProfilePlatformAccounts";
+import type { SellerApplicationRow } from "./useMySellerApplication";
+
+type SellerAccess = {
+  isLoading: boolean;
+  isSignedIn: boolean;
+  isAdmin: boolean;
+  isCreatorApproved: boolean;
+  canAccessCreatorRoutes: boolean;
+  canAccessAdminRoutes: boolean;
+  profileReady: boolean;
+  hasLinkedCreatorPlatform: boolean;
+  sellerApplication: SellerApplicationRow | null;
+  creatorStatusLabel: string;
+  canStartApplication: boolean;
+  canEditApplication: boolean;
+  canSubmitApplication: boolean;
+  error: Error | null;
+};
+
+const toError = (value: unknown): Error | null =>
+  value instanceof Error
+    ? value
+    : value && typeof value === "object" && "message" in value
+      ? new Error(String((value as { message: unknown }).message))
+      : null;
+
+const getCreatorStatusLabel = (
+  sellerApplication: SellerApplicationRow | null
+): string =>
+  !sellerApplication
+    ? "Not started"
+    : sellerApplication.status === "approved"
+      ? "Approved creator"
+      : sellerApplication.status === "under_review"
+        ? "Under review"
+        : sellerApplication.status === "submitted"
+          ? "Submitted"
+          : sellerApplication.status === "needs_changes"
+            ? "Needs changes"
+            : sellerApplication.status === "rejected"
+              ? "Rejected"
+              : sellerApplication.status === "suspended"
+                ? "Suspended"
+                : "Draft";
+
+export const useSellerAccess = (): SellerAccess => {
+  const { user, loading: isAuthLoading } = useAuth();
+
+  const {
+    data: profile = null,
+    isLoading: isProfileLoading,
+    error: profileError,
+  } = useMyProfile();
+
+  const {
+    data: platformAccounts = [],
+    isLoading: isPlatformAccountsLoading,
+    error: platformAccountsError,
+  } = useProfilePlatformAccounts();
+
+  const {
+    data: sellerApplicationData = null,
+    isLoading: isSellerApplicationLoading,
+    error: sellerApplicationError,
+  } = useMySellerApplication();
+
+  const {
+    data: isAdmin = false,
+    isLoading: isAdminLoading,
+    error: adminError,
+  } = useMyAdminAccess();
+
+  const sellerApplication = sellerApplicationData ?? null;
+
+  return useMemo(() => {
+    const isSignedIn = Boolean(user?.id);
+
+    const profileReady =
+      Boolean(profile?.handle?.trim()) && Boolean(profile?.display_name?.trim());
+
+    const hasLinkedCreatorPlatform = platformAccounts.some(
+      (platformAccount) =>
+        platformAccount.platform === "twitch" ||
+        platformAccount.platform === "youtube"
+    );
+
+    const isCreatorApproved = sellerApplication?.status === "approved";
+
+    const canEditApplication =
+      !sellerApplication ||
+      sellerApplication.status === "draft" ||
+      sellerApplication.status === "needs_changes";
+
+    const canStartApplication = profileReady;
+
+    const canSubmitApplication =
+      profileReady &&
+      hasLinkedCreatorPlatform &&
+      sellerApplication !== null &&
+      (sellerApplication.status === "draft" ||
+        sellerApplication.status === "needs_changes");
+
+    const creatorStatusLabel = getCreatorStatusLabel(sellerApplication);
+
+    const error =
+      toError(profileError) ||
+      toError(platformAccountsError) ||
+      toError(sellerApplicationError) ||
+      toError(adminError);
+
+    const isLoading =
+      isAuthLoading ||
+      isProfileLoading ||
+      isPlatformAccountsLoading ||
+      isSellerApplicationLoading ||
+      isAdminLoading;
+
+    return {
+      isLoading,
+      isSignedIn,
+      isAdmin,
+      isCreatorApproved,
+      canAccessCreatorRoutes: isCreatorApproved,
+      canAccessAdminRoutes: isAdmin,
+      profileReady,
+      hasLinkedCreatorPlatform,
+      sellerApplication,
+      creatorStatusLabel,
+      canStartApplication,
+      canEditApplication,
+      canSubmitApplication,
+      error,
+    };
+  }, [
+    user?.id,
+    profile,
+    platformAccounts,
+    sellerApplication,
+    isAdmin,
+    isAuthLoading,
+    isProfileLoading,
+    isPlatformAccountsLoading,
+    isSellerApplicationLoading,
+    isAdminLoading,
+    profileError,
+    platformAccountsError,
+    sellerApplicationError,
+    adminError,
+  ]);
+};
