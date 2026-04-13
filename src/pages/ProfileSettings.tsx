@@ -4,11 +4,7 @@ import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import { useMyProfile, type ProfileRow } from "../hooks/useMyProfile";
 import { useProfilePlatformAccounts } from "../hooks/useProfilePlatformAccounts";
-import {
-  useMySellerApplication,
-  type SellerApplicationRow,
-} from "../hooks/useMySellerApplication";
-import { useUpsertMySellerApplication } from "../hooks/useUpsertMySellerApplication";
+import { useSellerAccess } from "../hooks/useSellerAccess";
 import { getProfileAvatarUrl } from "../domain/profileMedia";
 
 const classes = {
@@ -90,26 +86,6 @@ const getErrorMessage = (error: unknown): string =>
 const isValidHandle = (value: string): boolean =>
   /^[a-z0-9][a-z0-9_-]{2,24}$/i.test(value);
 
-// Maps creator application state into a readable label
-const getCreatorStatusLabel = (
-  creatorApplication: SellerApplicationRow | null | undefined
-): string =>
-  !creatorApplication
-    ? "Not started"
-    : creatorApplication.status === "approved"
-      ? "Approved creator"
-      : creatorApplication.status === "under_review"
-        ? "Under review"
-        : creatorApplication.status === "submitted"
-          ? "Submitted"
-          : creatorApplication.status === "needs_changes"
-            ? "Needs changes"
-            : creatorApplication.status === "rejected"
-              ? "Rejected"
-              : creatorApplication.status === "suspended"
-                ? "Suspended"
-                : "Draft";
-
 const ProfileSettings = () => {
   const navigate = useNavigate();
   const { search } = useLocation();
@@ -125,12 +101,11 @@ const ProfileSettings = () => {
   } = useProfilePlatformAccounts();
 
   const {
-    data: sellerApplication,
-    isLoading: isLoadingSellerApplication,
-    error: sellerApplicationError,
-  } = useMySellerApplication();
-
-  const sellerApplicationMutation = useUpsertMySellerApplication();
+    isLoading: isSellerAccessLoading,
+    sellerApplication,
+    creatorStatusLabel,
+    canStartApplication,
+  } = useSellerAccess();
 
   const [handle, setHandle] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -161,7 +136,7 @@ const ProfileSettings = () => {
 
     // Removes the query params so the banner does not reappear on refresh
     navigate({ pathname: "/settings/profile", search: "" }, { replace: true });
-  }, [search, navigate, refetchPlatformAccounts]);
+  }, [search, navigate, refetch, refetchPlatformAccounts]);
 
   // Syncs form state from the latest profile response
   useEffect(() => {
@@ -197,23 +172,18 @@ const ProfileSettings = () => {
     const messages = [
       error ? getErrorMessage(error) : null,
       platformAccountsError ? getErrorMessage(platformAccountsError) : null,
-      sellerApplicationError ? getErrorMessage(sellerApplicationError) : null,
     ].filter(Boolean);
 
     return messages.length ? messages.join(" ") : null;
-  }, [error, platformAccountsError, sellerApplicationError]);
+  }, [error, platformAccountsError]);
 
   const twitchAccount = useMemo(
-    () => {
-      console.log({ platformAccounts })
-      return platformAccounts.find((account) => account.platform === "twitch") ?? null
-    },
+    () => platformAccounts.find((account) => account.platform === "twitch") ?? null,
     [platformAccounts]
   );
 
   const youtubeAccount = useMemo(
-    () =>
-      platformAccounts.find((account) => account.platform === "youtube") ?? null,
+    () => platformAccounts.find((account) => account.platform === "youtube") ?? null,
     [platformAccounts]
   );
 
@@ -223,10 +193,7 @@ const ProfileSettings = () => {
   );
 
   const isTwitchConnected = useMemo(
-    () => {
-      console.log({ twitchAccount })
-      return Boolean(twitchAccount?.platform_user_id)
-    },
+    () => Boolean(twitchAccount?.platform_user_id),
     [twitchAccount]
   );
 
@@ -235,24 +202,10 @@ const ProfileSettings = () => {
     [youtubeAccount]
   );
 
-  const creatorStatus = useMemo(
-    () => getCreatorStatusLabel(sellerApplication),
-    [sellerApplication]
-  );
-
   const myProfileLink = useMemo(() => {
     const nextHandle = (profile?.handle ?? "").trim();
     return nextHandle ? `/creator/${nextHandle}` : "/creators";
   }, [profile]);
-
-  const hasLinkedCreatorPlatform = useMemo(
-    () =>
-      platformAccounts.some(
-        (account) =>
-          account.platform === "twitch" || account.platform === "youtube"
-      ),
-    [platformAccounts]
-  );
 
   const avatarUrl = useMemo(() => {
     const profileAvatarUrl = getProfileAvatarUrl(profile);
@@ -269,52 +222,36 @@ const ProfileSettings = () => {
       : null;
   }, [profile, twitchAccount]);
 
-  const canStartCreatorApplication = Boolean(profile?.handle?.trim()) &&
-    Boolean(profile?.display_name?.trim());
+  const creatorApplicationCtaLabel = useMemo(() => {
+    if (!sellerApplication) return "Start Creator application";
 
-  const canSubmitCreatorApplication =
-    canStartCreatorApplication && hasLinkedCreatorPlatform;
-
-  // Starts a draft creator application for the current user
-  const onStartCreatorApplication = async () => {
-    setOkMsg(null);
-    setErrMsg(null);
-    setInfoMsg(null);
-
-    try {
-      await sellerApplicationMutation.mutateAsync({
-        status: "draft",
-      });
-
-      setOkMsg("Creator application draft created.");
-    } catch (error) {
-      setErrMsg(getErrorMessage(error));
-    }
-  };
-
-  // Submits the creator application for manual review
-  const onSubmitCreatorApplication = async () => {
-    setOkMsg(null);
-    setErrMsg(null);
-    setInfoMsg(null);
-
-    if (!canSubmitCreatorApplication) {
-      setErrMsg(
-        "Complete your basic profile and link at least one creator platform before submitting."
-      );
-      return;
+    if (
+      sellerApplication.status === "draft" ||
+      sellerApplication.status === "needs_changes"
+    ) {
+      return "Continue Creator application";
     }
 
-    try {
-      await sellerApplicationMutation.mutateAsync({
-        status: "submitted",
-      });
-
-      setOkMsg("Creator application submitted for review.");
-    } catch (error) {
-      setErrMsg(getErrorMessage(error));
+    if (
+      sellerApplication.status === "submitted" ||
+      sellerApplication.status === "under_review"
+    ) {
+      return "View application";
     }
-  };
+
+    if (sellerApplication.status === "approved") {
+      return "View creator access";
+    }
+
+    if (
+      sellerApplication.status === "rejected" ||
+      sellerApplication.status === "suspended"
+    ) {
+      return "View application status";
+    }
+
+    return "Open application";
+  }, [sellerApplication]);
 
   const onSave = async () => {
     if (!user?.id) return;
@@ -443,8 +380,7 @@ const ProfileSettings = () => {
         <h1 className={classes.h1}>Profile settings</h1>
 
         <p className={classes.sub}>
-          Set up your account, connect platforms, and prepare for future creator
-          application steps.
+          Set up your account, connect platforms, and prepare for creator access.
         </p>
       </div>
 
@@ -597,8 +533,7 @@ const ProfileSettings = () => {
             <div className={classes.platformHeader}>
               <div className={classes.platformTitle}>Twitch</div>
               <div className={classes.platformHelp}>
-                Useful for community trust, live status, and future creator
-                review.
+                Useful for community trust, live status, and future creator review.
               </div>
             </div>
 
@@ -671,13 +606,13 @@ const ProfileSettings = () => {
         <div className={classes.title}>Creator application</div>
 
         <p className={classes.help}>
-          Creator access is reviewed manually. Linking platforms and keeping
-          your profile complete now will make that process smoother.
+          Creator access is reviewed manually. The full application now lives in
+          its own dedicated flow.
         </p>
 
         <div className={classes.applicationCard}>
           <div className={classes.applicationTitle}>Current status</div>
-          <div className={classes.applicationStatus}>{creatorStatus}</div>
+          <div className={classes.applicationStatus}>{creatorStatusLabel}</div>
 
           <div className={classes.applicationText}>
             Creator applications are reviewed manually to reduce spam, bots, and
@@ -687,7 +622,7 @@ const ProfileSettings = () => {
           <div className={classes.applicationList}>
             <div>• Complete your public profile</div>
             <div>• Link at least one creator platform</div>
-            <div>• Show recent public activity on Twitch or YouTube</div>
+            <div>• Add work samples in the Creator application flow</div>
             <div>• Pass manual CreatorHub review</div>
           </div>
 
@@ -698,83 +633,20 @@ const ProfileSettings = () => {
           </div>
 
           <div className={classes.row}>
-            {!sellerApplication && (
-              <button
-                className={classes.btnOutline}
-                type="button"
-                onClick={onStartCreatorApplication}
-                disabled={
-                  busy ||
-                  sellerApplicationMutation.isPending ||
-                  !canStartCreatorApplication
-                }
-              >
-                Start Application
-              </button>
-            )}
-
-            {sellerApplication?.status === "draft" && (
-              <button
-                className={classes.btnPrimary}
-                type="button"
-                onClick={onSubmitCreatorApplication}
-                disabled={busy || sellerApplicationMutation.isPending}
-              >
-                Submit for Review
-              </button>
-            )}
-
-            {sellerApplication?.status === "needs_changes" && (
-              <button
-                className={classes.btnPrimary}
-                type="button"
-                onClick={onSubmitCreatorApplication}
-                disabled={busy || sellerApplicationMutation.isPending}
-              >
-                Re-submit for Review
-              </button>
-            )}
-
-            {sellerApplication?.status === "submitted" && (
-              <button className={classes.btnOutline} type="button" disabled>
-                Awaiting Review
-              </button>
-            )}
-
-            {sellerApplication?.status === "under_review" && (
-              <button className={classes.btnOutline} type="button" disabled>
-                Under Review
-              </button>
-            )}
-
-            {sellerApplication?.status === "approved" && (
-              <button className={classes.btnOutline} type="button" disabled>
-                Creator Approved
-              </button>
-            )}
-
-            {sellerApplication?.status === "rejected" && (
-              <button className={classes.btnOutline} type="button" disabled>
-                Application Rejected
-              </button>
-            )}
-
-            {sellerApplication?.status === "suspended" && (
-              <button className={classes.btnOutline} type="button" disabled>
-                Creator Suspended
-              </button>
-            )}
+            <Link className={classes.btnPrimary} to="/apply/creator">
+              {creatorApplicationCtaLabel}
+            </Link>
           </div>
 
-          {!canStartCreatorApplication && (
+          {!canStartApplication && (
             <div className={classes.fieldHelp}>
               Add a display name and handle before starting your application.
             </div>
           )}
 
-          {sellerApplication?.status === "draft" && !hasLinkedCreatorPlatform && (
+          {sellerApplication?.reviewer_notes && (
             <div className={classes.fieldHelp}>
-              Link Twitch or YouTube before submitting for review.
+              Reviewer notes are available in the Creator application page.
             </div>
           )}
         </div>
@@ -783,7 +655,7 @@ const ProfileSettings = () => {
       {(loading ||
         isLoading ||
         isLoadingPlatforms ||
-        isLoadingSellerApplication) && (
+        isSellerAccessLoading) && (
           <div className={classes.loadingText}>Loading…</div>
         )}
     </div>
