@@ -34,6 +34,11 @@ const classes = {
   cardTitle: "text-base font-extrabold tracking-tight",
   cardText: "mt-1 text-sm text-zinc-600",
 
+  cardComplete: "card border border-emerald-200 bg-emerald-50/70 p-6",
+  cardIncomplete: "card border border-rose-200 bg-rose-50/70 p-6",
+  cardInProgress: "card border border-sky-200 bg-sky-50/70 p-6",
+
+
   bannerInfo: "card border border-sky-200 bg-sky-50 p-4 text-sky-900",
   bannerOk: "card border border-emerald-200 bg-emerald-50 p-4 text-emerald-900",
   bannerErr: "card border border-rose-200 bg-rose-50 p-4 text-rose-900",
@@ -45,6 +50,10 @@ const classes = {
   statusLabel: "text-xs font-bold uppercase tracking-wide text-zinc-500",
   statusValue: "mt-1 text-sm font-semibold text-zinc-900",
   statusHelp: "mt-1 text-xs text-zinc-500",
+
+  statusCardComplete: "rounded-2xl border border-emerald-200 bg-emerald-50 p-4",
+  statusCardIncomplete: "rounded-2xl border border-rose-200 bg-rose-50 p-4",
+  statusCardInProgress: "rounded-2xl border border-sky-200 bg-sky-50 p-4",
 
   checklist: "mt-4 space-y-2 text-sm text-zinc-700",
   checklistItem: "flex items-start gap-2",
@@ -131,6 +140,36 @@ const getDisplayUrl = (value: string): string => {
 
   return normaliseUrlInput(trimmedValue);
 };
+
+const getStatusCardClass = (
+  isComplete: boolean,
+  classes: Record<string, string>
+): string => (isComplete ? classes.statusCardComplete : classes.statusCardIncomplete);
+
+const getApplicationStatusCardClass = (
+  status: string | null | undefined,
+  classes: Record<string, string>
+): string =>
+  status === "approved"
+    ? classes.statusCardComplete
+    : status === "submitted" || status === "under_review"
+      ? classes.statusCardInProgress
+      : classes.statusCardIncomplete;
+
+const getSectionCardClass = (
+  isComplete: boolean,
+  classes: Record<string, string>
+): string => (isComplete ? classes.cardComplete : classes.cardIncomplete);
+
+const getApplicationSectionCardClass = (
+  status: string | null | undefined,
+  classes: Record<string, string>
+): string =>
+  status === "approved"
+    ? classes.cardComplete
+    : status === "submitted" || status === "under_review"
+      ? classes.cardInProgress
+      : classes.cardIncomplete;
 
 // Loads the current application's samples
 const fetchSellerApplicationSamples = async (
@@ -475,6 +514,22 @@ const ApplyCreator = () => {
     mostRecentUploadSample?.url?.trim()
   );
 
+  const isProfileBasicsComplete = profileReady;
+  const isLinkedPlatformComplete = hasLinkedCreatorPlatform;
+  const isRequiredRecentUploadComplete = hasMostRecentUploadSample;
+  const isWorkSamplesComplete =
+    hasMinimumSamples &&
+    hasMostRecentUploadSample &&
+    sampleCount <= 10 &&
+    videoCount <= 1;
+
+  const isSubmitReady =
+    canSubmitApplication &&
+    hasMinimumSamples &&
+    hasMostRecentUploadSample &&
+    sampleCount <= 10 &&
+    videoCount <= 1;
+
   useEffect(() => {
     setMostRecentUploadUrl(mostRecentUploadSample?.url ?? "");
   }, [mostRecentUploadSample]);
@@ -693,7 +748,14 @@ const ApplyCreator = () => {
         </div>
       )}
 
-      <div className={classes.card}>
+      <div
+        className={getSectionCardClass(
+          isProfileBasicsComplete &&
+          isLinkedPlatformComplete &&
+          isRequiredRecentUploadComplete,
+          classes
+        )}
+      >
         <div className={classes.cardTitle}>Before you apply</div>
 
         <p className={classes.cardText}>
@@ -701,7 +763,7 @@ const ApplyCreator = () => {
         </p>
 
         <div className={classes.statusGrid}>
-          <div className={classes.statusCard}>
+          <div className={getStatusCardClass(isProfileBasicsComplete, classes)}>
             <div className={classes.statusLabel}>Profile basics</div>
             <div className={classes.statusValue}>
               {profileReady ? "Ready" : "Needs update"}
@@ -711,7 +773,7 @@ const ApplyCreator = () => {
             </div>
           </div>
 
-          <div className={classes.statusCard}>
+          <div className={getStatusCardClass(isLinkedPlatformComplete, classes)}>
             <div className={classes.statusLabel}>Linked platform</div>
             <div className={classes.statusValue}>
               {hasLinkedCreatorPlatform ? "Ready" : "Not linked yet"}
@@ -722,7 +784,12 @@ const ApplyCreator = () => {
           </div>
 
 
-          <div className={classes.statusCard}>
+          <div
+            className={getApplicationStatusCardClass(
+              sellerApplication?.status,
+              classes
+            )}
+          >
             <div className={classes.statusLabel}>Current status</div>
             <div className={classes.statusValue}>{creatorStatusLabel}</div>
             <div className={classes.statusHelp}>
@@ -793,7 +860,12 @@ const ApplyCreator = () => {
         </div>
       </div>
 
-      <div className={classes.card}>
+      <div
+        className={getApplicationSectionCardClass(
+          sellerApplication?.status,
+          classes
+        )}
+      >
         <div className={classes.cardTitle}>Application status</div>
 
         <p className={classes.cardText}>
@@ -826,7 +898,7 @@ const ApplyCreator = () => {
         )}
       </div>
 
-      <div className={classes.card}>
+      <div className={getSectionCardClass(isWorkSamplesComplete, classes)}>
         <div className={classes.cardTitle}>Work samples</div>
 
         <p className={classes.cardText}>
@@ -838,6 +910,7 @@ const ApplyCreator = () => {
           <div>
             <div className={classes.sampleCount}>
               {sampleCount} / 10 samples added
+              {isWorkSamplesComplete ? " • Complete" : " • Incomplete"}
             </div>
             <div className={classes.sampleHelp}>
               Minimum 3 required before submission.
@@ -1036,12 +1109,13 @@ const ApplyCreator = () => {
         )}
       </div>
 
-      <div className={classes.card}>
+      <div className={getSectionCardClass(isSubmitReady, classes)}>
         <div className={classes.cardTitle}>Submit for review</div>
 
         <p className={classes.cardText}>
-          Once submitted, your application should no longer be editable until it
-          is returned for changes.
+          {isSubmitReady
+            ? "This section is complete and ready for submission."
+            : "Complete the missing requirements below before submitting for review."}
         </p>
 
         <div className={classes.checklist}>
