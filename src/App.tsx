@@ -3,6 +3,7 @@ import Layout from "./components/Layout";
 import ScrollToTop from "./components/ScrollToTop";
 import ProfileSetupRedirect from "./components/ProfileSetupRedirect";
 import RequireAuth from "./components/RequireAuth";
+import RequireAdminAccess from "./components/RequireAdminAccess";
 
 import Home from "./pages/Home";
 import Live from "./pages/Live";
@@ -15,6 +16,7 @@ import About from "./pages/About";
 import SignIn from "./pages/SignIn";
 import ProfileSettings from "./pages/ProfileSettings";
 import ApplyCreator from "./pages/ApplyCreator";
+import AdminCreatorApplications from "./pages/AdminCreatorApplications";
 
 const App = () => {
   return (
@@ -36,6 +38,13 @@ const App = () => {
           <Route element={<RequireAuth />}>
             <Route path="/settings/profile" element={<ProfileSettings />} />
             <Route path="/apply/creator" element={<ApplyCreator />} />
+          </Route>
+
+          <Route element={<RequireAdminAccess />}>
+            <Route
+              path="/admin/creator-applications"
+              element={<AdminCreatorApplications />}
+            />
           </Route>
 
           <Route path="*" element={<NotFound />} />

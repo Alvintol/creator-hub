@@ -4,8 +4,13 @@ import { useSellerAccess } from "../hooks/useSellerAccess";
 const RequireCreatorAccess = () => {
   const { isLoading, isSignedIn, canAccessCreatorRoutes } = useSellerAccess();
 
-  if (isLoading) return <div className="text-sm text-zinc-600">Loading…</div>;
-  if (!isSignedIn) return <Navigate to="/signin" replace />;
+  if (isLoading) {
+    return <div className="text-sm text-zinc-600">Loading…</div>;
+  }
+
+  if (!isSignedIn) {
+    return <Navigate to="/signin" replace />;
+  }
 
   return canAccessCreatorRoutes ? (
     <Outlet />
