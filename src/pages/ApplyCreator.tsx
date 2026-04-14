@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabaseClient";
@@ -101,6 +101,35 @@ const isValidUrl = (value: string): boolean => {
   } catch {
     return false;
   }
+};
+
+const normaliseUrlInput = (value: string): string => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) return "";
+
+  const hasProtocol = /^[a-z]+:\/\//i.test(trimmedValue);
+
+  return hasProtocol ? trimmedValue : `https://${trimmedValue}`;
+};
+
+const getUrlValidationError = (value: string): string | null => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) return null;
+
+  const normalisedValue = normaliseUrlInput(trimmedValue);
+
+  return isValidUrl(normalisedValue)
+    ? null
+    : "Enter a valid public URL. CreatorHub can add https:// automatically, but the link still needs to be valid.";
+};
+
+const getDisplayUrl = (value: string): string => {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return "";
+
+  return normaliseUrlInput(trimmedValue);
 };
 
 // Loads the current application's samples
@@ -226,6 +255,67 @@ const submitSellerApplication = async (
   return data;
 };
 
+const requiredRecentUploadTitle = "Most Recent Upload/Vod";
+
+const requiredRecentUploadDescription =
+  "Link to your most recent public upload, VOD, or equivalent recent creator work.";
+
+const isRequiredRecentUploadSample = (
+  sample: SellerApplicationSampleRow
+): boolean =>
+  sample.sample_type === "link" &&
+  sample.title.trim().toLowerCase() === requiredRecentUploadTitle.toLowerCase();
+
+const saveRequiredRecentUploadSample = async (
+  input: {
+    applicationId: string;
+    sampleId?: string;
+    url: string;
+    sortOrder: number;
+  }
+): Promise<SellerApplicationSampleRow> => {
+  const now = new Date().toISOString();
+
+  if (input.sampleId) {
+    const { data, error } = await supabase
+      .from("seller_application_samples")
+      .update({
+        title: requiredRecentUploadTitle,
+        description: requiredRecentUploadDescription,
+        url: input.url,
+        updated_at: now,
+      })
+      .eq("id", input.sampleId)
+      .select(`
+        id,
+        application_id,
+        sample_type,
+        title,
+        description,
+        url,
+        storage_path,
+        file_name,
+        mime_type,
+        file_size_bytes,
+        sort_order,
+        created_at,
+        updated_at
+      `)
+      .single();
+
+    if (error) throw error;
+
+    return data as SellerApplicationSampleRow;
+  }
+
+  return insertLinkSample(input.applicationId, {
+    title: requiredRecentUploadTitle,
+    description: requiredRecentUploadDescription,
+    url: input.url,
+    sortOrder: input.sortOrder,
+  });
+};
+
 const ApplyCreator = () => {
   const queryClient = useQueryClient();
   const { user, loading } = useAuth();
@@ -247,6 +337,7 @@ const ApplyCreator = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
+  const [mostRecentUploadUrl, setMostRecentUploadUrl] = useState("");
 
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
@@ -269,6 +360,8 @@ const ApplyCreator = () => {
         ? fetchSellerApplicationSamples(applicationId)
         : Promise.resolve([]),
   });
+
+
 
   const addLinkSampleMutation = useMutation({
     mutationFn: (input: {
@@ -320,6 +413,20 @@ const ApplyCreator = () => {
     },
   });
 
+  const saveMostRecentUploadMutation = useMutation({
+    mutationFn: (input: {
+      applicationId: string;
+      sampleId?: string;
+      url: string;
+      sortOrder: number;
+    }) => saveRequiredRecentUploadSample(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["mySellerApplicationSamples", applicationId],
+      });
+    },
+  });
+
   const sampleCount = samples.length;
 
   const videoCount = useMemo(
@@ -352,6 +459,26 @@ const ApplyCreator = () => {
     return messages.length ? messages.join(" ") : null;
   }, [sellerAccessError, samplesError]);
 
+  const mostRecentUploadSample = useMemo(
+    () => samples.find(isRequiredRecentUploadSample) ?? null,
+    [samples]
+  );
+
+  const sampleUrlError = useMemo(() => getUrlValidationError(url), [url]);
+
+  const mostRecentUploadUrlError = useMemo(
+    () => getUrlValidationError(mostRecentUploadUrl),
+    [mostRecentUploadUrl]
+  );
+
+  const hasMostRecentUploadSample = Boolean(
+    mostRecentUploadSample?.url?.trim()
+  );
+
+  useEffect(() => {
+    setMostRecentUploadUrl(mostRecentUploadSample?.url ?? "");
+  }, [mostRecentUploadSample]);
+
   const onStartDraft = async () => {
     setOkMsg(null);
     setErrMsg(null);
@@ -380,7 +507,7 @@ const ApplyCreator = () => {
 
     const nextTitle = title.trim();
     const nextDescription = description.trim();
-    const nextUrl = url.trim();
+    const nextUrl = normaliseUrlInput(url);
 
     if (!applicationId) {
       setErrMsg("Create an application draft before adding work samples.");
@@ -403,7 +530,9 @@ const ApplyCreator = () => {
     }
 
     if (!nextUrl || !isValidUrl(nextUrl)) {
-      setErrMsg("Add a valid http or https URL.");
+      setErrMsg(
+        "Add a valid public URL. CreatorHub can add https:// automatically when it is missing."
+      );
       return;
     }
 
@@ -420,6 +549,49 @@ const ApplyCreator = () => {
       setDescription("");
       setUrl("");
       setOkMsg("Work sample added.");
+    } catch (error) {
+      setErrMsg(getErrorMessage(error));
+    }
+  };
+
+  const onSaveMostRecentUpload = async () => {
+    setOkMsg(null);
+    setErrMsg(null);
+
+    const nextUrl = normaliseUrlInput(mostRecentUploadUrl);
+
+    if (!applicationId) {
+      setErrMsg("Create an application draft before adding required links.");
+      return;
+    }
+
+    if (!canEditApplication) {
+      setErrMsg("This application can no longer be edited.");
+      return;
+    }
+
+    if (!mostRecentUploadSample && hasReachedMaxSamples) {
+      setErrMsg("You can add a maximum of 10 work samples.");
+      return;
+    }
+
+    if (!nextUrl || !isValidUrl(nextUrl)) {
+      setErrMsg(
+        "Add a valid public URL for your most recent upload or VOD. CreatorHub can add https:// automatically when it is missing."
+      );
+      return;
+    }
+
+    try {
+      await saveMostRecentUploadMutation.mutateAsync({
+        applicationId,
+        sampleId: mostRecentUploadSample?.id,
+        url: nextUrl,
+        sortOrder: sampleCount,
+      });
+
+      setMostRecentUploadUrl(nextUrl);
+      setOkMsg("Most Recent Upload/Vod link saved.");
     } catch (error) {
       setErrMsg(getErrorMessage(error));
     }
@@ -450,6 +622,11 @@ const ApplyCreator = () => {
 
     if (!hasMinimumSamples) {
       setErrMsg("Add at least 3 work samples before submitting.");
+      return;
+    }
+
+    if (!hasMostRecentUploadSample) {
+      setErrMsg("Add your Most Recent Upload/Vod link before submitting.");
       return;
     }
 
@@ -544,6 +721,7 @@ const ApplyCreator = () => {
             </div>
           </div>
 
+
           <div className={classes.statusCard}>
             <div className={classes.statusLabel}>Current status</div>
             <div className={classes.statusValue}>{creatorStatusLabel}</div>
@@ -572,6 +750,17 @@ const ApplyCreator = () => {
               }
             />
             <span>Link at least one creator platform</span>
+          </div>
+
+          <div className={classes.checklistItem}>
+            <span
+              className={
+                hasMostRecentUploadSample
+                  ? classes.checklistOkDot
+                  : classes.checklistDot
+              }
+            />
+            <span>Add your Most Recent Upload/Vod link</span>
           </div>
 
           <div className={classes.checklistItem}>
@@ -665,6 +854,59 @@ const ApplyCreator = () => {
         {applicationId && canEditApplication && !isApplicationLocked && (
           <div className={classes.formGrid}>
             <div className={classes.field}>
+              <div className={classes.label}>Most Recent Upload/Vod</div>
+
+              <input
+                className={classes.input}
+                value={mostRecentUploadUrl}
+                onChange={(event) => setMostRecentUploadUrl(event.currentTarget.value)}
+                onBlur={() =>
+                  setMostRecentUploadUrl((currentValue) => getDisplayUrl(currentValue))
+                }
+                placeholder="https://..."
+              />
+
+              <div className={classes.fieldHelp}>
+                Required. Add a public link to your most recent Twitch VOD, YouTube upload,
+                or other recent creator work. This counts toward your 3 minimum samples.
+              </div>
+
+              {mostRecentUploadUrlError && (
+                <div className={classes.fieldHelp}>{mostRecentUploadUrlError}</div>
+              )}
+
+              {!mostRecentUploadUrlError && mostRecentUploadUrl.trim() && (
+                <div className={classes.fieldHelp}>
+                  Saved as: {getDisplayUrl(mostRecentUploadUrl)}
+                </div>
+              )}
+            </div>
+
+            <div className={classes.row}>
+              <button
+                className={classes.btnPrimary}
+                type="button"
+                onClick={onSaveMostRecentUpload}
+                disabled={
+                  saveMostRecentUploadMutation.isPending ||
+                  !canEditApplication ||
+                  Boolean(mostRecentUploadUrlError) ||
+                  (!mostRecentUploadSample && hasReachedMaxSamples)
+                }
+              >
+                {saveMostRecentUploadMutation.isPending
+                  ? "Saving…"
+                  : mostRecentUploadSample
+                    ? "Update required link"
+                    : "Save required link"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {applicationId && canEditApplication && !isApplicationLocked && (
+          <div className={classes.formGrid}>
+            <div className={classes.field}>
               <div className={classes.label}>Sample title</div>
 
               <input
@@ -682,12 +924,23 @@ const ApplyCreator = () => {
                 className={classes.input}
                 value={url}
                 onChange={(event) => setUrl(event.currentTarget.value)}
+                onBlur={() => setUrl((currentValue) => getDisplayUrl(currentValue))}
                 placeholder="https://..."
               />
 
               <div className={classes.fieldHelp}>
                 Use a public portfolio, drive folder, website, or direct showcase link.
               </div>
+
+              {sampleUrlError && (
+                <div className={classes.fieldHelp}>{sampleUrlError}</div>
+              )}
+
+              {!sampleUrlError && url.trim() && (
+                <div className={classes.fieldHelp}>
+                  Saved as: {getDisplayUrl(url)}
+                </div>
+              )}
             </div>
 
             <div className={classes.field}>
@@ -710,7 +963,8 @@ const ApplyCreator = () => {
                 disabled={
                   addLinkSampleMutation.isPending ||
                   hasReachedMaxSamples ||
-                  !canEditApplication
+                  !canEditApplication ||
+                  Boolean(sampleUrlError)
                 }
               >
                 {addLinkSampleMutation.isPending ? "Adding…" : "Add link sample"}
@@ -739,11 +993,13 @@ const ApplyCreator = () => {
                 <div>
                   <div className={classes.sampleTitle}>{sample.title}</div>
                   <div className={classes.sampleMeta}>
-                    {sample.sample_type} sample
+                    {isRequiredRecentUploadSample(sample)
+                      ? "Required link sample"
+                      : `${sample.sample_type} sample`}
                   </div>
                 </div>
 
-                {canEditApplication && (
+                {canEditApplication && !isRequiredRecentUploadSample(sample) && (
                   <button
                     className={classes.btnDanger}
                     type="button"
@@ -812,6 +1068,17 @@ const ApplyCreator = () => {
           <div className={classes.checklistItem}>
             <span
               className={
+                hasMostRecentUploadSample
+                  ? classes.checklistOkDot
+                  : classes.checklistDot
+              }
+            />
+            <span>Most Recent Upload/Vod link added</span>
+          </div>
+
+          <div className={classes.checklistItem}>
+            <span
+              className={
                 hasMinimumSamples ? classes.checklistOkDot : classes.checklistDot
               }
             />
@@ -837,6 +1104,7 @@ const ApplyCreator = () => {
               submitApplicationMutation.isPending ||
               !canSubmitApplication ||
               !hasMinimumSamples ||
+              !hasMostRecentUploadSample ||
               sampleCount > 10 ||
               videoCount > 1 ||
               !applicationId
