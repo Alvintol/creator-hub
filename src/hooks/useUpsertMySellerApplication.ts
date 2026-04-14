@@ -4,7 +4,13 @@ import { useAuth } from "../providers/AuthProvider";
 import type { SellerApplicationStatus } from "./useMySellerApplication";
 
 type UpsertSellerApplicationInput = {
+  id?: string;
   status: Extract<SellerApplicationStatus, "draft" | "submitted" | "needs_changes">;
+  applicant_notes?: string | null;
+  agreed_to_terms?: boolean;
+  agreed_to_original_work?: boolean;
+  agreed_to_manual_review?: boolean;
+  submitted_at?: string | null;
 };
 
 // Creates or updates the current user's seller application
@@ -15,9 +21,17 @@ const upsertMySellerApplication = async (
   const now = new Date().toISOString();
 
   const patch = {
+    id: input.id,
     profile_user_id: userId,
     status: input.status,
-    submitted_at: input.status === "submitted" ? now : null,
+    applicant_notes: input.applicant_notes ?? null,
+    agreed_to_terms: input.agreed_to_terms ?? false,
+    agreed_to_original_work: input.agreed_to_original_work ?? false,
+    agreed_to_manual_review: input.agreed_to_manual_review ?? false,
+    submitted_at:
+      input.status === "submitted"
+        ? input.submitted_at ?? now
+        : input.submitted_at ?? null,
     updated_at: now,
   };
 
