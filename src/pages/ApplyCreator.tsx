@@ -103,6 +103,35 @@ const isValidUrl = (value: string): boolean => {
   }
 };
 
+const normaliseUrlInput = (value: string): string => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) return "";
+
+  const hasProtocol = /^[a-z]+:\/\//i.test(trimmedValue);
+
+  return hasProtocol ? trimmedValue : `https://${trimmedValue}`;
+};
+
+const getUrlValidationError = (value: string): string | null => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) return null;
+
+  const normalisedValue = normaliseUrlInput(trimmedValue);
+
+  return isValidUrl(normalisedValue)
+    ? null
+    : "Enter a valid public URL. CreatorHub can add https:// automatically, but the link still needs to be valid.";
+};
+
+const getDisplayUrl = (value: string): string => {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return "";
+
+  return normaliseUrlInput(trimmedValue);
+};
+
 // Loads the current application's samples
 const fetchSellerApplicationSamples = async (
   applicationId: string
@@ -435,6 +464,13 @@ const ApplyCreator = () => {
     [samples]
   );
 
+  const sampleUrlError = useMemo(() => getUrlValidationError(url), [url]);
+
+  const mostRecentUploadUrlError = useMemo(
+    () => getUrlValidationError(mostRecentUploadUrl),
+    [mostRecentUploadUrl]
+  );
+
   const hasMostRecentUploadSample = Boolean(
     mostRecentUploadSample?.url?.trim()
   );
@@ -471,7 +507,7 @@ const ApplyCreator = () => {
 
     const nextTitle = title.trim();
     const nextDescription = description.trim();
-    const nextUrl = url.trim();
+    const nextUrl = normaliseUrlInput(url);
 
     if (!applicationId) {
       setErrMsg("Create an application draft before adding work samples.");
@@ -494,7 +530,9 @@ const ApplyCreator = () => {
     }
 
     if (!nextUrl || !isValidUrl(nextUrl)) {
-      setErrMsg("Add a valid http or https URL.");
+      setErrMsg(
+        "Add a valid public URL. CreatorHub can add https:// automatically when it is missing."
+      );
       return;
     }
 
@@ -520,7 +558,7 @@ const ApplyCreator = () => {
     setOkMsg(null);
     setErrMsg(null);
 
-    const nextUrl = mostRecentUploadUrl.trim();
+    const nextUrl = normaliseUrlInput(mostRecentUploadUrl);
 
     if (!applicationId) {
       setErrMsg("Create an application draft before adding required links.");
@@ -538,7 +576,9 @@ const ApplyCreator = () => {
     }
 
     if (!nextUrl || !isValidUrl(nextUrl)) {
-      setErrMsg("Add a valid http or https URL for your most recent upload or VOD.");
+      setErrMsg(
+        "Add a valid public URL for your most recent upload or VOD. CreatorHub can add https:// automatically when it is missing."
+      );
       return;
     }
 
@@ -550,6 +590,7 @@ const ApplyCreator = () => {
         sortOrder: sampleCount,
       });
 
+      setMostRecentUploadUrl(nextUrl);
       setOkMsg("Most Recent Upload/Vod link saved.");
     } catch (error) {
       setErrMsg(getErrorMessage(error));
@@ -703,23 +744,23 @@ const ApplyCreator = () => {
           <div className={classes.checklistItem}>
             <span
               className={
-                hasMostRecentUploadSample
-                  ? classes.checklistOkDot
-                  : classes.checklistDot
-              }
-            />
-            <span>Add your Most Recent Upload/Vod link</span>
-          </div>
-
-          <div className={classes.checklistItem}>
-            <span
-              className={
                 hasLinkedCreatorPlatform
                   ? classes.checklistOkDot
                   : classes.checklistDot
               }
             />
             <span>Link at least one creator platform</span>
+          </div>
+
+          <div className={classes.checklistItem}>
+            <span
+              className={
+                hasMostRecentUploadSample
+                  ? classes.checklistOkDot
+                  : classes.checklistDot
+              }
+            />
+            <span>Add your Most Recent Upload/Vod link</span>
           </div>
 
           <div className={classes.checklistItem}>
@@ -819,6 +860,9 @@ const ApplyCreator = () => {
                 className={classes.input}
                 value={mostRecentUploadUrl}
                 onChange={(event) => setMostRecentUploadUrl(event.currentTarget.value)}
+                onBlur={() =>
+                  setMostRecentUploadUrl((currentValue) => getDisplayUrl(currentValue))
+                }
                 placeholder="https://..."
               />
 
@@ -826,6 +870,16 @@ const ApplyCreator = () => {
                 Required. Add a public link to your most recent Twitch VOD, YouTube upload,
                 or other recent creator work. This counts toward your 3 minimum samples.
               </div>
+
+              {mostRecentUploadUrlError && (
+                <div className={classes.fieldHelp}>{mostRecentUploadUrlError}</div>
+              )}
+
+              {!mostRecentUploadUrlError && mostRecentUploadUrl.trim() && (
+                <div className={classes.fieldHelp}>
+                  Saved as: {getDisplayUrl(mostRecentUploadUrl)}
+                </div>
+              )}
             </div>
 
             <div className={classes.row}>
@@ -836,6 +890,7 @@ const ApplyCreator = () => {
                 disabled={
                   saveMostRecentUploadMutation.isPending ||
                   !canEditApplication ||
+                  Boolean(mostRecentUploadUrlError) ||
                   (!mostRecentUploadSample && hasReachedMaxSamples)
                 }
               >
@@ -869,12 +924,23 @@ const ApplyCreator = () => {
                 className={classes.input}
                 value={url}
                 onChange={(event) => setUrl(event.currentTarget.value)}
+                onBlur={() => setUrl((currentValue) => getDisplayUrl(currentValue))}
                 placeholder="https://..."
               />
 
               <div className={classes.fieldHelp}>
                 Use a public portfolio, drive folder, website, or direct showcase link.
               </div>
+
+              {sampleUrlError && (
+                <div className={classes.fieldHelp}>{sampleUrlError}</div>
+              )}
+
+              {!sampleUrlError && url.trim() && (
+                <div className={classes.fieldHelp}>
+                  Saved as: {getDisplayUrl(url)}
+                </div>
+              )}
             </div>
 
             <div className={classes.field}>
@@ -897,7 +963,8 @@ const ApplyCreator = () => {
                 disabled={
                   addLinkSampleMutation.isPending ||
                   hasReachedMaxSamples ||
-                  !canEditApplication
+                  !canEditApplication ||
+                  Boolean(sampleUrlError)
                 }
               >
                 {addLinkSampleMutation.isPending ? "Adding…" : "Add link sample"}

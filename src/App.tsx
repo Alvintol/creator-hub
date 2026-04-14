@@ -17,6 +17,8 @@ import SignIn from "./pages/SignIn";
 import ProfileSettings from "./pages/ProfileSettings";
 import ApplyCreator from "./pages/ApplyCreator";
 import AdminCreatorApplications from "./pages/AdminCreatorApplications";
+import RequireCreatorAccess from './components/RequireCreatorAccess';
+import CreatorDashboard from './pages/CreatorDashboard';
 
 const App = () => {
   return (
@@ -45,6 +47,10 @@ const App = () => {
               path="/admin/creator-applications"
               element={<AdminCreatorApplications />}
             />
+          </Route>
+
+          <Route element={<RequireCreatorAccess />}>
+            <Route path="/creator/dashboard" element={<CreatorDashboard />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

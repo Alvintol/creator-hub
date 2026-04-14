@@ -52,6 +52,10 @@ const classes = {
   sampleDescription: "mt-2 text-sm text-zinc-700",
   sampleLink: "mt-2 inline-flex text-sm font-semibold text-[rgb(var(--brand))] underline",
 
+  sampleUrlBlock: "mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3",
+  sampleUrlLabel: "text-[11px] font-bold uppercase tracking-wide text-zinc-500",
+  sampleUrlValue: "mt-1 break-all text-xs text-zinc-700",
+
   bannerOk: "card border border-emerald-200 bg-emerald-50 p-4 text-emerald-900",
   bannerErr: "card border border-rose-200 bg-rose-50 p-4 text-rose-900",
   bannerTitle: "text-sm font-extrabold",
@@ -88,6 +92,19 @@ const getSampleTypeLabel = (sample: SellerApplicationSampleRow): string =>
     : sample.sample_type === "image"
       ? "Image"
       : "Video";
+
+const getUrlHost = (value: string | null): string | null => {
+  if (!value) return null;
+
+  try {
+    return new URL(value).host;
+  } catch {
+    return null;
+  }
+};
+
+const getSafeUrlDisplay = (value: string | null): string =>
+  value?.trim() || "No URL";
 
 const AdminCreatorApplications = () => {
   const {
@@ -361,6 +378,20 @@ const AdminCreatorApplications = () => {
                   {sample.description && (
                     <div className={classes.sampleDescription}>
                       {sample.description}
+                    </div>
+                  )}
+
+                  {sample.url && (
+                    <div className={classes.sampleUrlBlock}>
+                      <div className={classes.sampleUrlLabel}>Domain</div>
+                      <div className={classes.sampleUrlValue}>
+                        {getUrlHost(sample.url) ?? "Invalid URL"}
+                      </div>
+
+                      <div className={classes.sampleUrlLabel}>Full URL</div>
+                      <div className={classes.sampleUrlValue}>
+                        {getSafeUrlDisplay(sample.url)}
+                      </div>
                     </div>
                   )}
 

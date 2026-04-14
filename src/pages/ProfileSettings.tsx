@@ -622,6 +622,7 @@ const ProfileSettings = () => {
           <div className={classes.applicationList}>
             <div>• Complete your public profile</div>
             <div>• Link at least one creator platform</div>
+            <div>• Link your Most Recent Upload/Vod from the last 30 days</div>
             <div>• Add work samples in the Creator application flow</div>
             <div>• Pass manual CreatorHub review</div>
           </div>
