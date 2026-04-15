@@ -5,6 +5,7 @@ import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import { useSellerAccess } from "../hooks/useSellerAccess";
 import { useUpsertMySellerApplication } from "../hooks/useUpsertMySellerApplication";
+import { useCreatorApplicationQueueState } from "../hooks/useCreatorApplicationQueueState";
 
 type SellerApplicationSampleType = "link" | "image" | "video";
 
@@ -258,7 +259,6 @@ const removeSellerApplicationSample = async (sampleId: string) => {
 
 // Submits the current draft / needs-changes application for review
 const submitSellerApplication = async (
-  profileUserId: string,
   applicationId: string,
   sampleCount: number,
   videoCount: number
@@ -275,23 +275,13 @@ const submitSellerApplication = async (
     throw new Error("Only 1 video sample is allowed per application.");
   }
 
-  const now = new Date().toISOString();
-
-  const { data, error } = await supabase
-    .from("seller_applications")
-    .update({
-      status: "submitted",
-      submitted_at: now,
-      updated_at: now,
-    })
-    .eq("id", applicationId)
-    .eq("profile_user_id", profileUserId)
-    .select("id")
-    .single();
+  const { data, error } = await supabase.rpc("submit_seller_application", {
+    application_id: applicationId,
+  });
 
   if (error) throw error;
 
-  return data;
+  return Array.isArray(data) ? data[0] : data;
 };
 
 const requiredRecentUploadTitle = "Most Recent Upload/Vod";
@@ -373,6 +363,12 @@ const ApplyCreator = () => {
 
   const createDraftMutation = useUpsertMySellerApplication();
 
+  const {
+    data: queueState,
+    isLoading: isQueueStateLoading,
+    error: queueStateError,
+  } = useCreatorApplicationQueueState();
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [url, setUrl] = useState("");
@@ -385,6 +381,7 @@ const ApplyCreator = () => {
   );
 
   const applicationId = sellerApplication?.id ?? null;
+  const isQueueFull = Boolean(queueState?.isFull);
 
   const {
     data: samples = [],
@@ -435,17 +432,33 @@ const ApplyCreator = () => {
         (sample) => sample.sample_type === "video"
       ).length;
 
+      if (samples.length < 3) {
+        throw new Error("Add at least 3 work samples before submitting.");
+      }
+
+      if (samples.length > 10) {
+        throw new Error("You can submit a maximum of 10 work samples.");
+      }
+
+      if (videoCount > 1) {
+        throw new Error("Only 1 video sample is allowed per application.");
+      }
+
       return submitSellerApplication(
-        user.id,
         applicationId,
         samples.length,
         videoCount
       );
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["mySellerApplication", user?.id ?? null],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["mySellerApplication", user?.id ?? null],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["creatorApplicationQueueState"],
+        }),
+      ]);
 
       setOkMsg("Creator application submitted for review.");
       setErrMsg(null);
@@ -493,10 +506,11 @@ const ApplyCreator = () => {
     const messages = [
       sellerAccessError ? getErrorMessage(sellerAccessError) : null,
       samplesError ? getErrorMessage(samplesError) : null,
+      queueStateError ? getErrorMessage(queueStateError) : null,
     ].filter(Boolean);
 
     return messages.length ? messages.join(" ") : null;
-  }, [sellerAccessError, samplesError]);
+  }, [sellerAccessError, samplesError, queueStateError]);
 
   const mostRecentUploadSample = useMemo(
     () => samples.find(isRequiredRecentUploadSample) ?? null,
@@ -509,6 +523,13 @@ const ApplyCreator = () => {
     () => getUrlValidationError(mostRecentUploadUrl),
     [mostRecentUploadUrl]
   );
+
+  const queueMessage = useMemo(() => {
+    if (!queueState) return "Checking review queue availability...";
+    return queueState.isFull
+      ? `Creator applications are full right now (${queueState.openCount}/${queueState.maxOpen} open). Please check again later.`
+      : `Review queue is open (${queueState.openCount}/${queueState.maxOpen} open, ${queueState.remaining} slot${queueState.remaining === 1 ? "" : "s"} left).`;
+  }, [queueState]);
 
   const hasMostRecentUploadSample = Boolean(
     mostRecentUploadSample?.url?.trim()
@@ -682,6 +703,13 @@ const ApplyCreator = () => {
 
     if (!hasMostRecentUploadSample) {
       setErrMsg("Add your Most Recent Upload/Vod link before submitting.");
+      return;
+    }
+
+    if (isQueueFull) {
+      setErrMsg(
+        "Creator applications are full right now. Please check again later."
+      );
       return;
     }
 
@@ -1176,6 +1204,8 @@ const ApplyCreator = () => {
             onClick={onSubmitForReview}
             disabled={
               submitApplicationMutation.isPending ||
+              isQueueFull ||
+              isQueueStateLoading ||
               !canSubmitApplication ||
               !hasMinimumSamples ||
               !hasMostRecentUploadSample ||
