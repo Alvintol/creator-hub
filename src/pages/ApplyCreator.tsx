@@ -95,6 +95,9 @@ const classes = {
 
   divider: "my-4 border-t border-zinc-200",
   loadingText: "text-sm text-zinc-600",
+
+  queueHelpOpen: "text-xs text-zinc-500",
+  queueHelpFull: "text-xs font-semibold text-rose-700",
 } as const;
 
 // Turns unknown thrown values into readable text
@@ -1145,6 +1148,12 @@ const ApplyCreator = () => {
             ? "This section is complete and ready for submission."
             : "Complete the missing requirements below before submitting for review."}
         </p>
+
+        <div
+          className={isQueueFull ? classes.queueHelpFull : classes.queueHelpOpen}
+        >
+          {queueMessage}
+        </div>
 
         <div className={classes.checklist}>
           <div className={classes.checklistItem}>

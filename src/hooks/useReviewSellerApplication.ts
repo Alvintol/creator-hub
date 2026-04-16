@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabaseClient";
+import { useAuth } from "../providers/AuthProvider";
 import type { SellerApplicationStatus } from "./useMySellerApplication";
 
 type ReviewSellerApplicationInput = {
@@ -13,6 +14,7 @@ type ReviewSellerApplicationInput = {
 };
 
 const reviewSellerApplication = async (
+  adminUserId: string,
   input: ReviewSellerApplicationInput
 ) => {
   const now = new Date().toISOString();
@@ -22,6 +24,7 @@ const reviewSellerApplication = async (
     reviewer_notes: input.reviewerNotes?.trim() || null,
     rejection_reason: input.rejectionReason?.trim() || null,
     reviewed_at: now,
+    reviewed_by: adminUserId,
     updated_at: now,
   };
 
@@ -35,6 +38,7 @@ const reviewSellerApplication = async (
       status,
       submitted_at,
       reviewed_at,
+      reviewed_by,
       reviewer_notes,
       rejection_reason,
       created_at,
@@ -48,11 +52,14 @@ const reviewSellerApplication = async (
 };
 
 export const useReviewSellerApplication = () => {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (input: ReviewSellerApplicationInput) =>
-      reviewSellerApplication(input),
+    mutationFn: (input: ReviewSellerApplicationInput) => {
+      if (!user?.id) throw new Error("You must be signed in.");
+      return reviewSellerApplication(user.id, input);
+    },
     onSuccess: async (_, variables) => {
       await Promise.all([
         queryClient.invalidateQueries({
