@@ -6,6 +6,9 @@ import {
 } from "../hooks/useAdminSellerApplicationSamples";
 import { useReviewSellerApplication } from "../hooks/useReviewSellerApplication";
 import type { SellerApplicationRow } from "../hooks/useMySellerApplication";
+import { useCreatorApplicationQueueState } from "../hooks/useCreatorApplicationQueueState";
+import { useAdminApplicantProfile } from "../hooks/useAdminApplicantProfile";
+import { useAdminApplicantPlatformAccounts } from "../hooks/useAdminApplicantAccounts";
 
 const classes = {
   page: "space-y-6",
@@ -131,6 +134,26 @@ const AdminCreatorApplications = () => {
     error: samplesError,
   } = useAdminSellerApplicationSamples(selectedApplication?.id ?? null);
 
+  const {
+    data: queueState,
+    isLoading: isQueueStateLoading,
+    error: queueStateError,
+  } = useCreatorApplicationQueueState();
+
+  const {
+    data: applicantProfile,
+    isLoading: isApplicantProfileLoading,
+    error: applicantProfileError,
+  } = useAdminApplicantProfile(selectedApplication?.profile_user_id ?? null);
+
+  const {
+    data: applicantPlatformAccounts = [],
+    isLoading: isApplicantPlatformsLoading,
+    error: applicantPlatformsError,
+  } = useAdminApplicantPlatformAccounts(
+    selectedApplication?.profile_user_id ?? null
+  );
+
   const reviewMutation = useReviewSellerApplication();
 
   const [reviewerNotes, setReviewerNotes] = useState("");
@@ -157,6 +180,14 @@ const AdminCreatorApplications = () => {
 
     return messages.length ? messages.join(" ") : null;
   }, [applicationsError, samplesError]);
+
+  const queueMessage = useMemo(() => {
+    if (!queueState) return "Checking review queue capacity…";
+
+    return queueState.isFull
+      ? `Queue full: ${queueState.openCount}/${queueState.maxOpen} open applications.`
+      : `Queue open: ${queueState.openCount}/${queueState.maxOpen} open, ${queueState.remaining} slot${queueState.remaining === 1 ? "" : "s"} left.`;
+  }, [queueState]);
 
   const onReview = async (
     status: "under_review" | "approved" | "rejected" | "needs_changes" | "suspended"
@@ -212,6 +243,11 @@ const AdminCreatorApplications = () => {
           <div className={classes.bannerText}>{errMsg ?? combinedErrorText}</div>
         </div>
       )}
+
+      <div className={classes.card}>
+        <div className={classes.title}>Queue capacity</div>
+        <p className={classes.help}>{queueMessage}</p>
+      </div>
 
       <div className={classes.grid}>
         <div className={classes.card}>
@@ -270,10 +306,34 @@ const AdminCreatorApplications = () => {
                   <span className={classes.pill}>
                     {getStatusLabel(selectedApplication)}
                   </span>
+
                   <span className={classes.pill}>
-                    User: {selectedApplication.profile_user_id}
+                    {applicantProfile?.display_name?.trim() || "Unnamed applicant"}
                   </span>
+
+                  {applicantProfile?.handle && (
+                    <span className={classes.pill}>
+                      @{applicantProfile.handle}
+                    </span>
+                  )}
                 </div>
+
+                <div className={classes.help}>
+                  Applicant ID: {selectedApplication.profile_user_id}
+                </div>
+
+                {applicantPlatformAccounts.length > 0 && (
+                  <div className={classes.statusPills}>
+                    {applicantPlatformAccounts.map((platformAccount) => (
+                      <span key={platformAccount.id} className={classes.pill}>
+                        {platformAccount.platform}
+                        {platformAccount.platform_login
+                          ? ` · @${platformAccount.platform_login}`
+                          : ""}
+                      </span>
+                    ))}
+                  </div>
+                )}
 
                 <div className={classes.row}>
                   <button

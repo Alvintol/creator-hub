@@ -14,15 +14,12 @@ export type SellerApplicationStatus =
 export type SellerApplicationRow = {
   id: string;
   profile_user_id: string;
-
   status: SellerApplicationStatus;
-
   submitted_at: string | null;
   reviewed_at: string | null;
-
+  reviewed_by: string | null;
   reviewer_notes: string | null;
   rejection_reason: string | null;
-
   created_at: string;
   updated_at: string;
 };
