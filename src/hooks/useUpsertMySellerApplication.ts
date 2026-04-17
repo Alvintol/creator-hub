@@ -10,6 +10,7 @@ type UpsertSellerApplicationInput = {
   agreed_to_terms?: boolean;
   agreed_to_original_work?: boolean;
   agreed_to_manual_review?: boolean;
+  agreed_to_age_and_capacity?: boolean;
   submitted_at?: string | null;
 };
 
@@ -28,6 +29,7 @@ const upsertMySellerApplication = async (
     agreed_to_terms: input.agreed_to_terms ?? false,
     agreed_to_original_work: input.agreed_to_original_work ?? false,
     agreed_to_manual_review: input.agreed_to_manual_review ?? false,
+    agreed_to_age_and_capacity: input.agreed_to_age_and_capacity ?? false,
     submitted_at:
       input.status === "submitted"
         ? input.submitted_at ?? now
