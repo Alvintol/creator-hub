@@ -98,6 +98,12 @@ const classes = {
 
   queueHelpOpen: "text-xs text-zinc-500",
   queueHelpFull: "text-xs font-semibold text-rose-700",
+
+  checkboxGroup: "mt-4 space-y-3",
+  checkboxRow: "flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-4",
+  checkbox: "mt-1 h-4 w-4 rounded border-zinc-300",
+  checkboxText: "text-sm text-zinc-700",
+  checkboxLink: "font-semibold text-[rgb(var(--brand))] underline",
 } as const;
 
 // Turns unknown thrown values into readable text
@@ -383,8 +389,31 @@ const ApplyCreator = () => {
     "Links are strongly preferred right now. Image and video uploads can be enabled once storage is wired."
   );
 
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [agreedToOriginalWork, setAgreedToOriginalWork] = useState(false);
+  const [agreedToManualReview, setAgreedToManualReview] = useState(false);
+  const [agreedToAgeAndCapacity, setAgreedToAgeAndCapacity] = useState(false);
+
   const applicationId = sellerApplication?.id ?? null;
   const isQueueFull = Boolean(queueState?.isFull);
+
+  useEffect(() => {
+    setAgreedToTerms(Boolean(sellerApplication?.agreed_to_terms));
+    setAgreedToOriginalWork(Boolean(sellerApplication?.agreed_to_original_work));
+    setAgreedToManualReview(Boolean(sellerApplication?.agreed_to_manual_review));
+    setAgreedToAgeAndCapacity(Boolean(sellerApplication?.agreed_to_age_and_capacity));
+  }, [
+    sellerApplication?.agreed_to_terms,
+    sellerApplication?.agreed_to_original_work,
+    sellerApplication?.agreed_to_manual_review,
+    sellerApplication?.agreed_to_age_and_capacity,
+  ]);
+
+  const hasAcceptedAllAgreements =
+    agreedToTerms &&
+    agreedToOriginalWork &&
+    agreedToManualReview &&
+    agreedToAgeAndCapacity;
 
   const {
     data: samples = [],
@@ -399,8 +428,6 @@ const ApplyCreator = () => {
         ? fetchSellerApplicationSamples(applicationId)
         : Promise.resolve([]),
   });
-
-
 
   const addLinkSampleMutation = useMutation({
     mutationFn: (input: {
@@ -548,9 +575,11 @@ const ApplyCreator = () => {
     videoCount <= 1;
 
   const isSubmitReady =
+    !isQueueFull &&
     canSubmitApplication &&
     hasMinimumSamples &&
     hasMostRecentUploadSample &&
+    hasAcceptedAllAgreements &&
     sampleCount <= 10 &&
     videoCount <= 1;
 
@@ -572,8 +601,11 @@ const ApplyCreator = () => {
     try {
       await createDraftMutation.mutateAsync({
         status: "draft",
+        agreed_to_terms: agreedToTerms,
+        agreed_to_original_work: agreedToOriginalWork,
+        agreed_to_manual_review: agreedToManualReview,
+        agreed_to_age_and_capacity: agreedToAgeAndCapacity,
       });
-
       setOkMsg("Creator application draft created.");
     } catch (error) {
       setErrMsg(getErrorMessage(error));
@@ -709,12 +741,26 @@ const ApplyCreator = () => {
       return;
     }
 
-    if (isQueueFull) {
+    if (!hasAcceptedAllAgreements) {
       setErrMsg(
-        "Creator applications are full right now. Please check again later."
+        "Read and agree to the Creator application terms and acknowledgements before submitting."
       );
       return;
     }
+
+    if (isQueueFull) {
+      setErrMsg("Creator applications are full right now. Please check again later.");
+      return;
+    }
+
+    await createDraftMutation.mutateAsync({
+      id: sellerApplication?.id,
+      status: sellerApplication?.status === "needs_changes" ? "needs_changes" : "draft",
+      agreed_to_terms: agreedToTerms,
+      agreed_to_original_work: agreedToOriginalWork,
+      agreed_to_manual_review: agreedToManualReview,
+      agreed_to_age_and_capacity: agreedToAgeAndCapacity,
+    });
 
     try {
       await submitApplicationMutation.mutateAsync();
@@ -760,7 +806,7 @@ const ApplyCreator = () => {
 
       {infoMsg && (
         <div className={classes.bannerInfo}>
-          <div className={classes.bannerTitle}>Application guidance</div>
+          <div className={classes.bannerTitle}>Application Guidance</div>
           <div className={classes.bannerText}>{infoMsg}</div>
         </div>
       )}
@@ -787,7 +833,7 @@ const ApplyCreator = () => {
           classes
         )}
       >
-        <div className={classes.cardTitle}>Before you apply</div>
+        <div className={classes.cardTitle}>Before you Apply</div>
 
         <p className={classes.cardText}>
           These checks help keep CreatorHub higher trust and easier to review.
@@ -827,6 +873,17 @@ const ApplyCreator = () => {
               Only draft and needs-changes applications can be edited.
             </div>
           </div>
+        </div>
+
+        <div className={classes.checklistItem}>
+          <span
+            className={
+              hasAcceptedAllAgreements
+                ? classes.checklistOkDot
+                : classes.checklistDot
+            }
+          />
+          <span>Terms, originality, manual review, and age/capacity confirmed</span>
         </div>
 
         <div className={classes.checklist}>
@@ -927,6 +984,92 @@ const ApplyCreator = () => {
             </div>
           </div>
         )}
+      </div>
+
+      <div className={classes.card}>
+        <div className={classes.cardTitle}>Agreements</div>
+
+        <p className={classes.cardText}>
+          You must read and agree to these acknowledgements before submitting your
+          Creator application.
+        </p>
+
+        <div className={classes.checkboxGroup}>
+          <label className={classes.checkboxRow}>
+            <input
+              className={classes.checkbox}
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(event) => setAgreedToTerms(event.currentTarget.checked)}
+              disabled={!canEditApplication}
+            />
+
+            <div className={classes.checkboxText}>
+              I have read and agree to the{" "}
+              <Link
+                className={classes.checkboxLink}
+                to="/terms/creator-application"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Creator application terms
+              </Link>
+              .
+            </div>
+          </label>
+
+          <label className={classes.checkboxRow}>
+            <input
+              className={classes.checkbox}
+              type="checkbox"
+              checked={agreedToOriginalWork}
+              onChange={(event) =>
+                setAgreedToOriginalWork(event.currentTarget.checked)
+              }
+              disabled={!canEditApplication}
+            />
+
+            <div className={classes.checkboxText}>
+              I confirm that my submitted samples are my own work or work I have
+              the clear right to showcase.
+            </div>
+          </label>
+
+          <label className={classes.checkboxRow}>
+            <input
+              className={classes.checkbox}
+              type="checkbox"
+              checked={agreedToManualReview}
+              onChange={(event) =>
+                setAgreedToManualReview(event.currentTarget.checked)
+              }
+              disabled={!canEditApplication}
+            />
+
+            <div className={classes.checkboxText}>
+              I understand that creator access is reviewed manually and may be
+              approved, rejected, paused, suspended, or sent back for changes.
+            </div>
+          </label>
+
+          <label className={classes.checkboxRow}>
+            <input
+              className={classes.checkbox}
+              type="checkbox"
+              checked={agreedToAgeAndCapacity}
+              onChange={(event) =>
+                setAgreedToAgeAndCapacity(event.currentTarget.checked)
+              }
+              disabled={!canEditApplication}
+            />
+
+            <div className={classes.checkboxText}>
+              I confirm that I am at least 18 years old and legally able to enter
+              a binding agreement. If the age of majority or legal contracting age
+              in my jurisdiction is higher than 18, I meet that higher requirement.
+            </div>
+          </label>
+        </div>
       </div>
 
       <div className={getSectionCardClass(isWorkSamplesComplete, classes)}>
@@ -1218,6 +1361,7 @@ const ApplyCreator = () => {
               !canSubmitApplication ||
               !hasMinimumSamples ||
               !hasMostRecentUploadSample ||
+              !hasAcceptedAllAgreements ||
               sampleCount > 10 ||
               videoCount > 1 ||
               !applicationId

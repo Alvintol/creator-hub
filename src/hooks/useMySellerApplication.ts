@@ -14,12 +14,22 @@ export type SellerApplicationStatus =
 export type SellerApplicationRow = {
   id: string;
   profile_user_id: string;
+
   status: SellerApplicationStatus;
+
+  applicant_notes: string | null;
+  agreed_to_terms: boolean;
+  agreed_to_original_work: boolean;
+  agreed_to_manual_review: boolean;
+  agreed_to_age_and_capacity: boolean;
+
   submitted_at: string | null;
   reviewed_at: string | null;
   reviewed_by: string | null;
+
   reviewer_notes: string | null;
   rejection_reason: string | null;
+
   created_at: string;
   updated_at: string;
 };
@@ -31,16 +41,22 @@ const fetchMySellerApplication = async (
   const { data, error } = await supabase
     .from("seller_applications")
     .select(`
-      id,
-      profile_user_id,
-      status,
-      submitted_at,
-      reviewed_at,
-      reviewer_notes,
-      rejection_reason,
-      created_at,
-      updated_at
-    `)
+  id,
+  profile_user_id,
+  status,
+  applicant_notes,
+  agreed_to_terms,
+  agreed_to_original_work,
+  agreed_to_manual_review,
+  agreed_to_age_and_capacity,
+  submitted_at,
+  reviewed_at,
+  reviewed_by,
+  reviewer_notes,
+  rejection_reason,
+  created_at,
+  updated_at
+`)
     .eq("profile_user_id", userId)
     .maybeSingle();
 

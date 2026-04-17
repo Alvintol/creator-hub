@@ -131,6 +131,11 @@ describe("ApplyCreator", () => {
         reviewed_by: null,
         reviewer_notes: null,
         rejection_reason: null,
+        applicant_notes: null,
+        agreed_to_terms: true,
+        agreed_to_original_work: true,
+        agreed_to_manual_review: true,
+        agreed_to_age_and_capacity: true,
         created_at: "2026-04-01T00:00:00.000Z",
         updated_at: "2026-04-01T00:00:00.000Z",
       },
@@ -269,5 +274,60 @@ describe("ApplyCreator", () => {
 
     // Only the normal sample should expose a remove button.
     expect(screen.getAllByRole("button", { name: /remove/i })).toHaveLength(1);
+  });
+
+  it("disables submit when the age and capacity acknowledgement is missing", () => {
+    mockUseSellerAccess.mockReturnValue({
+      isLoading: false,
+      isSignedIn: true,
+      isAdmin: false,
+      isCreatorApproved: false,
+      canAccessCreatorRoutes: false,
+      canAccessAdminRoutes: false,
+      profileReady: true,
+      hasLinkedCreatorPlatform: true,
+      sellerApplication: {
+        id: "application-1",
+        profile_user_id: "user-1",
+        status: "draft",
+        applicant_notes: null,
+        agreed_to_terms: true,
+        agreed_to_original_work: true,
+        agreed_to_manual_review: true,
+        agreed_to_age_and_capacity: false,
+        submitted_at: null,
+        reviewed_at: null,
+        reviewed_by: null,
+        reviewer_notes: null,
+        rejection_reason: null,
+        created_at: "2026-04-01T00:00:00.000Z",
+        updated_at: "2026-04-01T00:00:00.000Z",
+      },
+      creatorStatusLabel: "Draft",
+      canStartApplication: true,
+      canEditApplication: true,
+      canSubmitApplication: true,
+      error: null,
+    } as never);
+
+    renderPage([
+      buildRequiredRecentUploadSample({ sort_order: 0 }),
+      buildSample({
+        id: "sample-2",
+        title: "Portfolio two",
+        url: "https://example.com/two",
+        sort_order: 1,
+      }),
+      buildSample({
+        id: "sample-3",
+        title: "Portfolio three",
+        url: "https://example.com/three",
+        sort_order: 2,
+      }),
+    ]);
+
+    expect(
+      screen.getByRole("button", { name: /submit for review/i })
+    ).toBeDisabled();
   });
 });
