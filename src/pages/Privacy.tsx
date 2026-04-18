@@ -23,7 +23,6 @@ const Privacy = () => {
       </div>
 
       <div className={classes.card}>
-        <div className={classes.meta}>Version: {privacyVersion}</div>
 
         <div className={classes.sectionList}>
           {privacySections.map((section) => (
@@ -38,6 +37,7 @@ const Privacy = () => {
             </section>
           ))}
         </div>
+        <div className={classes.meta}>Version: {privacyVersion}</div>
       </div>
     </div>
   );

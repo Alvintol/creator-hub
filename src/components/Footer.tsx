@@ -20,6 +20,10 @@ const Footer = () => {
         </div>
 
         <nav className={classes.nav} aria-label="Footer legal navigation">
+          <Link className={classes.link} to="/legal">
+            Legal
+          </Link>
+
           <Link className={classes.link} to="/terms">
             Terms
           </Link>
@@ -30,10 +34,6 @@ const Footer = () => {
 
           <Link className={classes.link} to="/terms/creator">
             Creator Terms
-          </Link>
-
-          <Link className={classes.link} to="/legal">
-            Legal
           </Link>
         </nav>
 
