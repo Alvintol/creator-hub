@@ -19,6 +19,10 @@ import ApplyCreator from "./pages/ApplyCreator";
 import AdminCreatorApplications from "./pages/AdminCreatorApplications";
 import RequireCreatorAccess from './components/RequireCreatorAccess';
 import CreatorDashboard from './pages/CreatorDashboard';
+import Legal from './pages/Legal';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
+import CreatorTerms from './pages/CreatorTerms';
 
 const App = () => {
   return (
@@ -36,6 +40,10 @@ const App = () => {
           <Route path="/creators" element={<Creators />} />
           <Route path="/listing/:id" element={<Listing />} />
           <Route path="/creator/:handle" element={<CreatorProfile />} />
+          <Route path="/legal" element={<Legal />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms/creator" element={<CreatorTerms />} />
 
           <Route element={<RequireAuth />}>
             <Route path="/settings/profile" element={<ProfileSettings />} />
