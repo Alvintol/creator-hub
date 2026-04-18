@@ -25,8 +25,6 @@ const CreatorTerms = () => {
       </div>
 
       <div className={classes.card}>
-        <div className={classes.meta}>Version: {creatorTermsVersion}</div>
-
         <div className={classes.sectionList}>
           {creatorTermsSections.map((section) => (
             <section key={section.title} className={classes.section}>
@@ -40,7 +38,9 @@ const CreatorTerms = () => {
             </section>
           ))}
         </div>
+        <div className={classes.meta}>Version: {creatorTermsVersion}</div>
       </div>
+
     </div>
   );
 };

@@ -23,7 +23,6 @@ const Terms = () => {
       </div>
 
       <div className={classes.card}>
-        <div className={classes.meta}>Version: {termsVersion}</div>
 
         <div className={classes.sectionList}>
           {termsSections.map((section) => (
@@ -38,6 +37,7 @@ const Terms = () => {
             </section>
           ))}
         </div>
+        <div className={classes.meta}>Version: {termsVersion}</div>
       </div>
     </div>
   );

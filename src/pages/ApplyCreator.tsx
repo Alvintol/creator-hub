@@ -986,92 +986,6 @@ const ApplyCreator = () => {
         )}
       </div>
 
-      <div className={classes.card}>
-        <div className={classes.cardTitle}>Agreements</div>
-
-        <p className={classes.cardText}>
-          You must read and agree to these acknowledgements before submitting your
-          Creator application.
-        </p>
-
-        <div className={classes.checkboxGroup}>
-          <label className={classes.checkboxRow}>
-            <input
-              className={classes.checkbox}
-              type="checkbox"
-              checked={agreedToTerms}
-              onChange={(event) => setAgreedToTerms(event.currentTarget.checked)}
-              disabled={!canEditApplication}
-            />
-
-            <div className={classes.checkboxText}>
-              I have read and agree to the{" "}
-              <Link
-                className={classes.checkboxLink}
-                to="/terms/creator-application"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Creator application terms
-              </Link>
-              .
-            </div>
-          </label>
-
-          <label className={classes.checkboxRow}>
-            <input
-              className={classes.checkbox}
-              type="checkbox"
-              checked={agreedToOriginalWork}
-              onChange={(event) =>
-                setAgreedToOriginalWork(event.currentTarget.checked)
-              }
-              disabled={!canEditApplication}
-            />
-
-            <div className={classes.checkboxText}>
-              I confirm that my submitted samples are my own work or work I have
-              the clear right to showcase.
-            </div>
-          </label>
-
-          <label className={classes.checkboxRow}>
-            <input
-              className={classes.checkbox}
-              type="checkbox"
-              checked={agreedToManualReview}
-              onChange={(event) =>
-                setAgreedToManualReview(event.currentTarget.checked)
-              }
-              disabled={!canEditApplication}
-            />
-
-            <div className={classes.checkboxText}>
-              I understand that creator access is reviewed manually and may be
-              approved, rejected, paused, suspended, or sent back for changes.
-            </div>
-          </label>
-
-          <label className={classes.checkboxRow}>
-            <input
-              className={classes.checkbox}
-              type="checkbox"
-              checked={agreedToAgeAndCapacity}
-              onChange={(event) =>
-                setAgreedToAgeAndCapacity(event.currentTarget.checked)
-              }
-              disabled={!canEditApplication}
-            />
-
-            <div className={classes.checkboxText}>
-              I confirm that I am at least 18 years old and legally able to enter
-              a binding agreement. If the age of majority or legal contracting age
-              in my jurisdiction is higher than 18, I meet that higher requirement.
-            </div>
-          </label>
-        </div>
-      </div>
-
       <div className={getSectionCardClass(isWorkSamplesComplete, classes)}>
         <div className={classes.cardTitle}>Work samples</div>
 
@@ -1283,6 +1197,107 @@ const ApplyCreator = () => {
         )}
       </div>
 
+      <div className={classes.card}>
+        <div className={classes.cardTitle}>Agreements</div>
+
+        <p className={classes.cardText}>
+          You must read and agree to these acknowledgements before submitting your
+          Creator application.
+        </p>
+
+        <div className={classes.row}>
+          <Link
+            className={classes.btnOutline}
+            to="/terms/creator"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Read Creator Terms
+          </Link>
+        </div>
+
+        <div className={classes.fieldHelp}>
+          Open the Creator Terms in a new tab and review them before agreeing below.
+        </div>
+
+        <div className={classes.checkboxGroup}>
+          <label className={classes.checkboxRow}>
+            <input
+              className={classes.checkbox}
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(event) => setAgreedToTerms(event.currentTarget.checked)}
+              disabled={!canEditApplication}
+            />
+
+            <div className={classes.checkboxText}>
+              I have read, understood, and agree to the{" "}
+              <Link
+                className={classes.checkboxLink}
+                to="/terms/creator"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Creator Terms
+              </Link>
+              .
+            </div>
+          </label>
+
+          <label className={classes.checkboxRow}>
+            <input
+              className={classes.checkbox}
+              type="checkbox"
+              checked={agreedToOriginalWork}
+              onChange={(event) =>
+                setAgreedToOriginalWork(event.currentTarget.checked)
+              }
+              disabled={!canEditApplication}
+            />
+
+            <div className={classes.checkboxText}>
+              I confirm that my submitted samples are my own work or work I have
+              the clear right to showcase.
+            </div>
+          </label>
+
+          <label className={classes.checkboxRow}>
+            <input
+              className={classes.checkbox}
+              type="checkbox"
+              checked={agreedToManualReview}
+              onChange={(event) =>
+                setAgreedToManualReview(event.currentTarget.checked)
+              }
+              disabled={!canEditApplication}
+            />
+
+            <div className={classes.checkboxText}>
+              I understand that creator access is reviewed manually and may be
+              approved, rejected, paused, suspended, or sent back for changes.
+            </div>
+          </label>
+
+          <label className={classes.checkboxRow}>
+            <input
+              className={classes.checkbox}
+              type="checkbox"
+              checked={agreedToAgeAndCapacity}
+              onChange={(event) =>
+                setAgreedToAgeAndCapacity(event.currentTarget.checked)
+              }
+              disabled={!canEditApplication}
+            />
+
+            <div className={classes.checkboxText}>
+              I confirm that I am at least 18 years old and legally able to enter
+              a binding agreement. If the age of majority or legal contracting age
+              in my jurisdiction is higher than 18, I meet that higher requirement.
+            </div>
+          </label>
+        </div>
+      </div>
+
       <div className={getSectionCardClass(isSubmitReady, classes)}>
         <div className={classes.cardTitle}>Submit for review</div>
 
@@ -1346,6 +1361,17 @@ const ApplyCreator = () => {
               }
             />
             <span>No more than 1 video sample</span>
+          </div>
+
+          <div className={classes.checklistItem}>
+            <span
+              className={
+                hasAcceptedAllAgreements
+                  ? classes.checklistOkDot
+                  : classes.checklistDot
+              }
+            />
+            <span>Creator Terms and all required acknowledgements confirmed</span>
           </div>
         </div>
 
