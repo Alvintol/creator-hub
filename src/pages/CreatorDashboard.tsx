@@ -44,8 +44,9 @@ const CreatorDashboard = () => {
         <div className={classes.title}>Access confirmed</div>
 
         <p className={classes.text}>
-          Your account currently has creator access. This page can later expand
-          into listings, delivery workflow, orders, and profile tools.
+          Your account currently has creator access. You can now create private
+          draft listings that stay unpublished until broader listing management
+          is added.
         </p>
 
         <div className={classes.pills}>
@@ -59,7 +60,11 @@ const CreatorDashboard = () => {
         </div>
 
         <div className={classes.row}>
-          <Link className={classes.btnPrimary} to="/market">
+          <Link className={classes.btnPrimary} to="/creator/listings/new">
+            Create listing
+          </Link>
+
+          <Link className={classes.btnOutline} to="/market">
             Browse market
           </Link>
 

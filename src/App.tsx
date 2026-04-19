@@ -23,6 +23,7 @@ import Legal from './pages/Legal';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import CreatorTerms from './pages/CreatorTerms';
+import CreateListing from './pages/CreateListing';
 
 const App = () => {
   return (
@@ -59,6 +60,7 @@ const App = () => {
 
           <Route element={<RequireCreatorAccess />}>
             <Route path="/creator/dashboard" element={<CreatorDashboard />} />
+            <Route path="/creator/listings/new" element={<CreateListing />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
