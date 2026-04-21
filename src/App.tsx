@@ -23,6 +23,9 @@ import Legal from './pages/Legal';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import CreatorTerms from './pages/CreatorTerms';
+import CreateListing from './pages/CreateListing';
+import CreatorListings from './pages/CreatorLIstings';
+import EditListing from './pages/EditListing';
 
 const App = () => {
   return (
@@ -59,6 +62,9 @@ const App = () => {
 
           <Route element={<RequireCreatorAccess />}>
             <Route path="/creator/dashboard" element={<CreatorDashboard />} />
+            <Route path="/creator/listings" element={<CreatorListings />} />
+            <Route path="/creator/listings/new" element={<CreateListing />} />
+            <Route path="/creator/listings/:id/edit" element={<EditListing />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
