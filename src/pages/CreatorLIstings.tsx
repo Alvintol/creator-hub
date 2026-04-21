@@ -61,10 +61,10 @@ const updatedText = (value: string): string => {
   return Number.isNaN(date.getTime())
     ? value
     : date.toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
 };
 
 const CreatorListings = () => {
@@ -169,7 +169,16 @@ const CreatorListings = () => {
                 </div>
 
                 <div className={classes.row}>
-                  <span className={classes.btnDisabled}>Edit soon</span>
+                  {listing.status === "draft" && !listing.is_active ? (
+                    <Link
+                      className={classes.btnOutline}
+                      to={`/creator/listings/${listing.id}/edit`}
+                    >
+                      Edit draft
+                    </Link>
+                  ) : (
+                    <span className={classes.btnDisabled}>Edit later</span>
+                  )}
                 </div>
               </div>
             </div>

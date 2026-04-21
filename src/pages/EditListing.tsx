@@ -1,7 +1,13 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
+import { useMyListing } from "../hooks/useMyListing";
 
 type ListingOfferingType = "digital" | "commission" | "service";
 type ListingPriceType = "fixed" | "starting_at" | "range";
@@ -64,6 +70,8 @@ const classes = {
     "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
   btnOutline:
     "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+
+  loadingText: "text-sm text-zinc-600",
 } as const;
 
 const offeringTypeOptions: Array<{
@@ -121,10 +129,11 @@ const parseTags = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-// Parses a numeric field while keeping empty input as null
+// Keeps only whole-number digits for price inputs
 const normaliseIntegerInput = (value: string) =>
   value.replace(/[^\d]/g, "");
 
+// Parses an integer field while keeping empty input as null
 const parseInteger = (value: string) => {
   if (!value.trim()) return null;
 
@@ -132,14 +141,51 @@ const parseInteger = (value: string) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+// Maps a loaded listing row into editable form state
+const toFormState = (listing: {
+  title: string;
+  short: string;
+  offering_type: ListingOfferingType;
+  category: string;
+  video_subtype: "long-form" | "short-form" | null;
+  price_type: ListingPriceType;
+  price_min: number;
+  price_max: number | null;
+  deliverables: string[];
+  tags: string[];
+  preview_url: string | null;
+}): FormState => ({
+  title: listing.title,
+  short: listing.short,
+  offeringType: listing.offering_type,
+  category: listing.category,
+  videoSubtype: listing.video_subtype ?? "",
+  priceType: listing.price_type,
+  priceMin: String(listing.price_min),
+  priceMax: listing.price_max === null ? "" : String(listing.price_max),
+  deliverablesText: listing.deliverables.join("\n"),
+  tagsText: listing.tags.join(", "),
+  previewUrl: listing.preview_url ?? "",
+});
 
-const CreateListing = () => {
+const EditListing = () => {
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+
+  const { data: listing, isLoading, error } = useMyListing(id ?? null);
 
   const [form, setForm] = useState<FormState>(initialState);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [hasLoadedForm, setHasLoadedForm] = useState(false);
+
+  useEffect(() => {
+    if (!listing || hasLoadedForm) return;
+
+    setForm(toFormState(listing));
+    setHasLoadedForm(true);
+  }, [listing, hasLoadedForm]);
 
   const isRangePrice = form.priceType === "range";
 
@@ -222,11 +268,11 @@ const CreateListing = () => {
     };
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const { isValid, priceMin, rawPriceMax } = validate();
-    if (!isValid || !user?.id || priceMin === null) return;
+    if (!isValid || !user?.id || !id || priceMin === null) return;
 
     setIsSaving(true);
 
@@ -238,25 +284,35 @@ const CreateListing = () => {
             ? null
             : rawPriceMax;
 
-      const { error } = await supabase.from("listings").insert({
-        user_id: user.id,
-        title: form.title.trim(),
-        short: form.short.trim(),
-        offering_type: form.offeringType,
-        category: form.category.trim(),
-        video_subtype: form.videoSubtype || null,
-        price_type: form.priceType,
-        price_min: priceMin,
-        price_max: nextPriceMax,
-        deliverables: parseDeliverables(form.deliverablesText),
-        tags: parseTags(form.tagsText),
-        preview_url: form.previewUrl.trim() || null,
-        status: "draft",
-        is_active: false,
-      });
+      const { data: updated, error: updateError } = await supabase
+        .from("listings")
+        .update({
+          title: form.title.trim(),
+          short: form.short.trim(),
+          offering_type: form.offeringType,
+          category: form.category.trim(),
+          video_subtype: form.videoSubtype || null,
+          price_type: form.priceType,
+          price_min: priceMin,
+          price_max: nextPriceMax,
+          deliverables: parseDeliverables(form.deliverablesText),
+          tags: parseTags(form.tagsText),
+          preview_url: form.previewUrl.trim() || null,
+          status: "draft",
+          is_active: false,
+        })
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .eq("status", "draft")
+        .select("id")
+        .maybeSingle();
 
-      if (error) {
-        throw error;
+      if (updateError) {
+        throw updateError;
+      }
+
+      if (!updated?.id) {
+        throw new Error("Only draft listings can be edited right now.");
       }
 
       navigate("/creator/listings");
@@ -264,7 +320,7 @@ const CreateListing = () => {
       const message =
         error instanceof Error
           ? error.message
-          : "The listing draft could not be saved.";
+          : "The listing draft could not be updated.";
 
       setErrors((current) => ({
         ...current,
@@ -275,18 +331,56 @@ const CreateListing = () => {
     }
   };
 
+  if (isLoading) {
+    return <div className={classes.loadingText}>Loading…</div>;
+  }
+
+  if (error || !listing) {
+    return (
+      <div className={classes.page}>
+        <Link to="/creator/listings" className={classes.backLink}>
+          ← Back to my listings
+        </Link>
+
+        <div className={classes.card}>
+          <h1 className={classes.h1}>Listing not found</h1>
+          <p className={classes.sub}>
+            This listing could not be loaded from your creator account.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (listing.status !== "draft" || listing.is_active) {
+    return (
+      <div className={classes.page}>
+        <Link to="/creator/listings" className={classes.backLink}>
+          ← Back to my listings
+        </Link>
+
+        <div className={classes.card}>
+          <h1 className={classes.h1}>Draft-only editing</h1>
+          <p className={classes.sub}>
+            Only inactive draft listings can be edited in this first pass.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={classes.page}>
       <Link to="/creator/listings" className={classes.backLink}>
-        ← Back to creator listings
+        ← Back to my listings
       </Link>
 
       <div className={classes.header}>
-        <h1 className={classes.h1}>Create listing</h1>
+        <h1 className={classes.h1}>Edit draft listing</h1>
 
         <p className={classes.sub}>
-          Save a private draft listing. This first pass does not publish listings,
-          upload media, or handle payouts yet.
+          Update your private draft listing. Publishing and activation are still
+          intentionally out of scope here.
         </p>
       </div>
 
@@ -295,8 +389,7 @@ const CreateListing = () => {
           <div>
             <h2 className={classes.sectionTitle}>Basics</h2>
             <p className={classes.sectionText}>
-              Add the core details buyers will eventually see when publishing is
-              added.
+              Edit the core listing details that will later feed the public view.
             </p>
           </div>
 
@@ -312,7 +405,6 @@ const CreateListing = () => {
                 type="text"
                 value={form.title}
                 onChange={(event) => setField("title", event.target.value)}
-                placeholder="Cozy Emote Pack (12)"
                 maxLength={80}
               />
 
@@ -331,7 +423,6 @@ const CreateListing = () => {
                 className={classes.textarea}
                 value={form.short}
                 onChange={(event) => setField("short", event.target.value)}
-                placeholder="12 emotes + variants. Includes PNG + licence notes."
                 maxLength={280}
               />
 
@@ -372,12 +463,7 @@ const CreateListing = () => {
                 type="text"
                 value={form.category}
                 onChange={(event) => setField("category", event.target.value)}
-                placeholder="emotes"
               />
-
-              <div className={classes.hint}>
-                Keep this aligned with your existing marketplace category values.
-              </div>
 
               {errors.category && (
                 <div className={classes.error}>{errors.category}</div>
@@ -419,7 +505,7 @@ const CreateListing = () => {
           <div>
             <h2 className={classes.sectionTitle}>Pricing</h2>
             <p className={classes.sectionText}>
-              Draft listings stay private and inactive even after saving.
+              Draft updates keep the listing private and inactive.
             </p>
           </div>
 
@@ -460,7 +546,6 @@ const CreateListing = () => {
                 onChange={(event) =>
                   setField("priceMin", normaliseIntegerInput(event.target.value))
                 }
-                placeholder={form.priceType === "starting_at" ? "5" : "18"}
               />
 
               {errors.priceMin && (
@@ -484,7 +569,6 @@ const CreateListing = () => {
                   onChange={(event) =>
                     setField("priceMax", normaliseIntegerInput(event.target.value))
                   }
-                  placeholder="30"
                 />
 
                 <div className={classes.hint}>
@@ -503,7 +587,7 @@ const CreateListing = () => {
           <div>
             <h2 className={classes.sectionTitle}>Deliverables and tags</h2>
             <p className={classes.sectionText}>
-              These are optional in the first pass and can stay empty.
+              These stay optional and are trimmed before saving.
             </p>
           </div>
 
@@ -520,7 +604,6 @@ const CreateListing = () => {
                 onChange={(event) =>
                   setField("deliverablesText", event.target.value)
                 }
-                placeholder={"png\npsd\nsource files"}
               />
 
               <div className={classes.hint}>Enter one deliverable per line.</div>
@@ -536,7 +619,6 @@ const CreateListing = () => {
                 className={classes.textarea}
                 value={form.tagsText}
                 onChange={(event) => setField("tagsText", event.target.value)}
-                placeholder="emotes, png, cozy"
               />
 
               <div className={classes.hint}>Separate tags with commas.</div>
@@ -563,7 +645,7 @@ const CreateListing = () => {
           <div>
             <h2 className={classes.sectionTitle}>Preview</h2>
             <p className={classes.sectionText}>
-              A preview image URL is optional for now. File uploads will come later.
+              Preview URLs remain optional until uploads are introduced.
             </p>
           </div>
 
@@ -579,7 +661,6 @@ const CreateListing = () => {
                 type="text"
                 value={form.previewUrl}
                 onChange={(event) => setField("previewUrl", event.target.value)}
-                placeholder="https://example.com/preview.jpg"
               />
             </div>
           </div>
@@ -587,10 +668,10 @@ const CreateListing = () => {
 
         <div className={classes.section}>
           <div className={classes.infoBox}>
-            <div className={classes.infoTitle}>Save behaviour</div>
+            <div className={classes.infoTitle}>Update behaviour</div>
 
             <div className={classes.infoText}>
-              Saving this form creates a draft listing with unpublished defaults:
+              Saving keeps this listing in private draft mode:
               <strong> status = draft</strong> and <strong>is_active = false</strong>.
             </div>
           </div>
@@ -601,7 +682,7 @@ const CreateListing = () => {
 
           <div className={classes.row}>
             <button className={classes.btnPrimary} type="submit" disabled={isSaving}>
-              {isSaving ? "Saving draft…" : "Save draft"}
+              {isSaving ? "Saving changes…" : "Save changes"}
             </button>
 
             <Link className={classes.btnOutline} to="/creator/listings">
@@ -614,4 +695,4 @@ const CreateListing = () => {
   );
 };
 
-export default CreateListing;
+export default EditListing;
