@@ -241,7 +241,7 @@ const CreateListing = () => {
         throw error;
       }
 
-      navigate("/creator/dashboard");
+      navigate("/creator/listings");
     } catch (error) {
       const message =
         error instanceof Error
@@ -259,8 +259,8 @@ const CreateListing = () => {
 
   return (
     <div className={classes.page}>
-      <Link to="/creator/dashboard" className={classes.backLink}>
-        ← Back to creator dashboard
+      <Link to="/creator/listings" className={classes.backLink}>
+        ← Back to creator listings
       </Link>
 
       <div className={classes.header}>
@@ -581,7 +581,7 @@ const CreateListing = () => {
               {isSaving ? "Saving draft…" : "Save draft"}
             </button>
 
-            <Link className={classes.btnOutline} to="/creator/dashboard">
+            <Link className={classes.btnOutline} to="/creator/listings">
               Cancel
             </Link>
           </div>

@@ -45,8 +45,7 @@ const CreatorDashboard = () => {
 
         <p className={classes.text}>
           Your account currently has creator access. You can now create private
-          draft listings that stay unpublished until broader listing management
-          is added.
+          draft listings and review them from your creator listings area.
         </p>
 
         <div className={classes.pills}>
@@ -62,6 +61,10 @@ const CreatorDashboard = () => {
         <div className={classes.row}>
           <Link className={classes.btnPrimary} to="/creator/listings/new">
             Create listing
+          </Link>
+
+          <Link className={classes.btnOutline} to="/creator/listings">
+            My listings
           </Link>
 
           <Link className={classes.btnOutline} to="/market">
