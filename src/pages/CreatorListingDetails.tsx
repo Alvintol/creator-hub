@@ -4,6 +4,7 @@ import { useDeleteListingDraft } from "../hooks/useDeleteListingDraft";
 import { getListingPublishReadiness } from '../lib/listings/listingPublishReadiness';
 import { usePublishListing } from '../hooks/usePublishListing';
 import { useSetListingActiveState } from '../hooks/useSetListingActiveState';
+import { useMoveListingToDraft } from '../hooks/useMoveListingToDraft';
 
 const classes = {
   page: "space-y-6",
@@ -98,6 +99,23 @@ const CreatorListingDetails = () => {
   const deleteDraftMutation = useDeleteListingDraft();
   const publishListingMutation = usePublishListing();
   const setListingActiveStateMutation = useSetListingActiveState();
+  const moveListingToDraftMutation = useMoveListingToDraft();
+
+  const handleMoveToDraft = async () => {
+    if (!listing) return;
+
+    const confirmed = window.confirm(
+      `Move listing "${listing.title}" back to draft? It will be removed from the public market until you publish it again.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await moveListingToDraftMutation.mutateAsync(listing.id);
+    } catch {
+      // Error is surfaced below
+    }
+  };
 
   const handleDeactivateListing = async () => {
     if (!listing) return;
@@ -203,6 +221,12 @@ const CreatorListingDetails = () => {
           and publishing are added.
         </p>
       </div>
+
+      {moveListingToDraftMutation.error && (
+        <div className={classes.errorCard}>
+          This listing could not be moved back to draft right now.
+        </div>
+      )}
 
       {publishListingMutation.error && (
         <div className={classes.errorCard}>
@@ -373,7 +397,7 @@ const CreatorListingDetails = () => {
 
               <p className={classes.text}>
                 Manage this listing here. Drafts can be edited or published, and published
-                listings can be hidden from or restored to the public market.
+                listings can be hidden, restored, or moved back to draft for further edits.
               </p>
             </div>
 
@@ -414,29 +438,42 @@ const CreatorListingDetails = () => {
                   )}
                 </>
               ) : listing.status === "published" ? (
-                listing.is_active ? (
+                <>
+                  {listing.is_active ? (
+                    <button
+                      className={classes.btnDanger}
+                      type="button"
+                      onClick={handleDeactivateListing}
+                      disabled={setListingActiveStateMutation.isPending}
+                    >
+                      {setListingActiveStateMutation.isPending
+                        ? "Updating…"
+                        : "Deactivate listing"}
+                    </button>
+                  ) : (
+                    <button
+                      className={classes.btnPrimary}
+                      type="button"
+                      onClick={handleReactivateListing}
+                      disabled={setListingActiveStateMutation.isPending}
+                    >
+                      {setListingActiveStateMutation.isPending
+                        ? "Updating…"
+                        : "Reactivate listing"}
+                    </button>
+                  )}
+
                   <button
-                    className={classes.btnDanger}
+                    className={classes.btnOutline}
                     type="button"
-                    onClick={handleDeactivateListing}
-                    disabled={setListingActiveStateMutation.isPending}
+                    onClick={handleMoveToDraft}
+                    disabled={moveListingToDraftMutation.isPending}
                   >
-                    {setListingActiveStateMutation.isPending
-                      ? "Updating…"
-                      : "Deactivate listing"}
+                    {moveListingToDraftMutation.isPending
+                      ? "Moving to draft…"
+                      : "Edit Listing"}
                   </button>
-                ) : (
-                  <button
-                    className={classes.btnPrimary}
-                    type="button"
-                    onClick={handleReactivateListing}
-                    disabled={setListingActiveStateMutation.isPending}
-                  >
-                    {setListingActiveStateMutation.isPending
-                      ? "Updating…"
-                      : "Reactivate listing"}
-                  </button>
-                )
+                </>
               ) : (
                 <span className={classes.btnDisabled}>No actions available</span>
               )}

@@ -18,6 +18,7 @@ export type PublicListingRow = {
   preview_url: string | null;
   status: string;
   is_active: boolean;
+  updated_at: string;
 };
 
 export type PublicListingCreator = {
@@ -59,7 +60,8 @@ const fetchPublicListing = async (
       tags,
       preview_url,
       status,
-      is_active
+      is_active,
+      updated_at
     `)
     .eq("id", id)
     .eq("status", "published")
