@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMyListing } from "../hooks/useMyListing";
 import { useDeleteListingDraft } from "../hooks/useDeleteListingDraft";
+import { getListingPublishReadiness } from '../lib/listings/listingPublishReadiness';
 
 const classes = {
   page: "space-y-6",
@@ -50,6 +51,22 @@ const classes = {
   loadingText: "text-sm text-zinc-600",
   errorCard:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+
+  readinessCard: "card p-6",
+  checkList: "space-y-2",
+  checkRow:
+    "flex items-start gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3",
+  checkPass:
+    "mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700",
+  checkFail:
+    "mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-100 text-xs font-bold text-red-700",
+  checkText: "text-sm text-zinc-700",
+  readyBox:
+    "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800",
+  notReadyBox:
+    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800",
+  btnDisabled:
+    "inline-flex items-center justify-center rounded-full border border-zinc-200 bg-zinc-100 px-5 py-3 text-sm font-bold text-zinc-500",
 } as const;
 
 const priceText = (priceType: "fixed" | "starting_at" | "range", priceMin: number, priceMax: number | null) =>
@@ -65,10 +82,10 @@ const dateText = (value: string) => {
   return Number.isNaN(date.getTime())
     ? value
     : date.toLocaleString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
 };
 
 const CreatorListingDetails = () => {
@@ -118,10 +135,18 @@ const CreatorListingDetails = () => {
 
   const isDraftInactive = listing.status === "draft" && !listing.is_active;
 
+  const publishReadiness = getListingPublishReadiness(listing);
+
   return (
     <div className={classes.page}>
-      <Link to="/creator/listings" className={classes.backLink}>
-        ← Back to my listings
+      {publishReadiness.isReady ? (
+        <span className={classes.btnDisabled}>Publish soon</span>
+      ) : (
+        <span className={classes.btnDisabled}>Complete checklist to publish</span>
+      )}
+
+      <Link className={classes.btnOutline} to="/creator/listings">
+        Back to listings
       </Link>
 
       <div className={classes.header}>
@@ -245,6 +270,41 @@ const CreatorListingDetails = () => {
               <div className={classes.metaBlock}>
                 <div className={classes.metaLabel}>Last updated</div>
                 <div className={classes.metaValue}>{dateText(listing.updated_at)}</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={classes.readinessCard}>
+            <div className={classes.section}>
+              <h2 className={classes.sectionTitle}>Publish readiness</h2>
+
+              <p className={classes.text}>
+                This checklist helps confirm the listing is ready before publishing is
+                introduced as a separate step.
+              </p>
+            </div>
+
+            <div className={classes.section}>
+              {publishReadiness.isReady ? (
+                <div className={classes.readyBox}>
+                  This listing is ready for a future publish action.
+                </div>
+              ) : (
+                <div className={classes.notReadyBox}>
+                  This listing is not ready to publish yet.
+                </div>
+              )}
+
+              <div className={classes.checkList}>
+                {publishReadiness.checks.map((check) => (
+                  <div key={check.key} className={classes.checkRow}>
+                    <span className={check.passed ? classes.checkPass : classes.checkFail}>
+                      {check.passed ? "✓" : "!"}
+                    </span>
+
+                    <div className={classes.checkText}>{check.label}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
