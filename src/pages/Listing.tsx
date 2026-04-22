@@ -43,6 +43,8 @@ const classes = {
   liveMeta: "text-sm font-extrabold text-zinc-900",
   liveDot: "text-zinc-400",
   liveTitle: "mt-1 text-sm text-zinc-600",
+
+  metaText: "text-sm text-zinc-500",
 } as const;
 
 // Formats the listing price for display
@@ -54,6 +56,19 @@ const priceText = (listing: PublicListingRow): string =>
       : listing.price_type === "range"
         ? `$${listing.price_min}–$${listing.price_max ?? listing.price_min}`
         : "";
+
+// Formats the updated timestamp for buyer-facing display
+const updatedText = (value: string): string => {
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+};
 
 const ListingNotFound = () => (
   <div className={classes.notFoundWrap}>
@@ -139,6 +154,10 @@ const ListingPage = () => {
               </span>
             )}
           </div>
+
+          <p className={classes.metaText}>
+            Last updated: {updatedText(listing.updated_at)}
+          </p>
 
           <div className={classes.chips}>
             <span className={classes.chip}>{listing.category}</span>

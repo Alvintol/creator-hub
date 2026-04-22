@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useMyListings, type MyListingRow } from "../hooks/useMyListings";
+import { useDeleteListingDraft } from '../hooks/useDeleteListingDraft';
 
 const classes = {
   page: "space-y-6",
@@ -41,6 +42,8 @@ const classes = {
     "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
   btnDisabled:
     "inline-flex items-center justify-center rounded-full border border-zinc-200 bg-zinc-100 px-5 py-3 text-sm font-bold text-zinc-500",
+  btnDanger:
+    "inline-flex items-center justify-center rounded-full border border-red-300 bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-red-400 hover:bg-red-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
 
   loadingText: "text-sm text-zinc-600",
   errorCard:
@@ -70,6 +73,22 @@ const updatedText = (value: string): string => {
 const CreatorListings = () => {
   const { data, isLoading, error } = useMyListings();
 
+  const deleteDraftMutation = useDeleteListingDraft();
+
+  const handleDeleteDraft = async (listingId: string, title: string) => {
+    const confirmed = window.confirm(
+      `Delete draft listing "${title}"? This cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      await deleteDraftMutation.mutateAsync(listingId);
+    } catch {
+      // Surface a generic message in the page instead of throwing
+    }
+  };
+
   if (isLoading) {
     return <div className={classes.loadingText}>Loading…</div>;
   }
@@ -97,6 +116,12 @@ const CreatorListings = () => {
       {error && (
         <div className={classes.errorCard}>
           Your listings could not be loaded right now.
+        </div>
+      )}
+
+      {deleteDraftMutation.error && (
+        <div className={classes.errorCard}>
+          This draft could not be deleted right now.
         </div>
       )}
 
@@ -169,13 +194,31 @@ const CreatorListings = () => {
                 </div>
 
                 <div className={classes.row}>
+                  <Link
+                    className={classes.btnOutline}
+                    to={`/creator/listings/${listing.id}`}
+                  >
+                    View details
+                  </Link>
+
                   {listing.status === "draft" && !listing.is_active ? (
-                    <Link
-                      className={classes.btnOutline}
-                      to={`/creator/listings/${listing.id}/edit`}
-                    >
-                      Edit draft
-                    </Link>
+                    <>
+                      <Link
+                        className={classes.btnOutline}
+                        to={`/creator/listings/${listing.id}/edit`}
+                      >
+                        Edit draft
+                      </Link>
+
+                      <button
+                        className={classes.btnDanger}
+                        type="button"
+                        onClick={() => handleDeleteDraft(listing.id, listing.title)}
+                        disabled={deleteDraftMutation.isPending}
+                      >
+                        {deleteDraftMutation.isPending ? "Deleting…" : "Delete draft"}
+                      </button>
+                    </>
                   ) : (
                     <span className={classes.btnDisabled}>Edit later</span>
                   )}
