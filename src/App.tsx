@@ -27,6 +27,7 @@ import CreateListing from './pages/CreateListing';
 import CreatorListings from './pages/CreatorListings';
 import EditListing from './pages/EditListing';
 import CreatorListingDetails from './pages/CreatorListingDetails';
+import CreatorListingRevisions from './pages/CreatorListingRevisions';
 
 const App = () => {
   return (
@@ -67,6 +68,7 @@ const App = () => {
             <Route path="/creator/listings/new" element={<CreateListing />} />
             <Route path="/creator/listings/:id" element={<CreatorListingDetails />} />
             <Route path="/creator/listings/:id/edit" element={<EditListing />} />
+            <Route path="/creator/listings/:id/revisions" element={<CreatorListingRevisions />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

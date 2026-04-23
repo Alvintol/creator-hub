@@ -150,10 +150,14 @@ const CreatorListingDetails = () => {
   const setListingActiveStateMutation = useSetListingActiveState();
   const moveListingToDraftMutation = useMoveListingToDraft();
   const {
-    data: revisions,
+    data: revisionsPage,
     isLoading: isLoadingRevisions,
     error: revisionsError,
-  } = useListingRevisions(listing?.id ?? id ?? null);
+  } = useListingRevisions({
+    listingId: listing?.id ?? id ?? null,
+    limit: 3,
+    offset: 0,
+  });
 
   const handleMoveToDraft = async () => {
     if (!listing) return;
@@ -466,49 +470,62 @@ const CreatorListingDetails = () => {
               <div className={classes.loadingText}>Loading revision history…</div>
             )}
 
-            {!isLoadingRevisions && !revisionsError && (revisions?.length ?? 0) === 0 && (
+            {!isLoadingRevisions && !revisionsError && (revisionsPage?.rows.length ?? 0) === 0 && (
               <p className={classes.text}>No revisions have been recorded yet.</p>
             )}
 
-            {!isLoadingRevisions && !revisionsError && (revisions?.length ?? 0) > 0 && (
-              <div className={classes.revisionList}>
-                {revisions?.map((revision) => (
-                  <div key={revision.id} className={classes.revisionItem}>
-                    <div className={classes.revisionTop}>
-                      <div className={classes.revisionTitle}>
-                        {revisionEventLabel(revision.event_type)}
+            {!isLoadingRevisions && !revisionsError && (revisionsPage?.rows.length ?? 0) > 0 && (
+              <div className={classes.section}>
+                <div className={classes.revisionList}>
+                  {revisionsPage?.rows.map((revision) => (
+                    <div key={revision.id} className={classes.revisionItem}>
+                      <div className={classes.revisionTop}>
+                        <div className={classes.revisionTitle}>
+                          {revisionEventLabel(revision.event_type)}
+                        </div>
+
+                        <div className={classes.revisionMeta}>
+                          {revisionDateText(revision.created_at)}
+                        </div>
                       </div>
 
-                      <div className={classes.revisionMeta}>
-                        {revisionDateText(revision.created_at)}
+                      <div className={classes.revisionBody}>
+                        <div className={classes.revisionText}>
+                          <strong>Title:</strong> {revision.snapshot.title}
+                        </div>
+
+                        <div className={classes.revisionText}>
+                          <strong>Price:</strong>{" "}
+                          {revisionPriceText(
+                            revision.snapshot.price_type,
+                            revision.snapshot.price_min,
+                            revision.snapshot.price_max
+                          )}
+                        </div>
+
+                        <div className={classes.revisionText}>
+                          <strong>Status:</strong> {revision.snapshot.status}
+                          {revision.snapshot.is_active ? " • Active" : " • Inactive"}
+                        </div>
+
+                        <div className={classes.revisionText}>
+                          <strong>Category:</strong> {revision.snapshot.category}
+                        </div>
                       </div>
                     </div>
+                  ))}
+                </div>
 
-                    <div className={classes.revisionBody}>
-                      <div className={classes.revisionText}>
-                        <strong>Title:</strong> {revision.snapshot.title}
-                      </div>
-
-                      <div className={classes.revisionText}>
-                        <strong>Price:</strong>{" "}
-                        {revisionPriceText(
-                          revision.snapshot.price_type,
-                          revision.snapshot.price_min,
-                          revision.snapshot.price_max
-                        )}
-                      </div>
-
-                      <div className={classes.revisionText}>
-                        <strong>Status:</strong> {revision.snapshot.status}
-                        {revision.snapshot.is_active ? " • Active" : " • Inactive"}
-                      </div>
-
-                      <div className={classes.revisionText}>
-                        <strong>Category:</strong> {revision.snapshot.category}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                <div className={classes.row}>
+                  {revisionsPage?.hasMore && (
+                    <Link
+                      className={classes.btnOutline}
+                      to={`/creator/listings/${listing.id}/revisions`}
+                    >
+                      View more revisions
+                    </Link>
+                  )}
+                </div>
               </div>
             )}
           </div>

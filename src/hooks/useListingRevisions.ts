@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabaseClient";
 
 export type ListingRevisionSnapshot = {
@@ -36,11 +36,29 @@ export type ListingRevisionRow = {
   created_at: string;
 };
 
-const emptyResult: ListingRevisionRow[] = [];
+export type ListingRevisionsPage = {
+  rows: ListingRevisionRow[];
+  hasMore: boolean;
+  nextOffset: number | null;
+};
 
-const fetchListingRevisions = async (
-  listingId: string
-): Promise<ListingRevisionRow[]> => {
+type UseListingRevisionsInput = {
+  listingId: string | null;
+  limit?: number;
+  offset?: number;
+};
+
+const emptyPage: ListingRevisionsPage = {
+  rows: [],
+  hasMore: false,
+  nextOffset: null,
+};
+
+const fetchListingRevisionsPage = async (
+  listingId: string,
+  limit: number,
+  offset: number
+): Promise<ListingRevisionsPage> => {
   const { data, error } = await supabase
     .from("listing_revisions")
     .select(`
@@ -52,20 +70,49 @@ const fetchListingRevisions = async (
       created_at
     `)
     .eq("listing_id", listingId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit);
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []) as ListingRevisionRow[];
+  const rows = (data ?? []) as ListingRevisionRow[];
+  const hasMore = rows.length > limit;
+
+  return {
+    rows: hasMore ? rows.slice(0, limit) : rows,
+    hasMore,
+    nextOffset: hasMore ? offset + limit : null,
+  };
 };
 
-export const useListingRevisions = (listingId: string | null) =>
-  useQuery<ListingRevisionRow[]>({
-    queryKey: ["listingRevisions", listingId],
+export const useListingRevisions = (input: UseListingRevisionsInput) => {
+  const { listingId, limit = 3, offset = 0 } = input;
+
+  return useQuery<ListingRevisionsPage>({
+    queryKey: ["listingRevisions", listingId, limit, offset],
     enabled: Boolean(listingId),
     queryFn: () =>
-      listingId ? fetchListingRevisions(listingId) : Promise.resolve(emptyResult),
+      listingId
+        ? fetchListingRevisionsPage(listingId, limit, offset)
+        : Promise.resolve(emptyPage),
+    staleTime: 15_000,
+  });
+};
+
+export const useInfiniteListingRevisions = (
+  listingId: string | null,
+  limit = 3
+) =>
+  useInfiniteQuery<ListingRevisionsPage>({
+    queryKey: ["listingRevisionsInfinite", listingId, limit],
+    enabled: Boolean(listingId),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      listingId
+        ? fetchListingRevisionsPage(listingId, limit, pageParam as number)
+        : Promise.resolve(emptyPage),
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
     staleTime: 15_000,
   });
