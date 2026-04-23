@@ -177,7 +177,8 @@ const CreateListing = () => {
     const category = form.category.trim();
 
     const priceMin = parseInteger(form.priceMin);
-    const rawPriceMax = parseInteger(form.priceMax);
+    const rawPriceMax =
+      form.priceType === "range" ? parseInteger(form.priceMax) : null;
 
     if (title.length < 3 || title.length > 80) {
       nextErrors.title = "Title must be between 3 and 80 characters.";

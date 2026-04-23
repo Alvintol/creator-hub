@@ -5,6 +5,7 @@ import { getListingPublishReadiness } from '../lib/listings/listingPublishReadin
 import { usePublishListing } from '../hooks/usePublishListing';
 import { useSetListingActiveState } from '../hooks/useSetListingActiveState';
 import { useMoveListingToDraft } from '../hooks/useMoveListingToDraft';
+import { ListingRevisionRow, useListingRevisions } from '../hooks/useListingRevisions';
 
 const classes = {
   page: "space-y-6",
@@ -70,6 +71,16 @@ const classes = {
     "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800",
   btnDisabled:
     "inline-flex items-center justify-center rounded-full border border-zinc-200 bg-zinc-100 px-5 py-3 text-sm font-bold text-zinc-500",
+
+  revisionCard: "card p-6",
+  revisionList: "space-y-3",
+  revisionItem:
+    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4",
+  revisionTop: "flex flex-wrap items-center justify-between gap-3",
+  revisionTitle: "text-sm font-bold text-zinc-900",
+  revisionMeta: "text-xs text-zinc-500",
+  revisionBody: "mt-3 space-y-2",
+  revisionText: "text-sm text-zinc-700",
 } as const;
 
 const priceText = (priceType: "fixed" | "starting_at" | "range", priceMin: number, priceMax: number | null) =>
@@ -91,6 +102,44 @@ const dateText = (value: string) => {
     });
 };
 
+const revisionEventLabel = (eventType: ListingRevisionRow["event_type"]) =>
+  eventType === "created"
+    ? "Created"
+    : eventType === "updated"
+      ? "Updated"
+      : eventType === "published"
+        ? "Published"
+        : eventType === "deactivated"
+          ? "Deactivated"
+          : eventType === "reactivated"
+            ? "Reactivated"
+            : "Moved to draft";
+
+const revisionDateText = (value: string) => {
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+};
+
+const revisionPriceText = (
+  priceType: "fixed" | "starting_at" | "range",
+  priceMin: number,
+  priceMax: number | null
+) =>
+  priceType === "fixed"
+    ? `$${priceMin}`
+    : priceType === "starting_at"
+      ? `From $${priceMin}`
+      : `$${priceMin}–$${priceMax ?? priceMin}`;
+
 const CreatorListingDetails = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -100,6 +149,11 @@ const CreatorListingDetails = () => {
   const publishListingMutation = usePublishListing();
   const setListingActiveStateMutation = useSetListingActiveState();
   const moveListingToDraftMutation = useMoveListingToDraft();
+  const {
+    data: revisions,
+    isLoading: isLoadingRevisions,
+    error: revisionsError,
+  } = useListingRevisions(listing?.id ?? id ?? null);
 
   const handleMoveToDraft = async () => {
     if (!listing) return;
@@ -111,7 +165,8 @@ const CreatorListingDetails = () => {
     if (!confirmed) return;
 
     try {
-      await moveListingToDraftMutation.mutateAsync(listing.id);
+      const listingId = await moveListingToDraftMutation.mutateAsync(listing.id);
+      navigate(`/creator/listings/${listingId}/edit`);
     } catch {
       // Error is surfaced below
     }
@@ -389,6 +444,73 @@ const CreatorListingDetails = () => {
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className={classes.revisionCard}>
+            <div className={classes.section}>
+              <h2 className={classes.sectionTitle}>Revision history</h2>
+
+              <p className={classes.text}>
+                This private history is only for creator-side review and future dispute support.
+                Buyers do not see it.
+              </p>
+            </div>
+
+            {revisionsError && (
+              <div className={classes.errorCard}>
+                Revision history could not be loaded right now.
+              </div>
+            )}
+
+            {isLoadingRevisions && (
+              <div className={classes.loadingText}>Loading revision history…</div>
+            )}
+
+            {!isLoadingRevisions && !revisionsError && (revisions?.length ?? 0) === 0 && (
+              <p className={classes.text}>No revisions have been recorded yet.</p>
+            )}
+
+            {!isLoadingRevisions && !revisionsError && (revisions?.length ?? 0) > 0 && (
+              <div className={classes.revisionList}>
+                {revisions?.map((revision) => (
+                  <div key={revision.id} className={classes.revisionItem}>
+                    <div className={classes.revisionTop}>
+                      <div className={classes.revisionTitle}>
+                        {revisionEventLabel(revision.event_type)}
+                      </div>
+
+                      <div className={classes.revisionMeta}>
+                        {revisionDateText(revision.created_at)}
+                      </div>
+                    </div>
+
+                    <div className={classes.revisionBody}>
+                      <div className={classes.revisionText}>
+                        <strong>Title:</strong> {revision.snapshot.title}
+                      </div>
+
+                      <div className={classes.revisionText}>
+                        <strong>Price:</strong>{" "}
+                        {revisionPriceText(
+                          revision.snapshot.price_type,
+                          revision.snapshot.price_min,
+                          revision.snapshot.price_max
+                        )}
+                      </div>
+
+                      <div className={classes.revisionText}>
+                        <strong>Status:</strong> {revision.snapshot.status}
+                        {revision.snapshot.is_active ? " • Active" : " • Inactive"}
+                      </div>
+
+                      <div className={classes.revisionText}>
+                        <strong>Category:</strong> {revision.snapshot.category}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className={classes.card}>

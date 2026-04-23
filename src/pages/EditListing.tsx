@@ -162,7 +162,10 @@ const toFormState = (listing: {
   videoSubtype: listing.video_subtype ?? "",
   priceType: listing.price_type,
   priceMin: String(listing.price_min),
-  priceMax: listing.price_max === null ? "" : String(listing.price_max),
+  priceMax:
+    listing.price_type === "range" && listing.price_max !== null
+      ? String(listing.price_max)
+      : "",
   deliverablesText: listing.deliverables.join("\n"),
   tagsText: listing.tags.join(", "),
   previewUrl: listing.preview_url ?? "",
@@ -223,7 +226,8 @@ const EditListing = () => {
     const category = form.category.trim();
 
     const priceMin = parseInteger(form.priceMin);
-    const rawPriceMax = parseInteger(form.priceMax);
+    const rawPriceMax =
+      form.priceType === "range" ? parseInteger(form.priceMax) : null;
 
     if (title.length < 3 || title.length > 80) {
       nextErrors.title = "Title must be between 3 and 80 characters.";
