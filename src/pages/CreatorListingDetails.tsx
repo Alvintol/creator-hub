@@ -6,6 +6,7 @@ import { usePublishListing } from '../hooks/usePublishListing';
 import { useSetListingActiveState } from '../hooks/useSetListingActiveState';
 import { useMoveListingToDraft } from '../hooks/useMoveListingToDraft';
 import { ListingRevisionRow, useListingRevisions } from '../hooks/useListingRevisions';
+import { getListingRevisionChanges } from '../lib/listings/listingRevisionDiff';
 
 const classes = {
   page: "space-y-6",
@@ -81,6 +82,10 @@ const classes = {
   revisionMeta: "text-xs text-zinc-500",
   revisionBody: "mt-3 space-y-2",
   revisionText: "text-sm text-zinc-700",
+
+  changeList: "mt-3 space-y-2",
+  changeItem:
+    "rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700",
 } as const;
 
 const priceText = (priceType: "fixed" | "starting_at" | "range", priceMin: number, priceMax: number | null) =>
@@ -477,43 +482,35 @@ const CreatorListingDetails = () => {
             {!isLoadingRevisions && !revisionsError && (revisionsPage?.rows.length ?? 0) > 0 && (
               <div className={classes.section}>
                 <div className={classes.revisionList}>
-                  {revisionsPage?.rows.map((revision) => (
-                    <div key={revision.id} className={classes.revisionItem}>
-                      <div className={classes.revisionTop}>
-                        <div className={classes.revisionTitle}>
-                          {revisionEventLabel(revision.event_type)}
+                  {revisionsPage?.rows.map((revision, index, rows) => {
+                    const previousRevision = rows[index + 1] ?? null;
+                    const changes = getListingRevisionChanges(revision, previousRevision);
+
+                    return (
+                      <div key={revision.id} className={classes.revisionItem}>
+                        <div className={classes.revisionTop}>
+                          <div className={classes.revisionTitle}>
+                            {revisionEventLabel(revision.event_type)}
+                          </div>
+
+                          <div className={classes.revisionMeta}>
+                            {revisionDateText(revision.created_at)}
+                          </div>
                         </div>
 
-                        <div className={classes.revisionMeta}>
-                          {revisionDateText(revision.created_at)}
+                        <div className={classes.changeList}>
+                          {changes.map((change) => (
+                            <div
+                              key={`${revision.id}-${change.key}-${change.label}`}
+                              className={classes.changeItem}
+                            >
+                              {change.label}
+                            </div>
+                          ))}
                         </div>
                       </div>
-
-                      <div className={classes.revisionBody}>
-                        <div className={classes.revisionText}>
-                          <strong>Title:</strong> {revision.snapshot.title}
-                        </div>
-
-                        <div className={classes.revisionText}>
-                          <strong>Price:</strong>{" "}
-                          {revisionPriceText(
-                            revision.snapshot.price_type,
-                            revision.snapshot.price_min,
-                            revision.snapshot.price_max
-                          )}
-                        </div>
-
-                        <div className={classes.revisionText}>
-                          <strong>Status:</strong> {revision.snapshot.status}
-                          {revision.snapshot.is_active ? " • Active" : " • Inactive"}
-                        </div>
-
-                        <div className={classes.revisionText}>
-                          <strong>Category:</strong> {revision.snapshot.category}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div className={classes.row}>
