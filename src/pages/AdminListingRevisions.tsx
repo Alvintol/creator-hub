@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useAdminListing } from "../hooks/useAdminListing";
+import { useAdminListingDetails } from "../hooks/useAdminListingDetails";
 import {
   useInfiniteListingRevisions,
   type ListingRevisionRow,
@@ -91,10 +91,10 @@ const AdminListingRevisions = () => {
   const { id } = useParams<{ id: string }>();
 
   const {
-    data: listing,
-    isLoading: isLoadingListing,
-    error: listingError,
-  } = useAdminListing(id ?? null);
+    data: details,
+    isLoading: isLoadingDetails,
+    error: detailsError,
+  } = useAdminListingDetails(id ?? null);
 
   const {
     data,
@@ -110,15 +110,18 @@ const AdminListingRevisions = () => {
     [data]
   );
 
-  if (isLoadingListing) {
+  if (isLoadingDetails) {
     return <div className={classes.loadingText}>Loading…</div>;
   }
 
-  if (listingError || !listing) {
+  const listing = details?.listing ?? null;
+  const creator = details?.creator ?? null;
+
+  if (detailsError || !listing) {
     return (
       <div className={classes.page}>
-        <Link to="/admin/creator-applications" className={classes.backLink}>
-          ← Back to admin
+        <Link to="/admin/listings" className={classes.backLink}>
+          ← Back to admin listings
         </Link>
 
         <div className={classes.card}>
@@ -131,10 +134,14 @@ const AdminListingRevisions = () => {
     );
   }
 
+  const creatorUsername = creator?.handle
+    ? `@${creator.handle}`
+    : creator?.display_name ?? listing.user_id;
+
   return (
     <div className={classes.page}>
-      <Link to="/admin/creator-applications" className={classes.backLink}>
-        ← Back to admin
+      <Link to="/admin/listings" className={classes.backLink}>
+        ← Back to admin listings
       </Link>
 
       <div className={classes.header}>
@@ -154,6 +161,18 @@ const AdminListingRevisions = () => {
               <div className={classes.metaBlock}>
                 <div className={classes.metaLabel}>Title</div>
                 <div className={classes.metaValue}>{listing.title}</div>
+              </div>
+
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Creator username</div>
+                <div className={classes.metaValue}>{creatorUsername}</div>
+              </div>
+
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Display name</div>
+                <div className={classes.metaValue}>
+                  {creator?.display_name ?? "None"}
+                </div>
               </div>
 
               <div className={classes.metaBlock}>
@@ -276,8 +295,8 @@ const AdminListingRevisions = () => {
                   </button>
                 )}
 
-                <Link className={classes.btnOutline} to="/admin/creator-applications">
-                  Back to admin
+                <Link className={classes.btnOutline} to="/admin/listings">
+                  Back to admin listings
                 </Link>
               </div>
             </div>

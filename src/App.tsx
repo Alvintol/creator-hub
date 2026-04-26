@@ -29,6 +29,7 @@ import EditListing from './pages/EditListing';
 import CreatorListingDetails from './pages/CreatorListingDetails';
 import CreatorListingRevisions from './pages/CreatorListingRevisions';
 import AdminListingRevisions from './pages/AdminListingRevisions';
+import AdminListings from './pages/AdminListings';
 
 const App = () => {
   return (
@@ -61,12 +62,12 @@ const App = () => {
               path="/admin/creator-applications"
               element={<AdminCreatorApplications />}
             />
+            <Route path="/admin/listings" element={<AdminListings />} />
             <Route
               path="/admin/listing-revisions/:id"
               element={<AdminListingRevisions />}
             />
           </Route>
-
           <Route element={<RequireCreatorAccess />}>
             <Route path="/creator/dashboard" element={<CreatorDashboard />} />
             <Route path="/creator/listings" element={<CreatorListings />} />
