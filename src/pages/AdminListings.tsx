@@ -58,6 +58,8 @@ const classes = {
   loadingText: "text-sm text-zinc-600",
   errorCard:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+
+  backLink: "text-sm font-semibold text-zinc-600 hover:text-zinc-900",
 } as const;
 
 const initialFilters: AdminListingsFilters = {
@@ -142,6 +144,10 @@ const AdminListings = () => {
           status, and visibility.
         </p>
       </div>
+      
+      <Link to="/admin/dashboard" className={classes.backLink}>
+        ← Back to admin dashboard
+      </Link>
 
       <div className={classes.card}>
         <div className={classes.section}>
