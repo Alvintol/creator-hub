@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
-import { useMyProfile, type ProfileRow } from "../hooks/useMyProfile";
-import { useProfilePlatformAccounts } from "../hooks/useProfilePlatformAccounts";
-import { useSellerAccess } from "../hooks/useSellerAccess";
+import { useMyProfile, type ProfileRow } from "../hooks/profile/useMyProfile";
+import { useProfilePlatformAccounts } from "../hooks/profile/useProfilePlatformAccounts";
+import { useSellerAccess } from "../hooks/creatorApplication/useSellerAccess";
 import { getProfileAvatarUrl } from "../domain/profileMedia";
 
 const classes = {

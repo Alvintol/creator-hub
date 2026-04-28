@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { render, screen } from "@testing-library/react";
 import RequireCreatorAccess from "../RequireCreatorAccess";
-import { useSellerAccess } from "../../hooks/useSellerAccess";
+import { useSellerAccess } from "../../hooks/creatorApplication/useSellerAccess";
 
 vi.mock("../../hooks/useSellerAccess", () => ({
   useSellerAccess: vi.fn(),

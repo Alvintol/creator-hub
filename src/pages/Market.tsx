@@ -3,7 +3,7 @@ import { useLocation } from "react-router-dom";
 import ListingCard from "../components/ListingCard";
 import { normalizeTwitchLogin } from "../domain/twitch";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
-import { useMarketListings, type MarketListingItem } from "../hooks/useMarketListings";
+import { useMarketListings, type MarketListingItem } from "../hooks/listings/useMarketListings";
 import {
   useHubActions,
   useHubState,

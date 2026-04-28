@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { useSellerAccess } from "../hooks/useSellerAccess";
+import { useSellerAccess } from "../hooks/creatorApplication/useSellerAccess";
 
 const RequireAdminAccess = () => {
   const { isLoading, isSignedIn, canAccessAdminRoutes } = useSellerAccess();

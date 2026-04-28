@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from "react-router-dom";
-import { useSellerAccess } from "../hooks/useSellerAccess";
+import { useSellerAccess } from "../hooks/creatorApplication/useSellerAccess";
 
 const RequireCreatorAccess = () => {
   const { isLoading, isSignedIn, canAccessCreatorRoutes } = useSellerAccess();

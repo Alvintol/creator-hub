@@ -1,5 +1,5 @@
-import type { ProfileRow } from "../hooks/useMyProfile";
-import type { ProfilePlatformAccountRow } from "../hooks/useProfilePlatformAccounts";
+import type { ProfileRow } from "../hooks/profile/useMyProfile";
+import type { ProfilePlatformAccountRow } from "../hooks/profile/useProfilePlatformAccounts";
 
 // Returns the best available avatar URL for a user profile
 // Priority:

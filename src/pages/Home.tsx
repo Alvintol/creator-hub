@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { CATEGORIES } from "../domain/catalog";
 import { normalizeTwitchLogin, type TwitchStream } from "../domain/twitch";
-import { useMarketListings, type MarketListingItem } from "../hooks/useMarketListings";
+import { useMarketListings, type MarketListingItem } from "../hooks/listings/useMarketListings";
 import { usePublicCreators, type PublicCreatorItem } from "../hooks/usePublicCreators";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
 

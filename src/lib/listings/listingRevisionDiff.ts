@@ -1,4 +1,4 @@
-import type { ListingRevisionRow } from "../../hooks/useListingRevisions";
+import type { ListingRevisionRow } from "../../hooks/listings/useListingRevisions";
 
 export type ListingRevisionChange = {
   key:

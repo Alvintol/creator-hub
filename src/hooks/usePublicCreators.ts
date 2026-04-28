@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabaseClient";
-import type { ProfilePlatformAccountRow } from "./useProfilePlatformAccounts";
-import type { PublicCreatorListing, PublicCreatorProfile } from "./usePublicCreatorProfile";
+import type { ProfilePlatformAccountRow } from "./profile/useProfilePlatformAccounts";
+import type { PublicCreatorListing, PublicCreatorProfile } from "./profile/usePublicCreatorProfile";
 
 export type PublicCreatorItem = {
   profile: PublicCreatorProfile;
