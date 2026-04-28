@@ -9,6 +9,7 @@ import { CATEGORIES } from "../domain/catalog";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
+import { useSellerAccess } from '../hooks/useSellerAccess';
 
 type CategoryLink = {
   key: string;
@@ -39,10 +40,12 @@ const classes = {
   navPillActive: "navPillActive",
   navPillHot: "navPillHot",
   navPillIdle: "navPillIdle",
-  navPillAuth: "navPill px-3 py-1",
+  navPillAuth: "navPill inline-flex items-center justify-center whitespace-nowrap px-3 py-1",
   navPillCount: "navPillCount",
   navPillDot: "navPillDot animate-pulse",
   navLabelWrap: "inline-flex items-center gap-2",
+  navPillButton:
+    "navPill inline-flex items-center justify-center whitespace-nowrap",
 
   subbar: "subbar",
   subbarRow:
@@ -85,6 +88,8 @@ const Nav = () => {
 
   const { twitchByLogin, isFetching } = useTwitchStreams();
   const { user, loading } = useAuth();
+  const { isLoading: isSellerAccessLoading, canAccessCreatorRoutes } =
+    useSellerAccess();
 
   const liveCount = useMemo(
     () => Object.keys(twitchByLogin).length,
@@ -176,6 +181,15 @@ const Nav = () => {
             </span>
           </NavLink>
 
+          {!loading && user && !isSellerAccessLoading && canAccessCreatorRoutes && (
+            <NavLink
+              to="/creator/dashboard"
+              className={({ isActive }) => getAuthPillClass(isActive)}
+            >
+              Dashboard
+            </NavLink>
+          )}
+
           {!loading && user && (
             <NavLink
               to="/settings/profile"
@@ -197,7 +211,7 @@ const Nav = () => {
           {!loading && user && (
             <button
               type="button"
-              className={`${classes.navPillBase} ${classes.navPillIdle}`}
+              className={`${classes.navPillButton} ${classes.navPillIdle}`}
               onClick={onSignOut}
             >
               Sign out

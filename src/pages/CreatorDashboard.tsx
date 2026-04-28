@@ -71,6 +71,10 @@ const CreatorDashboard = () => {
             Browse market
           </Link>
 
+          <Link className={classes.btnOutline} to="/creator/requests">
+            Requests
+          </Link>
+
           <Link className={classes.btnOutline} to="/settings/profile">
             Profile settings
           </Link>

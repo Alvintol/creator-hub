@@ -205,13 +205,11 @@ const ListingPage = () => {
 
             <p className={classes.ctaText}>{fulfilmentCopy.text}</p>
 
-            {listing.fulfilment_mode === "request" && creatorLink && (
-              <Link to={creatorLink} className={classes.ctaLink}>
-                Contact creator
+            {listing.fulfilment_mode === "request" ? (
+              <Link to={`/listing/${listing.id}/request`} className={classes.ctaLink}>
+                Submit request
               </Link>
-            )}
-
-            {listing.fulfilment_mode === "instant" && (
+            ) : (
               <span className={classes.ctaLink}>{fulfilmentCopy.primaryLabel}</span>
             )}
           </div>
