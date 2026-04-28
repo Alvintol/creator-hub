@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { useMyCreatorRequests } from "../../hooks/creatorRequests/useMyCreatorRequests";
+import { getListingRequestStatusLabel } from '../../domain/listings/listingRequests';
 
 const classes = {
   page: "space-y-6",
@@ -100,7 +101,9 @@ const CreatorRequests = () => {
               <div className={classes.metaGrid}>
                 <div className={classes.metaBlock}>
                   <div className={classes.metaLabel}>Status</div>
-                  <div className={classes.metaValue}>{item.request.status}</div>
+                  <div className={classes.metaValue}>
+                    {getListingRequestStatusLabel(item.request.status)}
+                  </div>
                 </div>
 
                 <div className={classes.metaBlock}>

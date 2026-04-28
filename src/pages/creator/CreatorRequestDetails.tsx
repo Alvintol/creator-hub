@@ -1,5 +1,12 @@
 import { Link, useParams } from "react-router-dom";
 import { useCreatorRequest } from "../../hooks/creatorRequests/useCreatorRequest";
+import { useUpdateCreatorListingRequestStatus } from "../../hooks/creatorRequests/useUpdateCreatorListingRequestStatus";
+import {
+  canAcceptListingRequest,
+  canArchiveListingRequest,
+  canDeclineListingRequest,
+  getListingRequestStatusLabel,
+} from "../../domain/listings/listingRequests";
 
 const classes = {
   page: "space-y-6",
@@ -27,6 +34,13 @@ const classes = {
   row: "flex flex-wrap items-center gap-3",
   btnOutline:
     "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+
+  btnPrimary:
+    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
+  btnDanger:
+    "inline-flex items-center justify-center rounded-full border border-red-300 bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-red-400 hover:bg-red-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+  submitError:
+    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
 
   loadingText: "text-sm text-zinc-600",
   errorCard:
@@ -74,9 +88,25 @@ const CreatorRequestDetails = () => {
   const { id } = useParams<{ id: string }>();
 
   const { data, isLoading, error } = useCreatorRequest(id ?? null);
+  const updateStatusMutation = useUpdateCreatorListingRequestStatus();
 
   const request = data?.request ?? null;
   const buyer = data?.buyer ?? null;
+
+  const handleUpdateStatus = async (
+    nextStatus: "accepted" | "declined" | "archived"
+  ) => {
+    if (!request) return;
+
+    try {
+      await updateStatusMutation.mutateAsync({
+        requestId: request.id,
+        status: nextStatus,
+      });
+    } catch {
+      // Error is surfaced below
+    }
+  };
 
   if (isLoading) {
     return <div className={classes.loadingText}>Loading…</div>;
@@ -139,7 +169,9 @@ const CreatorRequestDetails = () => {
 
             <div className={classes.metaBlock}>
               <div className={classes.metaLabel}>Status</div>
-              <div className={classes.metaValue}>{request.status}</div>
+              <div className={classes.metaValue}>
+                {getListingRequestStatusLabel(request.status)}
+              </div>
             </div>
 
             <div className={classes.metaBlock}>
@@ -155,6 +187,57 @@ const CreatorRequestDetails = () => {
                 {dateText(request.updated_at)}
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className={classes.card}>
+          <div className={classes.section}>
+            <h2 className={classes.sectionTitle}>Request actions</h2>
+
+            <p className={classes.text}>
+              Update the request status so the buyer can track your response.
+            </p>
+          </div>
+
+          {updateStatusMutation.error && (
+            <div className={classes.submitError}>
+              The request status could not be updated right now.
+            </div>
+          )}
+
+          <div className={classes.row}>
+            {canAcceptListingRequest(request.status) && (
+              <button
+                className={classes.btnPrimary}
+                type="button"
+                onClick={() => void handleUpdateStatus("accepted")}
+                disabled={updateStatusMutation.isPending}
+              >
+                {updateStatusMutation.isPending ? "Updating…" : "Accept request"}
+              </button>
+            )}
+
+            {canDeclineListingRequest(request.status) && (
+              <button
+                className={classes.btnDanger}
+                type="button"
+                onClick={() => void handleUpdateStatus("declined")}
+                disabled={updateStatusMutation.isPending}
+              >
+                {updateStatusMutation.isPending ? "Updating…" : "Decline request"}
+              </button>
+            )}
+
+            {canArchiveListingRequest(request.status) && (
+              <button
+                className={classes.btnOutline}
+                type="button"
+                onClick={() => void handleUpdateStatus("archived")}
+                disabled={updateStatusMutation.isPending}
+              >
+                {updateStatusMutation.isPending ? "Updating…" : "Archive request"}
+              </button>
+            )}
           </div>
         </div>
 
