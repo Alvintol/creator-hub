@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
+import { getAllowedFulfilmentModes, ListingFulfilmentMode, listingFulfilmentModeOptions, normaliseFulfilmentMode } from '../domain/listings/listings';
 
 type ListingOfferingType = "digital" | "commission" | "service";
 type ListingPriceType = "fixed" | "starting_at" | "range";
@@ -11,6 +12,7 @@ type FormState = {
   title: string;
   short: string;
   offeringType: ListingOfferingType;
+  fulfilmentMode: ListingFulfilmentMode;
   category: string;
   videoSubtype: ListingVideoSubtype;
   priceType: ListingPriceType;
@@ -97,6 +99,7 @@ const initialState: FormState = {
   title: "",
   short: "",
   offeringType: "digital",
+  fulfilmentMode: "request",
   category: "",
   videoSubtype: "",
   priceType: "fixed",
@@ -155,6 +158,21 @@ const CreateListing = () => {
     setErrors((current) => ({ ...current, [key]: undefined, submit: undefined }));
   };
 
+  const setOfferingType = (value: ListingOfferingType) => {
+    setForm((current) => ({
+      ...current,
+      offeringType: value,
+      fulfilmentMode: normaliseFulfilmentMode(value, current.fulfilmentMode),
+    }));
+
+    setErrors((current) => ({
+      ...current,
+      offeringType: undefined,
+      fulfilmentMode: undefined,
+      submit: undefined,
+    }));
+  };
+
   const setPriceType = (value: ListingPriceType) => {
     setForm((current) => ({
       ...current,
@@ -207,6 +225,13 @@ const CreateListing = () => {
     }
 
     if (
+      !getAllowedFulfilmentModes(form.offeringType).includes(form.fulfilmentMode)
+    ) {
+      nextErrors.fulfilmentMode =
+        "This purchase flow is not allowed for the selected offering type.";
+    }
+
+    if (
       form.videoSubtype &&
       form.videoSubtype !== "long-form" &&
       form.videoSubtype !== "short-form"
@@ -254,6 +279,10 @@ const CreateListing = () => {
         preview_url: form.previewUrl.trim() || null,
         status: "draft",
         is_active: false,
+        fulfilment_mode: normaliseFulfilmentMode(
+          form.offeringType,
+          form.fulfilmentMode
+        ),
       });
 
       if (error) {
@@ -351,7 +380,7 @@ const CreateListing = () => {
                 className={classes.select}
                 value={form.offeringType}
                 onChange={(event) =>
-                  setField("offeringType", event.target.value as ListingOfferingType)
+                  setOfferingType(event.target.value as ListingOfferingType)
                 }
               >
                 {offeringTypeOptions.map((option) => (
@@ -360,6 +389,43 @@ const CreateListing = () => {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className={classes.field}>
+              <label className={classes.label} htmlFor="fulfilmentMode">
+                Purchase flow
+              </label>
+
+              <select
+                id="fulfilmentMode"
+                className={classes.select}
+                value={form.fulfilmentMode}
+                onChange={(event) =>
+                  setField(
+                    "fulfilmentMode",
+                    event.target.value as ListingFulfilmentMode
+                  )
+                }
+              >
+                {listingFulfilmentModeOptions
+                  .filter((option) =>
+                    getAllowedFulfilmentModes(form.offeringType).includes(option.value)
+                  )
+                  .map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+              </select>
+
+              <div className={classes.hint}>
+                Digital listings can be request-based or instant later. Commissions and
+                services stay request-only in this first pass.
+              </div>
+
+              {errors.fulfilmentMode && (
+                <div className={classes.error}>{errors.fulfilmentMode}</div>
+              )}
             </div>
 
             <div className={classes.field}>

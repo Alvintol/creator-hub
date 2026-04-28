@@ -8,6 +8,7 @@ export type MarketListingRow = {
   title: string;
   short: string;
   offering_type: string;
+  fulfilment_mode: "request" | "instant";
   category: string;
   video_subtype: string | null;
   price_type: "fixed" | "starting_at" | "range";
@@ -53,7 +54,8 @@ const fetchMarketListings = async (): Promise<MarketListingItem[]> => {
       tags,
       preview_url,
       status,
-      is_active
+      is_active,
+      fulfilment_mode
     `)
     .eq("status", "published")
     .eq("is_active", true)

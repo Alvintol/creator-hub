@@ -5,6 +5,7 @@ import {
   usePublicListing,
   type PublicListingRow,
 } from "../hooks/usePublicListing";
+import { getFulfilmentModeCopy } from '../domain/listings/listings';
 
 const classes = {
   notFoundWrap: "space-y-4",
@@ -99,6 +100,7 @@ const ListingPage = () => {
   if (error || !data?.listing) return <ListingNotFound />;
 
   const { listing, creator, platformAccounts } = data;
+  const fulfilmentCopy = getFulfilmentModeCopy(listing.fulfilment_mode);
 
   const twitchAccount =
     platformAccounts.find((account) => account.platform === "twitch") ?? null;
@@ -199,16 +201,18 @@ const ListingPage = () => {
           )}
 
           <div className={classes.ctaBox}>
-            <div className={classes.ctaTitle}>Checkout coming soon</div>
+            <div className={classes.ctaTitle}>{fulfilmentCopy.title}</div>
 
-            <p className={classes.ctaText}>
-              v0 focuses on discovery. Payments + safe delivery will come after.
-            </p>
+            <p className={classes.ctaText}>{fulfilmentCopy.text}</p>
 
-            {creatorLink && (
+            {listing.fulfilment_mode === "request" && creatorLink && (
               <Link to={creatorLink} className={classes.ctaLink}>
                 Contact creator
               </Link>
+            )}
+
+            {listing.fulfilment_mode === "instant" && (
+              <span className={classes.ctaLink}>{fulfilmentCopy.primaryLabel}</span>
             )}
           </div>
         </div>

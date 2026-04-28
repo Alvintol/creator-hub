@@ -8,6 +8,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import { useMyListing } from "../hooks/useMyListing";
+import { ListingFulfilmentMode, normaliseFulfilmentMode } from '../domain/listings/listings';
 
 type ListingOfferingType = "digital" | "commission" | "service";
 type ListingPriceType = "fixed" | "starting_at" | "range";
@@ -17,6 +18,7 @@ type FormState = {
   title: string;
   short: string;
   offeringType: ListingOfferingType;
+  fulfilmentMode: ListingFulfilmentMode;
   category: string;
   videoSubtype: ListingVideoSubtype;
   priceType: ListingPriceType;
@@ -105,6 +107,7 @@ const initialState: FormState = {
   title: "",
   short: "",
   offeringType: "digital",
+  fulfilmentMode: "request",
   category: "",
   videoSubtype: "",
   priceType: "fixed",
@@ -146,6 +149,7 @@ const toFormState = (listing: {
   title: string;
   short: string;
   offering_type: ListingOfferingType;
+  fulfilment_mode: ListingFulfilmentMode;
   category: string;
   video_subtype: "long-form" | "short-form" | null;
   price_type: ListingPriceType;
@@ -158,6 +162,7 @@ const toFormState = (listing: {
   title: listing.title,
   short: listing.short,
   offeringType: listing.offering_type,
+  fulfilmentMode: listing.fulfilment_mode,
   category: listing.category,
   videoSubtype: listing.video_subtype ?? "",
   priceType: listing.price_type,
@@ -294,6 +299,10 @@ const EditListing = () => {
           title: form.title.trim(),
           short: form.short.trim(),
           offering_type: form.offeringType,
+          fulfilment_mode: normaliseFulfilmentMode(
+            form.offeringType,
+            form.fulfilmentMode
+          ),
           category: form.category.trim(),
           video_subtype: form.videoSubtype || null,
           price_type: form.priceType,

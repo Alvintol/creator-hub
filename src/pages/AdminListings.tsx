@@ -144,7 +144,7 @@ const AdminListings = () => {
           status, and visibility.
         </p>
       </div>
-      
+
       <Link to="/admin/dashboard" className={classes.backLink}>
         ← Back to admin dashboard
       </Link>
@@ -417,6 +417,11 @@ const AdminListings = () => {
                     <div className={classes.metaValue}>
                       {item.listing.offering_type}
                     </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Purchase flow</div>
+                    <div className={classes.metaValue}>{item.listing.fulfilment_mode}</div>
                   </div>
 
                   <div className={classes.metaBlock}>

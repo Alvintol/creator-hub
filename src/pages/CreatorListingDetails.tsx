@@ -397,6 +397,11 @@ const CreatorListingDetails = () => {
               </div>
 
               <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Purchase flow</div>
+                <div className={classes.metaValue}>{listing.fulfilment_mode}</div>
+              </div>
+
+              <div className={classes.metaBlock}>
                 <div className={classes.metaLabel}>Category</div>
                 <div className={classes.metaValue}>{listing.category}</div>
               </div>

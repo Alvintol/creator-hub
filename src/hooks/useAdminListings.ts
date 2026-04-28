@@ -123,6 +123,7 @@ const fetchAdminListings = async (
         title,
         short,
         offering_type,
+        fulfilment_mode,
         category,
         video_subtype,
         price_type,
