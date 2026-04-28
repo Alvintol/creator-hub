@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useBuyerRequest } from "../../hooks/creatorRequests/useBuyerRequest";
 import { getListingRequestStatusLabel } from "../../domain/listings/listingRequests";
+import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
 
 const classes = {
   page: "space-y-6",
@@ -121,6 +122,11 @@ const BuyerRequestDetails = () => {
             <h2 className={classes.sectionTitle}>Request summary</h2>
             <p className={classes.text}>{request.message}</p>
           </div>
+
+          <ListingRequestStatusCard
+            status={request.status}
+            reason={request.creator_status_reason}
+          />
 
           <div className={classes.metaGrid}>
             <div className={classes.metaBlock}>

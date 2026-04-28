@@ -6,7 +6,10 @@ import type { ListingRequestStatus } from "../../domain/listings/listingRequests
 type UpdateCreatorListingRequestStatusInput = {
   requestId: string;
   status: ListingRequestStatus;
+  reason?: string | null;
 };
+
+const normaliseReason = (value?: string | null) => value?.trim() ?? "";
 
 export const useUpdateCreatorListingRequestStatus = () => {
   const queryClient = useQueryClient();
@@ -18,10 +21,20 @@ export const useUpdateCreatorListingRequestStatus = () => {
         throw new Error("You must be signed in to update request status.");
       }
 
+      const trimmedReason = normaliseReason(input.reason);
+
+      if (input.status === "declined") {
+        if (trimmedReason.length < 10 || trimmedReason.length > 1000) {
+          throw new Error("Decline reason must be between 10 and 1000 characters.");
+        }
+      }
+
       const { data, error } = await supabase
         .from("listing_requests")
         .update({
           status: input.status,
+          creator_status_reason:
+            input.status === "declined" ? trimmedReason : null,
         })
         .eq("id", input.requestId)
         .eq("creator_user_id", user.id)
@@ -42,19 +55,19 @@ export const useUpdateCreatorListingRequestStatus = () => {
       };
     },
 
-    onSuccess: async (result) => {
+    onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["myCreatorRequests", user?.id ?? null],
+          queryKey: ["myCreatorRequests"],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["creatorRequest", user?.id ?? null, result.id],
+          queryKey: ["creatorRequest"],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["myBuyerRequests", user?.id ?? null],
+          queryKey: ["myBuyerRequests"],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["buyerRequest", user?.id ?? null, result.id],
+          queryKey: ["buyerRequest"],
         }),
       ]);
     },

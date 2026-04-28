@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useMyBuyerRequests } from "../../hooks/creatorRequests/useMyBuyerRequests";
-import { getListingRequestStatusLabel } from "../../domain/listings/listingRequests";
+import { getListingRequestStatusLabel, getListingRequestStatusTone } from "../../domain/listings/listingRequests";
 
 const classes = {
   page: "space-y-6",
@@ -29,6 +29,17 @@ const classes = {
   loadingText: "text-sm text-zinc-600",
   errorCard:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+
+  statusPillBase:
+    "rounded-full border px-3 py-1 text-xs font-semibold",
+  statusPillReview:
+    "border-amber-200 bg-amber-50 text-amber-800",
+  statusPillSuccess:
+    "border-emerald-200 bg-emerald-50 text-emerald-800",
+  statusPillDanger:
+    "border-red-200 bg-red-50 text-red-800",
+  statusPillMuted:
+    "border-zinc-200 bg-zinc-100 text-zinc-700",
 } as const;
 
 // Prefers handle for creator display, then display name, then user id
@@ -53,6 +64,18 @@ const dateText = (value: string) => {
       month: "short",
       day: "numeric",
     });
+};
+  
+const getStatusPillClass = (status: "submitted" | "accepted" | "declined" | "archived") => {
+  const tone = getListingRequestStatusTone(status);
+
+  return tone === "review"
+    ? `${classes.statusPillBase} ${classes.statusPillReview}`
+    : tone === "success"
+      ? `${classes.statusPillBase} ${classes.statusPillSuccess}`
+      : tone === "danger"
+        ? `${classes.statusPillBase} ${classes.statusPillDanger}`
+        : `${classes.statusPillBase} ${classes.statusPillMuted}`;
 };
 
 const BuyerRequests = () => {
@@ -98,7 +121,7 @@ const BuyerRequests = () => {
               <div className={classes.metaGrid}>
                 <div className={classes.metaBlock}>
                   <div className={classes.metaLabel}>Status</div>
-                  <div className={classes.metaValue}>
+                  <div className={getStatusPillClass(item.request.status)}>
                     {getListingRequestStatusLabel(item.request.status)}
                   </div>
                 </div>

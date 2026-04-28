@@ -7,6 +7,8 @@ import {
   canDeclineListingRequest,
   getListingRequestStatusLabel,
 } from "../../domain/listings/listingRequests";
+import { useEffect, useState } from 'react';
+import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
 
 const classes = {
   page: "space-y-6",
@@ -45,6 +47,13 @@ const classes = {
   loadingText: "text-sm text-zinc-600",
   errorCard:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+
+  field: "space-y-2",
+  label: "text-sm font-bold text-zinc-900",
+  hint: "text-xs text-zinc-500",
+  error: "text-xs font-semibold text-red-600",
+  textarea:
+    "min-h-[140px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
 } as const;
 
 // Prefers handle for buyer display, then display name, then user id
@@ -92,6 +101,67 @@ const CreatorRequestDetails = () => {
 
   const request = data?.request ?? null;
   const buyer = data?.buyer ?? null;
+
+  const [declineReason, setDeclineReason] = useState("");
+  const [declineReasonError, setDeclineReasonError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!request?.creator_status_reason) return;
+    setDeclineReason(request.creator_status_reason);
+  }, [request?.creator_status_reason]);
+
+  const handleAcceptRequest = async () => {
+    if (!request) return;
+
+    try {
+      await updateStatusMutation.mutateAsync({
+        requestId: request.id,
+        status: "accepted",
+        reason: null,
+      });
+    } catch {
+      // Error is surfaced below
+    }
+  };
+
+  const handleDeclineRequest = async () => {
+    if (!request) return;
+
+    const trimmedReason = declineReason.trim();
+
+    if (trimmedReason.length < 10 || trimmedReason.length > 1000) {
+      setDeclineReasonError(
+        "Decline reason must be between 10 and 1000 characters."
+      );
+      return;
+    }
+
+    setDeclineReasonError(null);
+
+    try {
+      await updateStatusMutation.mutateAsync({
+        requestId: request.id,
+        status: "declined",
+        reason: trimmedReason,
+      });
+    } catch {
+      // Error is surfaced below
+    }
+  };
+
+  const handleArchiveRequest = async () => {
+    if (!request) return;
+
+    try {
+      await updateStatusMutation.mutateAsync({
+        requestId: request.id,
+        status: "archived",
+        reason: null,
+      });
+    } catch {
+      // Error is surfaced below
+    }
+  };
 
   const handleUpdateStatus = async (
     nextStatus: "accepted" | "declined" | "archived"
@@ -159,6 +229,11 @@ const CreatorRequestDetails = () => {
             <p className={classes.text}>{request.message}</p>
           </div>
 
+          <ListingRequestStatusCard
+            status={request.status}
+            reason={request.creator_status_reason}
+          />
+
           <div className={classes.metaGrid}>
             <div className={classes.metaBlock}>
               <div className={classes.metaLabel}>Buyer</div>
@@ -195,9 +270,35 @@ const CreatorRequestDetails = () => {
             <h2 className={classes.sectionTitle}>Request actions</h2>
 
             <p className={classes.text}>
-              Update the request status so the buyer can track your response.
+              Update the request status so the buyer can clearly track your response.
             </p>
           </div>
+
+          {canDeclineListingRequest(request.status) && (
+            <div className={classes.field}>
+              <label className={classes.label} htmlFor="declineReason">
+                Decline reason
+              </label>
+
+              <textarea
+                id="declineReason"
+                className={classes.textarea}
+                value={declineReason}
+                onChange={(event) => {
+                  setDeclineReason(event.target.value);
+                  setDeclineReasonError(null);
+                }}
+                placeholder="Explain why this request is being declined for audit and buyer clarity."
+                maxLength={1000}
+              />
+
+              <div className={classes.hint}>10 to 1000 characters.</div>
+
+              {declineReasonError && (
+                <div className={classes.error}>{declineReasonError}</div>
+              )}
+            </div>
+          )}
 
           {updateStatusMutation.error && (
             <div className={classes.submitError}>
@@ -210,7 +311,7 @@ const CreatorRequestDetails = () => {
               <button
                 className={classes.btnPrimary}
                 type="button"
-                onClick={() => void handleUpdateStatus("accepted")}
+                onClick={() => void handleAcceptRequest()}
                 disabled={updateStatusMutation.isPending}
               >
                 {updateStatusMutation.isPending ? "Updating…" : "Accept request"}
@@ -221,7 +322,7 @@ const CreatorRequestDetails = () => {
               <button
                 className={classes.btnDanger}
                 type="button"
-                onClick={() => void handleUpdateStatus("declined")}
+                onClick={() => void handleDeclineRequest()}
                 disabled={updateStatusMutation.isPending}
               >
                 {updateStatusMutation.isPending ? "Updating…" : "Decline request"}
@@ -232,7 +333,7 @@ const CreatorRequestDetails = () => {
               <button
                 className={classes.btnOutline}
                 type="button"
-                onClick={() => void handleUpdateStatus("archived")}
+                onClick={() => void handleArchiveRequest()}
                 disabled={updateStatusMutation.isPending}
               >
                 {updateStatusMutation.isPending ? "Updating…" : "Archive request"}

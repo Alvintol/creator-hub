@@ -11,6 +11,7 @@ export type ListingRequestRow = {
   creator_user_id: string;
   status: ListingRequestStatus;
   message: string;
+  creator_status_reason: string | null;
   listing_snapshot: ListingRequestSnapshot;
   created_at: string;
   updated_at: string;
@@ -43,6 +44,7 @@ const fetchMyCreatorRequests = async (
       creator_user_id,
       status,
       message,
+      creator_status_reason,
       listing_snapshot,
       created_at,
       updated_at
