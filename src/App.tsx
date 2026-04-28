@@ -31,6 +31,9 @@ import CreatorListingRevisions from './pages/CreatorListingRevisions';
 import AdminListingRevisions from './pages/AdminListingRevisions';
 import AdminListings from './pages/AdminListings';
 import AdminDashboard from './pages/AdminDashboard';
+import RequestListing from './pages/RequestListing';
+import CreatorRequestDetails from './pages/CreatorRequestDetails';
+import CreatorRequests from './pages/CreatorRequests';
 
 const App = () => {
   return (
@@ -56,6 +59,7 @@ const App = () => {
           <Route element={<RequireAuth />}>
             <Route path="/settings/profile" element={<ProfileSettings />} />
             <Route path="/apply/creator" element={<ApplyCreator />} />
+            <Route path="/listing/:id/request" element={<RequestListing />} />
           </Route>
 
           <Route element={<RequireAdminAccess />}>
@@ -77,8 +81,13 @@ const App = () => {
             <Route path="/creator/listings" element={<CreatorListings />} />
             <Route path="/creator/listings/new" element={<CreateListing />} />
             <Route path="/creator/listings/:id" element={<CreatorListingDetails />} />
+            <Route
+              path="/creator/listings/:id/revisions"
+              element={<CreatorListingRevisions />}
+            />
             <Route path="/creator/listings/:id/edit" element={<EditListing />} />
-            <Route path="/creator/listings/:id/revisions" element={<CreatorListingRevisions />} />
+            <Route path="/creator/requests" element={<CreatorRequests />} />
+            <Route path="/creator/requests/:id" element={<CreatorRequestDetails />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
