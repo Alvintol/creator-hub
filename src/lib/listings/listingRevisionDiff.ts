@@ -5,6 +5,7 @@ export type ListingRevisionChange = {
   | "title"
   | "short"
   | "offering_type"
+  | "fulfilment_mode"
   | "category"
   | "video_subtype"
   | "price"
@@ -54,6 +55,13 @@ export const getListingRevisionChanges = (
     changes.push({
       key: "title",
       label: `Title changed from "${previousSnapshot.title}" to "${currentSnapshot.title}"`,
+    });
+  }
+
+  if (currentSnapshot.fulfilment_mode !== previousSnapshot.fulfilment_mode) {
+    changes.push({
+      key: "fulfilment_mode",
+      label: `Fulfilment mode changed from ${previousSnapshot.fulfilment_mode} to ${currentSnapshot.fulfilment_mode}`,
     });
   }
 

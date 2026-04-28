@@ -8,6 +8,7 @@ export type MyListingRow = {
   title: string;
   short: string;
   offering_type: "digital" | "commission" | "service";
+  fulfilment_mode: "request" | "instant";
   category: string;
   video_subtype: "long-form" | "short-form" | null;
   price_type: "fixed" | "starting_at" | "range";
@@ -33,6 +34,7 @@ const fetchMyListings = async (userId: string): Promise<MyListingRow[]> => {
       title,
       short,
       offering_type,
+      fulfilment_mode,
       category,
       video_subtype,
       price_type,

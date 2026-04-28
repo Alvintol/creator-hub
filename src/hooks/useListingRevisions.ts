@@ -7,6 +7,7 @@ export type ListingRevisionSnapshot = {
   title: string;
   short: string;
   offering_type: string;
+  fulfilment_mode: "request" | "instant";
   category: string;
   video_subtype: string | null;
   price_type: "fixed" | "starting_at" | "range";
@@ -26,12 +27,12 @@ export type ListingRevisionRow = {
   listing_id: string;
   actor_user_id: string | null;
   event_type:
-    | "created"
-    | "updated"
-    | "published"
-    | "deactivated"
-    | "reactivated"
-    | "moved_to_draft";
+  | "created"
+  | "updated"
+  | "published"
+  | "deactivated"
+  | "reactivated"
+  | "moved_to_draft";
   snapshot: ListingRevisionSnapshot;
   created_at: string;
 };

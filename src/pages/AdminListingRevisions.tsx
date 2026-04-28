@@ -200,6 +200,11 @@ const AdminListingRevisions = () => {
               </div>
 
               <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Purchase flow</div>
+                <div className={classes.metaValue}>{listing.fulfilment_mode}</div>
+              </div>
+
+              <div className={classes.metaBlock}>
                 <div className={classes.metaLabel}>Last updated</div>
                 <div className={classes.metaValue}>{listing.updated_at}</div>
               </div>

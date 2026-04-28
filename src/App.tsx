@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout";
 import ScrollToTop from "./components/ScrollToTop";
 import ProfileSetupRedirect from "./components/ProfileSetupRedirect";
@@ -30,6 +30,7 @@ import CreatorListingDetails from './pages/CreatorListingDetails';
 import CreatorListingRevisions from './pages/CreatorListingRevisions';
 import AdminListingRevisions from './pages/AdminListingRevisions';
 import AdminListings from './pages/AdminListings';
+import AdminDashboard from './pages/AdminDashboard';
 
 const App = () => {
   return (
@@ -58,6 +59,8 @@ const App = () => {
           </Route>
 
           <Route element={<RequireAdminAccess />}>
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route
               path="/admin/creator-applications"
               element={<AdminCreatorApplications />}
@@ -68,6 +71,7 @@ const App = () => {
               element={<AdminListingRevisions />}
             />
           </Route>
+
           <Route element={<RequireCreatorAccess />}>
             <Route path="/creator/dashboard" element={<CreatorDashboard />} />
             <Route path="/creator/listings" element={<CreatorListings />} />

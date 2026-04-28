@@ -35,7 +35,8 @@ const fetchAdminListingDetails = async (
       status,
       is_active,
       created_at,
-      updated_at
+      updated_at,
+      fulfilment_mode
     `)
     .eq("id", id)
     .maybeSingle();
