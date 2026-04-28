@@ -29,36 +29,83 @@ export type CreatorListingRequestItem = {
   buyer: ListingRequestProfile | null;
 };
 
-const emptyResult: CreatorListingRequestItem[] = [];
+export type CreatorListingRequestsResult = {
+  items: CreatorListingRequestItem[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+  archived: boolean;
+};
 
-// Loads requests for the signed-in creator and joins buyer profile display data
+type UseMyCreatorRequestsInput = {
+  archived: boolean;
+  page: number;
+  pageSize?: number;
+};
+
+const emptyResult: CreatorListingRequestsResult = {
+  items: [],
+  totalCount: 0,
+  page: 1,
+  pageSize: 12,
+  pageCount: 0,
+  archived: false,
+};
+
+// Loads a paginated creator request inbox and joins buyer profile display data
 const fetchMyCreatorRequests = async (
-  userId: string
-): Promise<CreatorListingRequestItem[]> => {
-  const { data: requests, error: requestsError } = await supabase
+  userId: string,
+  input: UseMyCreatorRequestsInput
+): Promise<CreatorListingRequestsResult> => {
+  const { archived, page, pageSize = 12 } = input;
+
+  let query = supabase
     .from("listing_requests")
-    .select(`
-      id,
-      listing_id,
-      buyer_user_id,
-      creator_user_id,
-      status,
-      message,
-      creator_status_reason,
-      listing_snapshot,
-      created_at,
-      updated_at
-    `)
+    .select(
+      `
+        id,
+        listing_id,
+        buyer_user_id,
+        creator_user_id,
+        status,
+        message,
+        creator_status_reason,
+        listing_snapshot,
+        created_at,
+        updated_at
+      `,
+      { count: "exact" }
+    )
     .eq("creator_user_id", userId)
     .order("created_at", { ascending: false });
+
+  query = archived
+    ? query.eq("status", "archived")
+    : query.neq("status", "archived");
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  const { data: requests, error: requestsError, count } = await query.range(from, to);
 
   if (requestsError) {
     throw requestsError;
   }
 
   const requestRows = (requests ?? []) as ListingRequestRow[];
+  const totalCount = count ?? 0;
+  const pageCount = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 0;
+
   if (requestRows.length === 0) {
-    return emptyResult;
+    return {
+      items: [],
+      totalCount,
+      page,
+      pageSize,
+      pageCount,
+      archived,
+    };
   }
 
   const buyerIds = Array.from(
@@ -81,21 +128,35 @@ const fetchMyCreatorRequests = async (
     ])
   ) as Record<string, ListingRequestProfile>;
 
-  return requestRows.map((request) => ({
-    request,
-    buyer: profileByUserId[request.buyer_user_id] ?? null,
-  }));
+  return {
+    items: requestRows.map((request) => ({
+      request,
+      buyer: profileByUserId[request.buyer_user_id] ?? null,
+    })),
+    totalCount,
+    page,
+    pageSize,
+    pageCount,
+    archived,
+  };
 };
 
-export const useMyCreatorRequests = () => {
+export const useMyCreatorRequests = (input: UseMyCreatorRequestsInput) => {
   const { user, loading } = useAuth();
   const userId = user?.id ?? null;
 
-  return useQuery<CreatorListingRequestItem[]>({
-    queryKey: ["myCreatorRequests", userId],
+  return useQuery<CreatorListingRequestsResult>({
+    queryKey: ["myCreatorRequests", userId, input],
     enabled: !loading && Boolean(userId),
     queryFn: () =>
-      userId ? fetchMyCreatorRequests(userId) : Promise.resolve(emptyResult),
+      userId
+        ? fetchMyCreatorRequests(userId, input)
+        : Promise.resolve({
+          ...emptyResult,
+          archived: input.archived,
+          page: input.page,
+          pageSize: input.pageSize ?? emptyResult.pageSize,
+        }),
     staleTime: 15_000,
   });
 };

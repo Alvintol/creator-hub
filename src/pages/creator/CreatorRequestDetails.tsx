@@ -201,9 +201,14 @@ const CreatorRequestDetails = () => {
 
   const snapshot = request.listing_snapshot;
 
+  const backTo =
+    request.status === "archived"
+      ? "/creator/requests/archived"
+      : "/creator/requests";
+
   return (
     <div className={classes.page}>
-      <Link to="/creator/requests" className={classes.backLink}>
+      <Link to={backTo} className={classes.backLink}>
         ← Back to creator requests
       </Link>
 
