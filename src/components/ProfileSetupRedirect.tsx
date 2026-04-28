@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../providers/AuthProvider";
-import { useMyProfile } from "../hooks/useMyProfile";
+import { useMyProfile } from "../hooks/profile/useMyProfile";
 
 // Paths that should never redirect into themselves
 const shouldSkipRedirect = (pathname: string): boolean =>

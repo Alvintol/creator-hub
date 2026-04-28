@@ -1,4 +1,4 @@
-import type { PublicListingRow } from "../../hooks/usePublicListing";
+import type { PublicListingRow } from "../../hooks/listings/usePublicListing";
 
 export type ListingRequestSnapshot = {
   listing_id: string;

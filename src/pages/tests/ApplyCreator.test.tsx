@@ -2,11 +2,11 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import ApplyCreator from "../ApplyCreator";
+import ApplyCreator from "../creator/ApplyCreator";
 import { useAuth } from "../../providers/AuthProvider";
-import { useSellerAccess } from "../../hooks/useSellerAccess";
-import { useUpsertMySellerApplication } from "../../hooks/useUpsertMySellerApplication";
-import { useCreatorApplicationQueueState } from "../../hooks/useCreatorApplicationQueueState";
+import { useSellerAccess } from "../../hooks/creatorApplication/useSellerAccess";
+import { useUpsertMySellerApplication } from "../../hooks/creatorApplication/useUpsertMySellerApplication";
+import { useCreatorApplicationQueueState } from "../../hooks/creatorApplication/useCreatorApplicationQueueState";
 
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual<typeof import("@tanstack/react-query")>(

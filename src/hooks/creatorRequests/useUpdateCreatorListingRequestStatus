@@ -1,0 +1,62 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "../../lib/supabaseClient";
+import { useAuth } from "../../providers/AuthProvider";
+import type { ListingRequestStatus } from "../../domain/listings/listingRequests";
+
+type UpdateCreatorListingRequestStatusInput = {
+  requestId: string;
+  status: ListingRequestStatus;
+};
+
+export const useUpdateCreatorListingRequestStatus = () => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (input: UpdateCreatorListingRequestStatusInput) => {
+      if (!user?.id) {
+        throw new Error("You must be signed in to update request status.");
+      }
+
+      const { data, error } = await supabase
+        .from("listing_requests")
+        .update({
+          status: input.status,
+        })
+        .eq("id", input.requestId)
+        .eq("creator_user_id", user.id)
+        .select("id, status")
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.id) {
+        throw new Error("The request status could not be updated.");
+      }
+
+      return {
+        id: data.id as string,
+        status: data.status as ListingRequestStatus,
+      };
+    },
+
+    onSuccess: async (result) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["myCreatorRequests", user?.id ?? null],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["creatorRequest", user?.id ?? null, result.id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["myBuyerRequests", user?.id ?? null],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["buyerRequest", user?.id ?? null, result.id],
+        }),
+      ]);
+    },
+  });
+};

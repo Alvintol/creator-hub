@@ -9,7 +9,7 @@ import { CATEGORIES } from "../domain/catalog";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
-import { useSellerAccess } from '../hooks/useSellerAccess';
+import { useSellerAccess } from '../hooks/creatorApplication/useSellerAccess';
 
 type CategoryLink = {
   key: string;
