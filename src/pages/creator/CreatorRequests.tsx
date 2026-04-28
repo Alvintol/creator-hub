@@ -1,5 +1,14 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMyCreatorRequests } from "../../hooks/creatorRequests/useMyCreatorRequests";
+import {
+  getListingRequestStatusLabel,
+  getListingRequestStatusTone,
+} from "../../domain/listings/listingRequests";
+
+type CreatorRequestsProps = {
+  archived?: boolean;
+};
 
 const classes = {
   page: "space-y-6",
@@ -22,6 +31,17 @@ const classes = {
   pills: "flex flex-wrap gap-2",
   pill: "chip",
 
+  statusPillBase:
+    "rounded-full border px-3 py-1 text-xs font-semibold",
+  statusPillReview:
+    "border-amber-200 bg-amber-50 text-amber-800",
+  statusPillSuccess:
+    "border-emerald-200 bg-emerald-50 text-emerald-800",
+  statusPillDanger:
+    "border-red-200 bg-red-50 text-red-800",
+  statusPillMuted:
+    "border-zinc-200 bg-zinc-100 text-zinc-700",
+
   btnPrimary:
     "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
   btnOutline:
@@ -30,7 +50,10 @@ const classes = {
   loadingText: "text-sm text-zinc-600",
   errorCard:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+  pagerText: "text-sm text-zinc-600",
 } as const;
+
+const pageSize = 12;
 
 // Prefers handle for buyer display, then display name, then user id
 const buyerText = (
@@ -56,17 +79,76 @@ const dateText = (value: string) => {
     });
 };
 
-const CreatorRequests = () => {
-  const { data, isLoading, error } = useMyCreatorRequests();
+const getStatusPillClass = (
+  status: "submitted" | "accepted" | "declined" | "archived"
+) => {
+  const tone = getListingRequestStatusTone(status);
+
+  return tone === "review"
+    ? `${classes.statusPillBase} ${classes.statusPillReview}`
+    : tone === "success"
+      ? `${classes.statusPillBase} ${classes.statusPillSuccess}`
+      : tone === "danger"
+        ? `${classes.statusPillBase} ${classes.statusPillDanger}`
+        : `${classes.statusPillBase} ${classes.statusPillMuted}`;
+};
+
+const CreatorRequests = (props: CreatorRequestsProps) => {
+  const { archived = false } = props;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [archived]);
+
+  const { data, isLoading, error } = useMyCreatorRequests({
+    archived,
+    page,
+    pageSize,
+  });
+
+  const items = data?.items ?? [];
+  const totalCount = data?.totalCount ?? 0;
+  const pageCount = data?.pageCount ?? 0;
 
   return (
     <div className={classes.page}>
       <div className={classes.header}>
-        <h1 className={classes.h1}>Creator requests</h1>
+        <h1 className={classes.h1}>
+          {archived ? "Archived creator requests" : "Creator requests"}
+        </h1>
 
         <p className={classes.sub}>
-          Review incoming buyer requests tied to your request-based listings.
+          {archived
+            ? "Review archived buyer requests tied to your listings."
+            : "Review incoming buyer requests tied to your request-based listings."}
         </p>
+      </div>
+
+      <div className={classes.row}>
+        <Link
+          className={archived ? classes.btnOutline : classes.btnPrimary}
+          to="/creator/requests"
+        >
+          Active requests
+        </Link>
+
+        <Link
+          className={archived ? classes.btnPrimary : classes.btnOutline}
+          to="/creator/requests/archived"
+        >
+          Archived requests
+        </Link>
+
+        <div className={classes.pagerText}>
+          {isLoading ? "Loading…" : `${totalCount} request(s) found`}
+        </div>
+
+        {pageCount > 0 && (
+          <div className={classes.pagerText}>
+            Page {page} of {pageCount}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -77,78 +159,108 @@ const CreatorRequests = () => {
 
       {isLoading && <div className={classes.loadingText}>Loading requests…</div>}
 
-      {!isLoading && !error && (data?.length ?? 0) === 0 && (
+      {!isLoading && !error && items.length === 0 && (
         <div className={classes.card}>
           <p className={classes.text}>
-            You do not have any listing requests yet.
+            {archived
+              ? "You do not have any archived requests."
+              : "You do not have any active listing requests."}
           </p>
         </div>
       )}
 
-      {!isLoading && !error && (data?.length ?? 0) > 0 && (
-        <div className={classes.grid}>
-          {data?.map((item) => (
-            <div key={item.request.id} className={classes.card}>
-              <h2 className={classes.title}>
-                {item.request.listing_snapshot.title}
-              </h2>
+      {!isLoading && !error && items.length > 0 && (
+        <>
+          <div className={classes.grid}>
+            {items.map((item) => (
+              <div key={item.request.id} className={classes.card}>
+                <h2 className={classes.title}>
+                  {item.request.listing_snapshot.title}
+                </h2>
 
-              <p className={classes.text}>
-                Buyer: {buyerText(item.buyer, item.request.buyer_user_id)}
-              </p>
+                <p className={classes.text}>
+                  Buyer: {buyerText(item.buyer, item.request.buyer_user_id)}
+                </p>
 
-              <div className={classes.metaGrid}>
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Status</div>
-                  <div className={classes.metaValue}>{item.request.status}</div>
-                </div>
+                <div className={classes.metaGrid}>
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Status</div>
+                    <div className={getStatusPillClass(item.request.status)}>
+                      {getListingRequestStatusLabel(item.request.status)}
+                    </div>
+                  </div>
 
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Received</div>
-                  <div className={classes.metaValue}>
-                    {dateText(item.request.created_at)}
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Received</div>
+                    <div className={classes.metaValue}>
+                      {dateText(item.request.created_at)}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Price snapshot</div>
+                    <div className={classes.metaValue}>
+                      {item.request.listing_snapshot.price_type === "fixed"
+                        ? `$${item.request.listing_snapshot.price_min}`
+                        : item.request.listing_snapshot.price_type === "starting_at"
+                          ? `From $${item.request.listing_snapshot.price_min}`
+                          : `$${item.request.listing_snapshot.price_min}–$${item.request.listing_snapshot.price_max ?? item.request.listing_snapshot.price_min}`}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Category</div>
+                    <div className={classes.metaValue}>
+                      {item.request.listing_snapshot.category}
+                    </div>
                   </div>
                 </div>
 
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Price snapshot</div>
-                  <div className={classes.metaValue}>
-                    {item.request.listing_snapshot.price_type === "fixed"
-                      ? `$${item.request.listing_snapshot.price_min}`
-                      : item.request.listing_snapshot.price_type === "starting_at"
-                        ? `From $${item.request.listing_snapshot.price_min}`
-                        : `$${item.request.listing_snapshot.price_min}–$${item.request.listing_snapshot.price_max ?? item.request.listing_snapshot.price_min}`}
-                  </div>
+                <div className={classes.pills}>
+                  <span className={classes.pill}>
+                    {item.request.listing_snapshot.fulfilment_mode}
+                  </span>
+                  <span className={classes.pill}>
+                    {item.request.listing_snapshot.offering_type}
+                  </span>
                 </div>
 
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Category</div>
-                  <div className={classes.metaValue}>
-                    {item.request.listing_snapshot.category}
-                  </div>
+                <div className={classes.row}>
+                  <Link
+                    className={classes.btnPrimary}
+                    to={`/creator/requests/${item.request.id}`}
+                  >
+                    View request
+                  </Link>
                 </div>
               </div>
+            ))}
+          </div>
 
-              <div className={classes.pills}>
-                <span className={classes.pill}>
-                  {item.request.listing_snapshot.fulfilment_mode}
-                </span>
-                <span className={classes.pill}>
-                  {item.request.listing_snapshot.offering_type}
-                </span>
-              </div>
+          <div className={classes.row}>
+            <button
+              className={classes.btnOutline}
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Previous
+            </button>
 
-              <div className={classes.row}>
-                <Link
-                  className={classes.btnPrimary}
-                  to={`/creator/requests/${item.request.id}`}
-                >
-                  View request
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
+            <button
+              className={classes.btnOutline}
+              type="button"
+              disabled={pageCount === 0 || page >= pageCount}
+              onClick={() =>
+                setPage((current) =>
+                  pageCount > 0 ? Math.min(pageCount, current + 1) : current
+                )
+              }
+            >
+              Next
+            </button>
+          </div>
+        </>
       )}
     </div>
   );

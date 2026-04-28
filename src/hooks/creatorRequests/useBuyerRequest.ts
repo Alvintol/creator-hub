@@ -30,6 +30,7 @@ const fetchBuyerRequest = async (
       creator_user_id,
       status,
       message,
+      creator_status_reason,
       listing_snapshot,
       created_at,
       updated_at

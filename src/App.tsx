@@ -34,6 +34,8 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import RequestListing from './pages/listings/RequestListing';
 import CreatorRequestDetails from './pages/creator/CreatorRequestDetails';
 import CreatorRequests from './pages/creator/CreatorRequests';
+import BuyerRequestDetails from './pages/buyer/BuyerRequestDetails';
+import BuyerRequests from './pages/buyer/BuyerRequests';
 
 const App = () => {
   return (
@@ -60,6 +62,9 @@ const App = () => {
             <Route path="/settings/profile" element={<ProfileSettings />} />
             <Route path="/apply/creator" element={<ApplyCreator />} />
             <Route path="/listing/:id/request" element={<RequestListing />} />
+            <Route path="/requests" element={<BuyerRequests />} />
+            <Route path="/requests/archived" element={<BuyerRequests archived />} />
+            <Route path="/requests/:id" element={<BuyerRequestDetails />} />
           </Route>
 
           <Route element={<RequireAdminAccess />}>
@@ -87,6 +92,7 @@ const App = () => {
             />
             <Route path="/creator/listings/:id/edit" element={<EditListing />} />
             <Route path="/creator/requests" element={<CreatorRequests />} />
+            <Route path="/creator/requests/archived" element={<CreatorRequests archived />} />
             <Route path="/creator/requests/:id" element={<CreatorRequestDetails />} />
           </Route>
 

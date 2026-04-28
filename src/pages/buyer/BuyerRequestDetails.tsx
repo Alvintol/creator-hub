@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useBuyerRequest } from "../../hooks/creatorRequests/useBuyerRequest";
 import { getListingRequestStatusLabel } from "../../domain/listings/listingRequests";
+import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
 
 const classes = {
   page: "space-y-6",
@@ -100,9 +101,14 @@ const BuyerRequestDetails = () => {
 
   const snapshot = request.listing_snapshot;
 
+  const backTo =
+    request.status === "archived"
+      ? "/requests/archived"
+      : "/requests";
+
   return (
     <div className={classes.page}>
-      <Link to="/requests" className={classes.backLink}>
+      <Link to={backTo} className={classes.backLink}>
         ← Back to my requests
       </Link>
 
@@ -121,6 +127,11 @@ const BuyerRequestDetails = () => {
             <h2 className={classes.sectionTitle}>Request summary</h2>
             <p className={classes.text}>{request.message}</p>
           </div>
+
+          <ListingRequestStatusCard
+            status={request.status}
+            reason={request.creator_status_reason}
+          />
 
           <div className={classes.metaGrid}>
             <div className={classes.metaBlock}>
@@ -236,7 +247,7 @@ const BuyerRequestDetails = () => {
       </div>
 
       <div className={classes.row}>
-        <Link className={classes.btnOutline} to="/requests">
+        <Link className={classes.btnOutline} to={backTo}>
           Back to my requests
         </Link>
       </div>
