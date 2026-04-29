@@ -4,11 +4,34 @@ import { render, screen } from "@testing-library/react";
 import RequireAdminAccess from "../RequireAdminAccess";
 import { useSellerAccess } from "../../hooks/creatorApplication/useSellerAccess";
 
-vi.mock("../../hooks/useSellerAccess", () => ({
+vi.mock("../../hooks/creatorApplication/useSellerAccess", () => ({
   useSellerAccess: vi.fn(),
 }));
 
 const mockUseSellerAccess = vi.mocked(useSellerAccess);
+
+type MockSellerAccess = ReturnType<typeof useSellerAccess>;
+
+const makeSellerAccess = (
+  overrides: Partial<MockSellerAccess> = {}
+): MockSellerAccess =>
+  ({
+    isLoading: false,
+    isSignedIn: false,
+    isAdmin: false,
+    isCreatorApproved: false,
+    profileReady: true,
+    hasLinkedCreatorPlatform: false,
+    canAccessCreatorRoutes: false,
+    canAccessAdminRoutes: false,
+    sellerApplication: null,
+    creatorStatusLabel: "Not applied",
+    canStartApplication: false,
+    canEditApplication: false,
+    canSubmitApplication: false,
+    error: null,
+    ...overrides,
+  }) as MockSellerAccess;
 
 const renderRoute = () => {
   render(
@@ -30,15 +53,16 @@ const renderRoute = () => {
 
 describe("RequireAdminAccess", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockUseSellerAccess.mockReset();
   });
 
   it("redirects signed-out users to sign in", () => {
-    mockUseSellerAccess.mockReturnValue({
-      isLoading: false,
-      isSignedIn: false,
-      canAccessAdminRoutes: false,
-    } as never);
+    mockUseSellerAccess.mockReturnValue(
+      makeSellerAccess({
+        isSignedIn: false,
+        canAccessAdminRoutes: false,
+      })
+    );
 
     renderRoute();
 
@@ -46,11 +70,13 @@ describe("RequireAdminAccess", () => {
   });
 
   it("redirects signed-in non-admin users to home", () => {
-    mockUseSellerAccess.mockReturnValue({
-      isLoading: false,
-      isSignedIn: true,
-      canAccessAdminRoutes: false,
-    } as never);
+    mockUseSellerAccess.mockReturnValue(
+      makeSellerAccess({
+        isSignedIn: true,
+        isAdmin: false,
+        canAccessAdminRoutes: false,
+      })
+    );
 
     renderRoute();
 
@@ -58,11 +84,13 @@ describe("RequireAdminAccess", () => {
   });
 
   it("renders the protected route for admins", () => {
-    mockUseSellerAccess.mockReturnValue({
-      isLoading: false,
-      isSignedIn: true,
-      canAccessAdminRoutes: true,
-    } as never);
+    mockUseSellerAccess.mockReturnValue(
+      makeSellerAccess({
+        isSignedIn: true,
+        isAdmin: true,
+        canAccessAdminRoutes: true,
+      })
+    );
 
     renderRoute();
 

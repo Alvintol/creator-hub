@@ -1,71 +1,106 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { render, screen } from "@testing-library/react";
 import RequireCreatorAccess from "../RequireCreatorAccess";
 import { useSellerAccess } from "../../hooks/creatorApplication/useSellerAccess";
 
-vi.mock("../../hooks/useSellerAccess", () => ({
+vi.mock("../../hooks/creatorApplication/useSellerAccess", () => ({
   useSellerAccess: vi.fn(),
 }));
 
 const mockUseSellerAccess = vi.mocked(useSellerAccess);
 
-const renderRoute = () => {
-  render(
-    <MemoryRouter initialEntries={["/creator/dashboard"]}>
-      <Routes>
-        <Route element={<RequireCreatorAccess />}>
-          <Route
-            path="/creator/dashboard"
-            element={<div>Creator dashboard page</div>}
-          />
-        </Route>
+type MockSellerAccess = ReturnType<typeof useSellerAccess>;
 
-        <Route path="/signin" element={<div>Sign in page</div>} />
-        <Route path="/apply/creator" element={<div>Apply creator page</div>} />
-      </Routes>
-    </MemoryRouter>
-  );
-};
+const makeSellerAccess = (
+  overrides: Partial<MockSellerAccess> = {}
+): MockSellerAccess =>
+  ({
+    isLoading: false,
+    isSignedIn: false,
+    isAdmin: false,
+    isCreatorApproved: false,
+    profileReady: true,
+    hasLinkedCreatorPlatform: false,
+    canAccessCreatorRoutes: false,
+    canAccessAdminRoutes: false,
+    sellerApplication: null,
+    creatorStatusLabel: "Not applied",
+    ...overrides,
+  }) as MockSellerAccess;
 
 describe("RequireCreatorAccess", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockUseSellerAccess.mockReset();
   });
 
   it("redirects signed-out users to sign in", () => {
-    mockUseSellerAccess.mockReturnValue({
-      isLoading: false,
-      isSignedIn: false,
-      canAccessCreatorRoutes: false,
-    } as never);
+    mockUseSellerAccess.mockReturnValue(
+      makeSellerAccess({
+        isSignedIn: false,
+      })
+    );
 
-    renderRoute();
+    render(
+      <MemoryRouter initialEntries={["/creator/dashboard"]}>
+        <Routes>
+          <Route path="/signin" element={<div>Sign in page</div>} />
+          <Route path="/apply/creator" element={<div>Apply page</div>} />
+          <Route element={<RequireCreatorAccess />}>
+            <Route path="/creator/dashboard" element={<div>Protected page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
 
-    expect(screen.getByText(/sign in page/i)).toBeInTheDocument();
+    expect(screen.getByText("Sign in page")).toBeInTheDocument();
   });
 
   it("redirects signed-in non-approved users to the creator application flow", () => {
-    mockUseSellerAccess.mockReturnValue({
-      isLoading: false,
-      isSignedIn: true,
-      canAccessCreatorRoutes: false,
-    } as never);
+    mockUseSellerAccess.mockReturnValue(
+      makeSellerAccess({
+        isSignedIn: true,
+        canAccessCreatorRoutes: false,
+      })
+    );
 
-    renderRoute();
+    render(
+      <MemoryRouter initialEntries={["/creator/dashboard"]}>
+        <Routes>
+          <Route path="/signin" element={<div>Sign in page</div>} />
+          <Route path="/apply/creator" element={<div>Apply page</div>} />
+          <Route element={<RequireCreatorAccess />}>
+            <Route path="/creator/dashboard" element={<div>Protected page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
 
-    expect(screen.getByText(/apply creator page/i)).toBeInTheDocument();
+    expect(screen.getByText("Apply page")).toBeInTheDocument();
   });
 
   it("renders the protected route for approved creators", () => {
-    mockUseSellerAccess.mockReturnValue({
-      isLoading: false,
-      isSignedIn: true,
-      canAccessCreatorRoutes: true,
-    } as never);
+    mockUseSellerAccess.mockReturnValue(
+      makeSellerAccess({
+        isSignedIn: true,
+        isCreatorApproved: true,
+        canAccessCreatorRoutes: true,
+        creatorStatusLabel: "Approved creator",
+      })
+    );
 
-    renderRoute();
+    render(
+      <MemoryRouter initialEntries={["/creator/dashboard"]}>
+        <Routes>
+          <Route path="/signin" element={<div>Sign in page</div>} />
+          <Route path="/apply/creator" element={<div>Apply page</div>} />
+          <Route element={<RequireCreatorAccess />}>
+            <Route path="/creator/dashboard" element={<div>Protected page</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    );
 
-    expect(screen.getByText(/creator dashboard page/i)).toBeInTheDocument();
+    expect(screen.getByText("Protected page")).toBeInTheDocument();
   });
 });
