@@ -36,6 +36,8 @@ import CreatorRequestDetails from './pages/creator/CreatorRequestDetails';
 import CreatorRequests from './pages/creator/CreatorRequests';
 import BuyerRequestDetails from './pages/buyer/BuyerRequestDetails';
 import BuyerRequests from './pages/buyer/BuyerRequests';
+import AdminRequestDetails from './pages/admin/AdminRequestDetails';
+import AdminRequests from './pages/admin/AdminRequests';
 
 const App = () => {
   return (
@@ -79,6 +81,8 @@ const App = () => {
               path="/admin/listing-revisions/:id"
               element={<AdminListingRevisions />}
             />
+            <Route path="/admin/requests" element={<AdminRequests />} />
+            <Route path="/admin/requests/:id" element={<AdminRequestDetails />} />
           </Route>
 
           <Route element={<RequireCreatorAccess />}>
