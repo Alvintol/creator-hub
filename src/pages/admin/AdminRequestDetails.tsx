@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { useAdminRequest } from "../../hooks/admin/useAdminRequest";
 import { getListingRequestStatusLabel } from "../../domain/listings/listingRequests";
 import ListingRequestStatusCard from "../../components/ListingRequestStatusCard";
+import RequestConversationThread from '../../components/RequestConversationThread';
 
 const classes = {
   page: "space-y-6",
@@ -249,6 +250,16 @@ const AdminRequestDetails = () => {
           </div>
         </div>
       </div>
+
+      <RequestConversationThread
+        requestId={request.id}
+        buyerUserId={request.buyer_user_id}
+        creatorUserId={request.creator_user_id}
+        buyerLabel={profileText(buyer, request.buyer_user_id)}
+        creatorLabel={profileText(creator, request.creator_user_id)}
+        viewer="admin"
+        requestArchived={request.status === "archived"}
+      />    
 
       <div className={classes.row}>
         <Link className={classes.btnPrimary} to={`/admin/listing-revisions/${request.listing_id}`}>

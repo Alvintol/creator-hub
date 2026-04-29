@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { useBuyerRequest } from "../../hooks/creatorRequests/useBuyerRequest";
 import { getListingRequestStatusLabel } from "../../domain/listings/listingRequests";
 import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
+import RequestConversationThread from '../../components/RequestConversationThread';
 
 const classes = {
   page: "space-y-6",
@@ -245,6 +246,16 @@ const BuyerRequestDetails = () => {
           </div>
         </div>
       </div>
+
+      <RequestConversationThread
+        requestId={request.id}
+        buyerUserId={request.buyer_user_id}
+        creatorUserId={request.creator_user_id}
+        buyerLabel="You"
+        creatorLabel={creatorText(creator, request.creator_user_id)}
+        viewer="buyer"
+        requestArchived={request.status === "archived"}
+      />
 
       <div className={classes.row}>
         <Link className={classes.btnOutline} to={backTo}>
