@@ -10,6 +10,7 @@ import { useTwitchStreams } from "../hooks/useTwitchStreams";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import { useSellerAccess } from '../hooks/creatorApplication/useSellerAccess';
+import { useMyAdminAccess } from '../hooks/admin/useMyAdminAccess';
 
 type CategoryLink = {
   key: string;
@@ -90,6 +91,7 @@ const Nav = () => {
   const { user, loading } = useAuth();
   const { isLoading: isSellerAccessLoading, canAccessCreatorRoutes } =
     useSellerAccess();
+  const { data: isAdmin = false, isLoading: isAdminLoading } = useMyAdminAccess();
 
   const liveCount = useMemo(
     () => Object.keys(twitchByLogin).length,
@@ -187,6 +189,15 @@ const Nav = () => {
               className={({ isActive }) => getAuthPillClass(isActive)}
             >
               Dashboard
+            </NavLink>
+          )}
+
+          {!loading && user && !isAdminLoading && isAdmin && (
+            <NavLink
+              to="/admin/dashboard"
+              className={({ isActive }) => getAuthPillClass(isActive)}
+            >
+              Admin
             </NavLink>
           )}
 
