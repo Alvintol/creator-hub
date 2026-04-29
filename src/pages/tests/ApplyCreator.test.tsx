@@ -25,15 +25,15 @@ vi.mock("../../providers/AuthProvider", () => ({
   useAuth: vi.fn(),
 }));
 
-vi.mock("../../hooks/useSellerAccess", () => ({
+vi.mock("../../hooks/creatorApplication/useSellerAccess", () => ({
   useSellerAccess: vi.fn(),
 }));
 
-vi.mock("../../hooks/useUpsertMySellerApplication", () => ({
+vi.mock("../../hooks/creatorApplication/useUpsertMySellerApplication", () => ({
   useUpsertMySellerApplication: vi.fn(),
 }));
 
-vi.mock("../../hooks/useCreatorApplicationQueueState", () => ({
+vi.mock("../../hooks/creatorApplication/useCreatorApplicationQueueState", () => ({
   useCreatorApplicationQueueState: vi.fn(),
 }));
 
