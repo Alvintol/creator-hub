@@ -9,6 +9,7 @@ import {
 } from "../../domain/listings/listingRequests";
 import { useEffect, useState } from 'react';
 import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
+import RequestConversationThread from '../../components/RequestConversationThread';
 
 const classes = {
   page: "space-y-6",
@@ -428,6 +429,16 @@ const CreatorRequestDetails = () => {
           </div>
         </div>
       </div>
+
+      <RequestConversationThread
+        requestId={request.id}
+        buyerUserId={request.buyer_user_id}
+        creatorUserId={request.creator_user_id}
+        buyerLabel={buyerText(buyer, request.buyer_user_id)}
+        creatorLabel="You"
+        viewer="creator"
+        requestArchived={request.status === "archived"}
+      />
 
       <div className={classes.row}>
         <Link className={classes.btnOutline} to="/creator/requests">
