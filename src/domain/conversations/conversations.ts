@@ -20,6 +20,23 @@ export type ConversationCloseReasonCode =
   | "unwanted_messages"
   | "other";
 
+export type BuyerImageUploadStatus =
+  | "blocked"
+  | "requested"
+  | "approved"
+  | "revoked";
+
+export const getBuyerImageUploadStatusLabel = (
+  status: BuyerImageUploadStatus
+): string =>
+  status === "blocked"
+    ? "Image uploads blocked"
+    : status === "requested"
+      ? "Image upload access requested"
+      : status === "approved"
+        ? "Image uploads allowed"
+        : "Image uploads disabled";
+
 export const conversationCloseReasonOptions: Array<{
   value: ConversationCloseReasonCode;
   label: string;

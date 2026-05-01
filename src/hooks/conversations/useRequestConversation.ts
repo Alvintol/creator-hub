@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
 import type {
+  BuyerImageUploadStatus,
   ConversationCloseReasonCode,
   ConversationStatus,
   ConversationType,
@@ -20,8 +21,14 @@ export type RequestConversationRow = {
   closed_by_user_id: string | null;
   closed_reason_code: ConversationCloseReasonCode | null;
   closed_reason_details: string | null;
-  buyer_image_upload_status: "blocked" | "requested" | "approved" | "revoked";
+  buyer_image_upload_status: BuyerImageUploadStatus;
+  buyer_image_upload_requested_at: string | null;
+  buyer_image_upload_requested_by_user_id: string | null;
   buyer_image_upload_request_note: string | null;
+  buyer_image_upload_approved_at: string | null;
+  buyer_image_upload_approved_by_user_id: string | null;
+  buyer_image_upload_revoked_at: string | null;
+  buyer_image_upload_revoked_by_user_id: string | null;
   last_message_at: string | null;
   last_message_sender_user_id: string | null;
   last_message_preview: string | null;
@@ -49,7 +56,13 @@ const fetchRequestConversation = async (
       closed_reason_code,
       closed_reason_details,
       buyer_image_upload_status,
+      buyer_image_upload_requested_at,
+      buyer_image_upload_requested_by_user_id,
       buyer_image_upload_request_note,
+      buyer_image_upload_approved_at,
+      buyer_image_upload_approved_by_user_id,
+      buyer_image_upload_revoked_at,
+      buyer_image_upload_revoked_by_user_id,
       last_message_at,
       last_message_sender_user_id,
       last_message_preview,

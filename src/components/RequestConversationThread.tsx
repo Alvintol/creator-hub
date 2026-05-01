@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   canSendConversationMessage,
   conversationCloseReasonOptions,
+  getBuyerImageUploadStatusLabel,
   getConversationCloseReasonLabel,
   isConversationReadOnly,
   type ConversationCloseReasonCode,
@@ -9,6 +10,7 @@ import {
 import { useCloseConversation } from "../hooks/conversations/useCloseConversation";
 import { useConversationMessages } from "../hooks/conversations/useConversationMessages";
 import { useRequestConversation } from "../hooks/conversations/useRequestConversation";
+import { useApproveBuyerImageUpload, useRequestBuyerImageUpload, useRevokeBuyerImageUpload } from '../hooks/conversations/useConversationImagePermissions';
 
 type RequestConversationThreadProps = {
   requestId: string;
@@ -79,6 +81,12 @@ const classes = {
   btnDanger:
     "inline-flex items-center justify-center rounded-full border border-red-300 bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-red-400 hover:bg-red-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
 
+  imagePermissionBox:
+    "rounded-2xl border border-zinc-300 bg-zinc-100/60 px-4 py-3 text-sm text-zinc-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
+  imagePermissionTitle: "font-extrabold text-zinc-900",
+  imagePermissionText: "mt-1 text-sm text-zinc-700",
+  imagePermissionActions: "mt-3 flex flex-wrap items-center gap-3",
+
 } as const;
 
 const dateText = (value: string) => {
@@ -133,6 +141,8 @@ const RequestConversationThread = ({
   const [closeReasonCode, setCloseReasonCode] =
     useState<ConversationCloseReasonCode | "">("");
   const [closeReasonDetails, setCloseReasonDetails] = useState("");
+  const [showImageRequestForm, setShowImageRequestForm] = useState(false);
+  const [imageRequestNote, setImageRequestNote] = useState("");
 
   const {
     data: conversation,
@@ -149,6 +159,9 @@ const RequestConversationThread = ({
   } = useConversationMessages(conversation?.id ?? null);
 
   const closeConversationMutation = useCloseConversation();
+  const requestBuyerImageUploadMutation = useRequestBuyerImageUpload();
+  const approveBuyerImageUploadMutation = useApproveBuyerImageUpload();
+  const revokeBuyerImageUploadMutation = useRevokeBuyerImageUpload();
 
   const trimmedBody = body.trim();
   const isAdmin = viewer === "admin";
@@ -183,6 +196,44 @@ const RequestConversationThread = ({
     !requestArchived &&
     conversation?.status === "open";
 
+  const imageRequestNoteTrimmed = imageRequestNote.trim();
+  const imageRequestNoteError =
+    imageRequestNoteTrimmed.length > 1000
+      ? "Request note must be 1000 characters or less."
+      : null;
+
+  const isImageActionPending =
+    requestBuyerImageUploadMutation.isPending ||
+    approveBuyerImageUploadMutation.isPending ||
+    revokeBuyerImageUploadMutation.isPending;
+
+  const buyerImageUploadStatus =
+    conversation?.buyer_image_upload_status ?? "blocked";
+
+  const canRequestImageUpload =
+    Boolean(conversation) &&
+    viewer === "buyer" &&
+    !readOnly &&
+    (buyerImageUploadStatus === "blocked" ||
+      buyerImageUploadStatus === "revoked");
+
+  const canApproveImageUpload =
+    Boolean(conversation) &&
+    viewer === "creator" &&
+    !readOnly &&
+    buyerImageUploadStatus !== "approved";
+
+  const canRevokeImageUpload =
+    Boolean(conversation) &&
+    viewer === "creator" &&
+    !readOnly &&
+    buyerImageUploadStatus === "approved";
+
+  const approveImageUploadButtonText =
+    buyerImageUploadStatus === "requested"
+      ? "Allow client images"
+      : "Enable client images";
+
   const handleSubmitMessage = async () => {
     if (!canSubmit) return;
 
@@ -207,6 +258,46 @@ const RequestConversationThread = ({
       setShowCloseForm(false);
       setCloseReasonCode("");
       setCloseReasonDetails("");
+    } catch {
+      // Error is surfaced below
+    }
+  };
+
+  const handleRequestImageUpload = async () => {
+    if (!conversation || imageRequestNoteError) return;
+
+    try {
+      await requestBuyerImageUploadMutation.mutateAsync({
+        conversationId: conversation.id,
+        requestNote: imageRequestNoteTrimmed,
+      });
+
+      setShowImageRequestForm(false);
+      setImageRequestNote("");
+    } catch {
+      // Error is surfaced below
+    }
+  };
+
+  const handleApproveImageUpload = async () => {
+    if (!conversation) return;
+
+    try {
+      await approveBuyerImageUploadMutation.mutateAsync({
+        conversationId: conversation.id,
+      });
+    } catch {
+      // Error is surfaced below
+    }
+  };
+
+  const handleRevokeImageUpload = async () => {
+    if (!conversation) return;
+
+    try {
+      await revokeBuyerImageUploadMutation.mutateAsync({
+        conversationId: conversation.id,
+      });
     } catch {
       // Error is surfaced below
     }
@@ -280,6 +371,136 @@ const RequestConversationThread = ({
           Archived requests are read-only.
         </div>
       )}
+
+      <div className={classes.imagePermissionBox}>
+        <div className={classes.imagePermissionTitle}>
+          Image sharing
+        </div>
+
+        <div className={classes.imagePermissionText}>
+          {getBuyerImageUploadStatusLabel(conversation.buyer_image_upload_status)}
+        </div>
+
+        {conversation.buyer_image_upload_status === "blocked" && (
+          <div className={classes.imagePermissionText}>
+            Clients cannot send images in this conversation unless the creator allows it.
+          </div>
+        )}
+
+        {conversation.buyer_image_upload_status === "requested" && (
+          <div className={classes.imagePermissionText}>
+            The client has requested permission to send images.
+            {conversation.buyer_image_upload_request_note
+              ? ` Note: ${conversation.buyer_image_upload_request_note}`
+              : ""}
+          </div>
+        )}
+
+        {conversation.buyer_image_upload_status === "approved" && (
+          <div className={classes.imagePermissionText}>
+            The creator has allowed the client to send images when uploads are added later.
+          </div>
+        )}
+
+        {conversation.buyer_image_upload_status === "revoked" && (
+          <div className={classes.imagePermissionText}>
+            The creator has disabled client image sharing for this conversation.
+          </div>
+        )}
+
+        {(requestBuyerImageUploadMutation.error ||
+          approveBuyerImageUploadMutation.error ||
+          revokeBuyerImageUploadMutation.error) && (
+            <div className={classes.errorBox}>
+              Image sharing permissions could not be updated right now.
+            </div>
+          )}
+
+        {canRequestImageUpload && (
+          <div className={classes.imagePermissionActions}>
+            <button
+              className={classes.btnOutline}
+              type="button"
+              onClick={() => setShowImageRequestForm((current) => !current)}
+              disabled={isImageActionPending}
+            >
+              {showImageRequestForm
+                ? "Cancel image request"
+                : "Request image sharing"}
+            </button>
+          </div>
+        )}
+
+        {showImageRequestForm && canRequestImageUpload && (
+          <div className={classes.form}>
+            <div className={classes.field}>
+              <label className={classes.label} htmlFor="imageRequestNote">
+                Why do you need to send images?
+              </label>
+
+              <textarea
+                id="imageRequestNote"
+                className={classes.textarea}
+                value={imageRequestNote}
+                onChange={(event) => setImageRequestNote(event.target.value)}
+                placeholder="Optional. Explain what kind of reference images you want to send."
+                maxLength={1000}
+              />
+
+              <div className={classes.hint}>
+                {imageRequestNoteTrimmed.length}/1000 characters.
+              </div>
+
+              {imageRequestNoteError && (
+                <div className={classes.errorBox}>{imageRequestNoteError}</div>
+              )}
+            </div>
+
+            <div className={classes.row}>
+              <button
+                className={classes.btnPrimary}
+                type="button"
+                onClick={() => void handleRequestImageUpload()}
+                disabled={Boolean(imageRequestNoteError) || isImageActionPending}
+              >
+                {requestBuyerImageUploadMutation.isPending
+                  ? "Sending request…"
+                  : "Send image request"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {canApproveImageUpload && (
+          <div className={classes.imagePermissionActions}>
+            <button
+              className={classes.btnPrimary}
+              type="button"
+              onClick={() => void handleApproveImageUpload()}
+              disabled={isImageActionPending}
+            >
+              {approveBuyerImageUploadMutation.isPending
+                ? "Allowing images…"
+                : approveImageUploadButtonText}
+            </button>
+          </div>
+        )}
+
+        {canRevokeImageUpload && (
+          <div className={classes.imagePermissionActions}>
+            <button
+              className={classes.btnDanger}
+              type="button"
+              onClick={() => void handleRevokeImageUpload()}
+              disabled={isImageActionPending}
+            >
+              {revokeBuyerImageUploadMutation.isPending
+                ? "Disabling images…"
+                : "Disable client images"}
+            </button>
+          </div>
+        )}
+      </div>
 
       {areMessagesLoading ? (
         <div className={classes.loadingText}>Loading messages…</div>
