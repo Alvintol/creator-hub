@@ -2,10 +2,12 @@ import { useState } from "react";
 import {
   canSendConversationMessage,
   conversationCloseReasonOptions,
+  conversationReportReasonOptions,
   getBuyerImageUploadStatusLabel,
   getConversationCloseReasonLabel,
+  getConversationReportStatusLabel,
+  getConversationReportStatusSummary,
   isConversationReadOnly,
-  conversationReportReasonOptions,
   type ConversationCloseReasonCode,
   type ConversationReportReasonCode,
 } from "../domain/conversations/conversations";
@@ -14,6 +16,7 @@ import { useConversationMessages } from "../hooks/conversations/useConversationM
 import { useRequestConversation } from "../hooks/conversations/useRequestConversation";
 import { useApproveBuyerImageUpload, useRequestBuyerImageUpload, useRevokeBuyerImageUpload } from '../hooks/conversations/useConversationImagePermissions';
 import { useReportConversation } from "../hooks/conversations/useReportConversation";
+import { useMyConversationReports } from "../hooks/conversations/useMyConversationReports";
 
 type RequestConversationThreadProps = {
   requestId: string;
@@ -99,6 +102,10 @@ const classes = {
     "inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-bold text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60",
   successBox:
     "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
+  reportStatusBox:
+    "rounded-2xl border border-zinc-300 bg-zinc-100/70 px-4 py-3 text-sm text-zinc-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
+  reportStatusTitle: "font-extrabold text-zinc-900",
+  reportStatusText: "mt-1 text-sm text-zinc-700",
 } as const;
 
 const dateText = (value: string) => {
@@ -160,7 +167,6 @@ const RequestConversationThread = ({
   const [reportTarget, setReportTarget] = useState<{
     type: "conversation" | "message";
     messageId: string | null;
-    reportedUserId: string | null;
   } | null>(null);
 
   const [reportReasonCode, setReportReasonCode] =
@@ -188,6 +194,9 @@ const RequestConversationThread = ({
   const approveBuyerImageUploadMutation = useApproveBuyerImageUpload();
   const revokeBuyerImageUploadMutation = useRevokeBuyerImageUpload();
   const reportConversationMutation = useReportConversation();
+  const { data: myReports = [] } = useMyConversationReports(
+    conversation?.id ?? null
+  );
 
   const reportReasonDetailsTrimmed = reportReasonDetails.trim();
   const isOtherReportReason = reportReasonCode === "other";
@@ -277,6 +286,32 @@ const RequestConversationThread = ({
       ? "Allow client images"
       : "Enable client images";
 
+  const conversationReport =
+    myReports.find((report) => report.message_id === null) ?? null;
+
+  const getMessageReport = (messageId: string) =>
+    myReports.find((report) => report.message_id === messageId) ?? null;
+
+  const hasReportedConversation = Boolean(conversationReport);
+
+  const hasReportedMessage = (messageId: string): boolean =>
+    Boolean(getMessageReport(messageId));
+
+  const getReportedConversationButtonText = () =>
+    conversationReport
+      ? `Conversation reported · ${getConversationReportStatusLabel(
+        conversationReport.status
+      )}`
+      : "Report conversation";
+
+  const getReportedMessageButtonText = (messageId: string) => {
+    const report = getMessageReport(messageId);
+
+    return report
+      ? `Message reported · ${getConversationReportStatusLabel(report.status)}`
+      : "Report message";
+  };
+
   const handleSubmitMessage = async () => {
     if (!canSubmit) return;
 
@@ -346,33 +381,27 @@ const RequestConversationThread = ({
     }
   };
 
-  const getOtherParticipantUserId = () =>
-    viewer === "buyer"
-      ? creatorUserId
-      : viewer === "creator"
-        ? buyerUserId
-        : null;
-
   const openConversationReport = () => {
+    if (hasReportedConversation) return;
+
     setReportSubmitted(false);
     setReportTarget({
       type: "conversation",
       messageId: null,
-      reportedUserId: getOtherParticipantUserId(),
     });
     setReportReasonCode("");
     setReportReasonDetails("");
   };
 
   const openMessageReport = (
-    messageId: string,
-    reportedUserId: string
+    messageId: string
   ) => {
+    if (hasReportedMessage(messageId)) return;
+
     setReportSubmitted(false);
     setReportTarget({
       type: "message",
-      messageId,
-      reportedUserId,
+      messageId
     });
     setReportReasonCode("");
     setReportReasonDetails("");
@@ -391,7 +420,6 @@ const RequestConversationThread = ({
       await reportConversationMutation.mutateAsync({
         conversationId: conversation.id,
         messageId: reportTarget.messageId,
-        reportedUserId: reportTarget.reportedUserId,
         reasonCode: reportReasonCode,
         reasonDetails: reportReasonDetailsTrimmed,
       });
@@ -608,9 +636,9 @@ const RequestConversationThread = ({
             className={classes.btnOutline}
             type="button"
             onClick={openConversationReport}
-            disabled={reportConversationMutation.isPending}
+            disabled={hasReportedConversation || reportConversationMutation.isPending}
           >
-            Report conversation
+            {getReportedConversationButtonText()}
           </button>
         </div>
       )}
@@ -682,10 +710,13 @@ const RequestConversationThread = ({
                       <button
                         className={classes.tinyDangerButton}
                         type="button"
-                        onClick={() => openMessageReport(message.id, message.sender_user_id)}
-                        disabled={reportConversationMutation.isPending}
+                        onClick={() => openMessageReport(message.id)}
+                        disabled={
+                          hasReportedMessage(message.id) ||
+                          reportConversationMutation.isPending
+                        }
                       >
-                        Report message
+                        {getReportedMessageButtonText(message.id)}
                       </button>
                     </div>
                   )}
@@ -794,6 +825,29 @@ const RequestConversationThread = ({
               Cancel
             </button>
           </div>
+        </div>
+      )}
+
+      {conversationReport && viewer !== "admin" && (
+        <div className={classes.reportStatusBox}>
+          <div className={classes.reportStatusTitle}>
+            Conversation report status
+          </div>
+
+          <div className={classes.reportStatusText}>
+            Status: {getConversationReportStatusLabel(conversationReport.status)}
+          </div>
+
+          <div className={classes.reportStatusText}>
+            {conversationReport.reporter_status_message ||
+              getConversationReportStatusSummary(conversationReport.status)}
+          </div>
+
+          {conversationReport.reporter_status_updated_at && (
+            <div className={classes.reportStatusText}>
+              Last update: {dateText(conversationReport.reporter_status_updated_at)}
+            </div>
+          )}
         </div>
       )}
 

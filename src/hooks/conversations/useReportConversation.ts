@@ -6,7 +6,6 @@ import type { ConversationReportReasonCode } from "../../domain/conversations/co
 type ReportConversationInput = {
   conversationId: string;
   messageId?: string | null;
-  reportedUserId?: string | null;
   reasonCode: ConversationReportReasonCode;
   reasonDetails?: string;
 };
@@ -30,26 +29,24 @@ export const useReportConversation = () => {
       }
 
       if (input.reasonCode === "other" && details.length < 10) {
-        throw new Error("Please add at least 10 characters of detail when choosing Other.");
+        throw new Error(
+          "Please add at least 10 characters of detail when choosing Other."
+        );
       }
 
       if (details.length > 1000) {
         throw new Error("Additional details must be 1000 characters or less.");
       }
 
-      const { data, error } = await supabase
-        .from("conversation_reports")
-        .insert({
-          conversation_id: input.conversationId,
-          message_id: input.messageId ?? null,
-          reporter_user_id: user.id,
-          reported_user_id: input.reportedUserId ?? null,
-          reason_code: input.reasonCode,
-          reason_details: details || null,
-          status: "submitted",
-        })
-        .select("id")
-        .maybeSingle();
+      const { data, error } = await supabase.rpc(
+        "submit_conversation_report",
+        {
+          p_conversation_id: input.conversationId,
+          p_message_id: input.messageId ?? null,
+          p_reason_code: input.reasonCode,
+          p_reason_details: details || null,
+        }
+      );
 
       if (error) {
         throw error;
@@ -62,10 +59,13 @@ export const useReportConversation = () => {
       return data.id as string;
     },
 
-    onSuccess: async () => {
+    onSuccess: async (_data, input) => {
       await Promise.all([
         queryClient.invalidateQueries({
           queryKey: ["conversationReports"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["myConversationReports", input.conversationId],
         }),
         queryClient.invalidateQueries({
           queryKey: ["adminRequests"],
