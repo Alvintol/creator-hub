@@ -322,7 +322,7 @@ const CreatorRequestDetails = () => {
               </button>
             )}
           </div>
-          
+
           {showDeclineForm && canDeclineListingRequest(request.status) && (
             <div className={classes.field}>
               <label className={classes.label} htmlFor="declineReason">
@@ -454,7 +454,14 @@ const CreatorRequestDetails = () => {
         buyerLabel={buyerText(buyer, request.buyer_user_id)}
         creatorLabel="You"
         viewer="creator"
-        requestArchived={request.status === "archived"}
+        requestReadOnly={
+          request.status === "archived" || request.status === "declined"
+        }
+        requestReadOnlyMessage={
+          request.status === "archived"
+            ? "Archived requests are read-only."
+            : "Declined requests are read-only because the conversation has been ended."
+        }
       />
 
       <div className={classes.row}>

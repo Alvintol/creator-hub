@@ -69,6 +69,15 @@ export const useUpdateCreatorListingRequestStatus = () => {
         queryClient.invalidateQueries({
           queryKey: ["buyerRequest"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["requestConversation"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["conversationMessages"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["adminRequests"],
+        }),
       ]);
     },
   });

@@ -19,7 +19,8 @@ type RequestConversationThreadProps = {
   buyerLabel: string;
   creatorLabel: string;
   viewer: "buyer" | "creator" | "admin";
-  requestArchived?: boolean;
+  requestReadOnly?: boolean;
+  requestReadOnlyMessage?: string;
 };
 
 const classes = {
@@ -134,7 +135,8 @@ const RequestConversationThread = ({
   buyerLabel,
   creatorLabel,
   viewer,
-  requestArchived = false,
+  requestReadOnly = false,
+  requestReadOnlyMessage = "This request is read-only.",
 }: RequestConversationThreadProps) => {
   const [body, setBody] = useState("");
   const [showCloseForm, setShowCloseForm] = useState(false);
@@ -167,7 +169,7 @@ const RequestConversationThread = ({
   const isAdmin = viewer === "admin";
   const readOnlyByConversation =
     !conversation || isConversationReadOnly(conversation.status);
-  const readOnly = isAdmin || requestArchived || readOnlyByConversation;
+  const readOnly = isAdmin || requestReadOnly || readOnlyByConversation;
 
   const closeReasonDetailsTrimmed = closeReasonDetails.trim();
   const isOtherCloseReason = closeReasonCode === "other";
@@ -193,7 +195,7 @@ const RequestConversationThread = ({
   const canCloseConversation =
     Boolean(conversation) &&
     !isAdmin &&
-    !requestArchived &&
+    !requestReadOnly &&
     conversation?.status === "open";
 
   const imageRequestNoteTrimmed = imageRequestNote.trim();
@@ -366,7 +368,7 @@ const RequestConversationThread = ({
         </div>
       )}
 
-      {requestArchived && conversation.status === "open" && (
+      {requestReadOnly && conversation.status === "open" && (
         <div className={classes.statusBox}>
           Archived requests are read-only.
         </div>

@@ -258,8 +258,15 @@ const AdminRequestDetails = () => {
         buyerLabel={profileText(buyer, request.buyer_user_id)}
         creatorLabel={profileText(creator, request.creator_user_id)}
         viewer="admin"
-        requestArchived={request.status === "archived"}
-      />    
+        requestReadOnly={
+          request.status === "archived" || request.status === "declined"
+        }
+        requestReadOnlyMessage={
+          request.status === "archived"
+            ? "Archived requests are read-only."
+            : "Declined requests are read-only because the conversation has been ended."
+        }
+      />
 
       <div className={classes.row}>
         <Link className={classes.btnPrimary} to={`/admin/listing-revisions/${request.listing_id}`}>
