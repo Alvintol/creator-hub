@@ -254,7 +254,14 @@ const BuyerRequestDetails = () => {
         buyerLabel="You"
         creatorLabel={creatorText(creator, request.creator_user_id)}
         viewer="buyer"
-        requestArchived={request.status === "archived"}
+        requestReadOnly={
+          request.status === "archived" || request.status === "declined"
+        }
+        requestReadOnlyMessage={
+          request.status === "archived"
+            ? "Archived requests are read-only."
+            : "Declined requests are read-only because the conversation has been ended."
+        }
       />
 
       <div className={classes.row}>
