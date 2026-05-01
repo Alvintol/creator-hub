@@ -2,15 +2,21 @@ import { useState } from "react";
 import {
   canSendConversationMessage,
   conversationCloseReasonOptions,
+  conversationReportReasonOptions,
   getBuyerImageUploadStatusLabel,
   getConversationCloseReasonLabel,
+  getConversationReportStatusLabel,
+  getConversationReportStatusSummary,
   isConversationReadOnly,
   type ConversationCloseReasonCode,
+  type ConversationReportReasonCode,
 } from "../domain/conversations/conversations";
 import { useCloseConversation } from "../hooks/conversations/useCloseConversation";
 import { useConversationMessages } from "../hooks/conversations/useConversationMessages";
 import { useRequestConversation } from "../hooks/conversations/useRequestConversation";
 import { useApproveBuyerImageUpload, useRequestBuyerImageUpload, useRevokeBuyerImageUpload } from '../hooks/conversations/useConversationImagePermissions';
+import { useReportConversation } from "../hooks/conversations/useReportConversation";
+import { useMyConversationReports } from "../hooks/conversations/useMyConversationReports";
 
 type RequestConversationThreadProps = {
   requestId: string;
@@ -88,6 +94,18 @@ const classes = {
   imagePermissionText: "mt-1 text-sm text-zinc-700",
   imagePermissionActions: "mt-3 flex flex-wrap items-center gap-3",
 
+  reportBox:
+    "rounded-2xl border border-red-200 bg-red-50/70 px-4 py-4 text-sm text-red-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
+  reportTitle: "font-extrabold text-red-900",
+  messageActions: "mt-2 flex flex-wrap items-center gap-2",
+  tinyDangerButton:
+    "inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-bold text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60",
+  successBox:
+    "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
+  reportStatusBox:
+    "rounded-2xl border border-zinc-300 bg-zinc-100/70 px-4 py-3 text-sm text-zinc-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
+  reportStatusTitle: "font-extrabold text-zinc-900",
+  reportStatusText: "mt-1 text-sm text-zinc-700",
 } as const;
 
 const dateText = (value: string) => {
@@ -146,6 +164,17 @@ const RequestConversationThread = ({
   const [showImageRequestForm, setShowImageRequestForm] = useState(false);
   const [imageRequestNote, setImageRequestNote] = useState("");
 
+  const [reportTarget, setReportTarget] = useState<{
+    type: "conversation" | "message";
+    messageId: string | null;
+  } | null>(null);
+
+  const [reportReasonCode, setReportReasonCode] =
+    useState<ConversationReportReasonCode | "">("");
+
+  const [reportReasonDetails, setReportReasonDetails] = useState("");
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+
   const {
     data: conversation,
     isLoading: isConversationLoading,
@@ -164,6 +193,27 @@ const RequestConversationThread = ({
   const requestBuyerImageUploadMutation = useRequestBuyerImageUpload();
   const approveBuyerImageUploadMutation = useApproveBuyerImageUpload();
   const revokeBuyerImageUploadMutation = useRevokeBuyerImageUpload();
+  const reportConversationMutation = useReportConversation();
+  const { data: myReports = [] } = useMyConversationReports(
+    conversation?.id ?? null
+  );
+
+  const reportReasonDetailsTrimmed = reportReasonDetails.trim();
+  const isOtherReportReason = reportReasonCode === "other";
+
+  const reportReasonDetailsError =
+    isOtherReportReason && reportReasonDetailsTrimmed.length < 10
+      ? "Please provide a reason for the report"
+      : reportReasonDetailsTrimmed.length > 1000
+        ? "Additional details must be 1000 characters or less"
+        : null;
+
+  const canSubmitReport =
+    Boolean(conversation) &&
+    Boolean(reportTarget) &&
+    Boolean(reportReasonCode) &&
+    !reportReasonDetailsError &&
+    !reportConversationMutation.isPending;
 
   const trimmedBody = body.trim();
   const isAdmin = viewer === "admin";
@@ -236,6 +286,32 @@ const RequestConversationThread = ({
       ? "Allow client images"
       : "Enable client images";
 
+  const conversationReport =
+    myReports.find((report) => report.message_id === null) ?? null;
+
+  const getMessageReport = (messageId: string) =>
+    myReports.find((report) => report.message_id === messageId) ?? null;
+
+  const hasReportedConversation = Boolean(conversationReport);
+
+  const hasReportedMessage = (messageId: string): boolean =>
+    Boolean(getMessageReport(messageId));
+
+  const getReportedConversationButtonText = () =>
+    conversationReport
+      ? `Conversation reported · ${getConversationReportStatusLabel(
+        conversationReport.status
+      )}`
+      : "Report conversation";
+
+  const getReportedMessageButtonText = (messageId: string) => {
+    const report = getMessageReport(messageId);
+
+    return report
+      ? `Message reported · ${getConversationReportStatusLabel(report.status)}`
+      : "Report message";
+  };
+
   const handleSubmitMessage = async () => {
     if (!canSubmit) return;
 
@@ -300,6 +376,56 @@ const RequestConversationThread = ({
       await revokeBuyerImageUploadMutation.mutateAsync({
         conversationId: conversation.id,
       });
+    } catch {
+      // Error is surfaced below
+    }
+  };
+
+  const openConversationReport = () => {
+    if (hasReportedConversation) return;
+
+    setReportSubmitted(false);
+    setReportTarget({
+      type: "conversation",
+      messageId: null,
+    });
+    setReportReasonCode("");
+    setReportReasonDetails("");
+  };
+
+  const openMessageReport = (
+    messageId: string
+  ) => {
+    if (hasReportedMessage(messageId)) return;
+
+    setReportSubmitted(false);
+    setReportTarget({
+      type: "message",
+      messageId
+    });
+    setReportReasonCode("");
+    setReportReasonDetails("");
+  };
+
+  const closeReportForm = () => {
+    setReportTarget(null);
+    setReportReasonCode("");
+    setReportReasonDetails("");
+  };
+
+  const handleSubmitReport = async () => {
+    if (!conversation || !reportTarget || !reportReasonCode || reportReasonDetailsError) return;
+
+    try {
+      await reportConversationMutation.mutateAsync({
+        conversationId: conversation.id,
+        messageId: reportTarget.messageId,
+        reasonCode: reportReasonCode,
+        reasonDetails: reportReasonDetailsTrimmed,
+      });
+
+      setReportSubmitted(true);
+      closeReportForm();
     } catch {
       // Error is surfaced below
     }
@@ -504,6 +630,19 @@ const RequestConversationThread = ({
         )}
       </div>
 
+      {viewer !== "admin" && (
+        <div className={classes.row}>
+          <button
+            className={classes.btnOutline}
+            type="button"
+            onClick={openConversationReport}
+            disabled={hasReportedConversation || reportConversationMutation.isPending}
+          >
+            {getReportedConversationButtonText()}
+          </button>
+        </div>
+      )}
+
       {areMessagesLoading ? (
         <div className={classes.loadingText}>Loading messages…</div>
       ) : messagesError ? (
@@ -566,6 +705,21 @@ const RequestConversationThread = ({
                   )}
 
                   <div className={classes.messageBody}>{message.body}</div>
+                  {!isSystemMessage && viewer !== "admin" && message.sender_user_id !== currentUserId && (
+                    <div className={classes.messageActions}>
+                      <button
+                        className={classes.tinyDangerButton}
+                        type="button"
+                        onClick={() => openMessageReport(message.id)}
+                        disabled={
+                          hasReportedMessage(message.id) ||
+                          reportConversationMutation.isPending
+                        }
+                      >
+                        {getReportedMessageButtonText(message.id)}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -573,6 +727,128 @@ const RequestConversationThread = ({
         </div>
       ) : (
         <div className={classes.empty}>No follow-up messages yet.</div>
+      )}
+
+      {reportSubmitted && (
+        <div className={classes.successBox}>
+          Report submitted. An admin can review it.
+        </div>
+      )}
+
+      {reportConversationMutation.error && (
+        <div className={classes.errorBox}>
+          Report could not be submitted right now.
+        </div>
+      )}
+
+      {reportTarget && (
+        <div className={classes.reportBox}>
+          <div className={classes.reportTitle}>
+            {reportTarget.type === "message"
+              ? "Report message"
+              : "Report conversation"}
+          </div>
+
+          <div className={classes.field}>
+            <label className={classes.label} htmlFor="reportReason">
+              Reason
+            </label>
+
+            <select
+              id="reportReason"
+              className={classes.select}
+              value={reportReasonCode}
+              onChange={(event) =>
+                setReportReasonCode(
+                  event.target.value as ConversationReportReasonCode | ""
+                )
+              }
+            >
+              <option value="">Choose a reason</option>
+
+              {conversationReportReasonOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className={classes.field}>
+            <label className={classes.label} htmlFor="reportDetails">
+              Additional details{isOtherReportReason ? " *" : ""}
+            </label>
+
+            <textarea
+              id="reportDetails"
+              className={classes.textarea}
+              value={reportReasonDetails}
+              onChange={(event) => setReportReasonDetails(event.target.value)}
+              placeholder={
+                isOtherReportReason
+                  ? "Required. Explain why this should be reviewed."
+                  : "Optional. Add context for the admin reviewing this report."
+              }
+              maxLength={1000}
+            />
+
+            <div className={classes.hint}>
+              {reportReasonDetailsTrimmed.length}/1000 characters.
+              {isOtherReportReason
+                ? " Please provide a reason for the report."
+                : " Optional unless you choose Other."}
+            </div>
+
+            {reportReasonDetailsError && (
+              <div className={classes.errorBox}>{reportReasonDetailsError}</div>
+            )}
+          </div>
+
+          <div className={classes.row}>
+            <button
+              className={classes.btnDanger}
+              type="button"
+              onClick={() => void handleSubmitReport()}
+              disabled={!canSubmitReport}
+            >
+              {reportConversationMutation.isPending
+                ? "Submitting report…"
+                : "Submit report"}
+            </button>
+
+            <button
+              className={classes.btnOutline}
+              type="button"
+              onClick={closeReportForm}
+              disabled={reportConversationMutation.isPending}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {conversationReport && viewer !== "admin" && (
+        <div className={classes.reportStatusBox}>
+          <div className={classes.reportStatusTitle}>
+            Conversation report status
+          </div>
+
+          <div className={classes.reportStatusText}>
+            Status: {getConversationReportStatusLabel(conversationReport.status)}
+          </div>
+
+          <div className={classes.reportStatusText}>
+            {conversationReport.reporter_status_message ||
+              getConversationReportStatusSummary(conversationReport.status)}
+          </div>
+
+          {conversationReport.reporter_status_updated_at && (
+            <div className={classes.reportStatusText}>
+              Last update: {dateText(conversationReport.reporter_status_updated_at)}
+            </div>
+          )}
+        </div>
       )}
 
       {sendMessageMutation.error && (

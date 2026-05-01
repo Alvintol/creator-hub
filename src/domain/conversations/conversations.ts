@@ -26,6 +26,76 @@ export type BuyerImageUploadStatus =
   | "approved"
   | "revoked";
 
+export type ConversationReportReasonCode =
+  | "spam"
+  | "harassment"
+  | "scam_or_suspicious"
+  | "inappropriate_content"
+  | "unsolicited_images"
+  | "off_platform_payment"
+  | "other";
+
+export type ConversationReportStatus =
+  | "submitted"
+  | "reviewing"
+  | "needs_more_info"
+  | "action_taken"
+  | "resolved"
+  | "dismissed";
+
+export type ConversationReportResolutionCode =
+  | "warning_issued"
+  | "content_removed"
+  | "conversation_locked"
+  | "account_restricted"
+  | "no_violation_found"
+  | "insufficient_information"
+  | "duplicate_report"
+  | "other";
+
+export const getConversationReportStatusLabel = (
+  status: ConversationReportStatus
+): string =>
+  status === "submitted"
+    ? "Submitted"
+    : status === "reviewing"
+      ? "Under review"
+      : status === "needs_more_info"
+        ? "Needs more info"
+        : status === "action_taken"
+          ? "Action taken"
+          : status === "resolved"
+            ? "Resolved"
+            : "Dismissed";
+
+export const getConversationReportStatusSummary = (
+  status: ConversationReportStatus
+): string =>
+  status === "submitted"
+    ? "Your report has been received."
+    : status === "reviewing"
+      ? "An admin is reviewing this report."
+      : status === "needs_more_info"
+        ? "An admin needs more information from you."
+        : status === "action_taken"
+          ? "An admin reviewed this report and took appropriate action."
+          : status === "resolved"
+            ? "This report has been reviewed and resolved."
+            : "This report was reviewed and dismissed.";
+
+export const conversationReportReasonOptions: Array<{
+  value: ConversationReportReasonCode;
+  label: string;
+}> = [
+    { value: "spam", label: "Spam or repeated unwanted messages" },
+    { value: "harassment", label: "Harassment or abusive behaviour" },
+    { value: "scam_or_suspicious", label: "Scam or suspicious behaviour" },
+    { value: "inappropriate_content", label: "Inappropriate content" },
+    { value: "unsolicited_images", label: "Unsolicited images or references" },
+    { value: "off_platform_payment", label: "Asked to move payment off-platform" },
+    { value: "other", label: "Other" },
+  ];
+
 export const getBuyerImageUploadStatusLabel = (
   status: BuyerImageUploadStatus
 ): string =>
