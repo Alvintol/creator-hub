@@ -26,6 +26,28 @@ export type BuyerImageUploadStatus =
   | "approved"
   | "revoked";
 
+export type ConversationReportReasonCode =
+  | "spam"
+  | "harassment"
+  | "scam_or_suspicious"
+  | "inappropriate_content"
+  | "unsolicited_images"
+  | "off_platform_payment"
+  | "other";
+
+export const conversationReportReasonOptions: Array<{
+  value: ConversationReportReasonCode;
+  label: string;
+}> = [
+    { value: "spam", label: "Spam or repeated unwanted messages" },
+    { value: "harassment", label: "Harassment or abusive behaviour" },
+    { value: "scam_or_suspicious", label: "Scam or suspicious behaviour" },
+    { value: "inappropriate_content", label: "Inappropriate content" },
+    { value: "unsolicited_images", label: "Unsolicited images or references" },
+    { value: "off_platform_payment", label: "Asked to move payment off-platform" },
+    { value: "other", label: "Other" },
+  ];
+
 export const getBuyerImageUploadStatusLabel = (
   status: BuyerImageUploadStatus
 ): string =>
