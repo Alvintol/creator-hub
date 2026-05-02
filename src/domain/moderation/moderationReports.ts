@@ -74,6 +74,35 @@ export const moderationReportResolutionOptions: Array<{
     { value: "other", label: "Other" },
   ];
 
+
+export const moderationReportReasonOptions: Array<{
+  value: ModerationReportReasonCode;
+  label: string;
+}> = [
+    { value: "spam", label: "Spam or repeated unwanted messages" },
+    { value: "harassment", label: "Harassment or abusive behaviour" },
+    { value: "scam_or_suspicious", label: "Scam or suspicious behaviour" },
+    { value: "inappropriate_content", label: "Inappropriate content" },
+    { value: "unsolicited_images", label: "Unsolicited images or references" },
+    { value: "off_platform_payment", label: "Asked to move payment off-platform" },
+    { value: "misleading_listing", label: "Misleading listing" },
+    { value: "stolen_or_copied_work", label: "Stolen or copied work" },
+    { value: "impersonation", label: "Impersonation" },
+    { value: "policy_violation", label: "Policy violation" },
+    { value: "other", label: "Other" },
+  ];
+
+export const getModerationReportTargetTypeLabel = (
+  targetType: ModerationReportTargetType
+): string =>
+  targetType === "conversation"
+    ? "Conversation report"
+    : targetType === "conversation_message"
+      ? "Message report"
+      : targetType === "listing"
+        ? "Listing report"
+        : "Profile report";
+
 export const getModerationReportStatusLabel = (
   status: ModerationReportStatus
 ): string =>
@@ -98,7 +127,7 @@ export const getModerationReportStatusSummary = (
 export const getModerationReportReasonLabel = (
   reasonCode: ModerationReportReasonCode
 ): string =>
-  conversationModerationReportReasonOptions.find(
+  moderationReportReasonOptions.find(
     (option) => option.value === reasonCode
   )?.label ?? "Unknown reason";
 
