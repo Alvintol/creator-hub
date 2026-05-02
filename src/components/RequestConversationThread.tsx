@@ -2,21 +2,24 @@ import { useState } from "react";
 import {
   canSendConversationMessage,
   conversationCloseReasonOptions,
-  conversationReportReasonOptions,
   getBuyerImageUploadStatusLabel,
   getConversationCloseReasonLabel,
-  getConversationReportStatusLabel,
-  getConversationReportStatusSummary,
   isConversationReadOnly,
   type ConversationCloseReasonCode,
-  type ConversationReportReasonCode,
 } from "../domain/conversations/conversations";
+import {
+  conversationModerationReportReasonOptions,
+  getModerationReportStatusLabel,
+  getModerationReportStatusSummary,
+  type ModerationReportReasonCode,
+} from "../domain/moderation/moderationReports";
 import { useCloseConversation } from "../hooks/conversations/useCloseConversation";
 import { useConversationMessages } from "../hooks/conversations/useConversationMessages";
 import { useRequestConversation } from "../hooks/conversations/useRequestConversation";
 import { useApproveBuyerImageUpload, useRequestBuyerImageUpload, useRevokeBuyerImageUpload } from '../hooks/conversations/useConversationImagePermissions';
-import { useReportConversation } from "../hooks/conversations/useReportConversation";
-import { useMyConversationReports } from "../hooks/conversations/useMyConversationReports";
+import { useSubmitModerationReport } from "../hooks/moderation/useSubmitModerationReport";
+import { useMyModerationReports } from "../hooks/moderation/useMyModerationReports";
+
 
 type RequestConversationThreadProps = {
   requestId: string;
@@ -170,7 +173,7 @@ const RequestConversationThread = ({
   } | null>(null);
 
   const [reportReasonCode, setReportReasonCode] =
-    useState<ConversationReportReasonCode | "">("");
+    useState<ModerationReportReasonCode | "">("");
 
   const [reportReasonDetails, setReportReasonDetails] = useState("");
   const [reportSubmitted, setReportSubmitted] = useState(false);
@@ -193,8 +196,9 @@ const RequestConversationThread = ({
   const requestBuyerImageUploadMutation = useRequestBuyerImageUpload();
   const approveBuyerImageUploadMutation = useApproveBuyerImageUpload();
   const revokeBuyerImageUploadMutation = useRevokeBuyerImageUpload();
-  const reportConversationMutation = useReportConversation();
-  const { data: myReports = [] } = useMyConversationReports(
+  const reportConversationMutation = useSubmitModerationReport();
+
+  const { data: myReports = [] } = useMyModerationReports(
     conversation?.id ?? null
   );
 
@@ -214,6 +218,36 @@ const RequestConversationThread = ({
     Boolean(reportReasonCode) &&
     !reportReasonDetailsError &&
     !reportConversationMutation.isPending;
+
+  const conversationReport =
+    myReports.find((report) => report.target_type === "conversation") ?? null;
+
+  const getMessageReport = (messageId: string) =>
+    myReports.find(
+      (report) =>
+        report.target_type === "conversation_message" &&
+        report.message_id === messageId
+    ) ?? null;
+
+  const hasReportedConversation = Boolean(conversationReport);
+
+  const hasReportedMessage = (messageId: string): boolean =>
+    Boolean(getMessageReport(messageId));
+
+  const getReportedConversationButtonText = () =>
+    conversationReport
+      ? `Conversation reported · ${getModerationReportStatusLabel(
+        conversationReport.status
+      )}`
+      : "Report conversation";
+
+  const getReportedMessageButtonText = (messageId: string) => {
+    const report = getMessageReport(messageId);
+
+    return report
+      ? `Message reported · ${getModerationReportStatusLabel(report.status)}`
+      : "Report message";
+  };
 
   const trimmedBody = body.trim();
   const isAdmin = viewer === "admin";
@@ -285,32 +319,6 @@ const RequestConversationThread = ({
     buyerImageUploadStatus === "requested"
       ? "Allow client images"
       : "Enable client images";
-
-  const conversationReport =
-    myReports.find((report) => report.message_id === null) ?? null;
-
-  const getMessageReport = (messageId: string) =>
-    myReports.find((report) => report.message_id === messageId) ?? null;
-
-  const hasReportedConversation = Boolean(conversationReport);
-
-  const hasReportedMessage = (messageId: string): boolean =>
-    Boolean(getMessageReport(messageId));
-
-  const getReportedConversationButtonText = () =>
-    conversationReport
-      ? `Conversation reported · ${getConversationReportStatusLabel(
-        conversationReport.status
-      )}`
-      : "Report conversation";
-
-  const getReportedMessageButtonText = (messageId: string) => {
-    const report = getMessageReport(messageId);
-
-    return report
-      ? `Message reported · ${getConversationReportStatusLabel(report.status)}`
-      : "Report message";
-  };
 
   const handleSubmitMessage = async () => {
     if (!canSubmit) return;
@@ -393,15 +401,13 @@ const RequestConversationThread = ({
     setReportReasonDetails("");
   };
 
-  const openMessageReport = (
-    messageId: string
-  ) => {
+  const openMessageReport = (messageId: string) => {
     if (hasReportedMessage(messageId)) return;
 
     setReportSubmitted(false);
     setReportTarget({
       type: "message",
-      messageId
+      messageId,
     });
     setReportReasonCode("");
     setReportReasonDetails("");
@@ -418,6 +424,10 @@ const RequestConversationThread = ({
 
     try {
       await reportConversationMutation.mutateAsync({
+        targetType:
+          reportTarget.type === "message"
+            ? "conversation_message"
+            : "conversation",
         conversationId: conversation.id,
         messageId: reportTarget.messageId,
         reasonCode: reportReasonCode,
@@ -643,6 +653,29 @@ const RequestConversationThread = ({
         </div>
       )}
 
+      {conversationReport && viewer !== "admin" && (
+        <div className={classes.reportStatusBox}>
+          <div className={classes.reportStatusTitle}>
+            Conversation report status
+          </div>
+
+          <div className={classes.reportStatusText}>
+            Status: {getModerationReportStatusLabel(conversationReport.status)}
+          </div>
+
+          <div className={classes.reportStatusText}>
+            {conversationReport.reporter_status_message ||
+              getModerationReportStatusSummary(conversationReport.status)}
+          </div>
+
+          {conversationReport.reporter_status_updated_at && (
+            <div className={classes.reportStatusText}>
+              Last update: {dateText(conversationReport.reporter_status_updated_at)}
+            </div>
+          )}
+        </div>
+      )}
+
       {areMessagesLoading ? (
         <div className={classes.loadingText}>Loading messages…</div>
       ) : messagesError ? (
@@ -760,13 +793,13 @@ const RequestConversationThread = ({
               value={reportReasonCode}
               onChange={(event) =>
                 setReportReasonCode(
-                  event.target.value as ConversationReportReasonCode | ""
+                  event.target.value as ModerationReportReasonCode | ""
                 )
               }
             >
               <option value="">Choose a reason</option>
 
-              {conversationReportReasonOptions.map((option) => (
+              {conversationModerationReportReasonOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -835,12 +868,12 @@ const RequestConversationThread = ({
           </div>
 
           <div className={classes.reportStatusText}>
-            Status: {getConversationReportStatusLabel(conversationReport.status)}
+            Status: {getModerationReportStatusLabel(conversationReport.status)}
           </div>
 
           <div className={classes.reportStatusText}>
             {conversationReport.reporter_status_message ||
-              getConversationReportStatusSummary(conversationReport.status)}
+              getModerationReportStatusSummary(conversationReport.status)}
           </div>
 
           {conversationReport.reporter_status_updated_at && (
