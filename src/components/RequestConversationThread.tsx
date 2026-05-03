@@ -108,7 +108,7 @@ const classes = {
   reportStatusBox:
     "rounded-2xl border border-rose-300 bg-rose-100/70 my-2 px-4 py-3 text-sm text-zinc-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
   reportStatusTitle: "font-extrabold text-zinc-900",
-  reportStatusText: "mt-1 text-sm text-zinc-700",
+  reportStatusText: "mt-1 text-sm font-semibold text-zinc-700",
 } as const;
 
 const dateText = (value: string) => {
@@ -735,7 +735,7 @@ const RequestConversationThread = ({
                   {messageReport && viewer !== "admin" && (
                     <div className={classes.reportStatusBox}>
                       <div className={classes.reportStatusTitle}>
-                        Message report status
+                        Message Report Status
                       </div>
 
                       <div className={classes.reportStatusText}>

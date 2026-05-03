@@ -2,6 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
 import type { ListingRequestSnapshot } from "../../lib/listings/listingRequestSnapshot";
 import type { ListingRequestStatus } from "../../domain/listings/listingRequests";
+import type {
+  BuyerImageUploadStatus,
+  ConversationStatus,
+} from "../../domain/conversations/conversations";
 
 export type AdminRequestProfile = {
   user_id: string;
@@ -23,10 +27,31 @@ export type AdminRequestRow = {
   updated_at: string;
 };
 
+export type AdminRequestConversation = {
+  id: string;
+  status: ConversationStatus;
+  last_message_at: string | null;
+  last_message_sender_user_id: string | null;
+  last_message_preview: string | null;
+  buyer_image_upload_status: BuyerImageUploadStatus;
+  updated_at: string;
+};
+
+type AdminRequestConversationRow = AdminRequestConversation & {
+  listing_requests: AdminRequestRow | AdminRequestRow[] | null;
+};
+
+type AdminRequestConversationItem = {
+  conversation: AdminRequestConversationRow;
+  request: AdminRequestRow;
+};
+
+
 export type AdminRequestItem = {
   request: AdminRequestRow;
   buyer: AdminRequestProfile | null;
   creator: AdminRequestProfile | null;
+  conversation: AdminRequestConversation;
 };
 
 export type AdminRequestsFilters = {
@@ -58,6 +83,13 @@ const emptyResult: AdminRequestsResult = {
   pageSize: 20,
   pageCount: 0,
 };
+
+const getConversationRequest = (
+  conversation: AdminRequestConversationRow
+): AdminRequestRow | null =>
+  Array.isArray(conversation.listing_requests)
+    ? conversation.listing_requests[0] ?? null
+    : conversation.listing_requests;
 
 // Normalises a handle search so admins can search with or without @
 const normaliseHandle = (value: string) => value.trim().replace(/^@+/, "");
@@ -98,6 +130,8 @@ const fetchMatchingProfileIds = async (
     .filter(Boolean);
 };
 
+// Loads admin request review rows from request-linked conversations.
+// This makes the admin request page sort by latest conversation activity.
 const fetchAdminRequests = async (
   input: UseAdminRequestsInput
 ): Promise<AdminRequestsResult> => {
@@ -110,80 +144,101 @@ const fetchAdminRequests = async (
 
   if (creatorUserIds && creatorUserIds.length === 0) {
     return {
-      items: [],
-      totalCount: 0,
+      ...emptyResult,
       page,
       pageSize,
-      pageCount: 0,
     };
   }
 
   if (buyerUserIds && buyerUserIds.length === 0) {
     return {
-      items: [],
-      totalCount: 0,
+      ...emptyResult,
       page,
       pageSize,
-      pageCount: 0,
     };
   }
 
   let query = supabase
-    .from("listing_requests")
+    .from("conversations")
     .select(
       `
         id,
-        listing_id,
-        buyer_user_id,
-        creator_user_id,
         status,
-        message,
-        creator_status_reason,
-        listing_snapshot,
-        created_at,
-        updated_at
+        last_message_at,
+        last_message_sender_user_id,
+        last_message_preview,
+        buyer_image_upload_status,
+        updated_at,
+        listing_requests!inner (
+          id,
+          listing_id,
+          buyer_user_id,
+          creator_user_id,
+          status,
+          message,
+          creator_status_reason,
+          listing_snapshot,
+          created_at,
+          updated_at
+        )
       `,
       { count: "exact" }
     )
-    .order("created_at", { ascending: false });
+    .eq("conversation_type", "listing_request")
+    .order("updated_at", { ascending: false });
 
   const createdFrom = toStartOfDayIso(filters.createdFrom);
   const createdTo = toEndOfDayIso(filters.createdTo);
 
   if (creatorUserIds) {
-    query = query.in("creator_user_id", creatorUserIds);
+    query = query.in("listing_requests.creator_user_id", creatorUserIds);
   }
 
   if (buyerUserIds) {
-    query = query.in("buyer_user_id", buyerUserIds);
+    query = query.in("listing_requests.buyer_user_id", buyerUserIds);
   }
 
   if (createdFrom) {
-    query = query.gte("created_at", createdFrom);
+    query = query.gte("listing_requests.created_at", createdFrom);
   }
 
   if (createdTo) {
-    query = query.lte("created_at", createdTo);
+    query = query.lte("listing_requests.created_at", createdTo);
   }
 
   if (filters.status !== "all") {
-    query = query.eq("status", filters.status);
+    query = query.eq("listing_requests.status", filters.status);
   }
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  const { data: requests, error: requestsError, count } = await query.range(from, to);
+  const {
+    data: conversations,
+    error: conversationsError,
+    count,
+  } = await query.range(from, to);
 
-  if (requestsError) {
-    throw requestsError;
+  if (conversationsError) {
+    throw conversationsError;
   }
 
-  const requestRows = (requests ?? []) as AdminRequestRow[];
+  const conversationRows =
+    (conversations ?? []) as unknown as AdminRequestConversationRow[];
+
+  const conversationItems = conversationRows
+    .map((conversation) => ({
+      conversation,
+      request: getConversationRequest(conversation),
+    }))
+    .filter(
+      (item): item is AdminRequestConversationItem => Boolean(item.request)
+    );
+
   const totalCount = count ?? 0;
   const pageCount = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 0;
 
-  if (requestRows.length === 0) {
+  if (conversationItems.length === 0) {
     return {
       items: [],
       totalCount,
@@ -195,9 +250,9 @@ const fetchAdminRequests = async (
 
   const userIds = Array.from(
     new Set(
-      requestRows.flatMap((request) => [
-        request.buyer_user_id,
-        request.creator_user_id,
+      conversationItems.flatMap((item) => [
+        item.request.buyer_user_id,
+        item.request.creator_user_id,
       ])
     )
   );
@@ -219,10 +274,19 @@ const fetchAdminRequests = async (
   ) as Record<string, AdminRequestProfile>;
 
   return {
-    items: requestRows.map((request) => ({
-      request,
-      buyer: profileByUserId[request.buyer_user_id] ?? null,
-      creator: profileByUserId[request.creator_user_id] ?? null,
+    items: conversationItems.map((item) => ({
+      request: item.request,
+      buyer: profileByUserId[item.request.buyer_user_id] ?? null,
+      creator: profileByUserId[item.request.creator_user_id] ?? null,
+      conversation: {
+        id: item.conversation.id,
+        status: item.conversation.status,
+        last_message_at: item.conversation.last_message_at,
+        last_message_sender_user_id: item.conversation.last_message_sender_user_id,
+        last_message_preview: item.conversation.last_message_preview,
+        buyer_image_upload_status: item.conversation.buyer_image_upload_status,
+        updated_at: item.conversation.updated_at,
+      },
     })),
     totalCount,
     page,

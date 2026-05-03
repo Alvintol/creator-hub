@@ -3,6 +3,10 @@ import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../providers/AuthProvider";
 import type { ListingRequestSnapshot } from "../../lib/listings/listingRequestSnapshot";
 import type { ListingRequestStatus } from "../../domain/listings/listingRequests";
+import type {
+  BuyerImageUploadStatus,
+  ConversationStatus,
+} from "../../domain/conversations/conversations";
 
 export type BuyerListingRequestRow = {
   id: string;
@@ -24,9 +28,29 @@ export type BuyerListingRequestProfile = {
   avatar_url: string | null;
 };
 
+export type BuyerListingRequestConversation = {
+  id: string;
+  status: ConversationStatus;
+  last_message_at: string | null;
+  last_message_sender_user_id: string | null;
+  last_message_preview: string | null;
+  buyer_image_upload_status: BuyerImageUploadStatus;
+  updated_at: string;
+};
+
+type BuyerListingRequestConversationRow = BuyerListingRequestConversation & {
+  listing_requests: BuyerListingRequestRow | BuyerListingRequestRow[] | null;
+};
+
+type BuyerListingRequestConversationItem = {
+  conversation: BuyerListingRequestConversationRow;
+  request: BuyerListingRequestRow;
+};
+
 export type BuyerListingRequestItem = {
   request: BuyerListingRequestRow;
   creator: BuyerListingRequestProfile | null;
+  conversation: BuyerListingRequestConversation;
 };
 
 export type BuyerListingRequestsResult = {
@@ -53,7 +77,17 @@ const emptyResult: BuyerListingRequestsResult = {
   archived: false,
 };
 
-// Loads a paginated buyer request inbox and joins creator profile data
+// Supabase can type nested joins as arrays even when our relationship is one-to-one.
+// This safely normalises the nested request into one row.
+const getConversationRequest = (
+  conversation: BuyerListingRequestConversationRow
+): BuyerListingRequestRow | null =>
+  Array.isArray(conversation.listing_requests)
+    ? conversation.listing_requests[0] ?? null
+    : conversation.listing_requests;
+
+// Loads a paginated client request inbox from request-linked conversations.
+// Conversation.updated_at drives inbox ordering, so new messages/activity move cards up.
 const fetchMyBuyerRequests = async (
   userId: string,
   input: UseMyBuyerRequestsInput
@@ -61,43 +95,68 @@ const fetchMyBuyerRequests = async (
   const { archived, page, pageSize = 12 } = input;
 
   let query = supabase
-    .from("listing_requests")
+    .from("conversations")
     .select(
       `
-        id,
-        listing_id,
-        buyer_user_id,
-        creator_user_id,
-        status,
-        message,
-        creator_status_reason,
-        listing_snapshot,
-        created_at,
-        updated_at
+      id,
+      status,
+      last_message_at,
+      last_message_sender_user_id,
+      last_message_preview,
+      buyer_image_upload_status,
+        updated_at,
+        listing_requests!inner (
+          id,
+          listing_id,
+          buyer_user_id,
+          creator_user_id,
+          status,
+          message,
+          creator_status_reason,
+          listing_snapshot,
+          created_at,
+          updated_at
+        )
       `,
       { count: "exact" }
     )
+    .eq("conversation_type", "listing_request")
     .eq("buyer_user_id", userId)
-    .order("created_at", { ascending: false });
+    .order("updated_at", { ascending: false });
 
   query = archived
-    ? query.eq("status", "archived")
-    : query.neq("status", "archived");
+    ? query.eq("listing_requests.status", "archived")
+    : query.neq("listing_requests.status", "archived");
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  const { data: requests, error: requestsError, count } = await query.range(from, to);
+  const {
+    data: conversations,
+    error: conversationsError,
+    count,
+  } = await query.range(from, to);
 
-  if (requestsError) {
-    throw requestsError;
+  if (conversationsError) {
+    throw conversationsError;
   }
 
-  const requestRows = (requests ?? []) as BuyerListingRequestRow[];
+  const conversationRows =
+    (conversations ?? []) as unknown as BuyerListingRequestConversationRow[];
+
+  const conversationItems = conversationRows
+    .map((conversation) => ({
+      conversation,
+      request: getConversationRequest(conversation),
+    }))
+    .filter(
+      (item): item is BuyerListingRequestConversationItem =>
+        Boolean(item.request)
+    );
   const totalCount = count ?? 0;
   const pageCount = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 0;
 
-  if (requestRows.length === 0) {
+  if (conversationItems.length === 0) {
     return {
       items: [],
       totalCount,
@@ -109,7 +168,11 @@ const fetchMyBuyerRequests = async (
   }
 
   const creatorIds = Array.from(
-    new Set(requestRows.map((request) => request.creator_user_id))
+    new Set(
+      conversationItems.map(
+        (item) => item.request.creator_user_id
+      )
+    )
   );
 
   const { data: profiles, error: profilesError } = await supabase
@@ -129,9 +192,18 @@ const fetchMyBuyerRequests = async (
   ) as Record<string, BuyerListingRequestProfile>;
 
   return {
-    items: requestRows.map((request) => ({
-      request,
-      creator: profileByUserId[request.creator_user_id] ?? null,
+    items: conversationItems.map((item) => ({
+      request: item.request,
+      creator: profileByUserId[item.request.creator_user_id] ?? null,
+      conversation: {
+        id: item.conversation.id,
+        status: item.conversation.status,
+        last_message_at: item.conversation.last_message_at,
+        last_message_sender_user_id: item.conversation.last_message_sender_user_id,
+        last_message_preview: item.conversation.last_message_preview,
+        buyer_image_upload_status: item.conversation.buyer_image_upload_status,
+        updated_at: item.conversation.updated_at,
+      },
     })),
     totalCount,
     page,
