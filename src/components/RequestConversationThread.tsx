@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   canSendConversationMessage,
   conversationCloseReasonOptions,
@@ -19,6 +19,7 @@ import { useRequestConversation } from "../hooks/conversations/useRequestConvers
 import { useApproveBuyerImageUpload, useRequestBuyerImageUpload, useRevokeBuyerImageUpload } from '../hooks/conversations/useConversationImagePermissions';
 import { useSubmitModerationReport } from "../hooks/moderation/useSubmitModerationReport";
 import { useMyModerationReports } from "../hooks/moderation/useMyModerationReports";
+import { useMarkConversationRead } from '../hooks/conversations/useMarkConversationRead';
 
 
 type RequestConversationThreadProps = {
@@ -197,6 +198,9 @@ const RequestConversationThread = ({
   const approveBuyerImageUploadMutation = useApproveBuyerImageUpload();
   const revokeBuyerImageUploadMutation = useRevokeBuyerImageUpload();
   const reportConversationMutation = useSubmitModerationReport();
+  const markConversationReadMutation = useMarkConversationRead();
+
+  const lastMarkedReadMessageAtRef = useRef<string | null>(null);
 
   const { data: myReports = [] } = useMyModerationReports(
     conversation?.id ?? null
@@ -262,6 +266,29 @@ const RequestConversationThread = ({
     isOtherCloseReason && closeReasonDetailsTrimmed.length < 10
       ? "Please give more detail"
       : null;
+
+  useEffect(() => {
+    if (!conversation || viewer === "admin" || !currentUserId) return;
+
+    const latestMessageAt = conversation.last_message_at;
+    const latestSenderUserId = conversation.last_message_sender_user_id;
+
+    if (!latestMessageAt || !latestSenderUserId) return;
+    if (latestSenderUserId === currentUserId) return;
+    if (lastMarkedReadMessageAtRef.current === latestMessageAt) return;
+    if (markConversationReadMutation.isPending) return;
+
+    lastMarkedReadMessageAtRef.current = latestMessageAt;
+
+    void markConversationReadMutation.mutateAsync({
+      conversationId: conversation.id,
+    });
+  }, [
+    conversation,
+    currentUserId,
+    markConversationReadMutation,
+    viewer,
+  ]);
 
   const canConfirmCloseConversation =
     Boolean(closeReasonCode) &&

@@ -36,6 +36,8 @@ export type BuyerListingRequestConversation = {
   last_message_preview: string | null;
   buyer_image_upload_status: BuyerImageUploadStatus;
   updated_at: string;
+  participant_last_read_at: string | null;
+  has_unread: boolean;
 };
 
 type BuyerListingRequestConversationRow = BuyerListingRequestConversation & {
@@ -153,6 +155,28 @@ const fetchMyBuyerRequests = async (
       (item): item is BuyerListingRequestConversationItem =>
         Boolean(item.request)
     );
+
+  const conversationIds = conversationItems.map((item) => item.conversation.id);
+
+  const { data: participants, error: participantsError } = await supabase
+    .from("conversation_participants")
+    .select("conversation_id, last_read_at")
+    .eq("user_id", userId)
+    .in("conversation_id", conversationIds);
+
+  if (participantsError) {
+    throw participantsError;
+  }
+
+  const participantByConversationId = Object.fromEntries(
+    ((participants ?? []) as Array<{
+      conversation_id: string;
+      last_read_at: string | null;
+    }>).map((participant) => [
+      participant.conversation_id,
+      participant,
+    ])
+  );
   const totalCount = count ?? 0;
   const pageCount = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 0;
 
@@ -192,19 +216,33 @@ const fetchMyBuyerRequests = async (
   ) as Record<string, BuyerListingRequestProfile>;
 
   return {
-    items: conversationItems.map((item) => ({
-      request: item.request,
-      creator: profileByUserId[item.request.creator_user_id] ?? null,
-      conversation: {
-        id: item.conversation.id,
-        status: item.conversation.status,
-        last_message_at: item.conversation.last_message_at,
-        last_message_sender_user_id: item.conversation.last_message_sender_user_id,
-        last_message_preview: item.conversation.last_message_preview,
-        buyer_image_upload_status: item.conversation.buyer_image_upload_status,
-        updated_at: item.conversation.updated_at,
-      },
-    })),
+    items: conversationItems.map((item) => {
+      const participant = participantByConversationId[item.conversation.id] ?? null;
+      const lastReadAt = participant?.last_read_at ?? null;
+      const latestMessageAt = item.conversation.last_message_at;
+      const latestSenderUserId = item.conversation.last_message_sender_user_id;
+
+      const hasUnread =
+        Boolean(latestMessageAt) &&
+        latestSenderUserId !== userId &&
+        (!lastReadAt || latestMessageAt! > lastReadAt);
+
+      return {
+        request: item.request,
+        creator: profileByUserId[item.request.creator_user_id] ?? null,
+        conversation: {
+          id: item.conversation.id,
+          status: item.conversation.status,
+          last_message_at: item.conversation.last_message_at,
+          last_message_sender_user_id: item.conversation.last_message_sender_user_id,
+          last_message_preview: item.conversation.last_message_preview,
+          buyer_image_upload_status: item.conversation.buyer_image_upload_status,
+          updated_at: item.conversation.updated_at,
+          participant_last_read_at: lastReadAt,
+          has_unread: hasUnread,
+        },
+      };
+    }),
     totalCount,
     page,
     pageSize,
