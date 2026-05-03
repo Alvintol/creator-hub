@@ -106,7 +106,7 @@ const classes = {
   successBox:
     "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
   reportStatusBox:
-    "rounded-2xl border border-zinc-300 bg-zinc-100/70 px-4 py-3 text-sm text-zinc-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
+    "rounded-2xl border border-rose-300 bg-rose-100/70 my-2 px-4 py-3 text-sm text-zinc-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
   reportStatusTitle: "font-extrabold text-zinc-900",
   reportStatusText: "mt-1 text-sm text-zinc-700",
 } as const;
@@ -653,29 +653,6 @@ const RequestConversationThread = ({
         </div>
       )}
 
-      {conversationReport && viewer !== "admin" && (
-        <div className={classes.reportStatusBox}>
-          <div className={classes.reportStatusTitle}>
-            Conversation report status
-          </div>
-
-          <div className={classes.reportStatusText}>
-            Status: {getModerationReportStatusLabel(conversationReport.status)}
-          </div>
-
-          <div className={classes.reportStatusText}>
-            {conversationReport.reporter_status_message ||
-              getModerationReportStatusSummary(conversationReport.status)}
-          </div>
-
-          {conversationReport.reporter_status_updated_at && (
-            <div className={classes.reportStatusText}>
-              Last update: {dateText(conversationReport.reporter_status_updated_at)}
-            </div>
-          )}
-        </div>
-      )}
-
       {areMessagesLoading ? (
         <div className={classes.loadingText}>Loading messages…</div>
       ) : messagesError ? (
@@ -687,6 +664,7 @@ const RequestConversationThread = ({
           {messages.map((message) => {
             const isSystemMessage = message.message_type === "system";
             const isOwnMessage = message.sender_user_id === currentUserId;
+            const messageReport = getMessageReport(message.id);
 
             const rowClassName = `${classes.messageRow} ${isSystemMessage
               ? classes.messageRowSystem
@@ -751,6 +729,29 @@ const RequestConversationThread = ({
                       >
                         {getReportedMessageButtonText(message.id)}
                       </button>
+                    </div>
+                  )}
+
+                  {messageReport && viewer !== "admin" && (
+                    <div className={classes.reportStatusBox}>
+                      <div className={classes.reportStatusTitle}>
+                        Message report status
+                      </div>
+
+                      <div className={classes.reportStatusText}>
+                        Status: {getModerationReportStatusLabel(messageReport.status)}
+                      </div>
+
+                      <div className={classes.reportStatusText}>
+                        {messageReport.reporter_status_message ||
+                          getModerationReportStatusSummary(messageReport.status)}
+                      </div>
+
+                      {messageReport.reporter_status_updated_at && (
+                        <div className={classes.reportStatusText}>
+                          Last update: {dateText(messageReport.reporter_status_updated_at)}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
