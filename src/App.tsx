@@ -38,6 +38,8 @@ import BuyerRequestDetails from './pages/buyer/BuyerRequestDetails';
 import BuyerRequests from './pages/buyer/BuyerRequests';
 import AdminRequestDetails from './pages/admin/AdminRequestDetails';
 import AdminRequests from './pages/admin/AdminRequests';
+import AdminModerationReportDetails from './pages/admin/AdminModerationReportDetails';
+import AdminModerationReports from './pages/admin/AdminModerationReports';
 
 const App = () => {
   return (
@@ -83,6 +85,8 @@ const App = () => {
             />
             <Route path="/admin/requests" element={<AdminRequests />} />
             <Route path="/admin/requests/:id" element={<AdminRequestDetails />} />
+            <Route path="/admin/reports" element={<AdminModerationReports />} />
+            <Route path="/admin/reports/:id" element={<AdminModerationReportDetails />} />
           </Route>
 
           <Route element={<RequireCreatorAccess />}>

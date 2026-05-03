@@ -1,23 +1,29 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../providers/AuthProvider";
-import type { ConversationReportReasonCode } from "../../domain/conversations/conversations";
+import type {
+  ModerationReportReasonCode,
+  ModerationReportTargetType,
+} from "../../domain/moderation/moderationReports";
 
-type ReportConversationInput = {
-  conversationId: string;
+type SubmitModerationReportInput = {
+  targetType: ModerationReportTargetType;
+  conversationId?: string | null;
   messageId?: string | null;
-  reasonCode: ConversationReportReasonCode;
+  listingId?: string | null;
+  profileUserId?: string | null;
+  reasonCode: ModerationReportReasonCode;
   reasonDetails?: string;
 };
 
 const normaliseDetails = (value?: string) => value?.trim() ?? "";
 
-export const useReportConversation = () => {
+export const useSubmitModerationReport = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (input: ReportConversationInput) => {
+    mutationFn: async (input: SubmitModerationReportInput) => {
       if (!user?.id) {
         throw new Error("You must be signed in to submit a report.");
       }
@@ -38,15 +44,15 @@ export const useReportConversation = () => {
         throw new Error("Additional details must be 1000 characters or less.");
       }
 
-      const { data, error } = await supabase.rpc(
-        "submit_conversation_report",
-        {
-          p_conversation_id: input.conversationId,
-          p_message_id: input.messageId ?? null,
-          p_reason_code: input.reasonCode,
-          p_reason_details: details || null,
-        }
-      );
+      const { data, error } = await supabase.rpc("submit_moderation_report", {
+        p_target_type: input.targetType,
+        p_conversation_id: input.conversationId ?? null,
+        p_message_id: input.messageId ?? null,
+        p_listing_id: input.listingId ?? null,
+        p_profile_user_id: input.profileUserId ?? null,
+        p_reason_code: input.reasonCode,
+        p_reason_details: details || null,
+      });
 
       if (error) {
         throw error;
@@ -62,13 +68,13 @@ export const useReportConversation = () => {
     onSuccess: async (_data, input) => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["conversationReports"],
+          queryKey: ["moderationReports"],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["myConversationReports", input.conversationId],
+          queryKey: ["myModerationReports", input.conversationId],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["adminRequests"],
+          queryKey: ["adminModerationReports"],
         }),
       ]);
     },

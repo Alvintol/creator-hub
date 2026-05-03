@@ -53,6 +53,46 @@ export type ConversationReportResolutionCode =
   | "duplicate_report"
   | "other";
 
+export const conversationReportStatusOptions: Array<{
+  value: ConversationReportStatus;
+  label: string;
+}> = [
+    { value: "submitted", label: "Submitted" },
+    { value: "reviewing", label: "Under review" },
+    { value: "needs_more_info", label: "Needs more info" },
+    { value: "action_taken", label: "Action taken" },
+    { value: "resolved", label: "Resolved" },
+    { value: "dismissed", label: "Dismissed" },
+  ];
+
+export const conversationReportResolutionOptions: Array<{
+  value: ConversationReportResolutionCode;
+  label: string;
+}> = [
+    { value: "warning_issued", label: "Warning issued" },
+    { value: "content_removed", label: "Content removed" },
+    { value: "conversation_locked", label: "Conversation locked" },
+    { value: "account_restricted", label: "Account restricted" },
+    { value: "no_violation_found", label: "No violation found" },
+    { value: "insufficient_information", label: "Insufficient information" },
+    { value: "duplicate_report", label: "Duplicate report" },
+    { value: "other", label: "Other" },
+  ];
+
+export const getConversationReportReasonLabel = (
+  reasonCode: ConversationReportReasonCode
+): string =>
+  conversationReportReasonOptions.find((option) => option.value === reasonCode)
+    ?.label ?? "Unknown reason";
+
+export const getConversationReportResolutionLabel = (
+  resolutionCode: ConversationReportResolutionCode | null
+): string =>
+  resolutionCode
+    ? conversationReportResolutionOptions.find(
+      (option) => option.value === resolutionCode
+    )?.label ?? "Unknown resolution"
+    : "No resolution selected";
 export const getConversationReportStatusLabel = (
   status: ConversationReportStatus
 ): string =>

@@ -147,6 +147,22 @@ const AdminDashboard = () => {
             </Link>
           </div>
         </div>
+
+        <div className={classes.toolCard}>
+          <h2 className={classes.toolTitle}>Reports and moderation</h2>
+
+          <p className={classes.toolText}>
+            Review reports across conversations, messages, listings, and profiles,
+            then track status updates for reporter visibility.
+          </p>
+
+          <div className={classes.row}>
+            <Link className={classes.btnPrimary} to="/admin/reports">
+              Review reports
+            </Link>
+          </div>
+        </div>
+        
       </div>
     </div>
   );

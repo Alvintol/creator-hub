@@ -51,6 +51,10 @@ const classes = {
   errorCard:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
   pagerText: "text-sm text-zinc-600",
+
+  unreadPill:
+    "inline-flex rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-800",
+  titleRow: "flex flex-wrap items-start justify-between gap-3",
 } as const;
 
 const pageSize = 12;
@@ -174,9 +178,15 @@ const CreatorRequests = (props: CreatorRequestsProps) => {
           <div className={classes.grid}>
             {items.map((item) => (
               <div key={item.request.id} className={classes.card}>
-                <h2 className={classes.title}>
-                  {item.request.listing_snapshot.title}
-                </h2>
+                <div className={classes.titleRow}>
+                  <h2 className={classes.title}>
+                    {item.request.listing_snapshot.title}
+                  </h2>
+
+                  {item.conversation.has_unread && (
+                    <span className={classes.unreadPill}>New message</span>
+                  )}
+                </div>
 
                 <p className={classes.text}>
                   Buyer: {buyerText(item.buyer, item.request.buyer_user_id)}
