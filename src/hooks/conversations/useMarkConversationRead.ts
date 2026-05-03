@@ -32,6 +32,9 @@ export const useMarkConversationRead = () => {
         queryClient.invalidateQueries({
           queryKey: ["requestConversation"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["conversationParticipants"],
+        }),
       ]);
     },
   });

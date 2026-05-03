@@ -20,6 +20,7 @@ import { useApproveBuyerImageUpload, useRequestBuyerImageUpload, useRevokeBuyerI
 import { useSubmitModerationReport } from "../hooks/moderation/useSubmitModerationReport";
 import { useMyModerationReports } from "../hooks/moderation/useMyModerationReports";
 import { useMarkConversationRead } from '../hooks/conversations/useMarkConversationRead';
+import { useConversationParticipants } from '../hooks/conversations/useConversationParticipants';
 
 
 type RequestConversationThreadProps = {
@@ -110,6 +111,10 @@ const classes = {
     "rounded-2xl border border-rose-300 bg-rose-100/70 my-2 px-4 py-3 text-sm text-zinc-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
   reportStatusTitle: "font-extrabold text-zinc-900",
   reportStatusText: "mt-1 text-sm font-semibold text-zinc-700",
+  readReceipt:
+    "mt-1 text-right text-xs font-semibold text-zinc-500",
+  readReceiptOther:
+    "mt-1 text-left text-xs font-semibold text-zinc-500",
 } as const;
 
 const dateText = (value: string) => {
@@ -206,6 +211,10 @@ const RequestConversationThread = ({
     conversation?.id ?? null
   );
 
+  const { data: participants = [] } = useConversationParticipants(
+    conversation?.id ?? null
+  );
+
   const reportReasonDetailsTrimmed = reportReasonDetails.trim();
   const isOtherReportReason = reportReasonCode === "other";
 
@@ -266,6 +275,48 @@ const RequestConversationThread = ({
     isOtherCloseReason && closeReasonDetailsTrimmed.length < 10
       ? "Please give more detail"
       : null;
+
+  const otherParticipantUserId =
+    viewer === "buyer"
+      ? creatorUserId
+      : viewer === "creator"
+        ? buyerUserId
+        : null;
+
+  const otherParticipantLabel =
+    viewer === "buyer"
+      ? "Creator"
+      : viewer === "creator"
+        ? "Client"
+        : null;
+
+  const otherParticipantLastReadAt =
+    otherParticipantUserId
+      ? participants.find(
+        (participant) => participant.user_id === otherParticipantUserId
+      )?.last_read_at ?? null
+      : null;
+
+  const hasOtherParticipantReadMessage = (messageCreatedAt: string): boolean => {
+    if (!otherParticipantLastReadAt) return false;
+
+    const readAtTime = new Date(otherParticipantLastReadAt).getTime();
+    const messageTime = new Date(messageCreatedAt).getTime();
+
+    if (Number.isNaN(readAtTime) || Number.isNaN(messageTime)) return false;
+
+    return readAtTime >= messageTime;
+  };
+
+  const latestReadOwnMessageId =
+    [...messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.message_type !== "system" &&
+          message.sender_user_id === currentUserId &&
+          hasOtherParticipantReadMessage(message.created_at)
+      )?.id ?? null;
 
   useEffect(() => {
     if (!conversation || viewer === "admin" || !currentUserId) return;
@@ -743,6 +794,15 @@ const RequestConversationThread = ({
                   )}
 
                   <div className={classes.messageBody}>{message.body}</div>
+
+                  {message.id === latestReadOwnMessageId &&
+                    otherParticipantLabel &&
+                    otherParticipantLastReadAt && (
+                      <div className={classes.readReceipt}>
+                        Read by {otherParticipantLabel} · {dateText(otherParticipantLastReadAt)}
+                      </div>
+                    )}
+
                   {!isSystemMessage && viewer !== "admin" && message.sender_user_id !== currentUserId && (
                     <div className={classes.messageActions}>
                       <button
