@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   canSendConversationMessage,
+  getBuyerImageUploadStatusLabel,
   getConversationInitiationReasonLabel,
   isConversationReadOnly,
 } from "../../domain/conversations/conversations";
@@ -12,6 +13,7 @@ import { useMarkConversationRead } from "../../hooks/conversations/useMarkConver
 import { conversationModerationReportReasonOptions, getModerationReportStatusLabel, getModerationReportStatusSummary, ModerationReportReasonCode } from '../../domain/moderation/moderationReports';
 import { useMyModerationReports } from '../../hooks/moderation/useMyModerationReports';
 import { useSubmitModerationReport } from '../../hooks/moderation/useSubmitModerationReport';
+import { useApproveBuyerImageUpload, useRequestBuyerImageUpload, useRevokeBuyerImageUpload } from '../../hooks/conversations/useConversationImagePermissions';
 
 const classes = {
   page: "space-y-6",
@@ -85,6 +87,15 @@ const classes = {
   reportStatusText: "mt-1 text-sm font-semibold text-zinc-700",
   successBox:
     "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
+  chatUtilityBar:
+    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700",
+  chatUtilityHeader:
+    "flex flex-wrap items-center justify-between gap-3",
+  chatUtilityTitle: "text-sm font-extrabold text-zinc-900",
+  chatUtilityText: "mt-1 text-sm text-zinc-600",
+  chatUtilityActions: "flex flex-wrap items-center gap-2",
+  chatUtilityButton:
+    "inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60",
 } as const;
 
 const dateText = (value: string) => {
@@ -113,6 +124,8 @@ const profileText = (
 const MessageDetails = () => {
   const { id } = useParams<{ id: string }>();
   const [body, setBody] = useState("");
+  const [showImageRequestForm, setShowImageRequestForm] = useState(false);
+  const [imageRequestNote, setImageRequestNote] = useState("");
   const [reportTarget, setReportTarget] = useState<{
     type: "conversation" | "message";
     messageId: string | null;
@@ -124,6 +137,9 @@ const MessageDetails = () => {
   const [reportReasonDetails, setReportReasonDetails] = useState("");
   const [reportSubmitted, setReportSubmitted] = useState(false);
 
+  const requestBuyerImageUploadMutation = useRequestBuyerImageUpload();
+  const approveBuyerImageUploadMutation = useApproveBuyerImageUpload();
+  const revokeBuyerImageUploadMutation = useRevokeBuyerImageUpload();
   const {
     data,
     isLoading: isConversationLoading,
@@ -159,6 +175,52 @@ const MessageDetails = () => {
 
   const readOnly =
     !conversation || isConversationReadOnly(conversation.status);
+
+  const viewerRole =
+    conversation && currentUserId === conversation.buyer_user_id
+      ? "buyer"
+      : conversation && currentUserId === conversation.creator_user_id
+        ? "creator"
+        : null;
+
+  const imageRequestNoteTrimmed = imageRequestNote.trim();
+
+  const imageRequestNoteError =
+    imageRequestNoteTrimmed.length > 1000
+      ? "Request note must be 1000 characters or less."
+      : null;
+
+  const isImageActionPending =
+    requestBuyerImageUploadMutation.isPending ||
+    approveBuyerImageUploadMutation.isPending ||
+    revokeBuyerImageUploadMutation.isPending;
+
+  const buyerImageUploadStatus =
+    conversation?.buyer_image_upload_status ?? "blocked";
+
+  const canRequestImageUpload =
+    Boolean(conversation) &&
+    viewerRole === "buyer" &&
+    !readOnly &&
+    (buyerImageUploadStatus === "blocked" ||
+      buyerImageUploadStatus === "revoked");
+
+  const canApproveImageUpload =
+    Boolean(conversation) &&
+    viewerRole === "creator" &&
+    !readOnly &&
+    buyerImageUploadStatus !== "approved";
+
+  const canRevokeImageUpload =
+    Boolean(conversation) &&
+    viewerRole === "creator" &&
+    !readOnly &&
+    buyerImageUploadStatus === "approved";
+
+  const approveImageUploadButtonText =
+    buyerImageUploadStatus === "requested"
+      ? "Allow client images"
+      : "Enable client images";
 
   const otherParticipantUserId =
     conversation && currentUserId === conversation.buyer_user_id
@@ -277,6 +339,46 @@ const MessageDetails = () => {
     setReportTarget(null);
     setReportReasonCode("");
     setReportReasonDetails("");
+  };
+
+  const handleRequestImageUpload = async () => {
+    if (!conversation || imageRequestNoteError) return;
+
+    try {
+      await requestBuyerImageUploadMutation.mutateAsync({
+        conversationId: conversation.id,
+        requestNote: imageRequestNoteTrimmed,
+      });
+
+      setShowImageRequestForm(false);
+      setImageRequestNote("");
+    } catch {
+      // Error is surfaced below
+    }
+  };
+
+  const handleApproveImageUpload = async () => {
+    if (!conversation) return;
+
+    try {
+      await approveBuyerImageUploadMutation.mutateAsync({
+        conversationId: conversation.id,
+      });
+    } catch {
+      // Error is surfaced below
+    }
+  };
+
+  const handleRevokeImageUpload = async () => {
+    if (!conversation) return;
+
+    try {
+      await revokeBuyerImageUploadMutation.mutateAsync({
+        conversationId: conversation.id,
+      });
+    } catch {
+      // Error is surfaced below
+    }
   };
 
   const handleSubmitReport = async () => {
@@ -659,6 +761,111 @@ const MessageDetails = () => {
 
         {!readOnly && (
           <div className={classes.form}>
+            <div className={classes.chatUtilityBar}>
+              <div className={classes.chatUtilityHeader}>
+                <div>
+                  <div className={classes.chatUtilityTitle}>Image sharing</div>
+
+                  <div className={classes.chatUtilityText}>
+                    {getBuyerImageUploadStatusLabel(conversation.buyer_image_upload_status)}
+                  </div>
+
+                  {conversation.buyer_image_upload_status === "requested" &&
+                    conversation.buyer_image_upload_request_note && (
+                      <div className={classes.chatUtilityText}>
+                        Client note: {conversation.buyer_image_upload_request_note}
+                      </div>
+                    )}
+                </div>
+
+                <div className={classes.chatUtilityActions}>
+                  {canRequestImageUpload && (
+                    <button
+                      className={classes.chatUtilityButton}
+                      type="button"
+                      onClick={() => setShowImageRequestForm((current) => !current)}
+                      disabled={isImageActionPending}
+                    >
+                      {showImageRequestForm ? "Cancel image request" : "Request images"}
+                    </button>
+                  )}
+
+                  {canApproveImageUpload && (
+                    <button
+                      className={classes.chatUtilityButton}
+                      type="button"
+                      onClick={() => void handleApproveImageUpload()}
+                      disabled={isImageActionPending}
+                    >
+                      {approveBuyerImageUploadMutation.isPending
+                        ? "Allowing…"
+                        : approveImageUploadButtonText}
+                    </button>
+                  )}
+
+                  {canRevokeImageUpload && (
+                    <button
+                      className={classes.chatUtilityButton}
+                      type="button"
+                      onClick={() => void handleRevokeImageUpload()}
+                      disabled={isImageActionPending}
+                    >
+                      {revokeBuyerImageUploadMutation.isPending
+                        ? "Disabling…"
+                        : "Disable images"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {(requestBuyerImageUploadMutation.error ||
+                approveBuyerImageUploadMutation.error ||
+                revokeBuyerImageUploadMutation.error) && (
+                  <div className={classes.errorBox}>
+                    Image sharing permissions could not be updated right now.
+                  </div>
+                )}
+
+              {showImageRequestForm && canRequestImageUpload && (
+                <div className={classes.form}>
+                  <div className={classes.field}>
+                    <label className={classes.label} htmlFor="imageRequestNote">
+                      Why do you need to send images?
+                    </label>
+
+                    <textarea
+                      id="imageRequestNote"
+                      className={classes.textarea}
+                      value={imageRequestNote}
+                      onChange={(event) => setImageRequestNote(event.target.value)}
+                      placeholder="Optional. Explain what kind of reference images you want to send."
+                      maxLength={1000}
+                    />
+
+                    <div className={classes.hint}>
+                      {imageRequestNoteTrimmed.length}/1000 characters.
+                    </div>
+
+                    {imageRequestNoteError && (
+                      <div className={classes.errorBox}>{imageRequestNoteError}</div>
+                    )}
+                  </div>
+
+                  <div className={classes.row}>
+                    <button
+                      className={classes.btnPrimary}
+                      type="button"
+                      onClick={() => void handleRequestImageUpload()}
+                      disabled={Boolean(imageRequestNoteError) || isImageActionPending}
+                    >
+                      {requestBuyerImageUploadMutation.isPending
+                        ? "Sending request…"
+                        : "Send image request"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <textarea
               className={classes.textarea}
               value={body}

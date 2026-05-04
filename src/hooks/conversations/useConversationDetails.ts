@@ -37,6 +37,8 @@ export type ConversationDetailsRow = {
   last_message_preview: string | null;
   updated_at: string;
   created_at: string;
+  buyer_image_upload_status: "blocked" | "requested" | "approved" | "revoked";
+  buyer_image_upload_request_note: string | null;
 };
 
 export type ConversationDetailsResult = {
@@ -75,7 +77,9 @@ const fetchConversationDetails = async (
       last_message_sender_user_id,
       last_message_preview,
       updated_at,
-      created_at
+      created_at,
+      buyer_image_upload_status,
+      buyer_image_upload_request_note
     `)
     .eq("id", conversationId)
     .maybeSingle();
@@ -101,10 +105,10 @@ const fetchConversationDetails = async (
         ]),
       conversationRow.listing_id
         ? supabase
-            .from("listings")
-            .select("id, title, preview_url")
-            .eq("id", conversationRow.listing_id)
-            .maybeSingle()
+          .from("listings")
+          .select("id, title, preview_url")
+          .eq("id", conversationRow.listing_id)
+          .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
     ]);
 

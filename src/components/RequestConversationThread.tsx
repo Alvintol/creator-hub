@@ -115,6 +115,15 @@ const classes = {
     "mt-1 text-right text-xs font-semibold text-zinc-500",
   readReceiptOther:
     "mt-1 text-left text-xs font-semibold text-zinc-500",
+  chatUtilityBar:
+    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700",
+  chatUtilityHeader:
+    "flex flex-wrap items-center justify-between gap-3",
+  chatUtilityTitle: "text-sm font-extrabold text-zinc-900",
+  chatUtilityText: "mt-1 text-sm text-zinc-600",
+  chatUtilityActions: "flex flex-wrap items-center gap-2",
+  chatUtilityButton:
+    "inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60",
 } as const;
 
 const dateText = (value: string) => {
@@ -588,136 +597,6 @@ const RequestConversationThread = ({
         </div>
       )}
 
-      <div className={classes.imagePermissionBox}>
-        <div className={classes.imagePermissionTitle}>
-          Image sharing
-        </div>
-
-        <div className={classes.imagePermissionText}>
-          {getBuyerImageUploadStatusLabel(conversation.buyer_image_upload_status)}
-        </div>
-
-        {conversation.buyer_image_upload_status === "blocked" && (
-          <div className={classes.imagePermissionText}>
-            Clients cannot send images in this conversation unless the creator allows it.
-          </div>
-        )}
-
-        {conversation.buyer_image_upload_status === "requested" && (
-          <div className={classes.imagePermissionText}>
-            The client has requested permission to send images.
-            {conversation.buyer_image_upload_request_note
-              ? ` Note: ${conversation.buyer_image_upload_request_note}`
-              : ""}
-          </div>
-        )}
-
-        {conversation.buyer_image_upload_status === "approved" && (
-          <div className={classes.imagePermissionText}>
-            The creator has allowed the client to send images when uploads are added later.
-          </div>
-        )}
-
-        {conversation.buyer_image_upload_status === "revoked" && (
-          <div className={classes.imagePermissionText}>
-            The creator has disabled client image sharing for this conversation.
-          </div>
-        )}
-
-        {(requestBuyerImageUploadMutation.error ||
-          approveBuyerImageUploadMutation.error ||
-          revokeBuyerImageUploadMutation.error) && (
-            <div className={classes.errorBox}>
-              Image sharing permissions could not be updated right now.
-            </div>
-          )}
-
-        {canRequestImageUpload && (
-          <div className={classes.imagePermissionActions}>
-            <button
-              className={classes.btnOutline}
-              type="button"
-              onClick={() => setShowImageRequestForm((current) => !current)}
-              disabled={isImageActionPending}
-            >
-              {showImageRequestForm
-                ? "Cancel image request"
-                : "Request image sharing"}
-            </button>
-          </div>
-        )}
-
-        {showImageRequestForm && canRequestImageUpload && (
-          <div className={classes.form}>
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="imageRequestNote">
-                Why do you need to send images?
-              </label>
-
-              <textarea
-                id="imageRequestNote"
-                className={classes.textarea}
-                value={imageRequestNote}
-                onChange={(event) => setImageRequestNote(event.target.value)}
-                placeholder="Optional. Explain what kind of reference images you want to send."
-                maxLength={1000}
-              />
-
-              <div className={classes.hint}>
-                {imageRequestNoteTrimmed.length}/1000 characters.
-              </div>
-
-              {imageRequestNoteError && (
-                <div className={classes.errorBox}>{imageRequestNoteError}</div>
-              )}
-            </div>
-
-            <div className={classes.row}>
-              <button
-                className={classes.btnPrimary}
-                type="button"
-                onClick={() => void handleRequestImageUpload()}
-                disabled={Boolean(imageRequestNoteError) || isImageActionPending}
-              >
-                {requestBuyerImageUploadMutation.isPending
-                  ? "Sending request…"
-                  : "Send image request"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {canApproveImageUpload && (
-          <div className={classes.imagePermissionActions}>
-            <button
-              className={classes.btnPrimary}
-              type="button"
-              onClick={() => void handleApproveImageUpload()}
-              disabled={isImageActionPending}
-            >
-              {approveBuyerImageUploadMutation.isPending
-                ? "Allowing images…"
-                : approveImageUploadButtonText}
-            </button>
-          </div>
-        )}
-
-        {canRevokeImageUpload && (
-          <div className={classes.imagePermissionActions}>
-            <button
-              className={classes.btnDanger}
-              type="button"
-              onClick={() => void handleRevokeImageUpload()}
-              disabled={isImageActionPending}
-            >
-              {revokeBuyerImageUploadMutation.isPending
-                ? "Disabling images…"
-                : "Disable client images"}
-            </button>
-          </div>
-        )}
-      </div>
-
       {viewer !== "admin" && (
         <div className={classes.row}>
           <button
@@ -987,6 +866,111 @@ const RequestConversationThread = ({
 
       {!readOnly && (
         <div className={classes.form}>
+          <div className={classes.chatUtilityBar}>
+            <div className={classes.chatUtilityHeader}>
+              <div>
+                <div className={classes.chatUtilityTitle}>Image sharing</div>
+
+                <div className={classes.chatUtilityText}>
+                  {getBuyerImageUploadStatusLabel(conversation.buyer_image_upload_status)}
+                </div>
+
+                {conversation.buyer_image_upload_status === "requested" &&
+                  conversation.buyer_image_upload_request_note && (
+                    <div className={classes.chatUtilityText}>
+                      Client note: {conversation.buyer_image_upload_request_note}
+                    </div>
+                  )}
+              </div>
+
+              <div className={classes.chatUtilityActions}>
+                {canRequestImageUpload && (
+                  <button
+                    className={classes.chatUtilityButton}
+                    type="button"
+                    onClick={() => setShowImageRequestForm((current) => !current)}
+                    disabled={isImageActionPending}
+                  >
+                    {showImageRequestForm ? "Cancel image request" : "Request images"}
+                  </button>
+                )}
+
+                {canApproveImageUpload && (
+                  <button
+                    className={classes.chatUtilityButton}
+                    type="button"
+                    onClick={() => void handleApproveImageUpload()}
+                    disabled={isImageActionPending}
+                  >
+                    {approveBuyerImageUploadMutation.isPending
+                      ? "Allowing…"
+                      : approveImageUploadButtonText}
+                  </button>
+                )}
+
+                {canRevokeImageUpload && (
+                  <button
+                    className={classes.chatUtilityButton}
+                    type="button"
+                    onClick={() => void handleRevokeImageUpload()}
+                    disabled={isImageActionPending}
+                  >
+                    {revokeBuyerImageUploadMutation.isPending
+                      ? "Disabling…"
+                      : "Disable images"}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {(requestBuyerImageUploadMutation.error ||
+              approveBuyerImageUploadMutation.error ||
+              revokeBuyerImageUploadMutation.error) && (
+                <div className={classes.errorBox}>
+                  Image sharing permissions could not be updated right now.
+                </div>
+              )}
+
+            {showImageRequestForm && canRequestImageUpload && (
+              <div className={classes.form}>
+                <div className={classes.field}>
+                  <label className={classes.label} htmlFor="imageRequestNote">
+                    Why do you need to send images?
+                  </label>
+
+                  <textarea
+                    id="imageRequestNote"
+                    className={classes.textarea}
+                    value={imageRequestNote}
+                    onChange={(event) => setImageRequestNote(event.target.value)}
+                    placeholder="Optional. Explain what kind of reference images you want to send."
+                    maxLength={1000}
+                  />
+
+                  <div className={classes.hint}>
+                    {imageRequestNoteTrimmed.length}/1000 characters.
+                  </div>
+
+                  {imageRequestNoteError && (
+                    <div className={classes.errorBox}>{imageRequestNoteError}</div>
+                  )}
+                </div>
+
+                <div className={classes.row}>
+                  <button
+                    className={classes.btnPrimary}
+                    type="button"
+                    onClick={() => void handleRequestImageUpload()}
+                    disabled={Boolean(imageRequestNoteError) || isImageActionPending}
+                  >
+                    {requestBuyerImageUploadMutation.isPending
+                      ? "Sending request…"
+                      : "Send image request"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
           <textarea
             className={classes.textarea}
             value={body}
