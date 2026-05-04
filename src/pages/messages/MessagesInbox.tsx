@@ -38,6 +38,9 @@ const classes = {
   loadingText: "text-sm text-zinc-600",
   errorCard:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+  summaryBox:
+    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700",
+  summaryStrong: "font-extrabold text-zinc-900",
 } as const;
 
 const dateTimeText = (value: string | null) => {
@@ -48,12 +51,12 @@ const dateTimeText = (value: string | null) => {
   return Number.isNaN(date.getTime())
     ? value
     : date.toLocaleString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      });
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
 };
 
 const profileText = (
@@ -66,7 +69,11 @@ const profileText = (
 ) => (profile?.handle ? `@${profile.handle}` : profile?.display_name ?? fallback);
 
 const conversationTypeText = (value: string) =>
-  value === "listing_inquiry" ? "Listing inquiry" : "Creator inquiry";
+  value === "listing_request"
+    ? "Request conversation"
+    : value === "listing_inquiry"
+      ? "Listing inquiry"
+      : "Creator inquiry";
 
 const conversationStatusText = (status: string) =>
   status === "open" ? "Open" : status === "closed" ? "Ended" : "Admin locked";
@@ -84,10 +91,26 @@ const latestSenderText = (
         ? "Creator"
         : "System";
 
+const getConversationHref = (item: {
+  viewerRole: "buyer" | "creator";
+  conversation: {
+    id: string;
+    conversation_type: string;
+    listing_request_id: string | null;
+  };
+}) =>
+  item.conversation.conversation_type === "listing_request" &&
+    item.conversation.listing_request_id
+    ? item.viewerRole === "creator"
+      ? `/creator/requests/${item.conversation.listing_request_id}`
+      : `/requests/${item.conversation.listing_request_id}`
+    : `/messages/${item.conversation.id}`;
+
 const MessagesInbox = () => {
   const { data, isLoading, error } = useMessagesInbox();
 
   const items = data?.items ?? [];
+  const totalUnreadCount = data?.totalUnreadCount ?? 0;
 
   return (
     <div className={classes.page}>
@@ -95,9 +118,20 @@ const MessagesInbox = () => {
         <h1 className={classes.h1}>Messages</h1>
 
         <p className={classes.sub}>
-          Listing and creator inquiries before a formal request is submitted.
+          Messages, listing inquiries, creator inquiries, and request conversations.
         </p>
       </div>
+
+      {!isLoading && !error && (
+        <div className={classes.summaryBox}>
+          <span className={classes.summaryStrong}>
+            {totalUnreadCount}
+          </span>{" "}
+          unread {totalUnreadCount === 1 ? "message" : "messages"} across{" "}
+          <span className={classes.summaryStrong}>{items.length}</span>{" "}
+          {items.length === 1 ? "conversation" : "conversations"}.
+        </div>
+      )}
 
       {error && (
         <div className={classes.errorCard}>
@@ -125,16 +159,14 @@ const MessagesInbox = () => {
                 </h2>
 
                 {item.hasUnread && (
-                  <span className={classes.unreadPill}>New message</span>
+                  <span className={classes.unreadPill}>
+                    {item.unreadCount} new {item.unreadCount === 1 ? "message" : "messages"}
+                  </span>
                 )}
               </div>
 
               <p className={classes.text}>
-                With:{" "}
-                {profileText(
-                  item.otherParticipant,
-                  item.conversation.creator_user_id
-                )}
+                With: {profileText(item.otherParticipant, item.otherParticipantUserId)}
               </p>
 
               <div className={classes.metaGrid}>
@@ -175,7 +207,7 @@ const MessagesInbox = () => {
                 <div className={classes.activityText}>
                   {dateTimeText(
                     item.conversation.last_message_at ??
-                      item.conversation.updated_at
+                    item.conversation.updated_at
                   )}
                 </div>
 
@@ -197,7 +229,7 @@ const MessagesInbox = () => {
               <div className={classes.row}>
                 <Link
                   className={classes.btnPrimary}
-                  to={`/messages/${item.conversation.id}`}
+                  to={getConversationHref(item)}
                 >
                   Open conversation
                 </Link>

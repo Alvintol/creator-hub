@@ -7,6 +7,9 @@ import type {
   ConversationType,
 } from "../../domain/conversations/conversations";
 
+export type MessagesInboxViewerRole = "buyer" | "creator";
+
+
 export type MessagesInboxProfile = {
   user_id: string;
   handle: string | null;
@@ -26,6 +29,7 @@ export type MessagesInboxConversation = {
   buyer_user_id: string;
   creator_user_id: string;
   listing_id: string | null;
+  listing_request_id: string | null;
   subject: string | null;
   initiation_reason_code: ConversationInitiationReasonCode | null;
   status: ConversationStatus;
@@ -38,20 +42,34 @@ export type MessagesInboxConversation = {
 
 export type MessagesInboxItem = {
   conversation: MessagesInboxConversation;
+  viewerRole: MessagesInboxViewerRole;
+  otherParticipantUserId: string;
   otherParticipant: MessagesInboxProfile | null;
   listing: MessagesInboxListing | null;
   participantLastReadAt: string | null;
+  unreadCount: number;
   hasUnread: boolean;
 };
 
 export type MessagesInboxResult = {
   items: MessagesInboxItem[];
+  totalUnreadCount: number;
+};
+
+type UnreadMessageRow = {
+  id: string;
+  conversation_id: string;
+  sender_user_id: string;
+  created_at: string;
 };
 
 const emptyResult: MessagesInboxResult = {
   items: [],
+  totalUnreadCount: 0,
 };
 
+// Loads all user-visible communication threads.
+// Request conversations are included because Inbox is now the primary nav entry.
 const fetchMessagesInbox = async (
   userId: string
 ): Promise<MessagesInboxResult> => {
@@ -63,6 +81,7 @@ const fetchMessagesInbox = async (
       buyer_user_id,
       creator_user_id,
       listing_id,
+      listing_request_id,
       subject,
       initiation_reason_code,
       status,
@@ -72,7 +91,11 @@ const fetchMessagesInbox = async (
       updated_at,
       created_at
     `)
-    .in("conversation_type", ["creator_inquiry", "listing_inquiry"])
+    .in("conversation_type", [
+      "creator_inquiry",
+      "listing_inquiry",
+      "listing_request",
+    ])
     .or(`buyer_user_id.eq.${userId},creator_user_id.eq.${userId}`)
     .order("updated_at", { ascending: false });
 
@@ -110,22 +133,31 @@ const fetchMessagesInbox = async (
     { data: profiles, error: profilesError },
     { data: listings, error: listingsError },
     { data: participants, error: participantsError },
+    { data: unreadMessages, error: unreadMessagesError },
   ] = await Promise.all([
     supabase
       .from("profiles")
       .select("user_id, handle, display_name, avatar_url")
       .in("user_id", otherUserIds),
+
     listingIds.length > 0
       ? supabase
-          .from("listings")
-          .select("id, title, preview_url")
-          .in("id", listingIds)
+        .from("listings")
+        .select("id, title, preview_url")
+        .in("id", listingIds)
       : Promise.resolve({ data: [], error: null }),
+
     supabase
       .from("conversation_participants")
       .select("conversation_id, last_read_at")
       .eq("user_id", userId)
       .in("conversation_id", conversationIds),
+
+    supabase
+      .from("conversation_messages")
+      .select("id, conversation_id, sender_user_id, created_at")
+      .in("conversation_id", conversationIds)
+      .neq("sender_user_id", userId),
   ]);
 
   if (profilesError) {
@@ -138,6 +170,10 @@ const fetchMessagesInbox = async (
 
   if (participantsError) {
     throw participantsError;
+  }
+
+  if (unreadMessagesError) {
+    throw unreadMessagesError;
   }
 
   const profileByUserId = Object.fromEntries(
@@ -164,32 +200,64 @@ const fetchMessagesInbox = async (
     ])
   );
 
+  // Groups unread candidate messages by conversation to allow efficient lookup when calculating unread counts
+  const unreadMessagesByConversationId = (
+    (unreadMessages ?? []) as UnreadMessageRow[]
+  ).reduce<Record<string, UnreadMessageRow[]>>((acc, message) => {
+    const currentMessages = acc[message.conversation_id] ?? [];
+
+    return {
+      ...acc,
+      [message.conversation_id]: [...currentMessages, message],
+    };
+  }, {});
+
+  const getUnreadCount = (
+    conversationId: string,
+    lastReadAt: string | null
+  ): number => {
+    const messagesForConversation =
+      unreadMessagesByConversationId[conversationId] ?? [];
+
+    return messagesForConversation.filter((message) =>
+      !lastReadAt ? true : message.created_at > lastReadAt
+    ).length;
+  };
+
+  const items = conversationRows.map((conversation) => {
+    const viewerRole: MessagesInboxViewerRole =
+      conversation.buyer_user_id === userId ? "buyer" : "creator";
+
+    const otherParticipantUserId =
+      viewerRole === "buyer"
+        ? conversation.creator_user_id
+        : conversation.buyer_user_id;
+
+    const participant = participantByConversationId[conversation.id] ?? null;
+    const participantLastReadAt = participant?.last_read_at ?? null;
+    const unreadCount = getUnreadCount(conversation.id, participantLastReadAt);
+
+    return {
+      conversation,
+      viewerRole,
+      otherParticipantUserId,
+      otherParticipant: profileByUserId[otherParticipantUserId] ?? null,
+      listing: conversation.listing_id
+        ? listingById[conversation.listing_id] ?? null
+        : null,
+      participantLastReadAt,
+      unreadCount,
+      hasUnread: unreadCount > 0,
+    };
+  });
+
   return {
-    items: conversationRows.map((conversation) => {
-      const otherUserId =
-        conversation.buyer_user_id === userId
-          ? conversation.creator_user_id
-          : conversation.buyer_user_id;
+    items,
+    totalUnreadCount: items.reduce(
+      (total, item) => total + item.unreadCount,
+      0
+    ),
 
-      const participant = participantByConversationId[conversation.id] ?? null;
-      const participantLastReadAt = participant?.last_read_at ?? null;
-
-      const hasUnread =
-        Boolean(conversation.last_message_at) &&
-        conversation.last_message_sender_user_id !== userId &&
-        (!participantLastReadAt ||
-          conversation.last_message_at! > participantLastReadAt);
-
-      return {
-        conversation,
-        otherParticipant: profileByUserId[otherUserId] ?? null,
-        listing: conversation.listing_id
-          ? listingById[conversation.listing_id] ?? null
-          : null,
-        participantLastReadAt,
-        hasUnread,
-      };
-    }),
   };
 };
 

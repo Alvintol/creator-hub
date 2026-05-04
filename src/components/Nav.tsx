@@ -11,6 +11,7 @@ import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 import { useSellerAccess } from '../hooks/creatorApplication/useSellerAccess';
 import { useMyAdminAccess } from '../hooks/admin/useMyAdminAccess';
+import { useMessagesInbox } from '../hooks/conversations/useMessagesInbox';
 
 type CategoryLink = {
   key: string;
@@ -115,11 +116,17 @@ const Nav = () => {
   const { isLoading: isSellerAccessLoading, canAccessCreatorRoutes } =
     useSellerAccess();
   const { data: isAdmin = false, isLoading: isAdminLoading } = useMyAdminAccess();
+  const { data: messagesInbox } = useMessagesInbox();
 
   const liveCount = useMemo(
     () => Object.keys(twitchByLogin).length,
     [twitchByLogin]
   );
+
+  const unreadMessageCount = messagesInbox?.totalUnreadCount ?? 0;
+
+  const unreadMessageLabel =
+    unreadMessageCount > 99 ? "99+" : String(unreadMessageCount);
 
   const activeCat = useMemo(() => {
     const params = new URLSearchParams(search);
@@ -227,11 +234,30 @@ const Nav = () => {
           {!loading && user && (
             <NavLink
               to="/messages"
+              aria-label={
+                unreadMessageCount > 0
+                  ? `Inbox, ${unreadMessageCount} unread message${unreadMessageCount === 1 ? "" : "s"}`
+                  : "Inbox"
+              }
+              title={
+                unreadMessageCount > 0
+                  ? `${unreadMessageCount} unread message${unreadMessageCount === 1 ? "" : "s"}`
+                  : "Inbox"
+              }
               className={({ isActive }) => getAuthPillClass(isActive)}
             >
-              Inbox
+              <span className={classes.navLabelWrap}>
+                <span>Inbox</span>
+
+                {unreadMessageCount > 0 && (
+                  <span className={classes.navPillCount}>
+                    {unreadMessageLabel}
+                  </span>
+                )}
+              </span>
             </NavLink>
           )}
+          
           {!loading && user && (
             <NavLink
               to="/settings/profile"
