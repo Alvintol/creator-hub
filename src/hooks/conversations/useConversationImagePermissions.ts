@@ -20,16 +20,16 @@ const invalidateConversationQueries = async (
       queryKey: ["requestConversation"],
     }),
     queryClient.invalidateQueries({
-      queryKey: ["conversationMessages"],
+      queryKey: ["conversationDetails"],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ["messagesInbox"],
     }),
     queryClient.invalidateQueries({
       queryKey: ["myBuyerRequests"],
     }),
     queryClient.invalidateQueries({
       queryKey: ["myCreatorRequests"],
-    }),
-    queryClient.invalidateQueries({
-      queryKey: ["adminRequests"],
     }),
   ]);
 };
