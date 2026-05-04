@@ -40,6 +40,8 @@ import AdminRequestDetails from './pages/admin/AdminRequestDetails';
 import AdminRequests from './pages/admin/AdminRequests';
 import AdminModerationReportDetails from './pages/admin/AdminModerationReportDetails';
 import AdminModerationReports from './pages/admin/AdminModerationReports';
+import MessageDetails from './pages/messages/MessageDetails';
+import MessagesInbox from './pages/messages/MessagesInbox';
 
 const App = () => {
   return (
@@ -69,6 +71,8 @@ const App = () => {
             <Route path="/requests" element={<BuyerRequests />} />
             <Route path="/requests/archived" element={<BuyerRequests archived />} />
             <Route path="/requests/:id" element={<BuyerRequestDetails />} />
+            <Route path="/messages" element={<MessagesInbox />} />
+            <Route path="/messages/:id" element={<MessageDetails />} />
           </Route>
 
           <Route element={<RequireAdminAccess />}>

@@ -53,6 +53,56 @@ export type ConversationReportResolutionCode =
   | "duplicate_report"
   | "other";
 
+export type ConversationInitiationReasonCode =
+  | "custom_quote"
+  | "style_fit"
+  | "scope_or_complexity"
+  | "timeline_availability"
+  | "pricing"
+  | "deliverables"
+  | "usage_rights"
+  | "reference_requirements"
+  | "revision_policy"
+  | "commercial_use"
+  | "file_formats"
+  | "bundle_or_multiple_items"
+  | "commission_availability"
+  | "listing_clarification"
+  | "before_requesting";
+
+export const conversationInitiationReasonOptions: Array<{
+  value: ConversationInitiationReasonCode;
+  label: string;
+}> = [
+    { value: "custom_quote", label: "Custom quote" },
+    { value: "style_fit", label: "Style fit or creative direction" },
+    { value: "scope_or_complexity", label: "Scope or complexity" },
+    { value: "timeline_availability", label: "Timeline or availability" },
+    { value: "pricing", label: "Pricing question" },
+    { value: "deliverables", label: "Deliverables question" },
+    { value: "usage_rights", label: "Usage rights or licensing" },
+    {
+      value: "reference_requirements",
+      label: "Reference image or material requirements",
+    },
+    { value: "revision_policy", label: "Revision policy" },
+    { value: "commercial_use", label: "Commercial-use question" },
+    { value: "file_formats", label: "File format or source-file question" },
+    { value: "bundle_or_multiple_items", label: "Bundle or multiple item request" },
+    { value: "commission_availability", label: "Commission availability" },
+    { value: "listing_clarification", label: "Clarification about a listing" },
+    { value: "before_requesting", label: "Question before submitting a request" },
+  ];
+
+export const getConversationInitiationReasonLabel = (
+  reasonCode: ConversationInitiationReasonCode | null
+): string =>
+  reasonCode
+    ? conversationInitiationReasonOptions.find(
+      (option) => option.value === reasonCode
+    )?.label ?? "Unknown topic"
+    : "No topic";
+
 export const conversationReportStatusOptions: Array<{
   value: ConversationReportStatus;
   label: string;

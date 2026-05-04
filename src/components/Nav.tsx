@@ -226,10 +226,10 @@ const Nav = () => {
 
           {!loading && user && (
             <NavLink
-              to="/requests"
+              to="/messages"
               className={({ isActive }) => getAuthPillClass(isActive)}
             >
-              Requests
+              Inbox
             </NavLink>
           )}
           {!loading && user && (
