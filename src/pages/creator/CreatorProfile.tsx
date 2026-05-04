@@ -1,7 +1,11 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { normalizeTwitchLogin } from "../../domain/twitch";
 import { usePublicCreatorProfile } from "../../hooks/profile/usePublicCreatorProfile";
 import { useTwitchStreams } from "../../hooks/useTwitchStreams";
+import { useState } from 'react';
+import { ConversationInitiationReasonCode, conversationInitiationReasonOptions } from '../../domain/conversations/conversations';
+import { useCreateCreatorInquiryConversation } from '../../hooks/conversations/useCreateInquiryConversation';
+import { useAuth } from '../../providers/AuthProvider';
 
 const classes = {
   container: "space-y-8",
@@ -62,6 +66,21 @@ const classes = {
   platformBtnGeneric:
     "border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-50 hover:border-zinc-400",
   platformBtnIcon: "h-4 w-4 shrink-0",
+
+  inquiryBox:
+    "mt-5 rounded-2xl border border-zinc-200 bg-zinc-50 p-4",
+  inquiryTitle: "font-extrabold text-zinc-900",
+  inquiryText: "mt-1 text-sm text-zinc-600",
+  form: "mt-4 space-y-3",
+  field: "space-y-2",
+  label: "text-sm font-bold text-zinc-900",
+  select:
+    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
+  textarea:
+    "min-h-[120px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-60",
+  hint: "text-xs text-zinc-500",
+  errorBox:
+    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
 } as const;
 
 type CreatorLinkButtonProps = {
@@ -132,8 +151,16 @@ const CreatorNotFound = () => (
 const CreatorProfile = () => {
   const { handle } = useParams<{ handle: string }>();
   const { twitchByLogin } = useTwitchStreams();
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
 
   const { data, isLoading, error } = usePublicCreatorProfile(handle ?? null);
+  const createInquiryMutation = useCreateCreatorInquiryConversation();
+
+  const [showInquiryForm, setShowInquiryForm] = useState(false);
+  const [inquiryTopic, setInquiryTopic] =
+    useState<ConversationInitiationReasonCode | "">("");
+  const [inquiryMessage, setInquiryMessage] = useState("");
 
   if (!handle) return <CreatorNotFound />;
 
@@ -169,6 +196,38 @@ const CreatorProfile = () => {
       ? `https://twitch.tv/${encodeURIComponent(twitchLogin)}`
       : undefined);
 
+  const inquiryMessageTrimmed = inquiryMessage.trim();
+  const isOwnProfile = user?.id === profile.user_id;
+
+  const inquiryMessageError =
+    inquiryMessageTrimmed.length > 0 && inquiryMessageTrimmed.length < 10
+      ? "Message must be at least 10 characters."
+      : inquiryMessageTrimmed.length > 2000
+        ? "Message must be 2000 characters or less."
+        : null;
+
+  const canSubmitInquiry =
+    Boolean(profile.user_id) &&
+    Boolean(inquiryTopic) &&
+    inquiryMessageTrimmed.length >= 10 &&
+    inquiryMessageTrimmed.length <= 2000 &&
+    !createInquiryMutation.isPending;
+
+  const handleCreateInquiry = async () => {
+    if (!profile.user_id || !inquiryTopic || !canSubmitInquiry) return;
+
+    try {
+      const conversation = await createInquiryMutation.mutateAsync({
+        creatorUserId: profile.user_id,
+        initiationReasonCode: inquiryTopic,
+        initialMessage: inquiryMessageTrimmed,
+      });
+
+      navigate(`/messages/${conversation.id}`);
+    } catch {
+    }
+  };
+
   return (
     <div className={classes.container}>
       <Link to="/creators" className={classes.backLink}>
@@ -201,6 +260,107 @@ const CreatorProfile = () => {
               label="YouTube"
               platform="youtube"
             />
+          )}
+        </div>
+
+        <div className={classes.inquiryBox}>
+          <div className={classes.inquiryTitle}>Message this creator</div>
+
+          <p className={classes.inquiryText}>
+            Start a focused conversation with a required topic so the creator knows what
+            you are asking about.
+          </p>
+
+          {authLoading ? (
+            <p className={classes.inquiryText}>Checking sign-in status…</p>
+          ) : !user ? (
+            <Link to="/signin" className={`${classes.btnPrimary} mt-3 inline-flex`}>
+              Sign in to message
+            </Link>
+          ) : isOwnProfile ? (
+            <p className={classes.inquiryText}>
+              You cannot start a conversation with your own creator profile.
+            </p>
+          ) : (
+            <>
+              <button
+                className={`${classes.btnOutline} mt-3`}
+                type="button"
+                onClick={() => setShowInquiryForm((current) => !current)}
+              >
+                {showInquiryForm ? "Cancel message" : "Message creator"}
+              </button>
+
+              {showInquiryForm && (
+                <div className={classes.form}>
+                  <div className={classes.field}>
+                    <label className={classes.label} htmlFor="creatorInquiryTopic">
+                      Topic
+                    </label>
+
+                    <select
+                      id="creatorInquiryTopic"
+                      className={classes.select}
+                      value={inquiryTopic}
+                      onChange={(event) =>
+                        setInquiryTopic(
+                          event.target.value as ConversationInitiationReasonCode | ""
+                        )
+                      }
+                    >
+                      <option value="">Choose a topic</option>
+
+                      {conversationInitiationReasonOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className={classes.field}>
+                    <label className={classes.label} htmlFor="creatorInquiryMessage">
+                      Message
+                    </label>
+
+                    <textarea
+                      id="creatorInquiryMessage"
+                      className={classes.textarea}
+                      value={inquiryMessage}
+                      onChange={(event) => setInquiryMessage(event.target.value)}
+                      placeholder="Ask a focused question about availability, style fit, pricing, deliverables, or project scope."
+                      maxLength={2000}
+                      disabled={createInquiryMutation.isPending}
+                    />
+
+                    <div className={classes.hint}>
+                      {inquiryMessageTrimmed.length}/2000 characters. Minimum 10.
+                    </div>
+
+                    {inquiryMessageError && (
+                      <div className={classes.errorBox}>{inquiryMessageError}</div>
+                    )}
+                  </div>
+
+                  {createInquiryMutation.error && (
+                    <div className={classes.errorBox}>
+                      Conversation could not be started right now.
+                    </div>
+                  )}
+
+                  <button
+                    className={classes.btnPrimary}
+                    type="button"
+                    onClick={() => void handleCreateInquiry()}
+                    disabled={!canSubmitInquiry}
+                  >
+                    {createInquiryMutation.isPending
+                      ? "Starting conversation…"
+                      : "Start conversation"}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 

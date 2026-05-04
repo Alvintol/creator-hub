@@ -27,7 +27,7 @@ const classes = {
     "inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700",
 
   activityBox:
-    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700",
+    "rounded-2xl border border-zinc-200 bg-zinc-50 my-2 px-4 py-3 text-sm text-zinc-700",
   activityTitle: "text-xs font-bold uppercase tracking-wide text-zinc-500",
   activityText: "mt-1 text-sm text-zinc-800",
 
@@ -202,7 +202,7 @@ const MessagesInbox = () => {
               </div>
 
               <div className={classes.activityBox}>
-                <div className={classes.activityTitle}>Latest activity</div>
+                {/* <div className={classes.activityTitle}>Latest activity</div>
 
                 <div className={classes.activityText}>
                   {dateTimeText(
@@ -210,6 +210,7 @@ const MessagesInbox = () => {
                     item.conversation.updated_at
                   )}
                 </div>
+                */}
 
                 <div className={classes.activityText}>
                   From:{" "}

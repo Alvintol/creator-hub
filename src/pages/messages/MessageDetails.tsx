@@ -9,6 +9,9 @@ import { useConversationDetails } from "../../hooks/conversations/useConversatio
 import { useConversationMessages } from "../../hooks/conversations/useConversationMessages";
 import { useConversationParticipants } from "../../hooks/conversations/useConversationParticipants";
 import { useMarkConversationRead } from "../../hooks/conversations/useMarkConversationRead";
+import { conversationModerationReportReasonOptions, getModerationReportStatusLabel, getModerationReportStatusSummary, ModerationReportReasonCode } from '../../domain/moderation/moderationReports';
+import { useMyModerationReports } from '../../hooks/moderation/useMyModerationReports';
+import { useSubmitModerationReport } from '../../hooks/moderation/useSubmitModerationReport';
 
 const classes = {
   page: "space-y-6",
@@ -58,6 +61,30 @@ const classes = {
 
   btnPrimary:
     "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
+  field: "space-y-2",
+  label: "text-sm font-bold text-zinc-900",
+  select:
+    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
+
+  row: "flex flex-wrap items-center gap-3",
+  btnOutline:
+    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+  btnDanger:
+    "inline-flex items-center justify-center rounded-full border border-red-300 bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-red-400 hover:bg-red-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+
+  messageActions: "mt-2 flex flex-wrap items-center gap-2",
+  tinyDangerButton:
+    "inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-bold text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60",
+
+  reportBox:
+    "rounded-2xl border border-red-200 bg-red-50/70 px-4 py-4 text-sm text-red-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
+  reportTitle: "font-extrabold text-red-900",
+  reportStatusBox:
+    "rounded-2xl border border-rose-300 bg-rose-100/70 my-2 px-4 py-3 text-sm text-zinc-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
+  reportStatusTitle: "font-extrabold text-zinc-900",
+  reportStatusText: "mt-1 text-sm font-semibold text-zinc-700",
+  successBox:
+    "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
 } as const;
 
 const dateText = (value: string) => {
@@ -66,12 +93,12 @@ const dateText = (value: string) => {
   return Number.isNaN(date.getTime())
     ? value
     : date.toLocaleString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      });
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
 };
 
 const profileText = (
@@ -86,6 +113,16 @@ const profileText = (
 const MessageDetails = () => {
   const { id } = useParams<{ id: string }>();
   const [body, setBody] = useState("");
+  const [reportTarget, setReportTarget] = useState<{
+    type: "conversation" | "message";
+    messageId: string | null;
+  } | null>(null);
+
+  const [reportReasonCode, setReportReasonCode] =
+    useState<ModerationReportReasonCode | "">("");
+
+  const [reportReasonDetails, setReportReasonDetails] = useState("");
+  const [reportSubmitted, setReportSubmitted] = useState(false);
 
   const {
     data,
@@ -105,6 +142,11 @@ const MessageDetails = () => {
     currentUserId,
     sendMessageMutation,
   } = useConversationMessages(conversation?.id ?? null);
+  const reportConversationMutation = useSubmitModerationReport();
+
+  const { data: myReports = [] } = useMyModerationReports(
+    conversation?.id ?? null
+  );
 
   const { data: participants = [] } = useConversationParticipants(
     conversation?.id ?? null
@@ -135,8 +177,8 @@ const MessageDetails = () => {
   const otherParticipantLastReadAt =
     otherParticipantUserId
       ? participants.find(
-          (participant) => participant.user_id === otherParticipantUserId
-        )?.last_read_at ?? null
+        (participant) => participant.user_id === otherParticipantUserId
+      )?.last_read_at ?? null
       : null;
 
   const hasOtherParticipantReadMessage = (messageCreatedAt: string): boolean => {
@@ -159,6 +201,112 @@ const MessageDetails = () => {
           message.sender_user_id === currentUserId &&
           hasOtherParticipantReadMessage(message.created_at)
       )?.id ?? null;
+
+  const reportReasonDetailsTrimmed = reportReasonDetails.trim();
+  const isOtherReportReason = reportReasonCode === "other";
+
+  const reportReasonDetailsError =
+    isOtherReportReason && reportReasonDetailsTrimmed.length < 10
+      ? "Please provide a reason for the report."
+      : reportReasonDetailsTrimmed.length > 1000
+        ? "Additional details must be 1000 characters or less."
+        : null;
+
+  const canSubmitReport =
+    Boolean(conversation) &&
+    Boolean(reportTarget) &&
+    Boolean(reportReasonCode) &&
+    !reportReasonDetailsError &&
+    !reportConversationMutation.isPending;
+
+  const conversationReport =
+    myReports.find((report) => report.target_type === "conversation") ?? null;
+
+  const getMessageReport = (messageId: string) =>
+    myReports.find(
+      (report) =>
+        report.target_type === "conversation_message" &&
+        report.message_id === messageId
+    ) ?? null;
+
+  const hasReportedConversation = Boolean(conversationReport);
+
+  const hasReportedMessage = (messageId: string): boolean =>
+    Boolean(getMessageReport(messageId));
+
+  const getReportedConversationButtonText = () =>
+    conversationReport
+      ? `Conversation reported · ${getModerationReportStatusLabel(
+        conversationReport.status
+      )}`
+      : "Report conversation";
+
+  const getReportedMessageButtonText = (messageId: string) => {
+    const report = getMessageReport(messageId);
+
+    return report
+      ? `Message reported · ${getModerationReportStatusLabel(report.status)}`
+      : "Report message";
+  };
+
+  const openConversationReport = () => {
+    if (hasReportedConversation) return;
+
+    setReportSubmitted(false);
+    setReportTarget({
+      type: "conversation",
+      messageId: null,
+    });
+    setReportReasonCode("");
+    setReportReasonDetails("");
+  };
+
+  const openMessageReport = (messageId: string) => {
+    if (hasReportedMessage(messageId)) return;
+
+    setReportSubmitted(false);
+    setReportTarget({
+      type: "message",
+      messageId,
+    });
+    setReportReasonCode("");
+    setReportReasonDetails("");
+  };
+
+  const closeReportForm = () => {
+    setReportTarget(null);
+    setReportReasonCode("");
+    setReportReasonDetails("");
+  };
+
+  const handleSubmitReport = async () => {
+    if (
+      !conversation ||
+      !reportTarget ||
+      !reportReasonCode ||
+      reportReasonDetailsError
+    ) {
+      return;
+    }
+
+    try {
+      await reportConversationMutation.mutateAsync({
+        targetType:
+          reportTarget.type === "message"
+            ? "conversation_message"
+            : "conversation",
+        conversationId: conversation.id,
+        messageId: reportTarget.messageId,
+        reasonCode: reportReasonCode,
+        reasonDetails: reportReasonDetailsTrimmed,
+      });
+
+      setReportSubmitted(true);
+      closeReportForm();
+    } catch {
+      // Error is surfaced below
+    }
+  };
 
   useEffect(() => {
     if (!conversation || !currentUserId) return;
@@ -267,6 +415,40 @@ const MessageDetails = () => {
           </div>
         )}
 
+        {conversationReport && (
+          <div className={classes.reportStatusBox}>
+            <div className={classes.reportStatusTitle}>
+              Conversation report status
+            </div>
+
+            <div className={classes.reportStatusText}>
+              Status: {getModerationReportStatusLabel(conversationReport.status)}
+            </div>
+
+            <div className={classes.reportStatusText}>
+              {conversationReport.reporter_status_message ||
+                getModerationReportStatusSummary(conversationReport.status)}
+            </div>
+
+            {conversationReport.reporter_status_updated_at && (
+              <div className={classes.reportStatusText}>
+                Last update: {dateText(conversationReport.reporter_status_updated_at)}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className={classes.row}>
+          <button
+            className={classes.btnOutline}
+            type="button"
+            onClick={openConversationReport}
+            disabled={hasReportedConversation || reportConversationMutation.isPending}
+          >
+            {getReportedConversationButtonText()}
+          </button>
+        </div>
+
         {areMessagesLoading ? (
           <div className={classes.loadingText}>Loading messages…</div>
         ) : messagesError ? (
@@ -278,22 +460,21 @@ const MessageDetails = () => {
             {messages.map((message) => {
               const isSystemMessage = message.message_type === "system";
               const isOwnMessage = message.sender_user_id === currentUserId;
+              const messageReport = getMessageReport(message.id);
 
-              const rowClassName = `${classes.messageRow} ${
-                isSystemMessage
-                  ? classes.messageRowSystem
-                  : isOwnMessage
-                    ? classes.messageRowOwn
-                    : classes.messageRowOther
-              }`;
+              const rowClassName = `${classes.messageRow} ${isSystemMessage
+                ? classes.messageRowSystem
+                : isOwnMessage
+                  ? classes.messageRowOwn
+                  : classes.messageRowOther
+                }`;
 
-              const bubbleClassName = `${classes.messageBubble} ${
-                isSystemMessage
-                  ? classes.messageBubbleSystem
-                  : isOwnMessage
-                    ? classes.messageBubbleOwn
-                    : classes.messageBubbleOther
-              }`;
+              const bubbleClassName = `${classes.messageBubble} ${isSystemMessage
+                ? classes.messageBubbleSystem
+                : isOwnMessage
+                  ? classes.messageBubbleOwn
+                  : classes.messageBubbleOther
+                }`;
 
               return (
                 <div key={message.id} className={rowClassName}>
@@ -317,6 +498,42 @@ const MessageDetails = () => {
                     </div>
 
                     <div className={classes.messageBody}>{message.body}</div>
+                    {!isSystemMessage && !isOwnMessage && (
+                      <div className={classes.messageActions}>
+                        <button
+                          className={classes.tinyDangerButton}
+                          type="button"
+                          onClick={() => openMessageReport(message.id)}
+                          disabled={
+                            hasReportedMessage(message.id) ||
+                            reportConversationMutation.isPending
+                          }
+                        >
+                          {getReportedMessageButtonText(message.id)}
+                        </button>
+                      </div>
+                    )}
+
+                    {messageReport && (
+                      <div className={classes.reportStatusBox}>
+                        <div className={classes.reportStatusTitle}>Message report status</div>
+
+                        <div className={classes.reportStatusText}>
+                          Status: {getModerationReportStatusLabel(messageReport.status)}
+                        </div>
+
+                        <div className={classes.reportStatusText}>
+                          {messageReport.reporter_status_message ||
+                            getModerationReportStatusSummary(messageReport.status)}
+                        </div>
+
+                        {messageReport.reporter_status_updated_at && (
+                          <div className={classes.reportStatusText}>
+                            Last update: {dateText(messageReport.reporter_status_updated_at)}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {message.id === latestReadOwnMessageId &&
                       otherParticipantLabel &&
@@ -338,6 +555,105 @@ const MessageDetails = () => {
         {sendMessageMutation.error && (
           <div className={classes.errorBox}>
             Message could not be sent. Please try again.
+          </div>
+        )}
+
+        {reportSubmitted && (
+          <div className={classes.successBox}>
+            Report submitted. An admin can review it.
+          </div>
+        )}
+
+        {reportConversationMutation.error && (
+          <div className={classes.errorBox}>
+            Report could not be submitted right now.
+          </div>
+        )}
+
+        {reportTarget && (
+          <div className={classes.reportBox}>
+            <div className={classes.reportTitle}>
+              {reportTarget.type === "message"
+                ? "Report message"
+                : "Report conversation"}
+            </div>
+
+            <div className={classes.field}>
+              <label className={classes.label} htmlFor="reportReason">
+                Reason
+              </label>
+
+              <select
+                id="reportReason"
+                className={classes.select}
+                value={reportReasonCode}
+                onChange={(event) =>
+                  setReportReasonCode(
+                    event.target.value as ModerationReportReasonCode | ""
+                  )
+                }
+              >
+                <option value="">Choose a reason</option>
+
+                {conversationModerationReportReasonOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={classes.field}>
+              <label className={classes.label} htmlFor="reportDetails">
+                Additional details{isOtherReportReason ? " *" : ""}
+              </label>
+
+              <textarea
+                id="reportDetails"
+                className={classes.textarea}
+                value={reportReasonDetails}
+                onChange={(event) => setReportReasonDetails(event.target.value)}
+                placeholder={
+                  isOtherReportReason
+                    ? "Required. Explain why this should be reviewed."
+                    : "Optional. Add context for the admin reviewing this report."
+                }
+                maxLength={1000}
+              />
+
+              <div className={classes.hint}>
+                {reportReasonDetailsTrimmed.length}/1000 characters.
+                {isOtherReportReason
+                  ? " Please provide a reason for the report."
+                  : " Optional unless you choose Other."}
+              </div>
+
+              {reportReasonDetailsError && (
+                <div className={classes.errorBox}>{reportReasonDetailsError}</div>
+              )}
+            </div>
+
+            <div className={classes.row}>
+              <button
+                className={classes.btnDanger}
+                type="button"
+                onClick={() => void handleSubmitReport()}
+                disabled={!canSubmitReport}
+              >
+                {reportConversationMutation.isPending
+                  ? "Submitting report…"
+                  : "Submit report"}
+              </button>
+
+              <button
+                className={classes.btnOutline}
+                type="button"
+                onClick={closeReportForm}
+                disabled={reportConversationMutation.isPending}
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
