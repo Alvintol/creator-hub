@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
 import type {
+  ConversationCloseReasonCode,
   ConversationInitiationReasonCode,
   ConversationStatus,
   ConversationType,
@@ -30,7 +31,7 @@ export type ConversationDetailsRow = {
   initiation_reason_code: ConversationInitiationReasonCode | null;
   status: ConversationStatus;
   closed_at: string | null;
-  closed_reason_code: string | null;
+  closed_reason_code: ConversationCloseReasonCode | null;
   closed_reason_details: string | null;
   last_message_at: string | null;
   last_message_sender_user_id: string | null;

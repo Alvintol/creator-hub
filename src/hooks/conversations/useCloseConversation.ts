@@ -59,6 +59,12 @@ export const useCloseConversation = () => {
         queryClient.invalidateQueries({
           queryKey: ["adminRequests"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["conversationDetails"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["messagesInbox"],
+        }),
       ]);
     },
   });
