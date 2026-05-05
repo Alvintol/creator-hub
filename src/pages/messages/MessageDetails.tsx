@@ -1,8 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   canSendConversationMessage,
+  ConversationCloseReasonCode,
+  conversationCloseReasonOptions,
   getBuyerImageUploadStatusLabel,
+  getConversationCloseReasonLabel,
   getConversationInitiationReasonLabel,
   isConversationReadOnly,
 } from "../../domain/conversations/conversations";
@@ -14,6 +17,7 @@ import { conversationModerationReportReasonOptions, getModerationReportStatusLab
 import { useMyModerationReports } from '../../hooks/moderation/useMyModerationReports';
 import { useSubmitModerationReport } from '../../hooks/moderation/useSubmitModerationReport';
 import { useApproveBuyerImageUpload, useRequestBuyerImageUpload, useRevokeBuyerImageUpload } from '../../hooks/conversations/useConversationImagePermissions';
+import { useCloseConversation } from '../../hooks/conversations/useCloseConversation';
 
 const classes = {
   page: "space-y-6",
@@ -96,6 +100,11 @@ const classes = {
   chatUtilityActions: "flex flex-wrap items-center gap-2",
   chatUtilityButton:
     "inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60",
+  closedStatusBox:
+    "rounded-2xl border-2 border-zinc-300 bg-zinc-300/70 px-5 py-4 text-sm text-zinc-800 shadow-[0_100px_30px_rgba(0,0,0,0.08)]",
+  closedStatusTitle: "text-sm font-extrabold tracking-tight text-zinc-900",
+  closedStatusList: "mt-3 space-y-2 text-sm text-zinc-700",
+  closedStatusLabel: "font-semibold text-zinc-900",
 } as const;
 
 const dateText = (value: string) => {
@@ -130,6 +139,10 @@ const MessageDetails = () => {
     type: "conversation" | "message";
     messageId: string | null;
   } | null>(null);
+  const [showCloseForm, setShowCloseForm] = useState(false);
+  const [closeReasonCode, setCloseReasonCode] =
+    useState<ConversationCloseReasonCode | "">("");
+  const [closeReasonDetails, setCloseReasonDetails] = useState("");
 
   const [reportReasonCode, setReportReasonCode] =
     useState<ModerationReportReasonCode | "">("");
@@ -159,6 +172,7 @@ const MessageDetails = () => {
     sendMessageMutation,
   } = useConversationMessages(conversation?.id ?? null);
   const reportConversationMutation = useSubmitModerationReport();
+  const closeConversationMutation = useCloseConversation();
 
   const { data: myReports = [] } = useMyModerationReports(
     conversation?.id ?? null
@@ -281,6 +295,30 @@ const MessageDetails = () => {
     !reportReasonDetailsError &&
     !reportConversationMutation.isPending;
 
+  const closeReasonDetailsTrimmed = closeReasonDetails.trim();
+  const isOtherCloseReason = closeReasonCode === "other";
+
+  const closeReasonDetailsError =
+    isOtherCloseReason && closeReasonDetailsTrimmed.length < 10
+      ? "Please give more detail."
+      : closeReasonDetailsTrimmed.length > 1000
+        ? "Additional details must be 1000 characters or less."
+        : null;
+
+  const isConversationParticipant =
+    Boolean(conversation) &&
+    Boolean(currentUserId) &&
+    (currentUserId === conversation?.buyer_user_id ||
+      currentUserId === conversation?.creator_user_id);
+
+  const canCloseConversation =
+    Boolean(conversation) && conversation?.status === "open";
+
+  const canConfirmCloseConversation =
+    Boolean(closeReasonCode) &&
+    !closeReasonDetailsError &&
+    !closeConversationMutation.isPending;
+
   const conversationReport =
     myReports.find((report) => report.target_type === "conversation") ?? null;
 
@@ -339,6 +377,24 @@ const MessageDetails = () => {
     setReportTarget(null);
     setReportReasonCode("");
     setReportReasonDetails("");
+  };
+
+  const handleCloseConversation = async () => {
+    if (!conversation || !closeReasonCode || closeReasonDetailsError) return;
+
+    try {
+      await closeConversationMutation.mutateAsync({
+        conversationId: conversation.id,
+        reasonCode: closeReasonCode,
+        reasonDetails: closeReasonDetailsTrimmed,
+      });
+
+      setShowCloseForm(false);
+      setCloseReasonCode("");
+      setCloseReasonDetails("");
+    } catch {
+      // Error is surfaced below
+    }
   };
 
   const handleRequestImageUpload = async () => {
@@ -480,6 +536,7 @@ const MessageDetails = () => {
     );
   }
 
+
   return (
     <div className={classes.page}>
       <Link to="/messages" className={classes.backLink}>
@@ -506,8 +563,32 @@ const MessageDetails = () => {
         </div>
 
         {conversation.status === "closed" && (
-          <div className={classes.statusBox}>
-            This conversation has ended and is now read-only.
+          <div className={classes.closedStatusBox}>
+            <div className={classes.closedStatusTitle}>Conversation ended</div>
+
+            <div className={classes.closedStatusList}>
+              <div>
+                <span className={classes.closedStatusLabel}>Status:</span> This
+                conversation has been ended and is now read-only for both parties.
+              </div>
+
+              <div>
+                <span className={classes.closedStatusLabel}>Reason:</span>{" "}
+                {getConversationCloseReasonLabel(conversation.closed_reason_code)}
+              </div>
+
+              <div>
+                <span className={classes.closedStatusLabel}>Additional details:</span>{" "}
+                {conversation.closed_reason_details || "No additional details provided."}
+              </div>
+
+              {conversation.closed_at && (
+                <div>
+                  <span className={classes.closedStatusLabel}>Ended on:</span>{" "}
+                  {dateText(conversation.closed_at)}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -672,6 +753,12 @@ const MessageDetails = () => {
           </div>
         )}
 
+        {closeConversationMutation.error && (
+          <div className={classes.errorBox}>
+            Conversation could not be ended right now.
+          </div>
+        )}
+
         {reportTarget && (
           <div className={classes.reportBox}>
             <div className={classes.reportTitle}>
@@ -759,134 +846,227 @@ const MessageDetails = () => {
           </div>
         )}
 
-        {!readOnly && (
+        {canCloseConversation && (
           <div className={classes.form}>
-            <div className={classes.chatUtilityBar}>
-              <div className={classes.chatUtilityHeader}>
-                <div>
-                  <div className={classes.chatUtilityTitle}>Image sharing</div>
 
-                  <div className={classes.chatUtilityText}>
-                    {getBuyerImageUploadStatusLabel(conversation.buyer_image_upload_status)}
+            {showCloseForm && (
+              <>
+                <div className={classes.warningBox}>
+                  Ending this conversation will make the thread read-only for both
+                  parties. The message history and reason will remain visible.
+                </div>
+
+                <div className={classes.field}>
+                  <label className={classes.label} htmlFor="closeReason">
+                    Reason for ending conversation
+                  </label>
+
+                  <select
+                    id="closeReason"
+                    className={classes.select}
+                    value={closeReasonCode}
+                    onChange={(event) =>
+                      setCloseReasonCode(
+                        event.target.value as ConversationCloseReasonCode | ""
+                      )
+                    }
+                  >
+                    <option value="">Choose a reason</option>
+
+                    {conversationCloseReasonOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={classes.field}>
+                  <label className={classes.label} htmlFor="closeDetails">
+                    Additional details{isOtherCloseReason ? " *" : ""}
+                  </label>
+
+                  <textarea
+                    id="closeDetails"
+                    className={classes.textarea}
+                    value={closeReasonDetails}
+                    onChange={(event) => setCloseReasonDetails(event.target.value)}
+                    placeholder={
+                      isOtherCloseReason
+                        ? "Required. Explain why this conversation is being ended."
+                        : "Optional. Add context for both parties and admins."
+                    }
+                    maxLength={1000}
+                  />
+
+                  <div className={classes.hint}>
+                    {closeReasonDetailsTrimmed.length}/1000 characters.
+                    {isOtherCloseReason
+                      ? " Mandatory. Please explain why this conversation is being ended."
+                      : " Optional, but helpful for both parties and admins."}
                   </div>
 
-                  {conversation.buyer_image_upload_status === "requested" &&
-                    conversation.buyer_image_upload_request_note && (
+                  {closeReasonDetailsError && (
+                    <div className={classes.errorBox}>{closeReasonDetailsError}</div>
+                  )}
+                </div>
+
+                <div className={classes.row}>
+                  <button
+                    className={classes.btnDanger}
+                    type="button"
+                    onClick={() => void handleCloseConversation()}
+                    disabled={!canConfirmCloseConversation}
+                  >
+                    {closeConversationMutation.isPending
+                      ? "Ending conversation…"
+                      : "Confirm end conversation"}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {!readOnly && (
+              <div className={classes.form}>
+                <div className={classes.chatUtilityBar}>
+                  <div className={classes.chatUtilityHeader}>
+                    <div>
+                      <div className={classes.chatUtilityTitle}>Image sharing</div>
+
                       <div className={classes.chatUtilityText}>
-                        Client note: {conversation.buyer_image_upload_request_note}
+                        {getBuyerImageUploadStatusLabel(conversation.buyer_image_upload_status)}
                       </div>
-                    )}
-                </div>
 
-                <div className={classes.chatUtilityActions}>
-                  {canRequestImageUpload && (
-                    <button
-                      className={classes.chatUtilityButton}
-                      type="button"
-                      onClick={() => setShowImageRequestForm((current) => !current)}
-                      disabled={isImageActionPending}
-                    >
-                      {showImageRequestForm ? "Cancel image request" : "Request images"}
-                    </button>
-                  )}
-
-                  {canApproveImageUpload && (
-                    <button
-                      className={classes.chatUtilityButton}
-                      type="button"
-                      onClick={() => void handleApproveImageUpload()}
-                      disabled={isImageActionPending}
-                    >
-                      {approveBuyerImageUploadMutation.isPending
-                        ? "Allowing…"
-                        : approveImageUploadButtonText}
-                    </button>
-                  )}
-
-                  {canRevokeImageUpload && (
-                    <button
-                      className={classes.chatUtilityButton}
-                      type="button"
-                      onClick={() => void handleRevokeImageUpload()}
-                      disabled={isImageActionPending}
-                    >
-                      {revokeBuyerImageUploadMutation.isPending
-                        ? "Disabling…"
-                        : "Disable images"}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {(requestBuyerImageUploadMutation.error ||
-                approveBuyerImageUploadMutation.error ||
-                revokeBuyerImageUploadMutation.error) && (
-                  <div className={classes.errorBox}>
-                    Image sharing permissions could not be updated right now.
-                  </div>
-                )}
-
-              {showImageRequestForm && canRequestImageUpload && (
-                <div className={classes.form}>
-                  <div className={classes.field}>
-                    <label className={classes.label} htmlFor="imageRequestNote">
-                      Why do you need to send images?
-                    </label>
-
-                    <textarea
-                      id="imageRequestNote"
-                      className={classes.textarea}
-                      value={imageRequestNote}
-                      onChange={(event) => setImageRequestNote(event.target.value)}
-                      placeholder="Optional. Explain what kind of reference images you want to send."
-                      maxLength={1000}
-                    />
-
-                    <div className={classes.hint}>
-                      {imageRequestNoteTrimmed.length}/1000 characters.
+                      {conversation.buyer_image_upload_status === "requested" &&
+                        conversation.buyer_image_upload_request_note && (
+                          <div className={classes.chatUtilityText}>
+                            Client note: {conversation.buyer_image_upload_request_note}
+                          </div>
+                        )}
                     </div>
 
-                    {imageRequestNoteError && (
-                      <div className={classes.errorBox}>{imageRequestNoteError}</div>
+                    <div className={classes.chatUtilityActions}>
+                      {canRequestImageUpload && (
+                        <button
+                          className={classes.chatUtilityButton}
+                          type="button"
+                          onClick={() => setShowImageRequestForm((current) => !current)}
+                          disabled={isImageActionPending}
+                        >
+                          {showImageRequestForm ? "Cancel image request" : "Request images"}
+                        </button>
+                      )}
+
+                      {canApproveImageUpload && (
+                        <button
+                          className={classes.chatUtilityButton}
+                          type="button"
+                          onClick={() => void handleApproveImageUpload()}
+                          disabled={isImageActionPending}
+                        >
+                          {approveBuyerImageUploadMutation.isPending
+                            ? "Allowing…"
+                            : approveImageUploadButtonText}
+                        </button>
+                      )}
+
+                      {canRevokeImageUpload && (
+                        <button
+                          className={classes.chatUtilityButton}
+                          type="button"
+                          onClick={() => void handleRevokeImageUpload()}
+                          disabled={isImageActionPending}
+                        >
+                          {revokeBuyerImageUploadMutation.isPending
+                            ? "Disabling…"
+                            : "Disable images"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {(requestBuyerImageUploadMutation.error ||
+                    approveBuyerImageUploadMutation.error ||
+                    revokeBuyerImageUploadMutation.error) && (
+                      <div className={classes.errorBox}>
+                        Image sharing permissions could not be updated right now.
+                      </div>
                     )}
-                  </div>
 
-                  <div className={classes.row}>
-                    <button
-                      className={classes.btnPrimary}
-                      type="button"
-                      onClick={() => void handleRequestImageUpload()}
-                      disabled={Boolean(imageRequestNoteError) || isImageActionPending}
-                    >
-                      {requestBuyerImageUploadMutation.isPending
-                        ? "Sending request…"
-                        : "Send image request"}
-                    </button>
-                  </div>
+                  {showImageRequestForm && canRequestImageUpload && (
+                    <div className={classes.form}>
+                      <div className={classes.field}>
+                        <label className={classes.label} htmlFor="imageRequestNote">
+                          Why do you need to send images?
+                        </label>
+
+                        <textarea
+                          id="imageRequestNote"
+                          className={classes.textarea}
+                          value={imageRequestNote}
+                          onChange={(event) => setImageRequestNote(event.target.value)}
+                          placeholder="Optional. Explain what kind of reference images you want to send."
+                          maxLength={1000}
+                        />
+
+                        <div className={classes.hint}>
+                          {imageRequestNoteTrimmed.length}/1000 characters.
+                        </div>
+
+                        {imageRequestNoteError && (
+                          <div className={classes.errorBox}>{imageRequestNoteError}</div>
+                        )}
+                      </div>
+
+                      <div className={classes.row}>
+                        <button
+                          className={classes.btnPrimary}
+                          type="button"
+                          onClick={() => void handleRequestImageUpload()}
+                          disabled={Boolean(imageRequestNoteError) || isImageActionPending}
+                        >
+                          {requestBuyerImageUploadMutation.isPending
+                            ? "Sending request…"
+                            : "Send image request"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <textarea
-              className={classes.textarea}
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              placeholder="Write a message…"
-              maxLength={2000}
-              disabled={sendMessageMutation.isPending}
-            />
+                <textarea
+                  className={classes.textarea}
+                  value={body}
+                  onChange={(event) => setBody(event.target.value)}
+                  placeholder="Write a message…"
+                  maxLength={2000}
+                  disabled={sendMessageMutation.isPending}
+                />
 
-            <div className={classes.formFooter}>
-              <div className={classes.hint}>
-                {trimmedBody.length}/2000 characters
+                <div className={classes.formFooter}>
+                  <div className={classes.hint}>
+                    {trimmedBody.length}/2000 characters
+                  </div>
+
+                  <button
+                    className={classes.btnPrimary}
+                    type="button"
+                    onClick={() => void handleSubmitMessage()}
+                    disabled={!canSubmit}
+                  >
+                    {sendMessageMutation.isPending ? "Sending…" : "Send message"}
+                  </button>
+                </div>
               </div>
+            )}
 
+
+            <div className={classes.row}>
               <button
-                className={classes.btnPrimary}
+                className={classes.btnDanger}
                 type="button"
-                onClick={() => void handleSubmitMessage()}
-                disabled={!canSubmit}
+                onClick={() => setShowCloseForm((current) => !current)}
               >
-                {sendMessageMutation.isPending ? "Sending…" : "Send message"}
+                {showCloseForm ? "Cancel ending conversation" : "End conversation"}
               </button>
             </div>
           </div>
