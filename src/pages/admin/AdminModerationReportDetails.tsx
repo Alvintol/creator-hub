@@ -10,6 +10,10 @@ import {
   type ModerationReportResolutionCode,
   type ModerationReportStatus,
 } from "../../domain/moderation/moderationReports";
+import {
+  useAdminLockConversation,
+  useAdminReopenConversation,
+} from "../../hooks/admin/useAdminConversationModerationActions";
 import { useAdminModerationReport } from "../../hooks/admin/useAdminModerationReport";
 import { useUpdateModerationReportStatus } from "../../hooks/admin/useUpdateModerationReportStatus";
 
@@ -51,8 +55,7 @@ const classes = {
   messageBubbleNormal: "border-zinc-200 bg-white",
   messageBubbleReported:
     "border-2 border-red-300 bg-red-50 shadow-[0_8px_24px_rgba(0,0,0,0.08)]",
-  messageBubbleSystem:
-    "border-zinc-200 bg-zinc-50 text-center shadow-none",
+  messageBubbleSystem: "border-zinc-200 bg-zinc-50 text-center shadow-none",
   messageMeta:
     "mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-zinc-500",
   messageBody: "whitespace-pre-wrap text-sm leading-6 text-zinc-800",
@@ -70,6 +73,12 @@ const classes = {
     "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
   btnOutline:
     "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+  btnDanger:
+    "inline-flex items-center justify-center rounded-full border border-red-600 bg-red-600 px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(220,38,38,0.24)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(220,38,38,0.32)] disabled:cursor-not-allowed disabled:opacity-60",
+
+  actionCard: "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3",
+  actionTitle: "text-sm font-extrabold text-amber-950",
+  actionText: "text-sm leading-6 text-amber-900",
 
   loadingText: "text-sm text-zinc-600",
   errorCard:
@@ -103,13 +112,16 @@ const profileText = (
     user_id: string;
   } | null,
   fallbackUserId: string
-) => (profile?.handle ? `@${profile.handle}` : profile?.display_name ?? fallbackUserId);
+) =>
+  profile?.handle ? `@${profile.handle}` : profile?.display_name ?? fallbackUserId;
 
 const AdminModerationReportDetails = () => {
   const { id } = useParams();
 
   const { data, isLoading, error } = useAdminModerationReport(id ?? null);
   const updateStatusMutation = useUpdateModerationReportStatus();
+  const lockConversationMutation = useAdminLockConversation();
+  const reopenConversationMutation = useAdminReopenConversation();
 
   const report = data?.report ?? null;
   const conversation = data?.conversation ?? null;
@@ -126,6 +138,12 @@ const AdminModerationReportDetails = () => {
   const [reporterStatusMessage, setReporterStatusMessage] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [conversationActionMessage, setConversationActionMessage] = useState<
+    string | null
+  >(null);
+  const [conversationActionError, setConversationActionError] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     if (!report) return;
@@ -135,6 +153,8 @@ const AdminModerationReportDetails = () => {
     setReporterStatusMessage("");
     setAdminNotes("");
     setSavedMessage(null);
+    setConversationActionMessage(null);
+    setConversationActionError(null);
   }, [report]);
 
   const reporterStatusMessageTrimmed = reporterStatusMessage.trim();
@@ -154,9 +174,18 @@ const AdminModerationReportDetails = () => {
 
   const canSave =
     Boolean(report) &&
+    hasPendingUpdate &&
     reporterStatusMessageTrimmed.length <= 1000 &&
     adminNotesTrimmed.length <= 2000 &&
     !updateStatusMutation.isPending;
+
+  const conversationActionBusy =
+    lockConversationMutation.isPending || reopenConversationMutation.isPending;
+
+  const conversationStatus = conversation?.status ?? null;
+  const canModerateConversation = Boolean(report?.id && conversation?.id);
+  const isConversationOpen = conversationStatus === "open";
+  const isConversationAdminLocked = conversationStatus === "admin_locked";
 
   const senderText = (senderUserId: string) =>
     profileText(profilesByUserId[senderUserId] ?? null, senderUserId);
@@ -181,6 +210,50 @@ const AdminModerationReportDetails = () => {
     }
   };
 
+  const handleLockConversation = async () => {
+    if (!report?.id || !conversation?.id) return;
+
+    setConversationActionMessage(null);
+    setConversationActionError(null);
+
+    try {
+      await lockConversationMutation.mutateAsync({
+        conversationId: conversation.id,
+        moderationReportId: report.id,
+      });
+
+      setConversationActionMessage("Conversation locked by admin.");
+    } catch (error) {
+      setConversationActionError(
+        error instanceof Error
+          ? error.message
+          : "Conversation could not be locked right now."
+      );
+    }
+  };
+
+  const handleReopenConversation = async () => {
+    if (!report?.id || !conversation?.id) return;
+
+    setConversationActionMessage(null);
+    setConversationActionError(null);
+
+    try {
+      await reopenConversationMutation.mutateAsync({
+        conversationId: conversation.id,
+        moderationReportId: report.id,
+      });
+
+      setConversationActionMessage("Admin lock removed. Conversation reopened.");
+    } catch (error) {
+      setConversationActionError(
+        error instanceof Error
+          ? error.message
+          : "Conversation could not be reopened right now."
+      );
+    }
+  };
+
   if (isLoading) {
     return (
       <div className={classes.card}>
@@ -199,8 +272,6 @@ const AdminModerationReportDetails = () => {
       </div>
     );
   }
-
-  const activeReport = report;
 
   const reportedMessage = report.message_id
     ? messages.find((message) => message.id === report.message_id) ?? null
@@ -276,7 +347,8 @@ const AdminModerationReportDetails = () => {
               <div>
                 <div className={classes.metaLabel}>Reporter details</div>
                 <p className={classes.text}>
-                  {report.reason_details || "No additional report details provided."}
+                  {report.reason_details ||
+                    "No additional report details provided."}
                 </p>
               </div>
             </div>
@@ -416,184 +488,267 @@ const AdminModerationReportDetails = () => {
           )}
         </div>
 
-        <div className={classes.card}>
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Update report</h2>
+        <div className={classes.stack}>
+          {canModerateConversation && (
+            <div className={classes.card}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>
+                  Conversation moderation
+                </h2>
 
-            {savedMessage && (
-              <div className={classes.successCard}>{savedMessage}</div>
-            )}
+                <div className={classes.actionCard}>
+                  <div className={classes.actionTitle}>
+                    Admin conversation lock
+                  </div>
 
-            {updateStatusMutation.error && (
-              <div className={classes.errorCard}>
-                Report status could not be updated right now.
-              </div>
-            )}
+                  <p className={classes.actionText}>
+                    Current status:{" "}
+                    <span className="font-bold">{conversationStatus ?? "Unknown"}</span>
+                  </p>
 
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="reportStatus">
-                Status
-              </label>
+                  <p className={classes.actionText}>
+                    Locking prevents the Client and Creator from sending more
+                    messages while admins review this report.
+                  </p>
+                </div>
 
-              <select
-                id="reportStatus"
-                className={classes.select}
-                value={status}
-                onChange={(event) =>
-                  setStatus(event.target.value as ModerationReportStatus)
-                }
-              >
-                {moderationReportStatusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+                {conversationActionMessage && (
+                  <div className={classes.successCard}>
+                    {conversationActionMessage}
+                  </div>
+                )}
 
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="resolutionCode">
-                Resolution
-              </label>
+                {conversationActionError && (
+                  <div className={classes.errorCard}>
+                    {conversationActionError}
+                  </div>
+                )}
 
-              <select
-                id="resolutionCode"
-                className={classes.select}
-                value={resolutionCode}
-                onChange={(event) =>
-                  setResolutionCode(
-                    event.target.value as ModerationReportResolutionCode | ""
-                  )
-                }
-              >
-                <option value="">No resolution selected</option>
+                <div className={classes.row}>
+                  {!isConversationAdminLocked && (
+                    <button
+                      className={classes.btnDanger}
+                      type="button"
+                      disabled={
+                        conversationActionBusy || !isConversationOpen
+                      }
+                      onClick={() => void handleLockConversation()}
+                    >
+                      {lockConversationMutation.isPending
+                        ? "Locking…"
+                        : "Lock conversation"}
+                    </button>
+                  )}
 
-                {moderationReportResolutionOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+                  {isConversationAdminLocked && (
+                    <button
+                      className={classes.btnPrimary}
+                      type="button"
+                      disabled={conversationActionBusy}
+                      onClick={() => void handleReopenConversation()}
+                    >
+                      {reopenConversationMutation.isPending
+                        ? "Reopening…"
+                        : "Reopen conversation"}
+                    </button>
+                  )}
+                </div>
 
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="reporterStatusMessage">
-                New reporter-visible update
-              </label>
-
-              <textarea
-                id="reporterStatusMessage"
-                className={classes.textarea}
-                value={reporterStatusMessage}
-                onChange={(event) =>
-                  setReporterStatusMessage(event.target.value)
-                }
-                placeholder="Optional. This message is visible to the user who submitted the report."
-                maxLength={1000}
-              />
-
-              <div className={classes.hint}>
-                {reporterStatusMessageTrimmed.length}/1000 characters.
+                {!isConversationOpen && !isConversationAdminLocked && (
+                  <p className={classes.hint}>
+                    Only open conversations can be admin locked. Already closed
+                    conversations remain available for review.
+                  </p>
+                )}
               </div>
             </div>
+          )}
 
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="adminNotes">
-                New internal admin note
-              </label>
+          <div className={classes.card}>
+            <div className={classes.section}>
+              <h2 className={classes.sectionTitle}>Update report</h2>
 
-              <textarea
-                id="adminNotes"
-                className={classes.textarea}
-                value={adminNotes}
-                onChange={(event) => setAdminNotes(event.target.value)}
-                placeholder="Optional. This note is logged in the admin update history."
-                maxLength={2000}
-              />
-
-              <div className={classes.hint}>
-                {adminNotesTrimmed.length}/2000 characters.
-              </div>
-            </div>
-
-            <div className={classes.row}>
-              <button
-                className={classes.btnPrimary}
-                type="button"
-                onClick={() => void handleSaveStatus()}
-                disabled={!canSave}
-              >
-                {updateStatusMutation.isPending
-                  ? "Saving…"
-                  : "Save report update"}
-              </button>
-
-              {conversation?.listing_request_id && (
-                <Link
-                  className={classes.btnOutline}
-                  to={`/admin/requests/${conversation.listing_request_id}`}
-                >
-                  Open request
-                </Link>
+              {savedMessage && (
+                <div className={classes.successCard}>{savedMessage}</div>
               )}
+
+              {updateStatusMutation.error && (
+                <div className={classes.errorCard}>
+                  Report status could not be updated right now.
+                </div>
+              )}
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="reportStatus">
+                  Status
+                </label>
+
+                <select
+                  id="reportStatus"
+                  className={classes.select}
+                  value={status}
+                  onChange={(event) =>
+                    setStatus(event.target.value as ModerationReportStatus)
+                  }
+                >
+                  {moderationReportStatusOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="resolutionCode">
+                  Resolution
+                </label>
+
+                <select
+                  id="resolutionCode"
+                  className={classes.select}
+                  value={resolutionCode}
+                  onChange={(event) =>
+                    setResolutionCode(
+                      event.target.value as ModerationReportResolutionCode | ""
+                    )
+                  }
+                >
+                  <option value="">No resolution selected</option>
+
+                  {moderationReportResolutionOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="reporterStatusMessage">
+                  New reporter-visible update
+                </label>
+
+                <textarea
+                  id="reporterStatusMessage"
+                  className={classes.textarea}
+                  value={reporterStatusMessage}
+                  onChange={(event) =>
+                    setReporterStatusMessage(event.target.value)
+                  }
+                  placeholder="Optional. This message is visible to the user who submitted the report."
+                  maxLength={1000}
+                />
+
+                <div className={classes.hint}>
+                  {reporterStatusMessageTrimmed.length}/1000 characters.
+                </div>
+              </div>
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="adminNotes">
+                  New internal admin note
+                </label>
+
+                <textarea
+                  id="adminNotes"
+                  className={classes.textarea}
+                  value={adminNotes}
+                  onChange={(event) => setAdminNotes(event.target.value)}
+                  placeholder="Optional. This note is logged in the admin update history."
+                  maxLength={2000}
+                />
+
+                <div className={classes.hint}>
+                  {adminNotesTrimmed.length}/2000 characters.
+                </div>
+              </div>
+
+              <div className={classes.row}>
+                <button
+                  className={classes.btnPrimary}
+                  type="button"
+                  onClick={() => void handleSaveStatus()}
+                  disabled={!canSave}
+                >
+                  {updateStatusMutation.isPending
+                    ? "Saving…"
+                    : "Save report update"}
+                </button>
+
+                {conversation?.listing_request_id && (
+                  <Link
+                    className={classes.btnOutline}
+                    to={`/admin/requests/${conversation.listing_request_id}`}
+                  >
+                    Open request
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className={classes.card}>
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Admin update history</h2>
+          <div className={classes.card}>
+            <div className={classes.section}>
+              <h2 className={classes.sectionTitle}>Admin update history</h2>
 
-            {updates.length === 0 ? (
-              <p className={classes.text}>
-                No admin updates have been logged yet.
-              </p>
-            ) : (
-              <div className={classes.stack}>
-                {updates.map((update) => (
-                  <div key={update.id} className={classes.updateCard}>
-                    <div className="space-y-2">
-                      <div>
-                        <strong>
-                          {profileText(
-                            profilesByUserId[update.admin_user_id] ?? null,
-                            update.admin_user_id
+              {updates.length === 0 ? (
+                <p className={classes.text}>
+                  No admin updates have been logged yet.
+                </p>
+              ) : (
+                <div className={classes.stack}>
+                  {updates.map((update) => (
+                    <div key={update.id} className={classes.updateCard}>
+                      <div className="space-y-2">
+                        <div>
+                          <strong>
+                            {profileText(
+                              profilesByUserId[update.admin_user_id] ?? null,
+                              update.admin_user_id
+                            )}
+                          </strong>{" "}
+                          · {dateText(update.created_at)}
+                        </div>
+
+                        <div>
+                          Status:{" "}
+                          {getModerationReportStatusLabel(
+                            update.previous_status
+                          )}{" "}
+                          → {getModerationReportStatusLabel(update.new_status)}
+                        </div>
+
+                        <div>
+                          Resolution:{" "}
+                          {getModerationReportResolutionLabel(
+                            update.previous_resolution_code
+                          )}{" "}
+                          →{" "}
+                          {getModerationReportResolutionLabel(
+                            update.new_resolution_code
                           )}
-                        </strong>{" "}
-                        · {dateText(update.created_at)}
-                      </div>
-
-                      <div>
-                        Status: {getModerationReportStatusLabel(update.previous_status)} →{" "}
-                        {getModerationReportStatusLabel(update.new_status)}
-                      </div>
-
-                      <div>
-                        Resolution:{" "}
-                        {getModerationReportResolutionLabel(
-                          update.previous_resolution_code
-                        )}{" "}
-                        →{" "}
-                        {getModerationReportResolutionLabel(update.new_resolution_code)}
-                      </div>
-
-                      {update.reporter_status_message && (
-                        <div>
-                          <strong>Reporter-visible update:</strong>{" "}
-                          {update.reporter_status_message}
                         </div>
-                      )}
 
-                      {update.admin_notes && (
-                        <div>
-                          <strong>Internal note:</strong> {update.admin_notes}
-                        </div>
-                      )}
+                        {update.reporter_status_message && (
+                          <div>
+                            <strong>Reporter-visible update:</strong>{" "}
+                            {update.reporter_status_message}
+                          </div>
+                        )}
+
+                        {update.admin_notes && (
+                          <div>
+                            <strong>Internal note:</strong>{" "}
+                            {update.admin_notes}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
