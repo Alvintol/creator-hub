@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   lockConversation: vi.fn(),
   reopenConversation: vi.fn(),
   updateReportStatus: vi.fn(),
+  hideListing: vi.fn(),
+  restoreListing: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminModerationReport", () => ({
@@ -33,15 +35,37 @@ vi.mock("../../hooks/admin/useUpdateModerationReportStatus", () => ({
   }),
 }));
 
+vi.mock("../../hooks/admin/useAdminListingModerationActions", () => ({
+  useAdminHideListing: () => ({
+    mutateAsync: mocks.hideListing,
+    isPending: false,
+  }),
+  useAdminRestoreListing: () => ({
+    mutateAsync: mocks.restoreListing,
+    isPending: false,
+  }),
+}));
+
 type ConversationStatus = "open" | "admin_locked" | "closed";
 
-const createReportData = (conversationStatus: ConversationStatus) => ({
+type ReportDataOptions = {
+  conversationStatus?: ConversationStatus;
+  listing?: {
+    status: string;
+    isActive: boolean;
+  } | null;
+};
+
+const createReportData = ({
+  conversationStatus = "open",
+  listing = null,
+}: ReportDataOptions = {}) => ({
   report: {
     id: "report-1",
-    target_type: "conversation",
-    conversation_id: "conversation-1",
+    target_type: listing ? "listing" : "conversation",
+    conversation_id: listing ? null : "conversation-1",
     message_id: null,
-    listing_id: null,
+    listing_id: listing ? "listing-1" : null,
     profile_user_id: null,
     reporter_user_id: "reporter-1",
     reported_user_id: "reported-1",
@@ -57,20 +81,32 @@ const createReportData = (conversationStatus: ConversationStatus) => ({
     admin_notes: null,
     created_at: "2026-05-07T12:00:00.000Z",
   },
-  conversation: {
-    id: "conversation-1",
-    conversation_type: "creator_inquiry",
-    subject: "Custom emote inquiry",
-    listing_id: null,
-    listing_request_id: null,
-    status: conversationStatus,
-    last_message_at: "2026-05-07T12:05:00.000Z",
-    last_message_preview: "Can you make this in my style?",
-    created_at: "2026-05-07T12:00:00.000Z",
-    updated_at: "2026-05-07T12:05:00.000Z",
-  },
+  conversation: listing
+    ? null
+    : {
+      id: "conversation-1",
+      conversation_type: "creator_inquiry",
+      subject: "Custom emote inquiry",
+      listing_id: null,
+      listing_request_id: null,
+      status: conversationStatus,
+      last_message_at: "2026-05-07T12:05:00.000Z",
+      last_message_preview: "Can you make this in my style?",
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:05:00.000Z",
+    },
   messages: [],
-  listing: null,
+  listing: listing
+    ? {
+      id: "listing-1",
+      user_id: "reported-1",
+      title: "Custom Emote Pack",
+      status: listing.status,
+      is_active: listing.isActive,
+      created_at: "2026-05-07T12:00:00.000Z",
+      updated_at: "2026-05-07T12:05:00.000Z",
+    }
+    : null,
   reporter: {
     user_id: "reporter-1",
     handle: "clientuser",
@@ -135,7 +171,7 @@ describe("<AdminModerationReportDetails />", () => {
 
   it("shows the lock action for open conversations", () => {
     mocks.useAdminModerationReport.mockReturnValue({
-      data: createReportData("open"),
+      data: createReportData({ conversationStatus: "open" }),
       isLoading: false,
       error: null,
     });
@@ -157,7 +193,7 @@ describe("<AdminModerationReportDetails />", () => {
 
   it("locks an open conversation through the admin RPC hook", async () => {
     mocks.useAdminModerationReport.mockReturnValue({
-      data: createReportData("open"),
+      data: createReportData({ conversationStatus: "open" }),
       isLoading: false,
       error: null,
     });
@@ -180,7 +216,7 @@ describe("<AdminModerationReportDetails />", () => {
 
   it("shows the reopen action for admin-locked conversations", () => {
     mocks.useAdminModerationReport.mockReturnValue({
-      data: createReportData("admin_locked"),
+      data: createReportData({ conversationStatus: "admin_locked" }),
       isLoading: false,
       error: null,
     });
@@ -201,7 +237,7 @@ describe("<AdminModerationReportDetails />", () => {
 
   it("reopens an admin-locked conversation through the admin RPC hook", async () => {
     mocks.useAdminModerationReport.mockReturnValue({
-      data: createReportData("admin_locked"),
+      data: createReportData({ conversationStatus: "admin_locked" }),
       isLoading: false,
       error: null,
     });
@@ -224,7 +260,7 @@ describe("<AdminModerationReportDetails />", () => {
 
   it("disables locking for conversations that are already closed", () => {
     mocks.useAdminModerationReport.mockReturnValue({
-      data: createReportData("closed"),
+      data: createReportData({ conversationStatus: "closed" }),
       isLoading: false,
       error: null,
     });
@@ -250,7 +286,7 @@ describe("<AdminModerationReportDetails />", () => {
     );
 
     mocks.useAdminModerationReport.mockReturnValue({
-      data: createReportData("open"),
+      data: createReportData({ conversationStatus: "open" }),
       isLoading: false,
       error: null,
     });
@@ -261,6 +297,163 @@ describe("<AdminModerationReportDetails />", () => {
 
     expect(
       await screen.findByText("Only open conversations can be admin locked.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows the hide action for visible listings", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        listing: {
+          status: "published",
+          isActive: true,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Listing moderation")).toBeInTheDocument();
+    expect(screen.getAllByText("Custom Emote Pack").length).toBeGreaterThan(0);
+    expect(screen.getByText("Visibility:").closest("p")).toHaveTextContent(
+      "Visible"
+    );
+    expect(screen.getByRole("button", { name: "Hide listing" })).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Restore listing" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides a visible listing through the admin RPC hook", async () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        listing: {
+          status: "published",
+          isActive: true,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide listing" }));
+
+    await waitFor(() => {
+      expect(mocks.hideListing).toHaveBeenCalledWith({
+        listingId: "listing-1",
+        moderationReportId: "report-1",
+      });
+    });
+
+    expect(
+      await screen.findByText("Listing hidden from public visibility.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows the restore action for hidden published listings", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        listing: {
+          status: "published",
+          isActive: false,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Listing moderation")).toBeInTheDocument();
+    expect(screen.getByText("Visibility:").closest("p")).toHaveTextContent(
+      "Hidden"
+    );
+    expect(
+      screen.getByRole("button", { name: "Restore listing" })
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Hide listing" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("restores a hidden published listing through the admin RPC hook", async () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        listing: {
+          status: "published",
+          isActive: false,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore listing" }));
+
+    await waitFor(() => {
+      expect(mocks.restoreListing).toHaveBeenCalledWith({
+        listingId: "listing-1",
+        moderationReportId: "report-1",
+      });
+    });
+
+    expect(
+      await screen.findByText("Listing restored to public visibility.")
+    ).toBeInTheDocument();
+  });
+
+  it("does not allow draft listings to be restored to public visibility", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        listing: {
+          status: "draft",
+          isActive: false,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByRole("button", { name: "Restore listing" })
+    ).toBeDisabled();
+
+    expect(
+      screen.getByText(
+        "Only published listings can be restored to public visibility. Draft listings should stay hidden."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("shows a useful error when hiding a listing fails", async () => {
+    mocks.hideListing.mockRejectedValue(
+      new Error("Moderation report is not tied to this listing.")
+    );
+
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        listing: {
+          status: "published",
+          isActive: true,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide listing" }));
+
+    expect(
+      await screen.findByText("Moderation report is not tied to this listing.")
     ).toBeInTheDocument();
   });
 });

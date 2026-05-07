@@ -16,6 +16,7 @@ import {
 } from "../../hooks/admin/useAdminConversationModerationActions";
 import { useAdminModerationReport } from "../../hooks/admin/useAdminModerationReport";
 import { useUpdateModerationReportStatus } from "../../hooks/admin/useUpdateModerationReportStatus";
+import { useAdminHideListing, useAdminRestoreListing } from '../../hooks/admin/useAdminListingModerationActions';
 
 const classes = {
   page: "space-y-6",
@@ -122,6 +123,8 @@ const AdminModerationReportDetails = () => {
   const updateStatusMutation = useUpdateModerationReportStatus();
   const lockConversationMutation = useAdminLockConversation();
   const reopenConversationMutation = useAdminReopenConversation();
+  const hideListingMutation = useAdminHideListing();
+  const restoreListingMutation = useAdminRestoreListing();
 
   const report = data?.report ?? null;
   const conversation = data?.conversation ?? null;
@@ -144,6 +147,12 @@ const AdminModerationReportDetails = () => {
   const [conversationActionError, setConversationActionError] = useState<
     string | null
   >(null);
+  const [listingActionMessage, setListingActionMessage] = useState<string | null>(
+    null
+  );
+  const [listingActionError, setListingActionError] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     if (!report) return;
@@ -155,6 +164,8 @@ const AdminModerationReportDetails = () => {
     setSavedMessage(null);
     setConversationActionMessage(null);
     setConversationActionError(null);
+    setListingActionMessage(null);
+    setListingActionError(null);
   }, [report]);
 
   const reporterStatusMessageTrimmed = reporterStatusMessage.trim();
@@ -186,6 +197,14 @@ const AdminModerationReportDetails = () => {
   const canModerateConversation = Boolean(report?.id && conversation?.id);
   const isConversationOpen = conversationStatus === "open";
   const isConversationAdminLocked = conversationStatus === "admin_locked";
+
+  const listingActionBusy =
+    hideListingMutation.isPending || restoreListingMutation.isPending;
+
+  const canModerateListing = Boolean(report?.id && listing?.id);
+  const isListingPublished = listing?.status === "published";
+  const isListingVisible = Boolean(listing?.is_active);
+  const canRestoreListing = isListingPublished && !isListingVisible;
 
   const senderText = (senderUserId: string) =>
     profileText(profilesByUserId[senderUserId] ?? null, senderUserId);
@@ -250,6 +269,50 @@ const AdminModerationReportDetails = () => {
         error instanceof Error
           ? error.message
           : "Conversation could not be reopened right now."
+      );
+    }
+  };
+
+  const handleHideListing = async () => {
+    if (!report?.id || !listing?.id) return;
+
+    setListingActionMessage(null);
+    setListingActionError(null);
+
+    try {
+      await hideListingMutation.mutateAsync({
+        listingId: listing.id,
+        moderationReportId: report.id,
+      });
+
+      setListingActionMessage("Listing hidden from public visibility.");
+    } catch (error) {
+      setListingActionError(
+        error instanceof Error
+          ? error.message
+          : "Listing could not be hidden right now."
+      );
+    }
+  };
+
+  const handleRestoreListing = async () => {
+    if (!report?.id || !listing?.id) return;
+
+    setListingActionMessage(null);
+    setListingActionError(null);
+
+    try {
+      await restoreListingMutation.mutateAsync({
+        listingId: listing.id,
+        moderationReportId: report.id,
+      });
+
+      setListingActionMessage("Listing restored to public visibility.");
+    } catch (error) {
+      setListingActionError(
+        error instanceof Error
+          ? error.message
+          : "Listing could not be restored right now."
       );
     }
   };
@@ -558,6 +621,80 @@ const AdminModerationReportDetails = () => {
                   <p className={classes.hint}>
                     Only open conversations can be admin locked. Already closed
                     conversations remain available for review.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {canModerateListing && (
+            <div className={classes.card}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Listing moderation</h2>
+
+                <div className={classes.actionCard}>
+                  <div className={classes.actionTitle}>Admin listing visibility</div>
+
+                  <p className={classes.actionText}>
+                    Listing: <span className="font-bold">{listing?.title}</span>
+                  </p>
+
+                  <p className={classes.actionText}>
+                    Status:{" "}
+                    <span className="font-bold">{listing?.status ?? "Unknown"}</span>
+                  </p>
+
+                  <p className={classes.actionText}>
+                    Visibility:{" "}
+                    <span className="font-bold">
+                      {isListingVisible ? "Visible" : "Hidden"}
+                    </span>
+                  </p>
+
+                  <p className={classes.actionText}>
+                    Hiding removes the listing from public marketplace surfaces without
+                    deleting it or changing its draft/published status.
+                  </p>
+                </div>
+
+                {listingActionMessage && (
+                  <div className={classes.successCard}>{listingActionMessage}</div>
+                )}
+
+                {listingActionError && (
+                  <div className={classes.errorCard}>{listingActionError}</div>
+                )}
+
+                <div className={classes.row}>
+                  {isListingVisible && (
+                    <button
+                      className={classes.btnDanger}
+                      type="button"
+                      disabled={listingActionBusy}
+                      onClick={() => void handleHideListing()}
+                    >
+                      {hideListingMutation.isPending ? "Hiding…" : "Hide listing"}
+                    </button>
+                  )}
+
+                  {!isListingVisible && (
+                    <button
+                      className={classes.btnPrimary}
+                      type="button"
+                      disabled={listingActionBusy || !canRestoreListing}
+                      onClick={() => void handleRestoreListing()}
+                    >
+                      {restoreListingMutation.isPending
+                        ? "Restoring…"
+                        : "Restore listing"}
+                    </button>
+                  )}
+                </div>
+
+                {!isListingVisible && !isListingPublished && (
+                  <p className={classes.hint}>
+                    Only published listings can be restored to public visibility. Draft
+                    listings should stay hidden.
                   </p>
                 )}
               </div>
