@@ -52,11 +52,26 @@ export type AdminModerationReportListing = {
   updated_at: string;
 };
 
+export type AdminListingModerationAction = {
+  id: string;
+  moderation_report_id: string | null;
+  listing_id: string;
+  admin_user_id: string;
+  action_type: "admin_hidden" | "admin_restored";
+  previous_status: string;
+  new_status: string;
+  previous_is_active: boolean;
+  new_is_active: boolean;
+  admin_note: string | null;
+  created_at: string;
+};
+
 export type AdminModerationReportDetails = {
   report: AdminModerationReportRow | null;
   conversation: AdminModerationReportConversation | null;
   messages: AdminModerationReportMessage[];
   listing: AdminModerationReportListing | null;
+  listingModerationActions: AdminListingModerationAction[];
   reporter: AdminModerationReportProfile | null;
   reportedUser: AdminModerationReportProfile | null;
   profilesByUserId: Record<string, AdminModerationReportProfile>;
@@ -81,6 +96,7 @@ const emptyResult: AdminModerationReportDetails = {
   conversation: null,
   messages: [],
   listing: null,
+  listingModerationActions: [],
   reporter: null,
   reportedUser: null,
   profilesByUserId: {},
@@ -177,6 +193,26 @@ const fetchAdminModerationReport = async (
       .maybeSingle()
     : Promise.resolve({ data: null, error: null });
 
+  const listingModerationActionsPromise = reportRow.listing_id
+    ? supabase
+      .from("listing_moderation_actions")
+      .select(`
+        id,
+        moderation_report_id,
+        listing_id,
+        admin_user_id,
+        action_type,
+        previous_status,
+        new_status,
+        previous_is_active,
+        new_is_active,
+        admin_note,
+        created_at
+      `)
+      .eq("listing_id", reportRow.listing_id)
+      .order("created_at", { ascending: false })
+    : Promise.resolve({ data: [], error: null });
+
   const updatesPromise = supabase
     .from("moderation_report_updates")
     .select(`
@@ -198,11 +234,13 @@ const fetchAdminModerationReport = async (
     { data: conversation, error: conversationError },
     { data: messages, error: messagesError },
     { data: listing, error: listingError },
+    { data: listingModerationActions, error: listingModerationActionsError },
     { data: updates, error: updatesError },
   ] = await Promise.all([
     conversationPromise,
     messagesPromise,
     listingPromise,
+    listingModerationActionsPromise,
     updatesPromise,
   ]);
 
@@ -218,13 +256,17 @@ const fetchAdminModerationReport = async (
     throw listingError;
   }
 
+  if (listingModerationActionsError) {
+    throw listingModerationActionsError;
+  }
+
   if (updatesError) {
     throw updatesError;
   }
 
   const messageRows = (messages ?? []) as AdminModerationReportMessage[];
   const updateRows = (updates ?? []) as AdminModerationReportUpdate[];
-
+  const listingModerationActionRows = (listingModerationActions ?? []) as AdminListingModerationAction[];
   const userIds = Array.from(
     new Set(
       [
@@ -232,6 +274,7 @@ const fetchAdminModerationReport = async (
         reportRow.reported_user_id,
         ...messageRows.map((message) => message.sender_user_id),
         ...updateRows.map((update) => update.admin_user_id),
+        ...listingModerationActionRows.map((action) => action.admin_user_id),
       ].filter(Boolean)
     )
   );
@@ -257,6 +300,7 @@ const fetchAdminModerationReport = async (
     conversation: (conversation ?? null) as AdminModerationReportConversation | null,
     messages: messageRows,
     listing: (listing ?? null) as AdminModerationReportListing | null,
+    listingModerationActions: listingModerationActionRows,
     reporter: profilesByUserId[reportRow.reporter_user_id] ?? null,
     reportedUser: profilesByUserId[reportRow.reported_user_id] ?? null,
     profilesByUserId,

@@ -50,23 +50,33 @@ type ConversationStatus = "open" | "admin_locked" | "closed";
 
 type ReportDataOptions = {
   conversationStatus?: ConversationStatus;
+  profileReport?: boolean;
   listing?: {
     status: string;
     isActive: boolean;
   } | null;
+  listingModerationActions?: Array<{
+    id: string;
+    actionType: "admin_hidden" | "admin_restored";
+    previousIsActive: boolean;
+    newIsActive: boolean;
+    adminNote?: string | null;
+  }>;
 };
 
 const createReportData = ({
   conversationStatus = "open",
+  profileReport = false,
   listing = null,
+  listingModerationActions = [],
 }: ReportDataOptions = {}) => ({
   report: {
     id: "report-1",
-    target_type: listing ? "listing" : "conversation",
-    conversation_id: listing ? null : "conversation-1",
+    target_type: profileReport ? "profile" : listing ? "listing" : "conversation",
+    conversation_id: listing || profileReport ? null : "conversation-1",
     message_id: null,
     listing_id: listing ? "listing-1" : null,
-    profile_user_id: null,
+    profile_user_id: profileReport ? "reported-1" : null,
     reporter_user_id: "reporter-1",
     reported_user_id: "reported-1",
     reason_code: "harassment",
@@ -81,7 +91,7 @@ const createReportData = ({
     admin_notes: null,
     created_at: "2026-05-07T12:00:00.000Z",
   },
-  conversation: listing
+  conversation: listing || profileReport
     ? null
     : {
       id: "conversation-1",
@@ -107,6 +117,19 @@ const createReportData = ({
       updated_at: "2026-05-07T12:05:00.000Z",
     }
     : null,
+  listingModerationActions: listingModerationActions.map((action) => ({
+    id: action.id,
+    moderation_report_id: "report-1",
+    listing_id: "listing-1",
+    admin_user_id: "admin-1",
+    action_type: action.actionType,
+    previous_status: "published",
+    new_status: "published",
+    previous_is_active: action.previousIsActive,
+    new_is_active: action.newIsActive,
+    admin_note: action.adminNote ?? null,
+    created_at: "2026-05-07T12:10:00.000Z",
+  })),
   reporter: {
     user_id: "reporter-1",
     handle: "clientuser",
@@ -130,6 +153,12 @@ const createReportData = ({
       user_id: "reported-1",
       handle: "creatoruser",
       display_name: "Creator User",
+      avatar_url: null,
+    },
+    "admin-1": {
+      user_id: "admin-1",
+      handle: "adminuser",
+      display_name: "Admin User",
       avatar_url: null,
     },
   },
@@ -455,5 +484,24 @@ describe("<AdminModerationReportDetails />", () => {
     expect(
       await screen.findByText("Moderation report is not tied to this listing.")
     ).toBeInTheDocument();
+  });
+
+  it("shows profile context for profile reports", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        profileReport: true,
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Target context")).toBeInTheDocument();
+    expect(screen.getAllByText("@creatoruser").length).toBeGreaterThan(0);
+
+    expect(
+      screen.queryByText("Target context is not available for this report type yet.")
+    ).not.toBeInTheDocument();
   });
 });

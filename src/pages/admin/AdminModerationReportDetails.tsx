@@ -116,6 +116,9 @@ const profileText = (
 ) =>
   profile?.handle ? `@${profile.handle}` : profile?.display_name ?? fallbackUserId;
 
+const listingModerationActionText = (actionType: string) =>
+  actionType === "admin_restored" ? "Restored by admin" : "Hidden by admin";
+
 const AdminModerationReportDetails = () => {
   const { id } = useParams();
 
@@ -130,6 +133,7 @@ const AdminModerationReportDetails = () => {
   const conversation = data?.conversation ?? null;
   const messages = data?.messages ?? [];
   const listing = data?.listing ?? null;
+  const listingModerationActions = data?.listingModerationActions ?? [];
   const reporter = data?.reporter ?? null;
   const reportedUser = data?.reportedUser ?? null;
   const profilesByUserId = data?.profilesByUserId ?? {};
@@ -197,6 +201,12 @@ const AdminModerationReportDetails = () => {
   const canModerateConversation = Boolean(report?.id && conversation?.id);
   const isConversationOpen = conversationStatus === "open";
   const isConversationAdminLocked = conversationStatus === "admin_locked";
+
+  const profileTargetUserId = report?.profile_user_id ?? null;
+  const profileTargetUser = profileTargetUserId
+    ? profilesByUserId[profileTargetUserId] ?? reportedUser
+    : null;
+  const hasProfileTarget = Boolean(profileTargetUserId);
 
   const listingActionBusy =
     hideListingMutation.isPending || restoreListingMutation.isPending;
@@ -484,10 +494,58 @@ const AdminModerationReportDetails = () => {
                     <div className={classes.metaLabel}>Listing status</div>
                     <div className={classes.metaValue}>{listing.status}</div>
                   </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Listing visibility</div>
+                    <div className={classes.metaValue}>
+                      {listing.is_active ? "Visible" : "Hidden"}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Listing owner</div>
+                    <div className={classes.metaValue}>
+                      {profileText(reportedUser, listing.user_id)}
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {!conversation && !listing && (
+              {hasProfileTarget && (
+                <div className={classes.metaGrid}>
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Profile user</div>
+                    <div className={classes.metaValue}>
+                      {profileText(profileTargetUser, profileTargetUserId ?? "Unknown profile")}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Handle</div>
+                    <div className={classes.metaValue}>
+                      {profileTargetUser?.handle
+                        ? `@${profileTargetUser.handle}`
+                        : "No handle set"}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Display name</div>
+                    <div className={classes.metaValue}>
+                      {profileTargetUser?.display_name ?? "No display name set"}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Profile user ID</div>
+                    <div className={classes.metaValue}>
+                      {profileTargetUserId ?? "Unknown profile"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!conversation && !listing && !hasProfileTarget && (
                 <p className={classes.text}>
                   Target context is not available for this report type yet.
                 </p>
@@ -696,6 +754,66 @@ const AdminModerationReportDetails = () => {
                     Only published listings can be restored to public visibility. Draft
                     listings should stay hidden.
                   </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {canModerateListing && (
+            <div className={classes.card}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Listing moderation history</h2>
+
+                {listingModerationActions.length === 0 ? (
+                  <p className={classes.text}>
+                    No listing moderation actions have been logged yet.
+                  </p>
+                ) : (
+                  <div className={classes.stack}>
+                    {listingModerationActions.map((action) => (
+                      <div key={action.id} className={classes.updateCard}>
+                        <div className="space-y-2">
+                          <div>
+                            <strong>{listingModerationActionText(action.action_type)}</strong>{" "}
+                            · {dateText(action.created_at)}
+                          </div>
+
+                          <div>
+                            Admin:{" "}
+                            {profileText(
+                              profilesByUserId[action.admin_user_id] ?? null,
+                              action.admin_user_id
+                            )}
+                          </div>
+
+                          <div>
+                            Visibility:{" "}
+                            {action.previous_is_active ? "Visible" : "Hidden"} →{" "}
+                            {action.new_is_active ? "Visible" : "Hidden"}
+                          </div>
+
+                          <div>
+                            Status: {action.previous_status} → {action.new_status}
+                          </div>
+
+                          {action.moderation_report_id && (
+                            <div>
+                              Report:{" "}
+                              {action.moderation_report_id === report.id
+                                ? "This report"
+                                : action.moderation_report_id}
+                            </div>
+                          )}
+
+                          {action.admin_note && (
+                            <div>
+                              <strong>Internal note:</strong> {action.admin_note}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
