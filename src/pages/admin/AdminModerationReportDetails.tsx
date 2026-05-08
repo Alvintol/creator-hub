@@ -16,6 +16,8 @@ import {
 } from "../../hooks/admin/useAdminConversationModerationActions";
 import { useAdminModerationReport } from "../../hooks/admin/useAdminModerationReport";
 import { useUpdateModerationReportStatus } from "../../hooks/admin/useUpdateModerationReportStatus";
+import { useAdminHideListing, useAdminRestoreListing } from '../../hooks/admin/useAdminListingModerationActions';
+import { useAdminClearProfileReviewFlag, useAdminMarkProfileUnderReview } from '../../hooks/admin/useAdminProfileModerationActions';
 
 const classes = {
   page: "space-y-6",
@@ -115,6 +117,14 @@ const profileText = (
 ) =>
   profile?.handle ? `@${profile.handle}` : profile?.display_name ?? fallbackUserId;
 
+const listingModerationActionText = (actionType: string) =>
+  actionType === "admin_restored" ? "Restored by admin" : "Hidden by admin";
+
+const profileModerationActionText = (actionType: string) =>
+  actionType === "review_cleared"
+    ? "Review flag cleared"
+    : "Marked under review";
+
 const AdminModerationReportDetails = () => {
   const { id } = useParams();
 
@@ -122,15 +132,23 @@ const AdminModerationReportDetails = () => {
   const updateStatusMutation = useUpdateModerationReportStatus();
   const lockConversationMutation = useAdminLockConversation();
   const reopenConversationMutation = useAdminReopenConversation();
+  const hideListingMutation = useAdminHideListing();
+  const restoreListingMutation = useAdminRestoreListing();
+  const markProfileUnderReviewMutation = useAdminMarkProfileUnderReview();
+  const clearProfileReviewFlagMutation = useAdminClearProfileReviewFlag();
 
   const report = data?.report ?? null;
   const conversation = data?.conversation ?? null;
   const messages = data?.messages ?? [];
   const listing = data?.listing ?? null;
+  const listingModerationActions = data?.listingModerationActions ?? [];
   const reporter = data?.reporter ?? null;
   const reportedUser = data?.reportedUser ?? null;
   const profilesByUserId = data?.profilesByUserId ?? {};
   const updates = data?.updates ?? [];
+  const profileModerationState = data?.profileModerationState ?? null;
+  const profileModerationActions = data?.profileModerationActions ?? [];
+
 
   const [status, setStatus] = useState<ModerationReportStatus>("submitted");
   const [resolutionCode, setResolutionCode] =
@@ -144,6 +162,18 @@ const AdminModerationReportDetails = () => {
   const [conversationActionError, setConversationActionError] = useState<
     string | null
   >(null);
+  const [listingActionMessage, setListingActionMessage] = useState<string | null>(
+    null
+  );
+  const [listingActionError, setListingActionError] = useState<string | null>(
+    null
+  );
+  const [profileActionMessage, setProfileActionMessage] = useState<string | null>(
+    null
+  );
+  const [profileActionError, setProfileActionError] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     if (!report) return;
@@ -155,6 +185,10 @@ const AdminModerationReportDetails = () => {
     setSavedMessage(null);
     setConversationActionMessage(null);
     setConversationActionError(null);
+    setListingActionMessage(null);
+    setListingActionError(null);
+    setProfileActionMessage(null);
+    setProfileActionError(null);
   }, [report]);
 
   const reporterStatusMessageTrimmed = reporterStatusMessage.trim();
@@ -186,6 +220,27 @@ const AdminModerationReportDetails = () => {
   const canModerateConversation = Boolean(report?.id && conversation?.id);
   const isConversationOpen = conversationStatus === "open";
   const isConversationAdminLocked = conversationStatus === "admin_locked";
+
+  const profileTargetUserId = report?.profile_user_id ?? null;
+  const profileTargetUser = profileTargetUserId
+    ? profilesByUserId[profileTargetUserId] ?? reportedUser
+    : null;
+  const hasProfileTarget = Boolean(profileTargetUserId);
+
+  const listingActionBusy =
+    hideListingMutation.isPending || restoreListingMutation.isPending;
+
+  const canModerateListing = Boolean(report?.id && listing?.id);
+  const isListingPublished = listing?.status === "published";
+  const isListingVisible = Boolean(listing?.is_active);
+  const canRestoreListing = isListingPublished && !isListingVisible;
+
+  const profileActionBusy =
+    markProfileUnderReviewMutation.isPending ||
+    clearProfileReviewFlagMutation.isPending;
+
+  const canModerateProfile = Boolean(report?.id && profileTargetUserId);
+  const isProfileUnderReview = Boolean(profileModerationState?.is_under_review);
 
   const senderText = (senderUserId: string) =>
     profileText(profilesByUserId[senderUserId] ?? null, senderUserId);
@@ -250,6 +305,94 @@ const AdminModerationReportDetails = () => {
         error instanceof Error
           ? error.message
           : "Conversation could not be reopened right now."
+      );
+    }
+  };
+
+  const handleHideListing = async () => {
+    if (!report?.id || !listing?.id) return;
+
+    setListingActionMessage(null);
+    setListingActionError(null);
+
+    try {
+      await hideListingMutation.mutateAsync({
+        listingId: listing.id,
+        moderationReportId: report.id,
+      });
+
+      setListingActionMessage("Listing hidden from public visibility.");
+    } catch (error) {
+      setListingActionError(
+        error instanceof Error
+          ? error.message
+          : "Listing could not be hidden right now."
+      );
+    }
+  };
+
+  const handleRestoreListing = async () => {
+    if (!report?.id || !listing?.id) return;
+
+    setListingActionMessage(null);
+    setListingActionError(null);
+
+    try {
+      await restoreListingMutation.mutateAsync({
+        listingId: listing.id,
+        moderationReportId: report.id,
+      });
+
+      setListingActionMessage("Listing restored to public visibility.");
+    } catch (error) {
+      setListingActionError(
+        error instanceof Error
+          ? error.message
+          : "Listing could not be restored right now."
+      );
+    }
+  };
+
+  const handleMarkProfileUnderReview = async () => {
+    if (!report?.id || !profileTargetUserId) return;
+
+    setProfileActionMessage(null);
+    setProfileActionError(null);
+
+    try {
+      await markProfileUnderReviewMutation.mutateAsync({
+        profileUserId: profileTargetUserId,
+        moderationReportId: report.id,
+      });
+
+      setProfileActionMessage("Profile marked under review.");
+    } catch (error) {
+      setProfileActionError(
+        error instanceof Error
+          ? error.message
+          : "Profile could not be marked under review right now."
+      );
+    }
+  };
+
+  const handleClearProfileReviewFlag = async () => {
+    if (!report?.id || !profileTargetUserId) return;
+
+    setProfileActionMessage(null);
+    setProfileActionError(null);
+
+    try {
+      await clearProfileReviewFlagMutation.mutateAsync({
+        profileUserId: profileTargetUserId,
+        moderationReportId: report.id,
+      });
+
+      setProfileActionMessage("Profile review flag cleared.");
+    } catch (error) {
+      setProfileActionError(
+        error instanceof Error
+          ? error.message
+          : "Profile review flag could not be cleared right now."
       );
     }
   };
@@ -421,10 +564,58 @@ const AdminModerationReportDetails = () => {
                     <div className={classes.metaLabel}>Listing status</div>
                     <div className={classes.metaValue}>{listing.status}</div>
                   </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Listing visibility</div>
+                    <div className={classes.metaValue}>
+                      {listing.is_active ? "Visible" : "Hidden"}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Listing owner</div>
+                    <div className={classes.metaValue}>
+                      {profileText(reportedUser, listing.user_id)}
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {!conversation && !listing && (
+              {hasProfileTarget && (
+                <div className={classes.metaGrid}>
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Profile user</div>
+                    <div className={classes.metaValue}>
+                      {profileText(profileTargetUser, profileTargetUserId ?? "Unknown profile")}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Handle</div>
+                    <div className={classes.metaValue}>
+                      {profileTargetUser?.handle
+                        ? `@${profileTargetUser.handle}`
+                        : "No handle set"}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Display name</div>
+                    <div className={classes.metaValue}>
+                      {profileTargetUser?.display_name ?? "No display name set"}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Profile user ID</div>
+                    <div className={classes.metaValue}>
+                      {profileTargetUserId ?? "Unknown profile"}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!conversation && !listing && !hasProfileTarget && (
                 <p className={classes.text}>
                   Target context is not available for this report type yet.
                 </p>
@@ -559,6 +750,268 @@ const AdminModerationReportDetails = () => {
                     Only open conversations can be admin locked. Already closed
                     conversations remain available for review.
                   </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {canModerateListing && (
+            <div className={classes.card}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Listing moderation</h2>
+
+                <div className={classes.actionCard}>
+                  <div className={classes.actionTitle}>Admin listing visibility</div>
+
+                  <p className={classes.actionText}>
+                    Listing: <span className="font-bold">{listing?.title}</span>
+                  </p>
+
+                  <p className={classes.actionText}>
+                    Status:{" "}
+                    <span className="font-bold">{listing?.status ?? "Unknown"}</span>
+                  </p>
+
+                  <p className={classes.actionText}>
+                    Visibility:{" "}
+                    <span className="font-bold">
+                      {isListingVisible ? "Visible" : "Hidden"}
+                    </span>
+                  </p>
+
+                  <p className={classes.actionText}>
+                    Hiding removes the listing from public marketplace surfaces without
+                    deleting it or changing its draft/published status.
+                  </p>
+                </div>
+
+                {listingActionMessage && (
+                  <div className={classes.successCard}>{listingActionMessage}</div>
+                )}
+
+                {listingActionError && (
+                  <div className={classes.errorCard}>{listingActionError}</div>
+                )}
+
+                <div className={classes.row}>
+                  {isListingVisible && (
+                    <button
+                      className={classes.btnDanger}
+                      type="button"
+                      disabled={listingActionBusy}
+                      onClick={() => void handleHideListing()}
+                    >
+                      {hideListingMutation.isPending ? "Hiding…" : "Hide listing"}
+                    </button>
+                  )}
+
+                  {!isListingVisible && (
+                    <button
+                      className={classes.btnPrimary}
+                      type="button"
+                      disabled={listingActionBusy || !canRestoreListing}
+                      onClick={() => void handleRestoreListing()}
+                    >
+                      {restoreListingMutation.isPending
+                        ? "Restoring…"
+                        : "Restore listing"}
+                    </button>
+                  )}
+                </div>
+
+                {!isListingVisible && !isListingPublished && (
+                  <p className={classes.hint}>
+                    Only published listings can be restored to public visibility. Draft
+                    listings should stay hidden.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {canModerateListing && (
+            <div className={classes.card}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Listing moderation history</h2>
+
+                {listingModerationActions.length === 0 ? (
+                  <p className={classes.text}>
+                    No listing moderation actions have been logged yet.
+                  </p>
+                ) : (
+                  <div className={classes.stack}>
+                    {listingModerationActions.map((action) => (
+                      <div key={action.id} className={classes.updateCard}>
+                        <div className="space-y-2">
+                          <div>
+                            <strong>{listingModerationActionText(action.action_type)}</strong>{" "}
+                            · {dateText(action.created_at)}
+                          </div>
+
+                          <div>
+                            Admin:{" "}
+                            {profileText(
+                              profilesByUserId[action.admin_user_id] ?? null,
+                              action.admin_user_id
+                            )}
+                          </div>
+
+                          <div>
+                            Visibility:{" "}
+                            {action.previous_is_active ? "Visible" : "Hidden"} →{" "}
+                            {action.new_is_active ? "Visible" : "Hidden"}
+                          </div>
+
+                          <div>
+                            Status: {action.previous_status} → {action.new_status}
+                          </div>
+
+                          {action.moderation_report_id && (
+                            <div>
+                              Report:{" "}
+                              {action.moderation_report_id === report.id
+                                ? "This report"
+                                : action.moderation_report_id}
+                            </div>
+                          )}
+
+                          {action.admin_note && (
+                            <div>
+                              <strong>Internal note:</strong> {action.admin_note}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {canModerateProfile && (
+            <div className={classes.card}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Profile moderation</h2>
+
+                <div className={classes.actionCard}>
+                  <div className={classes.actionTitle}>Admin profile review</div>
+
+                  <p className={classes.actionText}>
+                    Profile:{" "}
+                    <span className="font-bold">
+                      {profileText(profileTargetUser, profileTargetUserId ?? "Unknown profile")}
+                    </span>
+                  </p>
+
+                  <p className={classes.actionText}>
+                    Review state:{" "}
+                    <span className="font-bold">
+                      {isProfileUnderReview ? "Under review" : "Not under review"}
+                    </span>
+                  </p>
+
+                  <p className={classes.actionText}>
+                    This is an internal admin flag only. It does not hide the profile,
+                    suspend the user, or notify either party.
+                  </p>
+                </div>
+
+                {profileActionMessage && (
+                  <div className={classes.successCard}>{profileActionMessage}</div>
+                )}
+
+                {profileActionError && (
+                  <div className={classes.errorCard}>{profileActionError}</div>
+                )}
+
+                <div className={classes.row}>
+                  {!isProfileUnderReview && (
+                    <button
+                      className={classes.btnDanger}
+                      type="button"
+                      disabled={profileActionBusy}
+                      onClick={() => void handleMarkProfileUnderReview()}
+                    >
+                      {markProfileUnderReviewMutation.isPending
+                        ? "Marking…"
+                        : "Mark under review"}
+                    </button>
+                  )}
+
+                  {isProfileUnderReview && (
+                    <button
+                      className={classes.btnPrimary}
+                      type="button"
+                      disabled={profileActionBusy}
+                      onClick={() => void handleClearProfileReviewFlag()}
+                    >
+                      {clearProfileReviewFlagMutation.isPending
+                        ? "Clearing…"
+                        : "Clear review flag"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {canModerateProfile && (
+            <div className={classes.card}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Profile moderation history</h2>
+
+                {profileModerationActions.length === 0 ? (
+                  <p className={classes.text}>
+                    No profile moderation actions have been logged yet.
+                  </p>
+                ) : (
+                  <div className={classes.stack}>
+                    {profileModerationActions.map((action) => (
+                      <div key={action.id} className={classes.updateCard}>
+                        <div className="space-y-2">
+                          <div>
+                            <strong>{profileModerationActionText(action.action_type)}</strong>{" "}
+                            · {dateText(action.created_at)}
+                          </div>
+
+                          <div>
+                            Admin:{" "}
+                            {profileText(
+                              profilesByUserId[action.admin_user_id] ?? null,
+                              action.admin_user_id
+                            )}
+                          </div>
+
+                          <div>
+                            Review state:{" "}
+                            {action.previous_is_under_review
+                              ? "Under review"
+                              : "Not under review"}{" "}
+                            →{" "}
+                            {action.new_is_under_review
+                              ? "Under review"
+                              : "Not under review"}
+                          </div>
+
+                          {action.moderation_report_id && (
+                            <div>
+                              Report:{" "}
+                              {action.moderation_report_id === report.id
+                                ? "This report"
+                                : action.moderation_report_id}
+                            </div>
+                          )}
+
+                          {action.admin_note && (
+                            <div>
+                              <strong>Internal note:</strong> {action.admin_note}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
