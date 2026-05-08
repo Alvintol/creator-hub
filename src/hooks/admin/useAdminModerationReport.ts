@@ -76,6 +76,8 @@ export type AdminModerationReportDetails = {
   reportedUser: AdminModerationReportProfile | null;
   profilesByUserId: Record<string, AdminModerationReportProfile>;
   updates: AdminModerationReportUpdate[];
+  profileModerationState: AdminProfileModerationState | null;
+  profileModerationActions: AdminProfileModerationAction[];
 };
 
 export type AdminModerationReportUpdate = {
@@ -91,6 +93,28 @@ export type AdminModerationReportUpdate = {
   created_at: string;
 };
 
+export type AdminProfileModerationState = {
+  profile_user_id: string;
+  is_under_review: boolean;
+  review_started_at: string | null;
+  review_started_by_user_id: string | null;
+  review_cleared_at: string | null;
+  review_cleared_by_user_id: string | null;
+  updated_at: string;
+};
+
+export type AdminProfileModerationAction = {
+  id: string;
+  moderation_report_id: string | null;
+  profile_user_id: string;
+  admin_user_id: string;
+  action_type: "under_review" | "review_cleared";
+  previous_is_under_review: boolean;
+  new_is_under_review: boolean;
+  admin_note: string | null;
+  created_at: string;
+};
+
 const emptyResult: AdminModerationReportDetails = {
   report: null,
   conversation: null,
@@ -101,6 +125,8 @@ const emptyResult: AdminModerationReportDetails = {
   reportedUser: null,
   profilesByUserId: {},
   updates: [],
+  profileModerationState: null,
+  profileModerationActions: [],
 };
 
 // Loads a single moderation report plus useful target context for admin review
@@ -213,6 +239,40 @@ const fetchAdminModerationReport = async (
       .order("created_at", { ascending: false })
     : Promise.resolve({ data: [], error: null });
 
+  const profileModerationStatePromise = reportRow.profile_user_id
+    ? supabase
+      .from("profile_moderation_states")
+      .select(`
+        profile_user_id,
+        is_under_review,
+        review_started_at,
+        review_started_by_user_id,
+        review_cleared_at,
+        review_cleared_by_user_id,
+        updated_at
+      `)
+      .eq("profile_user_id", reportRow.profile_user_id)
+      .maybeSingle()
+    : Promise.resolve({ data: null, error: null });
+
+  const profileModerationActionsPromise = reportRow.profile_user_id
+    ? supabase
+      .from("profile_moderation_actions")
+      .select(`
+        id,
+        moderation_report_id,
+        profile_user_id,
+        admin_user_id,
+        action_type,
+        previous_is_under_review,
+        new_is_under_review,
+        admin_note,
+        created_at
+      `)
+      .eq("profile_user_id", reportRow.profile_user_id)
+      .order("created_at", { ascending: false })
+    : Promise.resolve({ data: [], error: null });
+
   const updatesPromise = supabase
     .from("moderation_report_updates")
     .select(`
@@ -236,12 +296,16 @@ const fetchAdminModerationReport = async (
     { data: listing, error: listingError },
     { data: listingModerationActions, error: listingModerationActionsError },
     { data: updates, error: updatesError },
+    { data: profileModerationState, error: profileModerationStateError },
+    { data: profileModerationActions, error: profileModerationActionsError },
   ] = await Promise.all([
     conversationPromise,
     messagesPromise,
     listingPromise,
     listingModerationActionsPromise,
     updatesPromise,
+    profileModerationStatePromise,
+    profileModerationActionsPromise,
   ]);
 
   if (conversationError) {
@@ -264,9 +328,18 @@ const fetchAdminModerationReport = async (
     throw updatesError;
   }
 
+  if (profileModerationStateError) {
+    throw profileModerationStateError;
+  }
+
+  if (profileModerationActionsError) {
+    throw profileModerationActionsError;
+  }
+
   const messageRows = (messages ?? []) as AdminModerationReportMessage[];
   const updateRows = (updates ?? []) as AdminModerationReportUpdate[];
   const listingModerationActionRows = (listingModerationActions ?? []) as AdminListingModerationAction[];
+  const profileModerationActionRows = (profileModerationActions ?? []) as AdminProfileModerationAction[];
   const userIds = Array.from(
     new Set(
       [
@@ -275,6 +348,7 @@ const fetchAdminModerationReport = async (
         ...messageRows.map((message) => message.sender_user_id),
         ...updateRows.map((update) => update.admin_user_id),
         ...listingModerationActionRows.map((action) => action.admin_user_id),
+        ...profileModerationActionRows.map((action) => action.admin_user_id),
       ].filter(Boolean)
     )
   );
@@ -305,6 +379,9 @@ const fetchAdminModerationReport = async (
     reportedUser: profilesByUserId[reportRow.reported_user_id] ?? null,
     profilesByUserId,
     updates: updateRows,
+    profileModerationState:
+  (profileModerationState ?? null) as AdminProfileModerationState | null,
+profileModerationActions: profileModerationActionRows,
   };
 };
 

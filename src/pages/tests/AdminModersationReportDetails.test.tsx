@@ -10,6 +10,19 @@ const mocks = vi.hoisted(() => ({
   updateReportStatus: vi.fn(),
   hideListing: vi.fn(),
   restoreListing: vi.fn(),
+  markProfileUnderReview: vi.fn(),
+  clearProfileReviewFlag: vi.fn(),
+}));
+
+vi.mock("../../hooks/admin/useAdminProfileModerationActions", () => ({
+  useAdminMarkProfileUnderReview: () => ({
+    mutateAsync: mocks.markProfileUnderReview,
+    isPending: false,
+  }),
+  useAdminClearProfileReviewFlag: () => ({
+    mutateAsync: mocks.clearProfileReviewFlag,
+    isPending: false,
+  }),
 }));
 
 vi.mock("../../hooks/admin/useAdminModerationReport", () => ({
@@ -51,6 +64,16 @@ type ConversationStatus = "open" | "admin_locked" | "closed";
 type ReportDataOptions = {
   conversationStatus?: ConversationStatus;
   profileReport?: boolean;
+  profileModerationState?: {
+    isUnderReview: boolean;
+  } | null;
+  profileModerationActions?: Array<{
+    id: string;
+    actionType: "under_review" | "review_cleared";
+    previousIsUnderReview: boolean;
+    newIsUnderReview: boolean;
+    adminNote?: string | null;
+  }>;
   listing?: {
     status: string;
     isActive: boolean;
@@ -67,6 +90,8 @@ type ReportDataOptions = {
 const createReportData = ({
   conversationStatus = "open",
   profileReport = false,
+  profileModerationState = null,
+  profileModerationActions = [],
   listing = null,
   listingModerationActions = [],
 }: ReportDataOptions = {}) => ({
@@ -129,6 +154,36 @@ const createReportData = ({
     new_is_active: action.newIsActive,
     admin_note: action.adminNote ?? null,
     created_at: "2026-05-07T12:10:00.000Z",
+  })),
+  profileModerationState: profileModerationState
+    ? {
+      profile_user_id: "reported-1",
+      is_under_review: profileModerationState.isUnderReview,
+      review_started_at: profileModerationState.isUnderReview
+        ? "2026-05-08T12:10:00.000Z"
+        : null,
+      review_started_by_user_id: profileModerationState.isUnderReview
+        ? "admin-1"
+        : null,
+      review_cleared_at: profileModerationState.isUnderReview
+        ? null
+        : "2026-05-08T12:20:00.000Z",
+      review_cleared_by_user_id: profileModerationState.isUnderReview
+        ? null
+        : "admin-1",
+      updated_at: "2026-05-08T12:20:00.000Z",
+    }
+    : null,
+  profileModerationActions: profileModerationActions.map((action) => ({
+    id: action.id,
+    moderation_report_id: "report-1",
+    profile_user_id: "reported-1",
+    admin_user_id: "admin-1",
+    action_type: action.actionType,
+    previous_is_under_review: action.previousIsUnderReview,
+    new_is_under_review: action.newIsUnderReview,
+    admin_note: action.adminNote ?? null,
+    created_at: "2026-05-08T12:10:00.000Z",
   })),
   reporter: {
     user_id: "reporter-1",
@@ -196,6 +251,38 @@ describe("<AdminModerationReportDetails />", () => {
     });
 
     mocks.updateReportStatus.mockResolvedValue({});
+
+    mocks.hideListing.mockResolvedValue({
+      listing_id: "listing-1",
+      previous_status: "published",
+      new_status: "published",
+      previous_is_active: true,
+      new_is_active: false,
+      changed: true,
+    });
+
+    mocks.restoreListing.mockResolvedValue({
+      listing_id: "listing-1",
+      previous_status: "published",
+      new_status: "published",
+      previous_is_active: false,
+      new_is_active: true,
+      changed: true,
+    });
+
+    mocks.markProfileUnderReview.mockResolvedValue({
+      profile_user_id: "reported-1",
+      previous_is_under_review: false,
+      new_is_under_review: true,
+      changed: true,
+    });
+
+    mocks.clearProfileReviewFlag.mockResolvedValue({
+      profile_user_id: "reported-1",
+      previous_is_under_review: true,
+      new_is_under_review: false,
+      changed: true,
+    });
   });
 
   it("shows the lock action for open conversations", () => {
@@ -503,5 +590,142 @@ describe("<AdminModerationReportDetails />", () => {
     expect(
       screen.queryByText("Target context is not available for this report type yet.")
     ).not.toBeInTheDocument();
+  });
+
+  it("shows the mark-under-review action for profile reports not under review", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        profileReport: true,
+        profileModerationState: {
+          isUnderReview: false,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Profile moderation")).toBeInTheDocument();
+    expect(screen.getByText("Review state:").closest("p")).toHaveTextContent(
+      "Not under review"
+    );
+    expect(
+      screen.getByRole("button", { name: "Mark under review" })
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Clear review flag" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("marks a profile under review through the admin RPC hook", async () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        profileReport: true,
+        profileModerationState: {
+          isUnderReview: false,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark under review" }));
+
+    await waitFor(() => {
+      expect(mocks.markProfileUnderReview).toHaveBeenCalledWith({
+        profileUserId: "reported-1",
+        moderationReportId: "report-1",
+      });
+    });
+
+    expect(
+      await screen.findByText("Profile marked under review.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows the clear-review action for profile reports under review", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        profileReport: true,
+        profileModerationState: {
+          isUnderReview: true,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Profile moderation")).toBeInTheDocument();
+    expect(screen.getByText("Review state:").closest("p")).toHaveTextContent(
+      "Under review"
+    );
+    expect(
+      screen.getByRole("button", { name: "Clear review flag" })
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", { name: "Mark under review" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("clears a profile review flag through the admin RPC hook", async () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        profileReport: true,
+        profileModerationState: {
+          isUnderReview: true,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear review flag" }));
+
+    await waitFor(() => {
+      expect(mocks.clearProfileReviewFlag).toHaveBeenCalledWith({
+        profileUserId: "reported-1",
+        moderationReportId: "report-1",
+      });
+    });
+
+    expect(
+      await screen.findByText("Profile review flag cleared.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows profile moderation history actions", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        profileReport: true,
+        profileModerationState: {
+          isUnderReview: true,
+        },
+        profileModerationActions: [
+          {
+            id: "profile-action-1",
+            actionType: "under_review",
+            previousIsUnderReview: false,
+            newIsUnderReview: true,
+            adminNote: "Reviewing repeated reports.",
+          },
+        ],
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Profile moderation history")).toBeInTheDocument();
+    expect(screen.getByText("Marked under review")).toBeInTheDocument();
+    expect(screen.getByText("Reviewing repeated reports.")).toBeInTheDocument();
+    expect(screen.getByText(/@adminuser/)).toBeInTheDocument();
   });
 });

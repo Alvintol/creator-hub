@@ -17,6 +17,7 @@ import {
 import { useAdminModerationReport } from "../../hooks/admin/useAdminModerationReport";
 import { useUpdateModerationReportStatus } from "../../hooks/admin/useUpdateModerationReportStatus";
 import { useAdminHideListing, useAdminRestoreListing } from '../../hooks/admin/useAdminListingModerationActions';
+import { useAdminClearProfileReviewFlag, useAdminMarkProfileUnderReview } from '../../hooks/admin/useAdminProfileModerationActions';
 
 const classes = {
   page: "space-y-6",
@@ -119,6 +120,11 @@ const profileText = (
 const listingModerationActionText = (actionType: string) =>
   actionType === "admin_restored" ? "Restored by admin" : "Hidden by admin";
 
+const profileModerationActionText = (actionType: string) =>
+  actionType === "review_cleared"
+    ? "Review flag cleared"
+    : "Marked under review";
+
 const AdminModerationReportDetails = () => {
   const { id } = useParams();
 
@@ -128,6 +134,8 @@ const AdminModerationReportDetails = () => {
   const reopenConversationMutation = useAdminReopenConversation();
   const hideListingMutation = useAdminHideListing();
   const restoreListingMutation = useAdminRestoreListing();
+  const markProfileUnderReviewMutation = useAdminMarkProfileUnderReview();
+  const clearProfileReviewFlagMutation = useAdminClearProfileReviewFlag();
 
   const report = data?.report ?? null;
   const conversation = data?.conversation ?? null;
@@ -138,6 +146,9 @@ const AdminModerationReportDetails = () => {
   const reportedUser = data?.reportedUser ?? null;
   const profilesByUserId = data?.profilesByUserId ?? {};
   const updates = data?.updates ?? [];
+  const profileModerationState = data?.profileModerationState ?? null;
+  const profileModerationActions = data?.profileModerationActions ?? [];
+
 
   const [status, setStatus] = useState<ModerationReportStatus>("submitted");
   const [resolutionCode, setResolutionCode] =
@@ -157,6 +168,12 @@ const AdminModerationReportDetails = () => {
   const [listingActionError, setListingActionError] = useState<string | null>(
     null
   );
+  const [profileActionMessage, setProfileActionMessage] = useState<string | null>(
+    null
+  );
+  const [profileActionError, setProfileActionError] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     if (!report) return;
@@ -170,6 +187,8 @@ const AdminModerationReportDetails = () => {
     setConversationActionError(null);
     setListingActionMessage(null);
     setListingActionError(null);
+    setProfileActionMessage(null);
+    setProfileActionError(null);
   }, [report]);
 
   const reporterStatusMessageTrimmed = reporterStatusMessage.trim();
@@ -215,6 +234,13 @@ const AdminModerationReportDetails = () => {
   const isListingPublished = listing?.status === "published";
   const isListingVisible = Boolean(listing?.is_active);
   const canRestoreListing = isListingPublished && !isListingVisible;
+
+  const profileActionBusy =
+    markProfileUnderReviewMutation.isPending ||
+    clearProfileReviewFlagMutation.isPending;
+
+  const canModerateProfile = Boolean(report?.id && profileTargetUserId);
+  const isProfileUnderReview = Boolean(profileModerationState?.is_under_review);
 
   const senderText = (senderUserId: string) =>
     profileText(profilesByUserId[senderUserId] ?? null, senderUserId);
@@ -323,6 +349,50 @@ const AdminModerationReportDetails = () => {
         error instanceof Error
           ? error.message
           : "Listing could not be restored right now."
+      );
+    }
+  };
+
+  const handleMarkProfileUnderReview = async () => {
+    if (!report?.id || !profileTargetUserId) return;
+
+    setProfileActionMessage(null);
+    setProfileActionError(null);
+
+    try {
+      await markProfileUnderReviewMutation.mutateAsync({
+        profileUserId: profileTargetUserId,
+        moderationReportId: report.id,
+      });
+
+      setProfileActionMessage("Profile marked under review.");
+    } catch (error) {
+      setProfileActionError(
+        error instanceof Error
+          ? error.message
+          : "Profile could not be marked under review right now."
+      );
+    }
+  };
+
+  const handleClearProfileReviewFlag = async () => {
+    if (!report?.id || !profileTargetUserId) return;
+
+    setProfileActionMessage(null);
+    setProfileActionError(null);
+
+    try {
+      await clearProfileReviewFlagMutation.mutateAsync({
+        profileUserId: profileTargetUserId,
+        moderationReportId: report.id,
+      });
+
+      setProfileActionMessage("Profile review flag cleared.");
+    } catch (error) {
+      setProfileActionError(
+        error instanceof Error
+          ? error.message
+          : "Profile review flag could not be cleared right now."
       );
     }
   };
@@ -794,6 +864,134 @@ const AdminModerationReportDetails = () => {
 
                           <div>
                             Status: {action.previous_status} → {action.new_status}
+                          </div>
+
+                          {action.moderation_report_id && (
+                            <div>
+                              Report:{" "}
+                              {action.moderation_report_id === report.id
+                                ? "This report"
+                                : action.moderation_report_id}
+                            </div>
+                          )}
+
+                          {action.admin_note && (
+                            <div>
+                              <strong>Internal note:</strong> {action.admin_note}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {canModerateProfile && (
+            <div className={classes.card}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Profile moderation</h2>
+
+                <div className={classes.actionCard}>
+                  <div className={classes.actionTitle}>Admin profile review</div>
+
+                  <p className={classes.actionText}>
+                    Profile:{" "}
+                    <span className="font-bold">
+                      {profileText(profileTargetUser, profileTargetUserId ?? "Unknown profile")}
+                    </span>
+                  </p>
+
+                  <p className={classes.actionText}>
+                    Review state:{" "}
+                    <span className="font-bold">
+                      {isProfileUnderReview ? "Under review" : "Not under review"}
+                    </span>
+                  </p>
+
+                  <p className={classes.actionText}>
+                    This is an internal admin flag only. It does not hide the profile,
+                    suspend the user, or notify either party.
+                  </p>
+                </div>
+
+                {profileActionMessage && (
+                  <div className={classes.successCard}>{profileActionMessage}</div>
+                )}
+
+                {profileActionError && (
+                  <div className={classes.errorCard}>{profileActionError}</div>
+                )}
+
+                <div className={classes.row}>
+                  {!isProfileUnderReview && (
+                    <button
+                      className={classes.btnDanger}
+                      type="button"
+                      disabled={profileActionBusy}
+                      onClick={() => void handleMarkProfileUnderReview()}
+                    >
+                      {markProfileUnderReviewMutation.isPending
+                        ? "Marking…"
+                        : "Mark under review"}
+                    </button>
+                  )}
+
+                  {isProfileUnderReview && (
+                    <button
+                      className={classes.btnPrimary}
+                      type="button"
+                      disabled={profileActionBusy}
+                      onClick={() => void handleClearProfileReviewFlag()}
+                    >
+                      {clearProfileReviewFlagMutation.isPending
+                        ? "Clearing…"
+                        : "Clear review flag"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {canModerateProfile && (
+            <div className={classes.card}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Profile moderation history</h2>
+
+                {profileModerationActions.length === 0 ? (
+                  <p className={classes.text}>
+                    No profile moderation actions have been logged yet.
+                  </p>
+                ) : (
+                  <div className={classes.stack}>
+                    {profileModerationActions.map((action) => (
+                      <div key={action.id} className={classes.updateCard}>
+                        <div className="space-y-2">
+                          <div>
+                            <strong>{profileModerationActionText(action.action_type)}</strong>{" "}
+                            · {dateText(action.created_at)}
+                          </div>
+
+                          <div>
+                            Admin:{" "}
+                            {profileText(
+                              profilesByUserId[action.admin_user_id] ?? null,
+                              action.admin_user_id
+                            )}
+                          </div>
+
+                          <div>
+                            Review state:{" "}
+                            {action.previous_is_under_review
+                              ? "Under review"
+                              : "Not under review"}{" "}
+                            →{" "}
+                            {action.new_is_under_review
+                              ? "Under review"
+                              : "Not under review"}
                           </div>
 
                           {action.moderation_report_id && (
