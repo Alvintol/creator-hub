@@ -6,6 +6,8 @@ import { useState } from 'react';
 import { ConversationInitiationReasonCode, conversationInitiationReasonOptions } from '../../domain/conversations/conversations';
 import { useCreateCreatorInquiryConversation } from '../../hooks/conversations/useCreateInquiryConversation';
 import { useAuth } from '../../providers/AuthProvider';
+import { useSubmitProfileModerationReport } from '../../hooks/moderation/useSubmitProfileModerationReport';
+import { ModerationReportReasonCode, moderationReportReasonOptions } from '../../domain/moderation/moderationReports';
 
 const classes = {
   container: "space-y-8",
@@ -81,6 +83,18 @@ const classes = {
   hint: "text-xs text-zinc-500",
   errorBox:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+
+  reportCard: "card p-5",
+  reportTitle: "text-base font-extrabold tracking-tight",
+  reportText: "mt-1 text-sm text-zinc-600",
+  reportForm: "mt-4 space-y-3",
+  row: "flex flex-wrap items-center gap-3",
+  successCard:
+    "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
+  errorCard:
+    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+  btnDanger:
+    "inline-flex items-center justify-center rounded-full border border-red-600 bg-red-600 px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(220,38,38,0.24)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(220,38,38,0.32)] disabled:cursor-not-allowed disabled:opacity-60",
 } as const;
 
 type CreatorLinkButtonProps = {
@@ -156,11 +170,63 @@ const CreatorProfile = () => {
 
   const { data, isLoading, error } = usePublicCreatorProfile(handle ?? null);
   const createInquiryMutation = useCreateCreatorInquiryConversation();
+  const submitProfileReport = useSubmitProfileModerationReport();
+
+  const profile = data?.profile ?? null;
+  const profileUserId = profile?.user_id ?? null;
 
   const [showInquiryForm, setShowInquiryForm] = useState(false);
   const [inquiryTopic, setInquiryTopic] =
     useState<ConversationInitiationReasonCode | "">("");
   const [inquiryMessage, setInquiryMessage] = useState("");
+
+  const defaultProfileReportReason =
+    moderationReportReasonOptions[0]?.value ?? null;
+
+  const [isProfileReportOpen, setIsProfileReportOpen] = useState(false);
+  const [profileReportReason, setProfileReportReason] =
+    useState<ModerationReportReasonCode | null>(defaultProfileReportReason);
+  const [profileReportDetails, setProfileReportDetails] = useState("");
+  const [profileReportSuccess, setProfileReportSuccess] = useState<string | null>(
+    null
+  );
+  const [profileReportError, setProfileReportError] = useState<string | null>(
+    null
+  );
+
+  const profileReportDetailsTrimmed = profileReportDetails.trim();
+
+  const canSubmitProfileReport =
+    Boolean(profileUserId && profileReportReason) &&
+    profileReportDetailsTrimmed.length <= 2000 &&
+    !submitProfileReport.isPending;
+
+  const handleSubmitProfileReport = async () => {
+    if (!profileUserId || !profileReportReason || !canSubmitProfileReport) return;
+
+    setProfileReportSuccess(null);
+    setProfileReportError(null);
+
+    try {
+      await submitProfileReport.mutateAsync({
+        profileUserId,
+        reasonCode: profileReportReason,
+        reasonDetails: profileReportDetailsTrimmed,
+      });
+
+      setProfileReportSuccess(
+        "Profile report submitted. An admin will review it soon."
+      );
+      setProfileReportDetails("");
+      setIsProfileReportOpen(false);
+    } catch (error) {
+      setProfileReportError(
+        error instanceof Error
+          ? error.message
+          : "Profile report could not be submitted."
+      );
+    }
+  };
 
   if (!handle) return <CreatorNotFound />;
 
@@ -172,9 +238,9 @@ const CreatorProfile = () => {
     );
   }
 
-  if (error || !data?.profile) return <CreatorNotFound />;
+  if (error || !profile || !data) return <CreatorNotFound />;
 
-  const { profile, platformAccounts, listings } = data;
+  const { platformAccounts, listings } = data;
 
   const twitchAccount =
     platformAccounts.find((account) => account.platform === "twitch") ?? null;
@@ -433,6 +499,127 @@ const CreatorProfile = () => {
           </div>
         )}
       </section>
+      <div className={classes.reportCard}>
+        <h2 className={classes.reportTitle}>Report creator</h2>
+
+        <p className={classes.reportText}>
+          Report this creator profile if it appears unsafe, misleading, abusive,
+          impersonated, or against CreatorHub rules. Reporting does not automatically
+          restrict the profile.
+        </p>
+
+        {profileReportSuccess && (
+          <div className={classes.successCard}>{profileReportSuccess}</div>
+        )}
+
+        {profileReportError && (
+          <div className={classes.errorCard}>{profileReportError}</div>
+        )}
+
+        {authLoading ? (
+          <p className={classes.reportText}>Checking sign-in status…</p>
+        ) : !user ? (
+          <div className={classes.reportForm}>
+            <p className={classes.reportText}>
+              You need to sign in before reporting a creator.
+            </p>
+
+            <Link className={classes.btnOutline} to="/signin">
+              Sign in to report
+            </Link>
+          </div>
+        ) : isOwnProfile ? (
+          <p className={classes.reportText}>
+            You cannot report your own creator profile.
+          </p>
+        ) : (
+          <div className={classes.reportForm}>
+            {!isProfileReportOpen ? (
+              <button
+                className={classes.btnOutline}
+                type="button"
+                onClick={() => {
+                  setIsProfileReportOpen(true);
+                  setProfileReportSuccess(null);
+                  setProfileReportError(null);
+                }}
+              >
+                Report creator
+              </button>
+            ) : (
+              <>
+                <div className={classes.field}>
+                  <label className={classes.label} htmlFor="profileReportReason">
+                    Reason
+                  </label>
+
+                  <select
+                    id="profileReportReason"
+                    className={classes.select}
+                    value={profileReportReason ?? ""}
+                    onChange={(event) =>
+                      setProfileReportReason(
+                        event.target.value as ModerationReportReasonCode
+                      )
+                    }
+                  >
+                    {moderationReportReasonOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={classes.field}>
+                  <label className={classes.label} htmlFor="profileReportDetails">
+                    Details
+                  </label>
+
+                  <textarea
+                    id="profileReportDetails"
+                    className={classes.textarea}
+                    value={profileReportDetails}
+                    onChange={(event) => setProfileReportDetails(event.target.value)}
+                    placeholder="Optional. Add context that will help admins review this profile."
+                    maxLength={2000}
+                    disabled={submitProfileReport.isPending}
+                  />
+
+                  <div className={classes.hint}>
+                    {profileReportDetailsTrimmed.length}/2000 characters.
+                  </div>
+                </div>
+
+                <div className={classes.row}>
+                  <button
+                    className={classes.btnDanger}
+                    type="button"
+                    disabled={!canSubmitProfileReport}
+                    onClick={() => void handleSubmitProfileReport()}
+                  >
+                    {submitProfileReport.isPending
+                      ? "Submitting…"
+                      : "Submit report"}
+                  </button>
+
+                  <button
+                    className={classes.btnOutline}
+                    type="button"
+                    disabled={submitProfileReport.isPending}
+                    onClick={() => {
+                      setIsProfileReportOpen(false);
+                      setProfileReportError(null);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
