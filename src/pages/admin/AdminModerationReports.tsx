@@ -105,6 +105,56 @@ const profileText = (
   fallbackUserId: string
 ) => (profile?.handle ? `@${profile.handle}` : profile?.display_name ?? fallbackUserId);
 
+const targetStateText = (
+  item: ReturnType<typeof useAdminModerationReports>["data"] extends infer Data
+    ? never
+    : never
+) => item;
+
+const conversationStateText = (status: string | null | undefined) =>
+  status === "admin_locked"
+    ? "Locked by admin"
+    : status === "open"
+      ? "Open"
+      : status
+        ? status
+        : "Unknown";
+
+const listingVisibilityText = (
+  listing: { is_active: boolean; status: string } | null
+) => {
+  if (!listing) return "Unknown listing";
+
+  return listing.is_active ? "Listing visible" : "Listing hidden";
+};
+
+const profileReviewText = (
+  state: { is_under_review: boolean } | null
+) => (state?.is_under_review ? "Profile under review" : "Not under review");
+
+const reportTargetStateText = (item: {
+  report: {
+    target_type: ModerationReportTargetType;
+  };
+  conversation: { status: string } | null;
+  listing: { is_active: boolean; status: string } | null;
+  profileModerationState: { is_under_review: boolean } | null;
+}) => {
+  if (item.report.target_type === "conversation" || item.report.target_type === "conversation_message") {
+    return conversationStateText(item.conversation?.status);
+  }
+
+  if (item.report.target_type === "listing") {
+    return listingVisibilityText(item.listing);
+  }
+
+  if (item.report.target_type === "profile") {
+    return profileReviewText(item.profileModerationState);
+  }
+
+  return "Unknown target state";
+};
+
 const AdminModerationReports = () => {
   const [filters, setFilters] = useState<AdminModerationReportFilters>(
     initialFilters
@@ -330,6 +380,13 @@ const AdminModerationReports = () => {
                   </div>
 
                   <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>Target state</div>
+                    <div className={classes.statusPill}>
+                      {reportTargetStateText(item)}
+                    </div>
+                  </div>
+
+                  <div className={classes.metaBlock}>
                     <div className={classes.metaLabel}>Reason</div>
                     <div className={classes.metaValue}>
                       {getModerationReportReasonLabel(item.report.reason_code)}
@@ -347,7 +404,7 @@ const AdminModerationReports = () => {
                     <div className={classes.metaLabel}>Target</div>
                     <div className={classes.metaValue}>
                       {item.conversation?.subject ??
-                        item.report.listing_id ??
+                        item.listing?.title ??
                         item.report.profile_user_id ??
                         item.report.target_type}
                     </div>

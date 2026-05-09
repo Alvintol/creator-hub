@@ -27,6 +27,22 @@ export type AdminModerationReportConversation = {
   updated_at: string;
 };
 
+export type AdminModerationReportListing = {
+  id: string;
+  user_id: string;
+  title: string;
+  status: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminProfileModerationStateSummary = {
+  profile_user_id: string;
+  is_under_review: boolean;
+  updated_at: string;
+};
+
 export type AdminModerationReportRow = {
   id: string;
   target_type: ModerationReportTargetType;
@@ -52,6 +68,8 @@ export type AdminModerationReportRow = {
 export type AdminModerationReportItem = {
   report: AdminModerationReportRow;
   conversation: AdminModerationReportConversation | null;
+  listing: AdminModerationReportListing | null;
+  profileModerationState: AdminProfileModerationStateSummary | null;
   reporter: AdminModerationReportProfile | null;
   reportedUser: AdminModerationReportProfile | null;
 };
@@ -215,30 +233,77 @@ const fetchAdminModerationReports = async (
     )
   );
 
-  const [{ data: profiles, error: profilesError }, { data: conversations, error: conversationsError }] =
-    await Promise.all([
-      supabase
-        .from("profiles")
-        .select("user_id, handle, display_name, avatar_url")
-        .in("user_id", userIds),
-      conversationIds.length > 0
-        ? supabase
-            .from("conversations")
-            .select(`
-              id,
-              conversation_type,
-              subject,
-              listing_id,
-              listing_request_id,
-              status,
-              last_message_at,
-              last_message_preview,
-              created_at,
-              updated_at
-            `)
-            .in("id", conversationIds)
-        : Promise.resolve({ data: [], error: null }),
-    ]);
+  const listingIds = Array.from(
+    new Set(
+      reportRows
+        .map((report) => report.listing_id)
+        .filter((listingId): listingId is string => Boolean(listingId))
+    )
+  );
+
+  const profileUserIds = Array.from(
+    new Set(
+      reportRows
+        .map((report) => report.profile_user_id)
+        .filter((profileUserId): profileUserId is string => Boolean(profileUserId))
+    )
+  );
+
+  const [
+    { data: profiles, error: profilesError },
+    { data: conversations, error: conversationsError },
+    { data: listings, error: listingsError },
+    {
+      data: profileModerationStates,
+      error: profileModerationStatesError,
+    },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("user_id, handle, display_name, avatar_url")
+      .in("user_id", userIds),
+    conversationIds.length > 0
+      ? supabase
+        .from("conversations")
+        .select(`
+          id,
+          conversation_type,
+          subject,
+          listing_id,
+          listing_request_id,
+          status,
+          last_message_at,
+          last_message_preview,
+          created_at,
+          updated_at
+        `)
+        .in("id", conversationIds)
+      : Promise.resolve({ data: [], error: null }),
+    listingIds.length > 0
+      ? supabase
+        .from("listings")
+        .select(`
+          id,
+          user_id,
+          title,
+          status,
+          is_active,
+          created_at,
+          updated_at
+        `)
+        .in("id", listingIds)
+      : Promise.resolve({ data: [], error: null }),
+    profileUserIds.length > 0
+      ? supabase
+        .from("profile_moderation_states")
+        .select(`
+          profile_user_id,
+          is_under_review,
+          updated_at
+        `)
+        .in("profile_user_id", profileUserIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
 
   if (profilesError) {
     throw profilesError;
@@ -246,6 +311,14 @@ const fetchAdminModerationReports = async (
 
   if (conversationsError) {
     throw conversationsError;
+  }
+
+  if (listingsError) {
+    throw listingsError;
+  }
+
+  if (profileModerationStatesError) {
+    throw profileModerationStatesError;
   }
 
   const profileByUserId = Object.fromEntries(
@@ -261,11 +334,28 @@ const fetchAdminModerationReports = async (
     )
   ) as Record<string, AdminModerationReportConversation>;
 
+  const listingById = Object.fromEntries(
+    ((listings ?? []) as AdminModerationReportListing[]).map((listing) => [
+      listing.id,
+      listing,
+    ])
+  ) as Record<string, AdminModerationReportListing>;
+
+  const profileModerationStateByUserId = Object.fromEntries(
+    ((profileModerationStates ?? []) as AdminProfileModerationStateSummary[]).map(
+      (state) => [state.profile_user_id, state]
+    )
+  ) as Record<string, AdminProfileModerationStateSummary>;
+
   return {
     items: reportRows.map((report) => ({
       report,
       conversation: report.conversation_id
         ? conversationById[report.conversation_id] ?? null
+        : null,
+      listing: report.listing_id ? listingById[report.listing_id] ?? null : null,
+      profileModerationState: report.profile_user_id
+        ? profileModerationStateByUserId[report.profile_user_id] ?? null
         : null,
       reporter: profileByUserId[report.reporter_user_id] ?? null,
       reportedUser: profileByUserId[report.reported_user_id] ?? null,
