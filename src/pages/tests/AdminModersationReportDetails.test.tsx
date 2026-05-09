@@ -728,4 +728,92 @@ describe("<AdminModerationReportDetails />", () => {
     expect(screen.getByText("Reviewing repeated reports.")).toBeInTheDocument();
     expect(screen.getByText(/@adminuser/)).toBeInTheDocument();
   });
+
+  it("sends an internal note when locking a conversation", async () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({ conversationStatus: "open" }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Internal moderation action note"), {
+      target: {
+        value: "Locking while reviewing the report.",
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Lock conversation" }));
+
+    await waitFor(() => {
+      expect(mocks.lockConversation).toHaveBeenCalledWith({
+        conversationId: "conversation-1",
+        moderationReportId: "report-1",
+        adminNote: "Locking while reviewing the report.",
+      });
+    });
+  });
+
+  it("sends an internal note when hiding a listing", async () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        listing: {
+          status: "published",
+          isActive: true,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Internal moderation action note"), {
+      target: {
+        value: "Hidden while checking listing report.",
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide listing" }));
+
+    await waitFor(() => {
+      expect(mocks.hideListing).toHaveBeenCalledWith({
+        listingId: "listing-1",
+        moderationReportId: "report-1",
+        adminNote: "Hidden while checking listing report.",
+      });
+    });
+  });
+
+  it("sends an internal note when marking a profile under review", async () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        profileReport: true,
+        profileModerationState: {
+          isUnderReview: false,
+        },
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Internal moderation action note"), {
+      target: {
+        value: "Multiple reports need a closer look.",
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Mark under review" }));
+
+    await waitFor(() => {
+      expect(mocks.markProfileUnderReview).toHaveBeenCalledWith({
+        profileUserId: "reported-1",
+        moderationReportId: "report-1",
+        adminNote: "Multiple reports need a closer look.",
+      });
+    });
+  });
 });

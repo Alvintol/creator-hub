@@ -89,6 +89,8 @@ const classes = {
     "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
   updateCard:
     "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800",
+  actionTextarea:
+    "min-h-[88px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-60",
 } as const;
 
 const dateText = (value: string | null) => {
@@ -174,6 +176,7 @@ const AdminModerationReportDetails = () => {
   const [profileActionError, setProfileActionError] = useState<string | null>(
     null
   );
+  const [moderationActionNote, setModerationActionNote] = useState("");
 
   useEffect(() => {
     if (!report) return;
@@ -189,6 +192,7 @@ const AdminModerationReportDetails = () => {
     setListingActionError(null);
     setProfileActionMessage(null);
     setProfileActionError(null);
+    setModerationActionNote("");
   }, [report]);
 
   const reporterStatusMessageTrimmed = reporterStatusMessage.trim();
@@ -202,6 +206,13 @@ const AdminModerationReportDetails = () => {
 
   const hasReporterUpdate = reporterStatusMessageTrimmed.length > 0;
   const hasAdminNote = adminNotesTrimmed.length > 0;
+  const moderationActionNoteTrimmed = moderationActionNote.trim();
+
+  const moderationActionNotePayload = moderationActionNoteTrimmed
+    ? { adminNote: moderationActionNoteTrimmed }
+    : {};
+
+  const hasValidModerationActionNote = moderationActionNoteTrimmed.length <= 1000;
 
   const hasPendingUpdate =
     hasStatusChanged || hasResolutionChanged || hasReporterUpdate || hasAdminNote;
@@ -275,7 +286,10 @@ const AdminModerationReportDetails = () => {
       await lockConversationMutation.mutateAsync({
         conversationId: conversation.id,
         moderationReportId: report.id,
+        ...moderationActionNotePayload,
       });
+
+      setModerationActionNote("");
 
       setConversationActionMessage("Conversation locked by admin.");
     } catch (error) {
@@ -297,8 +311,10 @@ const AdminModerationReportDetails = () => {
       await reopenConversationMutation.mutateAsync({
         conversationId: conversation.id,
         moderationReportId: report.id,
+        ...moderationActionNotePayload,
       });
 
+      setModerationActionNote("");
       setConversationActionMessage("Admin lock removed. Conversation reopened.");
     } catch (error) {
       setConversationActionError(
@@ -319,9 +335,11 @@ const AdminModerationReportDetails = () => {
       await hideListingMutation.mutateAsync({
         listingId: listing.id,
         moderationReportId: report.id,
+        ...moderationActionNotePayload,
       });
 
       setListingActionMessage("Listing hidden from public visibility.");
+      setModerationActionNote("");
     } catch (error) {
       setListingActionError(
         error instanceof Error
@@ -341,9 +359,11 @@ const AdminModerationReportDetails = () => {
       await restoreListingMutation.mutateAsync({
         listingId: listing.id,
         moderationReportId: report.id,
+        ...moderationActionNotePayload,
       });
 
       setListingActionMessage("Listing restored to public visibility.");
+      setModerationActionNote("");
     } catch (error) {
       setListingActionError(
         error instanceof Error
@@ -363,9 +383,11 @@ const AdminModerationReportDetails = () => {
       await markProfileUnderReviewMutation.mutateAsync({
         profileUserId: profileTargetUserId,
         moderationReportId: report.id,
+        ...moderationActionNotePayload,
       });
 
       setProfileActionMessage("Profile marked under review.");
+      setModerationActionNote("");
     } catch (error) {
       setProfileActionError(
         error instanceof Error
@@ -385,9 +407,11 @@ const AdminModerationReportDetails = () => {
       await clearProfileReviewFlagMutation.mutateAsync({
         profileUserId: profileTargetUserId,
         moderationReportId: report.id,
+        ...moderationActionNotePayload,
       });
 
       setProfileActionMessage("Profile review flag cleared.");
+      setModerationActionNote("");
     } catch (error) {
       setProfileActionError(
         error instanceof Error
@@ -396,6 +420,27 @@ const AdminModerationReportDetails = () => {
       );
     }
   };
+
+  const renderModerationActionNoteField = () => (
+    <div className={classes.field}>
+      <label className={classes.label} htmlFor="moderationActionNote">
+        Internal moderation action note
+      </label>
+
+      <textarea
+        id="moderationActionNote"
+        className={classes.actionTextarea}
+        value={moderationActionNote}
+        onChange={(event) => setModerationActionNote(event.target.value)}
+        placeholder="Optional. This note is stored with the moderation action history."
+        maxLength={1000}
+      />
+
+      <div className={classes.hint}>
+        {moderationActionNoteTrimmed.length}/1000 characters.
+      </div>
+    </div>
+  );
 
   if (isLoading) {
     return (
@@ -715,13 +760,15 @@ const AdminModerationReportDetails = () => {
                   </div>
                 )}
 
+                {renderModerationActionNoteField()}
+
                 <div className={classes.row}>
                   {!isConversationAdminLocked && (
                     <button
                       className={classes.btnDanger}
                       type="button"
                       disabled={
-                        conversationActionBusy || !isConversationOpen
+                        conversationActionBusy || !isConversationOpen || !hasValidModerationActionNote
                       }
                       onClick={() => void handleLockConversation()}
                     >
@@ -735,7 +782,7 @@ const AdminModerationReportDetails = () => {
                     <button
                       className={classes.btnPrimary}
                       type="button"
-                      disabled={conversationActionBusy}
+                      disabled={conversationActionBusy || !hasValidModerationActionNote}
                       onClick={() => void handleReopenConversation()}
                     >
                       {reopenConversationMutation.isPending
@@ -793,12 +840,14 @@ const AdminModerationReportDetails = () => {
                   <div className={classes.errorCard}>{listingActionError}</div>
                 )}
 
+                {renderModerationActionNoteField()}
+
                 <div className={classes.row}>
                   {isListingVisible && (
                     <button
                       className={classes.btnDanger}
                       type="button"
-                      disabled={listingActionBusy}
+                      disabled={listingActionBusy || !hasValidModerationActionNote}
                       onClick={() => void handleHideListing()}
                     >
                       {hideListingMutation.isPending ? "Hiding…" : "Hide listing"}
@@ -809,7 +858,7 @@ const AdminModerationReportDetails = () => {
                     <button
                       className={classes.btnPrimary}
                       type="button"
-                      disabled={listingActionBusy || !canRestoreListing}
+                      disabled={listingActionBusy || !canRestoreListing || !hasValidModerationActionNote}
                       onClick={() => void handleRestoreListing()}
                     >
                       {restoreListingMutation.isPending
@@ -925,12 +974,14 @@ const AdminModerationReportDetails = () => {
                   <div className={classes.errorCard}>{profileActionError}</div>
                 )}
 
+                {renderModerationActionNoteField()}
+
                 <div className={classes.row}>
                   {!isProfileUnderReview && (
                     <button
                       className={classes.btnDanger}
                       type="button"
-                      disabled={profileActionBusy}
+                      disabled={profileActionBusy || !hasValidModerationActionNote}
                       onClick={() => void handleMarkProfileUnderReview()}
                     >
                       {markProfileUnderReviewMutation.isPending
@@ -943,7 +994,7 @@ const AdminModerationReportDetails = () => {
                     <button
                       className={classes.btnPrimary}
                       type="button"
-                      disabled={profileActionBusy}
+                      disabled={profileActionBusy || !hasValidModerationActionNote}
                       onClick={() => void handleClearProfileReviewFlag()}
                     >
                       {clearProfileReviewFlagMutation.isPending

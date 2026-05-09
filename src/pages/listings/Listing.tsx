@@ -6,6 +6,10 @@ import {
   type PublicListingRow,
 } from "../../hooks/listings/usePublicListing";
 import { getFulfilmentModeCopy } from '../../domain/listings/listings';
+import { useState } from 'react';
+import { ModerationReportReasonCode, moderationReportReasonOptions } from '../../domain/moderation/moderationReports';
+import { useSubmitListingModerationReport } from '../../hooks/moderation/useSubmitListingModerationReport';
+import { useAuth } from '../../providers/AuthProvider';
 
 const classes = {
   notFoundWrap: "space-y-4",
@@ -46,6 +50,28 @@ const classes = {
   liveTitle: "mt-1 text-sm text-zinc-600",
 
   metaText: "text-sm text-zinc-500",
+  reportCard: "card p-5",
+  reportTitle: "text-base font-extrabold tracking-tight",
+  reportText: "mt-1 text-sm text-zinc-600",
+  reportForm: "mt-4 space-y-3",
+  label: "text-sm font-bold text-zinc-900",
+  select:
+    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
+  textarea:
+    "min-h-[110px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-60",
+  hint: "text-xs text-zinc-500",
+  successCard:
+    "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
+  errorCard:
+    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+  btnPrimary:
+    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
+  btnOutline:
+    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+  btnDanger:
+    "inline-flex items-center justify-center rounded-full border border-red-600 bg-red-600 px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(220,38,38,0.24)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(220,38,38,0.32)] disabled:cursor-not-allowed disabled:opacity-60",
+  field: "space-y-2",
+  row: "flex flex-wrap items-center gap-3",
 } as const;
 
 // Formats the listing price for display
@@ -84,8 +110,54 @@ const ListingNotFound = () => (
 const ListingPage = () => {
   const { id } = useParams<{ id: string }>();
   const { twitchByLogin } = useTwitchStreams();
-
   const { data, isLoading, error } = usePublicListing(id ?? null);
+
+  const { user } = useAuth();
+  const submitListingReport = useSubmitListingModerationReport();
+
+  const defaultReportReason = moderationReportReasonOptions[0]?.value ?? null;
+
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportReason, setReportReason] =
+    useState<ModerationReportReasonCode | null>(defaultReportReason);
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportSuccess, setReportSuccess] = useState<string | null>(null);
+  const [reportError, setReportError] = useState<string | null>(null);
+
+  const listing = data?.listing ?? null;
+  const reportDetailsTrimmed = reportDetails.trim();
+
+  const canSubmitListingReport =
+    Boolean(listing?.id && reportReason) &&
+    reportDetailsTrimmed.length <= 2000 &&
+    !submitListingReport.isPending;
+
+  const handleSubmitListingReport = async () => {
+    if (!listing?.id || !reportReason || !canSubmitListingReport) return;
+
+    setReportSuccess(null);
+    setReportError(null);
+
+    try {
+      await submitListingReport.mutateAsync({
+        listingId: listing.id,
+        reasonCode: reportReason,
+        reasonDetails: reportDetailsTrimmed,
+      });
+
+      setReportSuccess(
+        "Listing report submitted. An admin will review it soon."
+      );
+      setReportDetails("");
+      setIsReportOpen(false);
+    } catch (error) {
+      setReportError(
+        error instanceof Error
+          ? error.message
+          : "Listing report could not be submitted."
+      );
+    }
+  };
 
   if (!id) return <ListingNotFound />;
 
@@ -97,9 +169,9 @@ const ListingPage = () => {
     );
   }
 
-  if (error || !data?.listing) return <ListingNotFound />;
+  if (error || !listing || !data) return <ListingNotFound />;
 
-  const { listing, creator, platformAccounts } = data;
+  const { creator, platformAccounts } = data;
   const fulfilmentCopy = getFulfilmentModeCopy(listing.fulfilment_mode);
 
   const twitchAccount =
@@ -211,6 +283,120 @@ const ListingPage = () => {
               </Link>
             ) : (
               <span className={classes.ctaLink}>{fulfilmentCopy.primaryLabel}</span>
+            )}
+          </div>
+
+          <div className={classes.reportCard}>
+            <h2 className={classes.reportTitle}>Report listing</h2>
+
+            <p className={classes.reportText}>
+              Report this listing if it appears unsafe, misleading, stolen, abusive, or
+              against CreatorHub rules. Reporting does not automatically hide the listing.
+            </p>
+
+            {reportSuccess && (
+              <div className={classes.successCard}>{reportSuccess}</div>
+            )}
+
+            {reportError && (
+              <div className={classes.errorCard}>{reportError}</div>
+            )}
+
+            {!user ? (
+              <div className={classes.reportForm}>
+                <p className={classes.reportText}>
+                  You need to sign in before reporting a listing.
+                </p>
+
+                <Link className={classes.btnOutline} to="/signin">
+                  Sign in to report
+                </Link>
+              </div>
+            ) : (
+              <div className={classes.reportForm}>
+                {!isReportOpen ? (
+                  <button
+                    className={classes.btnOutline}
+                    type="button"
+                    onClick={() => {
+                      setIsReportOpen(true);
+                      setReportSuccess(null);
+                      setReportError(null);
+                    }}
+                  >
+                    Report listing
+                  </button>
+                ) : (
+                  <>
+                    <div className={classes.field}>
+                      <label className={classes.label} htmlFor="listingReportReason">
+                        Reason
+                      </label>
+
+                      <select
+                        id="listingReportReason"
+                        className={classes.select}
+                        value={reportReason ?? ""}
+                        onChange={(event) =>
+                          setReportReason(
+                            event.target.value as ModerationReportReasonCode
+                          )
+                        }
+                      >
+                        {moderationReportReasonOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className={classes.field}>
+                      <label className={classes.label} htmlFor="listingReportDetails">
+                        Details
+                      </label>
+
+                      <textarea
+                        id="listingReportDetails"
+                        className={classes.textarea}
+                        value={reportDetails}
+                        onChange={(event) => setReportDetails(event.target.value)}
+                        placeholder="Optional. Add context that will help admins review this report."
+                        maxLength={2000}
+                      />
+
+                      <div className={classes.hint}>
+                        {reportDetailsTrimmed.length}/2000 characters.
+                      </div>
+                    </div>
+
+                    <div className={classes.row}>
+                      <button
+                        className={classes.btnDanger ?? classes.btnPrimary}
+                        type="button"
+                        disabled={!canSubmitListingReport}
+                        onClick={() => void handleSubmitListingReport()}
+                      >
+                        {submitListingReport.isPending
+                          ? "Submitting…"
+                          : "Submit report"}
+                      </button>
+
+                      <button
+                        className={classes.btnOutline}
+                        type="button"
+                        disabled={submitListingReport.isPending}
+                        onClick={() => {
+                          setIsReportOpen(false);
+                          setReportError(null);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
         </div>
