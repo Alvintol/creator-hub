@@ -41,6 +41,15 @@ const classes = {
   summaryBox:
     "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700",
   summaryStrong: "font-extrabold text-zinc-900",
+  moderationNav:
+    "rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm",
+  moderationNavInner:
+    "flex flex-wrap items-center justify-between gap-3",
+  moderationNavTextWrap: "space-y-1",
+  moderationNavTitle: "text-sm font-extrabold text-zinc-900",
+  moderationNavText: "text-sm text-zinc-600",
+  btnOutline:
+    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
 } as const;
 
 const dateTimeText = (value: string | null) => {
@@ -120,6 +129,22 @@ const MessagesInbox = () => {
         <p className={classes.sub}>
           Messages, listing inquiries, creator inquiries, and request conversations.
         </p>
+      </div>
+
+      <div className={classes.moderationNav}>
+        <div className={classes.moderationNavInner}>
+          <div className={classes.moderationNavTextWrap}>
+            <div className={classes.moderationNavTitle}>Moderation reports</div>
+
+            <p className={classes.moderationNavText}>
+              Track reports you have submitted and check review updates from admins.
+            </p>
+          </div>
+
+          <Link className={classes.btnOutline} to="/settings/reports">
+            My reports
+          </Link>
+        </div>
       </div>
 
       {!isLoading && !error && (

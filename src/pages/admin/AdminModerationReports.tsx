@@ -13,6 +13,7 @@ import {
 import {
   useAdminModerationReports,
   type AdminModerationReportFilters,
+  type AdminModerationReportItem,
 } from "../../hooks/admin/useAdminModerationReports";
 
 const classes = {
@@ -60,6 +61,20 @@ const classes = {
   loadingText: "text-sm text-zinc-600",
   errorCard:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+  statusPillBase:
+    "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+  statusSubmitted:
+    "border-orange-200 bg-orange-50 text-orange-800",
+  statusUnderReview:
+    "border-blue-200 bg-blue-50 text-blue-800",
+  statusResolved:
+    "border-emerald-200 bg-emerald-50 text-emerald-800",
+  statusDismissed:
+    "border-zinc-300 bg-zinc-100 text-zinc-700",
+  statusNeedsChanges:
+    "border-amber-200 bg-amber-50 text-amber-800",
+  statusUnknown:
+    "border-zinc-300 bg-zinc-100 text-zinc-700",
 } as const;
 
 const pageSize = 20;
@@ -105,12 +120,6 @@ const profileText = (
   fallbackUserId: string
 ) => (profile?.handle ? `@${profile.handle}` : profile?.display_name ?? fallbackUserId);
 
-const targetStateText = (
-  item: ReturnType<typeof useAdminModerationReports>["data"] extends infer Data
-    ? never
-    : never
-) => item;
-
 const conversationStateText = (status: string | null | undefined) =>
   status === "admin_locked"
     ? "Locked by admin"
@@ -132,14 +141,7 @@ const profileReviewText = (
   state: { is_under_review: boolean } | null
 ) => (state?.is_under_review ? "Profile under review" : "Not under review");
 
-const reportTargetStateText = (item: {
-  report: {
-    target_type: ModerationReportTargetType;
-  };
-  conversation: { status: string } | null;
-  listing: { is_active: boolean; status: string } | null;
-  profileModerationState: { is_under_review: boolean } | null;
-}) => {
+const reportTargetStateText = (item: AdminModerationReportItem) => {
   if (item.report.target_type === "conversation" || item.report.target_type === "conversation_message") {
     return conversationStateText(item.conversation?.status);
   }
@@ -153,6 +155,27 @@ const reportTargetStateText = (item: {
   }
 
   return "Unknown target state";
+};
+
+const reportTargetDisplayText = (item: AdminModerationReportItem) =>
+  item.conversation?.subject ??
+  item.listing?.title ??
+  item.report.profile_user_id ??
+  item.report.listing_id ??
+  item.report.target_type;
+
+const reportStatusPillClass = (status: string) => {
+  const statusClasses: Record<string, string> = {
+    submitted: classes.statusSubmitted,
+    under_review: classes.statusUnderReview,
+    resolved: classes.statusResolved,
+    dismissed: classes.statusDismissed,
+    rejected: classes.statusDismissed,
+    needs_changes: classes.statusNeedsChanges,
+  };
+
+  return `${classes.statusPillBase} ${statusClasses[status] ?? classes.statusUnknown
+    }`;
 };
 
 const AdminModerationReports = () => {
@@ -374,7 +397,7 @@ const AdminModerationReports = () => {
                 <div className={classes.metaGrid}>
                   <div className={classes.metaBlock}>
                     <div className={classes.metaLabel}>Status</div>
-                    <div className={classes.statusPill}>
+                    <div className={reportStatusPillClass(item.report.status)}>
                       {getModerationReportStatusLabel(item.report.status)}
                     </div>
                   </div>
@@ -403,10 +426,7 @@ const AdminModerationReports = () => {
                   <div className={classes.metaBlock}>
                     <div className={classes.metaLabel}>Target</div>
                     <div className={classes.metaValue}>
-                      {item.conversation?.subject ??
-                        item.listing?.title ??
-                        item.report.profile_user_id ??
-                        item.report.target_type}
+                      {reportTargetDisplayText(item)}
                     </div>
                   </div>
                 </div>

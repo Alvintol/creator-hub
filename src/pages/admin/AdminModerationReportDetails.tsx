@@ -91,6 +91,20 @@ const classes = {
     "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-800",
   actionTextarea:
     "min-h-[88px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-60",
+  statusPillBase:
+    "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
+  statusSubmitted:
+    "border-orange-200 bg-orange-50 text-orange-800",
+  statusUnderReview:
+    "border-blue-200 bg-blue-50 text-blue-800",
+  statusResolved:
+    "border-emerald-200 bg-emerald-50 text-emerald-800",
+  statusDismissed:
+    "border-zinc-300 bg-zinc-100 text-zinc-700",
+  statusNeedsChanges:
+    "border-amber-200 bg-amber-50 text-amber-800",
+  statusUnknown:
+    "border-zinc-300 bg-zinc-100 text-zinc-700",
 } as const;
 
 const dateText = (value: string | null) => {
@@ -126,6 +140,20 @@ const profileModerationActionText = (actionType: string) =>
   actionType === "review_cleared"
     ? "Review flag cleared"
     : "Marked under review";
+
+const reportStatusPillClass = (status: string) => {
+  const statusClasses: Record<string, string> = {
+    submitted: classes.statusSubmitted,
+    under_review: classes.statusUnderReview,
+    resolved: classes.statusResolved,
+    dismissed: classes.statusDismissed,
+    rejected: classes.statusDismissed,
+    needs_changes: classes.statusNeedsChanges,
+  };
+
+  return `${classes.statusPillBase} ${statusClasses[status] ?? classes.statusUnknown
+    }`;
+};
 
 const AdminModerationReportDetails = () => {
   const { id } = useParams();
@@ -491,7 +519,7 @@ const AdminModerationReportDetails = () => {
               <div className={classes.metaGrid}>
                 <div className={classes.metaBlock}>
                   <div className={classes.metaLabel}>Status</div>
-                  <div className={classes.statusPill}>
+                  <div className={reportStatusPillClass(report.status)}>
                     {getModerationReportStatusLabel(report.status)}
                   </div>
                 </div>

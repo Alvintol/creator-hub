@@ -1,22 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "../../lib/supabaseClient";
-import { useAuth } from "../../providers/AuthProvider";
 import type {
   ModerationReportReasonCode,
   ModerationReportResolutionCode,
   ModerationReportStatus,
   ModerationReportTargetType,
 } from "../../domain/moderation/moderationReports";
+import { supabase } from "../../lib/supabaseClient";
 
-export type MyModerationReportRow = {
+export type MyModerationReport = {
   id: string;
   target_type: ModerationReportTargetType;
-  conversation_id: string | null;
-  message_id: string | null;
-  listing_id: string | null;
-  profile_user_id: string | null;
-  reporter_user_id: string;
-  reported_user_id: string;
+  target_label: string;
   reason_code: ModerationReportReasonCode;
   reason_details: string | null;
   status: ModerationReportStatus;
@@ -27,53 +21,20 @@ export type MyModerationReportRow = {
   created_at: string;
 };
 
-const emptyReports: MyModerationReportRow[] = [];
-
-const fetchMyModerationReports = async (
-  conversationId: string,
-  userId: string
-): Promise<MyModerationReportRow[]> => {
-  const { data, error } = await supabase
-    .from("moderation_reports")
-    .select(`
-      id,
-      target_type,
-      conversation_id,
-      message_id,
-      listing_id,
-      profile_user_id,
-      reporter_user_id,
-      reported_user_id,
-      reason_code,
-      reason_details,
-      status,
-      reporter_status_message,
-      reporter_status_updated_at,
-      resolution_code,
-      resolved_at,
-      created_at
-    `)
-    .eq("conversation_id", conversationId)
-    .eq("reporter_user_id", userId);
+// Loads only the current user's own submitted reports
+const fetchMyModerationReports = async (): Promise<MyModerationReport[]> => {
+  const { data, error } = await supabase.rpc("get_my_moderation_reports");
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []) as MyModerationReportRow[];
+  return (data ?? []) as MyModerationReport[];
 };
 
-export const useMyModerationReports = (conversationId: string | null) => {
-  const { user, loading } = useAuth();
-  const userId = user?.id ?? null;
-
-  return useQuery<MyModerationReportRow[]>({
-    queryKey: ["myModerationReports", conversationId, userId],
-    enabled: !loading && Boolean(conversationId && userId),
-    queryFn: () =>
-      conversationId && userId
-        ? fetchMyModerationReports(conversationId, userId)
-        : Promise.resolve(emptyReports),
-    staleTime: 10_000,
+export const useMyModerationReports = () =>
+  useQuery({
+    queryKey: ["myModerationReports"],
+    queryFn: fetchMyModerationReports,
+    staleTime: 15_000,
   });
-};

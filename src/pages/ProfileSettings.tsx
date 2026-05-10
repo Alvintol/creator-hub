@@ -74,6 +74,12 @@ const classes = {
   mediaTitle: "text-sm font-extrabold text-zinc-900",
   mediaBody: "mt-3 min-h-[92px]",
   mediaHelp: "mt-2 text-xs text-zinc-500",
+
+  accountActionsCard: "card p-5",
+  accountActionsHeader: "flex flex-wrap items-center justify-between gap-4",
+  accountActionsTitle: "text-base font-extrabold tracking-tight",
+  accountActionsText: "mt-1 text-sm text-zinc-600",
+  accountActionsButtons: "flex flex-wrap items-center gap-3",
 } as const;
 
 // Pulls a readable error message from an unknown thrown value
@@ -404,6 +410,25 @@ const ProfileSettings = () => {
           <div className={classes.bannerText}>{errMsg ?? errText}</div>
         </div>
       )}
+
+      <div className={classes.accountActionsCard}>
+        <div className={classes.accountActionsHeader}>
+          <div>
+            <div className={classes.accountActionsTitle}>Account activity</div>
+
+            <p className={classes.accountActionsText}>
+              View moderation reports you have submitted and check their review status.
+            </p>
+          </div>
+
+          <div className={classes.accountActionsButtons}>
+            <Link className={classes.btnOutline} to="/settings/reports">
+              My reports
+            </Link>
+          </div>
+        </div>
+      </div>
+
 
       <div className={classes.card}>
         <div className={classes.title}>Public profile</div>
