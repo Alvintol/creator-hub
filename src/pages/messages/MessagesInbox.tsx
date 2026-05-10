@@ -3,6 +3,7 @@ import {
   getConversationInitiationReasonLabel,
 } from "../../domain/conversations/conversations";
 import { useMessagesInbox } from "../../hooks/conversations/useMessagesInbox";
+import { useMyModerationReports } from '../../hooks/moderation/useMyModerationReports';
 
 const classes = {
   page: "space-y-6",
@@ -50,6 +51,10 @@ const classes = {
   moderationNavText: "text-sm text-zinc-600",
   btnOutline:
     "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+  reportCountPill:
+    "inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800",
+  reportCountPillEmpty:
+    "inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700",
 } as const;
 
 const dateTimeText = (value: string | null) => {
@@ -118,8 +123,22 @@ const getConversationHref = (item: {
 const MessagesInbox = () => {
   const { data, isLoading, error } = useMessagesInbox();
 
+  const {
+    data: myReports = [],
+    isLoading: isLoadingMyReports,
+  } = useMyModerationReports();
+
   const items = data?.items ?? [];
   const totalUnreadCount = data?.totalUnreadCount ?? 0;
+
+  const activeReportCount = myReports.filter(
+    (report) => !report.resolved_at
+  ).length;
+
+  const activeReportText =
+    activeReportCount === 1
+      ? "1 active report"
+      : `${activeReportCount} active reports`;
 
   return (
     <div className={classes.page}>
@@ -141,9 +160,21 @@ const MessagesInbox = () => {
             </p>
           </div>
 
-          <Link className={classes.btnOutline} to="/settings/reports">
-            My reports
-          </Link>
+          <div className={classes.row}>
+            <span
+              className={
+                activeReportCount > 0
+                  ? classes.reportCountPill
+                  : classes.reportCountPillEmpty
+              }
+            >
+              {isLoadingMyReports ? "Checking reports…" : activeReportText}
+            </span>
+
+            <Link className={classes.btnOutline} to="/settings/reports">
+              My reports
+            </Link>
+          </div>
         </div>
       </div>
 
