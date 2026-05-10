@@ -5,7 +5,8 @@ import {
   getModerationReportStatusLabel,
   getModerationReportTargetTypeLabel,
 } from "../../domain/moderation/moderationReports";
-import { useMyModerationReports } from "../../hooks/moderation/useMyModerationReports";
+import { useMarkMyModerationReportsSeen, useMyModerationReports } from "../../hooks/moderation/useMyModerationReports";
+import { useEffect } from 'react';
 
 const classes = {
   page: "space-y-6",
@@ -50,6 +51,8 @@ const classes = {
     "border-amber-200 bg-amber-50 text-amber-800",
   statusUnknown:
     "border-zinc-300 bg-zinc-100 text-zinc-700",
+  newUpdatePill:
+    "inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800",
 } as const;
 
 const dateText = (value: string | null) => {
@@ -84,6 +87,17 @@ const reportStatusPillClass = (status: string) => {
 
 const MyReports = () => {
   const { data: reports = [], isLoading, error } = useMyModerationReports();
+  const markReportsSeen = useMarkMyModerationReportsSeen();
+
+  const hasUnreadReportUpdates = reports.some(
+    (report) => report.has_unread_update
+  );
+
+  useEffect(() => {
+    if (isLoading || error || !hasUnreadReportUpdates) return;
+
+    markReportsSeen.mutate();
+  }, [isLoading, error, hasUnreadReportUpdates, markReportsSeen]);
 
   return (
     <div className={classes.page}>
@@ -127,6 +141,12 @@ const MyReports = () => {
               <h2 className={classes.title}>
                 {getModerationReportTargetTypeLabel(report.target_type)}
               </h2>
+
+              {report.has_unread_update && (
+                    <div className={classes.statusPill}>
+                      New moderator update
+                    </div>
+              )}
 
               <p className={classes.text}>
                 Target:{" "}

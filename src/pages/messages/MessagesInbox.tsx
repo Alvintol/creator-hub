@@ -55,6 +55,8 @@ const classes = {
     "inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800",
   reportCountPillEmpty:
     "inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700",
+  reportUpdatePill:
+    "inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800",
 } as const;
 
 const dateTimeText = (value: string | null) => {
@@ -140,6 +142,15 @@ const MessagesInbox = () => {
       ? "1 active report"
       : `${activeReportCount} active reports`;
 
+  const unreadReportUpdateCount = myReports.filter(
+    (report) => report.has_unread_update
+  ).length;
+
+  const unreadReportUpdateText =
+    unreadReportUpdateCount === 1
+      ? "1 new report update"
+      : `${unreadReportUpdateCount} new report updates`;
+
   return (
     <div className={classes.page}>
       <div className={classes.header}>
@@ -159,6 +170,12 @@ const MessagesInbox = () => {
               Track reports you have submitted and check review updates from admins.
             </p>
           </div>
+
+          {unreadReportUpdateCount > 0 && (
+            <span className={classes.reportUpdatePill}>
+              {unreadReportUpdateText}
+            </span>
+          )}
 
           <div className={classes.row}>
             <span

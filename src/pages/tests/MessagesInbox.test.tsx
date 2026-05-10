@@ -50,6 +50,7 @@ const createInboxItem = () => ({
 const createReport = (overrides = {}) => ({
   id: "report-1",
   resolved_at: null,
+  has_unread_update: false,
   ...overrides,
 });
 
@@ -176,5 +177,21 @@ describe("<MessagesInbox />", () => {
     expect(
       screen.getByRole("link", { name: "Open conversation" })
     ).toHaveAttribute("href", "/messages/conversation-1");
+  });
+
+  it("shows the unread report update count", () => {
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [
+        createReport({ id: "report-1", has_unread_update: true }),
+        createReport({ id: "report-2", has_unread_update: true }),
+        createReport({ id: "report-3", has_unread_update: false }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("2 new report updates")).toBeInTheDocument();
   });
 });

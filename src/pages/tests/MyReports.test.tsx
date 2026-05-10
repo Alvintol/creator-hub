@@ -5,10 +5,15 @@ import MyReports from "../reports/MyReports";
 
 const mocks = vi.hoisted(() => ({
   useMyModerationReports: vi.fn(),
+  markReportsSeen: vi.fn(),
 }));
 
 vi.mock("../../hooks/moderation/useMyModerationReports", () => ({
   useMyModerationReports: mocks.useMyModerationReports,
+  useMarkMyModerationReportsSeen: () => ({
+    mutate: mocks.markReportsSeen,
+    isPending: false,
+  }),
 }));
 
 const createReport = (overrides = {}) => ({
@@ -23,8 +28,18 @@ const createReport = (overrides = {}) => ({
   resolution_code: null,
   resolved_at: null,
   created_at: "2026-05-09T12:00:00.000Z",
+  has_unread_update: false,
+  reporter_seen_at: null,
   ...overrides,
 });
+
+vi.mock("../../hooks/moderation/useMyModerationReports", () => ({
+  useMyModerationReports: mocks.useMyModerationReports,
+  useMarkMyModerationReportsSeen: () => ({
+    mutate: mocks.markReportsSeen,
+    isPending: false,
+  }),
+}));
 
 const renderPage = () =>
   render(
@@ -149,5 +164,23 @@ describe("<MyReports />", () => {
     expect(
       screen.getByText("Your reports could not be loaded right now.")
     ).toBeInTheDocument();
+  });
+
+  it("marks unread moderator updates as seen when the page loads", () => {
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [
+        createReport({
+          has_unread_update: true,
+          reporter_status_message: "We reviewed this report.",
+          reporter_status_updated_at: "2026-05-10T12:00:00.000Z",
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(mocks.markReportsSeen).toHaveBeenCalled();
   });
 });
