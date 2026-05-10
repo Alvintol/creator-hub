@@ -31,16 +31,13 @@ export const useUpdateModerationReportStatus = () => {
         throw new Error("Admin notes must be 2000 characters or less.");
       }
 
-      const { data, error } = await supabase.rpc(
-        "update_moderation_report_status",
-        {
-          p_report_id: input.reportId,
-          p_status: input.status,
-          p_reporter_status_message: reporterStatusMessage ?? null,
-          p_resolution_code: input.resolutionCode ?? null,
-          p_admin_notes: adminNotes ?? null,
-        }
-      );
+      const { data, error } = await supabase.rpc("update_moderation_report_status", {
+        p_report_id: input.reportId,
+        p_status: input.status,
+        p_resolution_code: input.resolutionCode || null,
+        p_reporter_status_message: input.reporterStatusMessage || null,
+        p_admin_notes: input.adminNotes || null,
+      });
 
       if (error) {
         throw error;
