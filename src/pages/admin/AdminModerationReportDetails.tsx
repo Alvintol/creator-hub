@@ -105,6 +105,11 @@ const classes = {
     "border-amber-200 bg-amber-50 text-amber-800",
   statusUnknown:
     "border-zinc-300 bg-zinc-100 text-zinc-700",
+
+  infoCard:
+    "rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900",
+  warningCard:
+    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900",
 } as const;
 
 const dateText = (value: string | null) => {
@@ -155,6 +160,22 @@ const reportStatusPillClass = (status: string) => {
     }`;
 };
 
+const hasReporterUnreadUpdate = (report: {
+  reporter_status_updated_at: string | null;
+  reporter_seen_at: string | null;
+}) => {
+  if (!report.reporter_status_updated_at) return false;
+  if (!report.reporter_seen_at) return true;
+
+  const updateDate = new Date(report.reporter_status_updated_at);
+  const seenDate = new Date(report.reporter_seen_at);
+
+  if (Number.isNaN(updateDate.getTime())) return false;
+  if (Number.isNaN(seenDate.getTime())) return true;
+
+  return updateDate.getTime() > seenDate.getTime();
+};
+
 const AdminModerationReportDetails = () => {
   const { id } = useParams();
 
@@ -178,7 +199,6 @@ const AdminModerationReportDetails = () => {
   const updates = data?.updates ?? [];
   const profileModerationState = data?.profileModerationState ?? null;
   const profileModerationActions = data?.profileModerationActions ?? [];
-
 
   const [status, setStatus] = useState<ModerationReportStatus>("submitted");
   const [resolutionCode, setResolutionCode] =
@@ -228,8 +248,12 @@ const AdminModerationReportDetails = () => {
 
   const hasStatusChanged = report ? status !== report.status : false;
 
+
+  const isResolvedStatus = status === "resolved";
+  const effectiveResolutionCode = isResolvedStatus ? resolutionCode : "";
+  const hasRequiredResolution = !isResolvedStatus || Boolean(effectiveResolutionCode);
   const hasResolutionChanged = report
-    ? resolutionCode !== (report.resolution_code ?? "")
+    ? effectiveResolutionCode !== (report.resolution_code ?? "")
     : false;
 
   const hasReporterUpdate = reporterStatusMessageTrimmed.length > 0;
@@ -245,11 +269,20 @@ const AdminModerationReportDetails = () => {
   const hasPendingUpdate =
     hasStatusChanged || hasResolutionChanged || hasReporterUpdate || hasAdminNote;
 
+  const reporterHasUnreadUpdate = report
+    ? hasReporterUnreadUpdate(report)
+    : false;
+
+  const reporterSeenText = report?.reporter_seen_at
+    ? dateText(report.reporter_seen_at)
+    : "Not seen yet";
+
   const canSave =
     Boolean(report) &&
     hasPendingUpdate &&
     reporterStatusMessageTrimmed.length <= 1000 &&
     adminNotesTrimmed.length <= 2000 &&
+    hasRequiredResolution &&
     !updateStatusMutation.isPending;
 
   const conversationActionBusy =
@@ -291,7 +324,7 @@ const AdminModerationReportDetails = () => {
       await updateStatusMutation.mutateAsync({
         reportId: report.id,
         status,
-        resolutionCode,
+        resolutionCode: effectiveResolutionCode,
         reporterStatusMessage: reporterStatusMessageTrimmed,
         adminNotes: adminNotesTrimmed,
       });
@@ -1140,12 +1173,17 @@ const AdminModerationReportDetails = () => {
                   id="resolutionCode"
                   className={classes.select}
                   value={resolutionCode}
-                  onChange={(event) =>
-                    setResolutionCode(
-                      event.target.value as ModerationReportResolutionCode | ""
-                    )
-                  }
+                  onChange={(event) => {
+                    const nextStatus = event.target.value as ModerationReportStatus;
+
+                    setStatus(nextStatus);
+
+                    if (nextStatus !== "resolved") {
+                      setResolutionCode("");
+                    }
+                  }}
                 >
+
                   <option value="">No resolution selected</option>
 
                   {moderationReportResolutionOptions.map((option) => (
@@ -1154,6 +1192,27 @@ const AdminModerationReportDetails = () => {
                     </option>
                   ))}
                 </select>
+                {isResolvedStatus && !hasRequiredResolution && (
+                  <div className={classes.errorCard}>
+                    A resolution is required before this report can be marked resolved.
+                  </div>
+                )}
+
+                {!isResolvedStatus && resolutionCode && (
+                  <div className={classes.hint}>
+                    Resolution will be cleared unless the report is marked resolved.
+                  </div>
+                )}
+              </div>
+
+              <div className={reporterHasUnreadUpdate ? classes.warningCard : classes.infoCard}>
+                <strong>Reporter visibility:</strong>{" "}
+                {reporterHasUnreadUpdate
+                  ? "The reporter has not seen the latest moderator update yet."
+                  : "The reporter has seen the latest moderator update, or no reporter-visible update has been sent."}
+                <div className="mt-1">
+                  Last seen by reporter: {reporterSeenText}
+                </div>
               </div>
 
               <div className={classes.field}>
@@ -1173,6 +1232,11 @@ const AdminModerationReportDetails = () => {
                 />
 
                 <div className={classes.hint}>
+                  This message is visible to the reporter in My Reports. Do not include internal
+                  investigation notes here.
+                </div>
+
+                <div className={classes.hint}>
                   {reporterStatusMessageTrimmed.length}/1000 characters.
                 </div>
               </div>
@@ -1190,6 +1254,10 @@ const AdminModerationReportDetails = () => {
                   placeholder="Optional. This note is logged in the admin update history."
                   maxLength={2000}
                 />
+
+                <div className={classes.hint}>
+                  Internal notes are admin-only and are not shown to the reporter.
+                </div>
 
                 <div className={classes.hint}>
                   {adminNotesTrimmed.length}/2000 characters.

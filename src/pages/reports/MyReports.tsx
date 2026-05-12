@@ -5,7 +5,8 @@ import {
   getModerationReportStatusLabel,
   getModerationReportTargetTypeLabel,
 } from "../../domain/moderation/moderationReports";
-import { useMyModerationReports } from "../../hooks/moderation/useMyModerationReports";
+import { useMarkMyModerationReportsSeen, useMyModerationReports } from "../../hooks/moderation/useMyModerationReports";
+import { useEffect, useMemo, useState } from 'react';
 
 const classes = {
   page: "space-y-6",
@@ -50,7 +51,21 @@ const classes = {
     "border-amber-200 bg-amber-50 text-amber-800",
   statusUnknown:
     "border-zinc-300 bg-zinc-100 text-zinc-700",
+  newUpdatePill:
+    "inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800",
+
+  filterRow: "flex flex-wrap items-center gap-2",
+  filterButton:
+    "inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-4 py-2 text-sm font-bold text-zinc-800 transition hover:bg-zinc-50",
+  filterButtonActive:
+    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-4 py-2 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.22)]",
+  filterCount:
+    "ml-2 rounded-full bg-white/80 px-2 py-0.5 text-xs font-extrabold text-zinc-700",
+  filterCountActive:
+    "ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold text-white",
 } as const;
+
+type ReportsFilter = "all" | "active" | "updates" | "resolved";
 
 const dateText = (value: string | null) => {
   if (!value) return "Not set";
@@ -84,6 +99,67 @@ const reportStatusPillClass = (status: string) => {
 
 const MyReports = () => {
   const { data: reports = [], isLoading, error } = useMyModerationReports();
+  const markReportsSeen = useMarkMyModerationReportsSeen();
+
+  const [reportsFilter, setReportsFilter] = useState<ReportsFilter>("all");
+
+  const activeReports = useMemo(
+    () => reports.filter((report) => !report.resolved_at),
+    [reports]
+  );
+
+  const reportsWithUpdates = useMemo(
+    () => reports.filter((report) => report.has_unread_update),
+    [reports]
+  );
+
+  const resolvedReports = useMemo(
+    () => reports.filter((report) => Boolean(report.resolved_at)),
+    [reports]
+  );
+
+  const filteredReports = useMemo(() => {
+    if (reportsFilter === "active") return activeReports;
+    if (reportsFilter === "updates") return reportsWithUpdates;
+    if (reportsFilter === "resolved") return resolvedReports;
+
+    return reports;
+  }, [activeReports, reports, reportsFilter, reportsWithUpdates, resolvedReports]);
+
+  const reportFilters: Array<{
+    value: ReportsFilter;
+    label: string;
+    count: number;
+  }> = [
+      {
+        value: "all",
+        label: "All",
+        count: reports.length,
+      },
+      {
+        value: "active",
+        label: "Active",
+        count: activeReports.length,
+      },
+      {
+        value: "updates",
+        label: "New updates",
+        count: reportsWithUpdates.length,
+      },
+      {
+        value: "resolved",
+        label: "Resolved",
+        count: resolvedReports.length,
+      },
+    ];
+
+  const hasUnreadReportUpdates = reportsWithUpdates.length > 0;
+
+  useEffect(() => {
+    if (isLoading || error || !hasUnreadReportUpdates) return;
+
+    markReportsSeen.mutate();
+  }, [isLoading, error, hasUnreadReportUpdates, markReportsSeen]);
 
   return (
     <div className={classes.page}>
@@ -99,6 +175,34 @@ const MyReports = () => {
           notes and internal actions are not shown here.
         </p>
       </div>
+
+      {!isLoading && !error && reports.length > 0 && (
+        <div className={classes.filterRow}>
+          {reportFilters.map((filter) => {
+            const isActive = reportsFilter === filter.value;
+
+            return (
+              <button
+                key={filter.value}
+                className={
+                  isActive ? classes.filterButtonActive : classes.filterButton
+                }
+                type="button"
+                onClick={() => setReportsFilter(filter.value)}
+              >
+                {filter.label}
+                <span
+                  className={
+                    isActive ? classes.filterCountActive : classes.filterCount
+                  }
+                >
+                  {filter.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {isLoading && (
         <div className={classes.card}>
@@ -120,13 +224,19 @@ const MyReports = () => {
         </div>
       )}
 
-      {!isLoading && !error && reports.length > 0 && (
+      {!isLoading && !error && filteredReports.length > 0 && (
         <div className={classes.stack}>
-          {reports.map((report) => (
+          {filteredReports.map((report) => (
             <div key={report.id} className={classes.reportCard}>
               <h2 className={classes.title}>
                 {getModerationReportTargetTypeLabel(report.target_type)}
               </h2>
+
+              {report.has_unread_update && (
+                <div className={classes.statusPill}>
+                  New moderator update
+                </div>
+              )}
 
               <p className={classes.text}>
                 Target:{" "}
@@ -197,6 +307,14 @@ const MyReports = () => {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {!isLoading && !error && reports.length > 0 && filteredReports.length === 0 && (
+        <div className={classes.card}>
+          <p className={classes.text}>
+            No reports match this filter.
+          </p>
         </div>
       )}
     </div>

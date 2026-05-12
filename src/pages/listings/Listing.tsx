@@ -21,7 +21,7 @@ const classes = {
   loadingText: "text-sm text-zinc-600",
 
   grid: "grid gap-6 lg:grid-cols-2",
-  img: "w-full rounded-3xl border border-zinc-200 object-cover bg-zinc-100",
+  img: "aspect-video w-full rounded-3xl border border-zinc-200 object-cover bg-zinc-100",
 
   rightCol: "space-y-4",
   titleRow: "flex flex-wrap items-center gap-2",
@@ -132,8 +132,11 @@ const ListingPage = () => {
     reportDetailsTrimmed.length <= 2000 &&
     !submitListingReport.isPending;
 
+  const isOwnListing = Boolean(user?.id && listing?.user_id === user.id);
+
   const handleSubmitListingReport = async () => {
     if (!listing?.id || !reportReason || !canSubmitListingReport) return;
+
 
     setReportSuccess(null);
     setReportError(null);
@@ -195,12 +198,16 @@ const ListingPage = () => {
       </Link>
 
       <div className={classes.grid}>
-        <img
-          src={listing.preview_url ?? ""}
-          alt=""
-          className={classes.img}
-          loading="lazy"
-        />
+        {listing.preview_url ? (
+          <img
+            src={listing.preview_url}
+            alt=""
+            className={classes.img}
+            loading="lazy"
+          />
+        ) : (
+          <div className={classes.img} />
+        )}
 
         <div className={classes.rightCol}>
           <div className={classes.titleRow}>
@@ -312,6 +319,10 @@ const ListingPage = () => {
                   Sign in to report
                 </Link>
               </div>
+            ) : isOwnListing ? (
+              <p className={classes.reportText}>
+                You cannot report your own listing.
+              </p>
             ) : (
               <div className={classes.reportForm}>
                 {!isReportOpen ? (

@@ -74,6 +74,8 @@ type ReportDataOptions = {
     newIsUnderReview: boolean;
     adminNote?: string | null;
   }>;
+  reporterStatusUpdatedAt?: string | null;
+  reporterSeenAt?: string | null;
   listing?: {
     status: string;
     isActive: boolean;
@@ -94,6 +96,8 @@ const createReportData = ({
   profileModerationActions = [],
   listing = null,
   listingModerationActions = [],
+  reporterStatusUpdatedAt = null,
+  reporterSeenAt = null,
 }: ReportDataOptions = {}) => ({
   report: {
     id: "report-1",
@@ -107,8 +111,11 @@ const createReportData = ({
     reason_code: "harassment",
     reason_details: "The reported user was hostile in the thread.",
     status: "submitted",
-    reporter_status_message: null,
-    reporter_status_updated_at: null,
+    reporter_status_message: reporterStatusUpdatedAt
+      ? "Thanks. We are reviewing this report."
+      : null,
+    reporter_status_updated_at: reporterStatusUpdatedAt,
+    reporter_seen_at: reporterSeenAt,
     resolution_code: null,
     resolved_at: null,
     reviewed_at: null,
@@ -815,5 +822,74 @@ describe("<AdminModerationReportDetails />", () => {
         adminNote: "Multiple reports need a closer look.",
       });
     });
+  });
+
+  it("requires a resolution before saving a resolved report", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({ conversationStatus: "open" }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Status"), {
+      target: {
+        value: "resolved",
+      },
+    });
+
+    expect(
+      screen.getByText(
+        "A resolution is required before this report can be marked resolved."
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("button", { name: "Save report update" })
+    ).toBeDisabled();
+  });
+
+  it("shows when the reporter has not seen the latest moderator update", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        conversationStatus: "open",
+        reporterStatusUpdatedAt: "2026-05-10T12:00:00.000Z",
+        reporterSeenAt: null,
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "The reporter has not seen the latest moderator update yet."
+      )
+    ).toBeInTheDocument();
+
+    expect(screen.getByText(/Last seen by reporter:/)).toBeInTheDocument();
+    expect(screen.getByText(/Not seen yet/)).toBeInTheDocument();
+  });
+
+  it("shows when the reporter has seen the latest moderator update", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({
+        conversationStatus: "open",
+        reporterStatusUpdatedAt: "2026-05-10T12:00:00.000Z",
+        reporterSeenAt: "2026-05-10T12:30:00.000Z",
+      }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "The reporter has seen the latest moderator update, or no reporter-visible update has been sent."
+      )
+    ).toBeInTheDocument();
   });
 });

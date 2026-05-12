@@ -1,14 +1,19 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import MyReports from "../reports/MyReports";
 
 const mocks = vi.hoisted(() => ({
   useMyModerationReports: vi.fn(),
+  markReportsSeen: vi.fn(),
 }));
 
 vi.mock("../../hooks/moderation/useMyModerationReports", () => ({
   useMyModerationReports: mocks.useMyModerationReports,
+  useMarkMyModerationReportsSeen: () => ({
+    mutate: mocks.markReportsSeen,
+    isPending: false,
+  }),
 }));
 
 const createReport = (overrides = {}) => ({
@@ -23,8 +28,18 @@ const createReport = (overrides = {}) => ({
   resolution_code: null,
   resolved_at: null,
   created_at: "2026-05-09T12:00:00.000Z",
+  has_unread_update: false,
+  reporter_seen_at: null,
   ...overrides,
 });
+
+vi.mock("../../hooks/moderation/useMyModerationReports", () => ({
+  useMyModerationReports: mocks.useMyModerationReports,
+  useMarkMyModerationReportsSeen: () => ({
+    mutate: mocks.markReportsSeen,
+    isPending: false,
+  }),
+}));
 
 const renderPage = () =>
   render(
@@ -36,6 +51,12 @@ const renderPage = () =>
 describe("<MyReports />", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("shows an empty state when the user has not submitted reports", () => {
@@ -149,5 +170,113 @@ describe("<MyReports />", () => {
     expect(
       screen.getByText("Your reports could not be loaded right now.")
     ).toBeInTheDocument();
+  });
+
+  it("marks unread moderator updates as seen when the page loads", () => {
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [
+        createReport({
+          has_unread_update: true,
+          reporter_status_message: "We reviewed this report.",
+          reporter_status_updated_at: "2026-05-10T12:00:00.000Z",
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(mocks.markReportsSeen).toHaveBeenCalled();
+  });
+
+  it("shows an unread moderator update indicator", () => {
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [
+        createReport({
+          has_unread_update: true,
+          reporter_status_message: "We reviewed this report.",
+          reporter_status_updated_at: "2026-05-10T12:00:00.000Z",
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("New moderator update")).toBeInTheDocument();
+    expect(screen.getByText(/We reviewed this report./)).toBeInTheDocument();
+  });
+
+  it("marks unread moderator updates as seen after reports load", () => {
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [
+        createReport({
+          has_unread_update: true,
+          reporter_status_message: "We reviewed this report.",
+          reporter_status_updated_at: "2026-05-10T12:00:00.000Z",
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(mocks.markReportsSeen).toHaveBeenCalled();
+  });
+
+  it("filters reports by active, updates, and resolved state", () => {
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [
+        createReport({
+          id: "active-report",
+          target_label: "Active Report",
+          resolved_at: null,
+          has_unread_update: false,
+        }),
+        createReport({
+          id: "updated-report",
+          target_label: "Updated Report",
+          resolved_at: null,
+          has_unread_update: true,
+          reporter_status_message: "There is a new update.",
+          reporter_status_updated_at: "2026-05-10T12:00:00.000Z",
+        }),
+        createReport({
+          id: "resolved-report",
+          target_label: "Resolved Report",
+          status: "resolved",
+          resolved_at: "2026-05-10T12:00:00.000Z",
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Active Report")).toBeInTheDocument();
+    expect(screen.getByText("Updated Report")).toBeInTheDocument();
+    expect(screen.getByText("Resolved Report")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /New updates/ }));
+
+    expect(screen.queryByText("Active Report")).not.toBeInTheDocument();
+    expect(screen.getByText("Updated Report")).toBeInTheDocument();
+    expect(screen.queryByText("Resolved Report")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Resolved/ }));
+
+    expect(screen.queryByText("Active Report")).not.toBeInTheDocument();
+    expect(screen.queryByText("Updated Report")).not.toBeInTheDocument();
+    expect(screen.getByText("Resolved Report")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Active/ }));
+
+    expect(screen.getByText("Active Report")).toBeInTheDocument();
+    expect(screen.getByText("Updated Report")).toBeInTheDocument();
+    expect(screen.queryByText("Resolved Report")).not.toBeInTheDocument();
   });
 });
