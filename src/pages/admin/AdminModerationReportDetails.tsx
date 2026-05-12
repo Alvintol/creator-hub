@@ -228,8 +228,12 @@ const AdminModerationReportDetails = () => {
 
   const hasStatusChanged = report ? status !== report.status : false;
 
+
+  const isResolvedStatus = status === "resolved";
+  const effectiveResolutionCode = isResolvedStatus ? resolutionCode : "";
+  const hasRequiredResolution = !isResolvedStatus || Boolean(effectiveResolutionCode);
   const hasResolutionChanged = report
-    ? resolutionCode !== (report.resolution_code ?? "")
+    ? effectiveResolutionCode !== (report.resolution_code ?? "")
     : false;
 
   const hasReporterUpdate = reporterStatusMessageTrimmed.length > 0;
@@ -250,6 +254,7 @@ const AdminModerationReportDetails = () => {
     hasPendingUpdate &&
     reporterStatusMessageTrimmed.length <= 1000 &&
     adminNotesTrimmed.length <= 2000 &&
+    hasRequiredResolution &&
     !updateStatusMutation.isPending;
 
   const conversationActionBusy =
@@ -291,7 +296,7 @@ const AdminModerationReportDetails = () => {
       await updateStatusMutation.mutateAsync({
         reportId: report.id,
         status,
-        resolutionCode,
+        resolutionCode: effectiveResolutionCode,
         reporterStatusMessage: reporterStatusMessageTrimmed,
         adminNotes: adminNotesTrimmed,
       });
@@ -1140,12 +1145,17 @@ const AdminModerationReportDetails = () => {
                   id="resolutionCode"
                   className={classes.select}
                   value={resolutionCode}
-                  onChange={(event) =>
-                    setResolutionCode(
-                      event.target.value as ModerationReportResolutionCode | ""
-                    )
-                  }
+                  onChange={(event) => {
+                    const nextStatus = event.target.value as ModerationReportStatus;
+
+                    setStatus(nextStatus);
+
+                    if (nextStatus !== "resolved") {
+                      setResolutionCode("");
+                    }
+                  }}
                 >
+
                   <option value="">No resolution selected</option>
 
                   {moderationReportResolutionOptions.map((option) => (
@@ -1154,6 +1164,17 @@ const AdminModerationReportDetails = () => {
                     </option>
                   ))}
                 </select>
+                {isResolvedStatus && !hasRequiredResolution && (
+                  <div className={classes.errorCard}>
+                    A resolution is required before this report can be marked resolved.
+                  </div>
+                )}
+
+                {!isResolvedStatus && resolutionCode && (
+                  <div className={classes.hint}>
+                    Resolution will be cleared unless the report is marked resolved.
+                  </div>
+                )}
               </div>
 
               <div className={classes.field}>

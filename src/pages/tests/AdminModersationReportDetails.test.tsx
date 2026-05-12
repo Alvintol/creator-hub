@@ -816,4 +816,30 @@ describe("<AdminModerationReportDetails />", () => {
       });
     });
   });
+
+  it("requires a resolution before saving a resolved report", () => {
+    mocks.useAdminModerationReport.mockReturnValue({
+      data: createReportData({ conversationStatus: "open" }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Status"), {
+      target: {
+        value: "resolved",
+      },
+    });
+
+    expect(
+      screen.getByText(
+        "A resolution is required before this report can be marked resolved."
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("button", { name: "Save report update" })
+    ).toBeDisabled();
+  });
 });
