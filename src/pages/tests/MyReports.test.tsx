@@ -51,6 +51,12 @@ const renderPage = () =>
 describe("<MyReports />", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("shows an empty state when the user has not submitted reports", () => {
@@ -183,4 +189,42 @@ describe("<MyReports />", () => {
 
     expect(mocks.markReportsSeen).toHaveBeenCalled();
   });
+
+  it("shows an unread moderator update indicator", () => {
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [
+        createReport({
+          has_unread_update: true,
+          reporter_status_message: "We reviewed this report.",
+          reporter_status_updated_at: "2026-05-10T12:00:00.000Z",
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("New moderator update")).toBeInTheDocument();
+    expect(screen.getByText(/We reviewed this report./)).toBeInTheDocument();
+  });
+
+  it("marks unread moderator updates as seen after reports load", () => {
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [
+        createReport({
+          has_unread_update: true,
+          reporter_status_message: "We reviewed this report.",
+          reporter_status_updated_at: "2026-05-10T12:00:00.000Z",
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(mocks.markReportsSeen).toHaveBeenCalled();
+  });
+
 });

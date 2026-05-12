@@ -23,6 +23,7 @@ export type AdminModerationReportRow = {
   reason_code: ModerationReportReasonCode;
   reason_details: string | null;
   status: ModerationReportStatus;
+  reporter_seen_at: string | null;  
   reporter_status_message: string | null;
   reporter_status_updated_at: string | null;
   resolution_code: ModerationReportResolutionCode | null;
@@ -149,6 +150,7 @@ const fetchAdminModerationReport = async (
       status,
       reporter_status_message,
       reporter_status_updated_at,
+      reporter_seen_at,
       resolution_code,
       resolved_at,
       reviewed_at,
