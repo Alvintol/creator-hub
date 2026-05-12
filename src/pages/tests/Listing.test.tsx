@@ -170,4 +170,22 @@ describe("<ListingPage /> report UI", () => {
       await screen.findByText("You already have an active report for this listing.")
     ).toBeInTheDocument();
   });
+
+  it("does not allow users to report their own listing", () => {
+    mocks.useAuth.mockReturnValue({
+      user: {
+        id: "creator-1",
+      },
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText("You cannot report your own listing.")
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", { name: "Report listing" })
+    ).not.toBeInTheDocument();
+  });
 });
