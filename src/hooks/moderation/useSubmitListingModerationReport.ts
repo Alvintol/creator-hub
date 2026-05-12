@@ -49,6 +49,10 @@ export const useSubmitListingModerationReport = () => {
       queryClient.invalidateQueries({
         queryKey: ["adminModerationReports"],
       });
+
+      queryClient.invalidateQueries({
+        queryKey: ["adminModerationReportSummary"],
+      });
     },
   });
 };

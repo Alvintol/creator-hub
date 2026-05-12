@@ -53,6 +53,10 @@ export const useAdminMarkProfileUnderReview = () => {
         queryKey: ["adminModerationReports"],
       });
 
+      queryClient.invalidateQueries({
+        queryKey: ["adminModerationReportSummary"],
+      });
+
       if (input.moderationReportId) {
         queryClient.invalidateQueries({
           queryKey: ["adminModerationReport", input.moderationReportId],
@@ -71,6 +75,10 @@ export const useAdminClearProfileReviewFlag = () => {
     onSuccess: (_data, input) => {
       queryClient.invalidateQueries({
         queryKey: ["adminModerationReports"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["adminModerationReportSummary"],
       });
 
       if (input.moderationReportId) {

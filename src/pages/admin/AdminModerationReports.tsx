@@ -15,6 +15,7 @@ import {
   type AdminModerationReportFilters,
   type AdminModerationReportItem,
 } from "../../hooks/admin/useAdminModerationReports";
+import { emptyAdminModerationReportSummary, useAdminModerationReportSummary } from '../../hooks/admin/useAdminModerationReportSummary';
 
 const classes = {
   page: "space-y-6",
@@ -75,6 +76,14 @@ const classes = {
     "border-amber-200 bg-amber-50 text-amber-800",
   statusUnknown:
     "border-zinc-300 bg-zinc-100 text-zinc-700",
+
+  summaryGrid: "grid gap-4 md:grid-cols-2 xl:grid-cols-3",
+  summaryCard: "card p-5",
+  summaryLabel: "text-xs font-bold uppercase tracking-wide text-zinc-500",
+  summaryValue: "mt-2 text-3xl font-extrabold tracking-tight text-zinc-900",
+  summaryText: "mt-1 text-sm text-zinc-600",
+  summaryError:
+    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900",
 } as const;
 
 const pageSize = 20;
@@ -190,6 +199,12 @@ const AdminModerationReports = () => {
     pageSize,
   });
 
+  const {
+    data: summary = emptyAdminModerationReportSummary,
+    isLoading: isSummaryLoading,
+    error: summaryError,
+  } = useAdminModerationReportSummary();
+
   const setField = <Key extends keyof AdminModerationReportFilters>(
     key: Key,
     value: AdminModerationReportFilters[Key]
@@ -206,6 +221,40 @@ const AdminModerationReports = () => {
   const totalCount = data?.totalCount ?? 0;
   const pageCount = data?.pageCount ?? 0;
 
+
+  const summaryItems = [
+    {
+      label: "Submitted",
+      value: summary.submitted_count,
+      text: "Reports waiting for first review.",
+    },
+    {
+      label: "Active",
+      value: summary.active_count,
+      text: "Reports not resolved yet.",
+    },
+    {
+      label: "Resolved",
+      value: summary.resolved_count,
+      text: "Reports with completed investigations.",
+    },
+    {
+      label: "Unread reporter updates",
+      value: summary.unread_reporter_update_count,
+      text: "Reporter-visible updates not seen yet.",
+    },
+    {
+      label: "Profiles under review",
+      value: summary.profile_under_review_count,
+      text: "Profiles currently flagged for admin review.",
+    },
+    {
+      label: "Hidden listings",
+      value: summary.hidden_listing_count,
+      text: "Published listings hidden from public view.",
+    },
+  ];
+
   return (
     <div className={classes.page}>
       <Link to="/admin/dashboard" className={classes.backLink}>
@@ -219,6 +268,26 @@ const AdminModerationReports = () => {
           Review reports across conversations, messages, listings, and profiles.
         </p>
       </div>
+
+      <div className={classes.summaryGrid}>
+        {summaryItems.map((item) => (
+          <div key={item.label} className={classes.summaryCard}>
+            <div className={classes.summaryLabel}>{item.label}</div>
+
+            <div className={classes.summaryValue}>
+              {isSummaryLoading ? "…" : item.value.toLocaleString()}
+            </div>
+
+            <p className={classes.summaryText}>{item.text}</p>
+          </div>
+        ))}
+      </div>
+
+      {summaryError && (
+        <div className={classes.summaryError}>
+          Summary counts could not be loaded right now.
+        </div>
+      )}
 
       <div className={classes.card}>
         <div className={classes.section}>

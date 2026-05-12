@@ -9,10 +9,23 @@ import type {
 
 const mocks = vi.hoisted(() => ({
   useAdminModerationReports: vi.fn(),
+  useAdminModerationReportSummary: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminModerationReports", () => ({
   useAdminModerationReports: mocks.useAdminModerationReports,
+}));
+
+vi.mock("../../hooks/admin/useAdminModerationReportSummary", () => ({
+  emptyAdminModerationReportSummary: {
+    submitted_count: 0,
+    active_count: 0,
+    resolved_count: 0,
+    unread_reporter_update_count: 0,
+    profile_under_review_count: 0,
+    hidden_listing_count: 0,
+  },
+  useAdminModerationReportSummary: mocks.useAdminModerationReportSummary,
 }));
 
 const createReport = (
@@ -96,6 +109,19 @@ describe("<AdminModerationReports />", () => {
 
     mocks.useAdminModerationReports.mockReturnValue({
       data: createResult(),
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useAdminModerationReportSummary.mockReturnValue({
+      data: {
+        submitted_count: 3,
+        active_count: 5,
+        resolved_count: 8,
+        unread_reporter_update_count: 2,
+        profile_under_review_count: 1,
+        hidden_listing_count: 4,
+      },
       isLoading: false,
       error: null,
     });
@@ -305,6 +331,48 @@ describe("<AdminModerationReports />", () => {
 
     expect(
       screen.getByText("Reports could not be loaded right now.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows global moderation summary cards", () => {
+    renderPage();
+
+    expect(screen.getByText("Reports waiting for first review.")).toBeInTheDocument();
+    expect(screen.getByText("Reports not resolved yet.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Reports with completed investigations.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Reporter-visible updates not seen yet.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Profiles currently flagged for admin review.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Published listings hidden from public view.")
+    ).toBeInTheDocument();
+    expect(screen.getByText("Unread reporter updates")).toBeInTheDocument();
+    expect(screen.getByText("Profiles under review")).toBeInTheDocument();
+    expect(screen.getByText("Hidden listings")).toBeInTheDocument();
+
+    expect(screen.getByText("Reports waiting for first review.")).toBeInTheDocument();
+    expect(screen.getByText("Reports not resolved yet.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Reporter-visible updates not seen yet.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows a summary error when summary counts fail to load", () => {
+    mocks.useAdminModerationReportSummary.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error("Failed to load summary."),
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText("Summary counts could not be loaded right now.")
     ).toBeInTheDocument();
   });
 });

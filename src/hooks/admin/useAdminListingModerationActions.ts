@@ -57,6 +57,9 @@ export const useAdminHideListing = () => {
         queryClient.invalidateQueries({
           queryKey: ["adminModerationReport", input.moderationReportId],
         });
+        queryClient.invalidateQueries({
+          queryKey: ["adminModerationReportSummary"],
+        });
       }
     },
   });
@@ -76,6 +79,9 @@ export const useAdminRestoreListing = () => {
       if (input.moderationReportId) {
         queryClient.invalidateQueries({
           queryKey: ["adminModerationReport", input.moderationReportId],
+        });
+        queryClient.invalidateQueries({
+          queryKey: ["adminModerationReportSummary"],
         });
       }
     },

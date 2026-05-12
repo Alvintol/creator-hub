@@ -50,6 +50,9 @@ export const useAdminLockConversation = () => {
       queryClient.invalidateQueries({
         queryKey: ["adminModerationReports"],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["adminModerationReportSummary"],
+      });
 
       if (input.moderationReportId) {
         queryClient.invalidateQueries({
@@ -69,6 +72,9 @@ export const useAdminReopenConversation = () => {
     onSuccess: (_data, input) => {
       queryClient.invalidateQueries({
         queryKey: ["adminModerationReports"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["adminModerationReportSummary"],
       });
 
       if (input.moderationReportId) {

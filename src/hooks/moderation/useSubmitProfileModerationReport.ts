@@ -49,6 +49,10 @@ export const useSubmitProfileModerationReport = () => {
       queryClient.invalidateQueries({
         queryKey: ["adminModerationReports"],
       });
+
+      queryClient.invalidateQueries({
+        queryKey: ["adminModerationReportSummary"],
+      });
     },
   });
 };
