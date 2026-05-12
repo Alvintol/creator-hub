@@ -375,4 +375,38 @@ describe("<AdminModerationReports />", () => {
       screen.getByText("Summary counts could not be loaded right now.")
     ).toBeInTheDocument();
   });
+
+  it("filters to submitted reports from the submitted summary card", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Submitted/i }));
+
+    expect(screen.getByLabelText("Status")).toHaveValue("submitted");
+  });
+
+  it("filters to resolved reports from the resolved summary card", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Resolved/i }));
+
+    expect(screen.getByLabelText("Status")).toHaveValue("resolved");
+  });
+
+  it("filters to profile reports from the profiles-under-review summary card", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Profiles under review/i }));
+
+    expect(screen.getByLabelText("Target type")).toHaveValue("profile");
+  });
+
+  it("filters to listing reports from the hidden-listings summary card", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Hidden listings/i }));
+
+    expect(screen.getByLabelText("Target type")).toHaveValue("listing");
+  });
+
+
 });

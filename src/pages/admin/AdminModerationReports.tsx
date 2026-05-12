@@ -84,6 +84,10 @@ const classes = {
   summaryText: "mt-1 text-sm text-zinc-600",
   summaryError:
     "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900",
+  summaryButton:
+    "w-full text-left transition hover:-translate-y-[1px] hover:shadow-[0_8px_22px_rgba(0,0,0,0.10)] focus:outline-none focus:ring-2 focus:ring-zinc-300",
+  summaryCardDisabled: "card p-5",
+  summaryHint: "mt-3 text-xs font-semibold text-zinc-500",
 } as const;
 
 const pageSize = 20;
@@ -227,6 +231,7 @@ const AdminModerationReports = () => {
       label: "Submitted",
       value: summary.submitted_count,
       text: "Reports waiting for first review.",
+      onClick: () => setField("status", "submitted"),
     },
     {
       label: "Active",
@@ -237,6 +242,7 @@ const AdminModerationReports = () => {
       label: "Resolved",
       value: summary.resolved_count,
       text: "Reports with completed investigations.",
+      onClick: () => setField("status", "resolved"),
     },
     {
       label: "Unread reporter updates",
@@ -247,11 +253,13 @@ const AdminModerationReports = () => {
       label: "Profiles under review",
       value: summary.profile_under_review_count,
       text: "Profiles currently flagged for admin review.",
+      onClick: () => setField("targetType", "profile"),
     },
     {
       label: "Hidden listings",
       value: summary.hidden_listing_count,
       text: "Published listings hidden from public view.",
+      onClick: () => setField("targetType", "listing"),
     },
   ];
 
@@ -270,19 +278,40 @@ const AdminModerationReports = () => {
       </div>
 
       <div className={classes.summaryGrid}>
-        {summaryItems.map((item) => (
-          <div key={item.label} className={classes.summaryCard}>
-            <div className={classes.summaryLabel}>{item.label}</div>
+        {summaryItems.map((item) => {
+          const content = (
+            <>
+              <div className={classes.summaryLabel}>{item.label}</div>
 
-            <div className={classes.summaryValue}>
-              {isSummaryLoading ? "…" : item.value.toLocaleString()}
+              <div className={classes.summaryValue}>
+                {isSummaryLoading ? "…" : item.value.toLocaleString()}
+              </div>
+
+              <p className={classes.summaryText}>{item.text}</p>
+
+              {item.onClick && (
+                <div className={classes.summaryHint}>Click to filter reports</div>
+              )}
+            </>
+          );
+
+          return item.onClick ? (
+            <button
+              key={item.label}
+              className={`${classes.summaryCard} ${classes.summaryButton}`}
+              type="button"
+              onClick={item.onClick}
+            >
+              {content}
+            </button>
+          ) : (
+            <div key={item.label} className={classes.summaryCardDisabled}>
+              {content}
             </div>
-
-            <p className={classes.summaryText}>{item.text}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
-
+      
       {summaryError && (
         <div className={classes.summaryError}>
           Summary counts could not be loaded right now.
