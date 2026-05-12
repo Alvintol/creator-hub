@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import MyReports from "../reports/MyReports";
@@ -227,4 +227,56 @@ describe("<MyReports />", () => {
     expect(mocks.markReportsSeen).toHaveBeenCalled();
   });
 
+  it("filters reports by active, updates, and resolved state", () => {
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [
+        createReport({
+          id: "active-report",
+          target_label: "Active Report",
+          resolved_at: null,
+          has_unread_update: false,
+        }),
+        createReport({
+          id: "updated-report",
+          target_label: "Updated Report",
+          resolved_at: null,
+          has_unread_update: true,
+          reporter_status_message: "There is a new update.",
+          reporter_status_updated_at: "2026-05-10T12:00:00.000Z",
+        }),
+        createReport({
+          id: "resolved-report",
+          target_label: "Resolved Report",
+          status: "resolved",
+          resolved_at: "2026-05-10T12:00:00.000Z",
+        }),
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Active Report")).toBeInTheDocument();
+    expect(screen.getByText("Updated Report")).toBeInTheDocument();
+    expect(screen.getByText("Resolved Report")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /New updates/ }));
+
+    expect(screen.queryByText("Active Report")).not.toBeInTheDocument();
+    expect(screen.getByText("Updated Report")).toBeInTheDocument();
+    expect(screen.queryByText("Resolved Report")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Resolved/ }));
+
+    expect(screen.queryByText("Active Report")).not.toBeInTheDocument();
+    expect(screen.queryByText("Updated Report")).not.toBeInTheDocument();
+    expect(screen.getByText("Resolved Report")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Active/ }));
+
+    expect(screen.getByText("Active Report")).toBeInTheDocument();
+    expect(screen.getByText("Updated Report")).toBeInTheDocument();
+    expect(screen.queryByText("Resolved Report")).not.toBeInTheDocument();
+  });
 });
