@@ -57,6 +57,7 @@ export type AdminModerationReportRow = {
   status: ModerationReportStatus;
   reporter_status_message: string | null;
   reporter_status_updated_at: string | null;
+  reporter_seen_at: string | null;
   resolution_code: ModerationReportResolutionCode | null;
   resolved_at: string | null;
   reviewed_at: string | null;
@@ -74,12 +75,20 @@ export type AdminModerationReportItem = {
   reportedUser: AdminModerationReportProfile | null;
 };
 
+export type AdminModerationReportTriageFilter =
+  | "all"
+  | "active"
+  | "unread_reporter_updates"
+  | "profile_under_review"
+  | "hidden_listing";
+
 export type AdminModerationReportFilters = {
   reporterHandle: string;
   reportedHandle: string;
   status: "all" | ModerationReportStatus;
   reason: "all" | ModerationReportReasonCode;
   targetType: "all" | ModerationReportTargetType;
+  triage: AdminModerationReportTriageFilter;
 };
 
 export type AdminModerationReportsResult = {
@@ -94,6 +103,13 @@ type UseAdminModerationReportsInput = {
   filters: AdminModerationReportFilters;
   page: number;
   pageSize?: number;
+};
+
+type TriageFilterScope = {
+  isEmpty: boolean;
+  reportIds?: string[];
+  listingIds?: string[];
+  profileUserIds?: string[];
 };
 
 const emptyResult: AdminModerationReportsResult = {
@@ -127,14 +143,116 @@ const fetchMatchingProfileIds = async (
     .filter(Boolean);
 };
 
+// Checks whether a reporter-visible update has not been seen by the reporter yet
+const hasUnreadReporterUpdate = (row: {
+  reporter_status_updated_at: string | null;
+  reporter_seen_at: string | null;
+}) => {
+  if (!row.reporter_status_updated_at) return false;
+  if (!row.reporter_seen_at) return true;
+
+  const updatedAt = new Date(row.reporter_status_updated_at);
+  const seenAt = new Date(row.reporter_seen_at);
+
+  if (Number.isNaN(updatedAt.getTime())) return false;
+  if (Number.isNaN(seenAt.getTime())) return true;
+
+  return updatedAt.getTime() > seenAt.getTime();
+};
+
+// Prefetches target ids for triage filters that cannot be expressed cleanly
+// with the main paginated moderation_reports query alone
+const fetchTriageFilterScope = async (
+  triage: AdminModerationReportTriageFilter
+): Promise<TriageFilterScope> => {
+  if (triage === "all" || triage === "active") {
+    return {
+      isEmpty: false,
+    };
+  }
+
+  if (triage === "unread_reporter_updates") {
+    const { data, error } = await supabase
+      .from("moderation_reports")
+      .select("id, reporter_status_updated_at, reporter_seen_at")
+      .not("reporter_status_updated_at", "is", null);
+
+    if (error) {
+      throw error;
+    }
+
+    const reportIds = (data ?? [])
+      .filter((row) =>
+        hasUnreadReporterUpdate({
+          reporter_status_updated_at:
+            (row.reporter_status_updated_at as string | null) ?? null,
+          reporter_seen_at: (row.reporter_seen_at as string | null) ?? null,
+        })
+      )
+      .map((row) => row.id as string)
+      .filter(Boolean);
+
+    return {
+      isEmpty: reportIds.length === 0,
+      reportIds,
+    };
+  }
+
+  if (triage === "profile_under_review") {
+    const { data, error } = await supabase
+      .from("profile_moderation_states")
+      .select("profile_user_id")
+      .eq("is_under_review", true);
+
+    if (error) {
+      throw error;
+    }
+
+    const profileUserIds = (data ?? [])
+      .map((row) => row.profile_user_id as string)
+      .filter(Boolean);
+
+    return {
+      isEmpty: profileUserIds.length === 0,
+      profileUserIds,
+    };
+  }
+
+  if (triage === "hidden_listing") {
+    const { data, error } = await supabase
+      .from("listings")
+      .select("id")
+      .eq("status", "published")
+      .eq("is_active", false);
+
+    if (error) {
+      throw error;
+    }
+
+    const listingIds = (data ?? [])
+      .map((row) => row.id as string)
+      .filter(Boolean);
+
+    return {
+      isEmpty: listingIds.length === 0,
+      listingIds,
+    };
+  }
+
+  return {
+    isEmpty: false,
+  };
+};
+
 const fetchAdminModerationReports = async (
   input: UseAdminModerationReportsInput
 ): Promise<AdminModerationReportsResult> => {
   const { filters, page, pageSize = 20 } = input;
 
-  const [reporterUserIds, reportedUserIds] = await Promise.all([
+  const [reporterUserIds, reportedUserIds, triageScope] = await Promise.all([
     fetchMatchingProfileIds(filters.reporterHandle),
     fetchMatchingProfileIds(filters.reportedHandle),
+    fetchTriageFilterScope(filters.triage),
   ]);
 
   if (reporterUserIds && reporterUserIds.length === 0) {
@@ -142,6 +260,10 @@ const fetchAdminModerationReports = async (
   }
 
   if (reportedUserIds && reportedUserIds.length === 0) {
+    return { ...emptyResult, page, pageSize };
+  }
+
+  if (triageScope.isEmpty) {
     return { ...emptyResult, page, pageSize };
   }
 
@@ -162,6 +284,7 @@ const fetchAdminModerationReports = async (
         status,
         reporter_status_message,
         reporter_status_updated_at,
+        reporter_seen_at,
         resolution_code,
         resolved_at,
         reviewed_at,
@@ -191,6 +314,26 @@ const fetchAdminModerationReports = async (
 
   if (filters.targetType !== "all") {
     query = query.eq("target_type", filters.targetType);
+  }
+
+  if (filters.triage === "active") {
+    query = query.is("resolved_at", null);
+  }
+
+  if (triageScope.reportIds) {
+    query = query.in("id", triageScope.reportIds);
+  }
+
+  if (triageScope.profileUserIds) {
+    query = query
+      .eq("target_type", "profile")
+      .in("profile_user_id", triageScope.profileUserIds);
+  }
+
+  if (triageScope.listingIds) {
+    query = query
+      .eq("target_type", "listing")
+      .in("listing_id", triageScope.listingIds);
   }
 
   const from = (page - 1) * pageSize;

@@ -11,6 +11,7 @@ import {
   type ModerationReportTargetType,
 } from "../../domain/moderation/moderationReports";
 import {
+  AdminModerationReportTriageFilter,
   useAdminModerationReports,
   type AdminModerationReportFilters,
   type AdminModerationReportItem,
@@ -30,7 +31,7 @@ const classes = {
   sectionTitle: "text-base font-extrabold tracking-tight",
   text: "text-sm text-zinc-600",
 
-  filtersGrid: "grid gap-4 md:grid-cols-2 xl:grid-cols-5",
+  filtersGrid: "grid gap-4 md:grid-cols-2 xl:grid-cols-6",
   field: "space-y-2",
   label: "text-sm font-bold text-zinc-900",
   input:
@@ -98,6 +99,7 @@ const initialFilters: AdminModerationReportFilters = {
   status: "all",
   reason: "all",
   targetType: "all",
+  triage: "all",
 };
 
 const targetTypeOptions: Array<{
@@ -108,6 +110,17 @@ const targetTypeOptions: Array<{
     { value: "conversation_message", label: "Message" },
     { value: "listing", label: "Listing" },
     { value: "profile", label: "Profile" },
+  ];
+
+const triageOptions: Array<{
+  value: AdminModerationReportTriageFilter;
+  label: string;
+}> = [
+    { value: "all", label: "All triage" },
+    { value: "active", label: "Active reports" },
+    { value: "unread_reporter_updates", label: "Unread reporter updates" },
+    { value: "profile_under_review", label: "Profiles under review" },
+    { value: "hidden_listing", label: "Hidden listings" },
   ];
 
 const dateText = (value: string) => {
@@ -221,47 +234,62 @@ const AdminModerationReports = () => {
     setPage(1);
   };
 
+  const applySummaryFilter = (patch: Partial<AdminModerationReportFilters>) => {
+    setFilters((current) => ({
+      ...current,
+      status: "all",
+      targetType: "all",
+      triage: "all",
+      ...patch,
+    }));
+
+    setPage(1);
+  };
+
   const items = data?.items ?? [];
   const totalCount = data?.totalCount ?? 0;
   const pageCount = data?.pageCount ?? 0;
-
 
   const summaryItems = [
     {
       label: "Submitted",
       value: summary.submitted_count,
       text: "Reports waiting for first review.",
-      onClick: () => setField("status", "submitted"),
+      onClick: () => applySummaryFilter({ status: "submitted" }),
     },
     {
       label: "Active",
       value: summary.active_count,
       text: "Reports not resolved yet.",
+      onClick: () => applySummaryFilter({ triage: "active" }),
     },
     {
       label: "Resolved",
       value: summary.resolved_count,
       text: "Reports with completed investigations.",
-      onClick: () => setField("status", "resolved"),
+      onClick: () => applySummaryFilter({ status: "resolved" }),
     },
     {
       label: "Unread reporter updates",
       value: summary.unread_reporter_update_count,
       text: "Reporter-visible updates not seen yet.",
+      onClick: () =>
+        applySummaryFilter({ triage: "unread_reporter_updates" }),
     },
     {
       label: "Profiles under review",
       value: summary.profile_under_review_count,
       text: "Profiles currently flagged for admin review.",
-      onClick: () => setField("targetType", "profile"),
+      onClick: () => applySummaryFilter({ triage: "profile_under_review" }),
     },
     {
       label: "Hidden listings",
       value: summary.hidden_listing_count,
       text: "Published listings hidden from public view.",
-      onClick: () => setField("targetType", "listing"),
+      onClick: () => applySummaryFilter({ triage: "hidden_listing" }),
     },
   ];
+
 
   return (
     <div className={classes.page}>
@@ -289,13 +317,11 @@ const AdminModerationReports = () => {
 
               <p className={classes.summaryText}>{item.text}</p>
 
-              {item.onClick && (
-                <div className={classes.summaryHint}>Click to filter reports</div>
-              )}
+              <div className={classes.summaryHint}>Click to filter reports</div>
             </>
           );
 
-          return item.onClick ? (
+          return (
             <button
               key={item.label}
               className={`${classes.summaryCard} ${classes.summaryButton}`}
@@ -304,14 +330,10 @@ const AdminModerationReports = () => {
             >
               {content}
             </button>
-          ) : (
-            <div key={item.label} className={classes.summaryCardDisabled}>
-              {content}
-            </div>
           );
         })}
       </div>
-      
+
       {summaryError && (
         <div className={classes.summaryError}>
           Summary counts could not be loaded right now.
@@ -374,6 +396,30 @@ const AdminModerationReports = () => {
                 <option value="all">All targets</option>
 
                 {targetTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={classes.field}>
+              <label className={classes.label} htmlFor="triage">
+                Triage
+              </label>
+
+              <select
+                id="triage"
+                className={classes.select}
+                value={filters.triage}
+                onChange={(event) =>
+                  setField(
+                    "triage",
+                    event.target.value as AdminModerationReportTriageFilter
+                  )
+                }
+              >
+                {triageOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

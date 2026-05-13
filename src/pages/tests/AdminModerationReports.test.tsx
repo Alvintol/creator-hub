@@ -44,6 +44,7 @@ const createReport = (
   status: "submitted",
   reporter_status_message: null,
   reporter_status_updated_at: null,
+  reporter_seen_at: null,
   resolution_code: null,
   resolved_at: null,
   reviewed_at: null,
@@ -309,15 +310,23 @@ describe("<AdminModerationReports />", () => {
       },
     });
 
+    fireEvent.change(screen.getByLabelText("Triage"), {
+      target: {
+        value: "hidden_listing",
+      },
+    });
+
     expect(screen.getByLabelText("Reporter username")).toHaveValue(
       "@reporteruser"
     );
     expect(screen.getByLabelText("Target type")).toHaveValue("listing");
+    expect(screen.getByLabelText("Triage")).toHaveValue("hidden_listing");
 
     fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
 
     expect(screen.getByLabelText("Reporter username")).toHaveValue("");
     expect(screen.getByLabelText("Target type")).toHaveValue("all");
+    expect(screen.getByLabelText("Triage")).toHaveValue("all");
   });
 
   it("shows an error state when reports fail to load", () => {
@@ -351,15 +360,6 @@ describe("<AdminModerationReports />", () => {
     expect(
       screen.getByText("Published listings hidden from public view.")
     ).toBeInTheDocument();
-    expect(screen.getByText("Unread reporter updates")).toBeInTheDocument();
-    expect(screen.getByText("Profiles under review")).toBeInTheDocument();
-    expect(screen.getByText("Hidden listings")).toBeInTheDocument();
-
-    expect(screen.getByText("Reports waiting for first review.")).toBeInTheDocument();
-    expect(screen.getByText("Reports not resolved yet.")).toBeInTheDocument();
-    expect(
-      screen.getByText("Reporter-visible updates not seen yet.")
-    ).toBeInTheDocument();
   });
 
   it("shows a summary error when summary counts fail to load", () => {
@@ -382,31 +382,83 @@ describe("<AdminModerationReports />", () => {
     fireEvent.click(screen.getByRole("button", { name: /Submitted/i }));
 
     expect(screen.getByLabelText("Status")).toHaveValue("submitted");
+    expect(screen.getByLabelText("Triage")).toHaveValue("all");
   });
 
   it("filters to resolved reports from the resolved summary card", () => {
     renderPage();
 
-    fireEvent.click(screen.getByRole("button", { name: /Resolved/i }));
+    const resolvedCard = screen
+      .getByText("Reports with completed investigations.")
+      .closest("button");
+
+    expect(resolvedCard).not.toBeNull();
+
+    fireEvent.click(resolvedCard as HTMLButtonElement);
 
     expect(screen.getByLabelText("Status")).toHaveValue("resolved");
+    expect(screen.getByLabelText("Triage")).toHaveValue("all");
   });
 
-  it("filters to profile reports from the profiles-under-review summary card", () => {
+  it("filters to profile-under-review reports from the summary card", () => {
     renderPage();
 
-    fireEvent.click(screen.getByRole("button", { name: /Profiles under review/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Profiles under review/i })
+    );
 
-    expect(screen.getByLabelText("Target type")).toHaveValue("profile");
+    expect(screen.getByLabelText("Triage")).toHaveValue(
+      "profile_under_review"
+    );
+    expect(screen.getByLabelText("Target type")).toHaveValue("all");
   });
 
-  it("filters to listing reports from the hidden-listings summary card", () => {
+  it("filters to active reports from the active summary card", () => {
     renderPage();
 
-    fireEvent.click(screen.getByRole("button", { name: /Hidden listings/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Active/i }));
 
-    expect(screen.getByLabelText("Target type")).toHaveValue("listing");
+    expect(screen.getByLabelText("Triage")).toHaveValue("active");
+    expect(screen.getByLabelText("Status")).toHaveValue("all");
   });
 
+  it("filters to unread reporter updates from the summary card", () => {
+    renderPage();
 
+    fireEvent.click(
+      screen.getByRole("button", { name: /Unread reporter updates/i })
+    );
+
+    expect(screen.getByLabelText("Triage")).toHaveValue(
+      "unread_reporter_updates"
+    );
+  });
+
+  it("filters to profile-under-review reports from the summary card", () => {
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Profiles under review/i })
+    );
+
+    expect(screen.getByLabelText("Triage")).toHaveValue(
+      "profile_under_review"
+    );
+    expect(screen.getByLabelText("Target type")).toHaveValue("all");
+  });
+
+  it("filters to hidden-listing reports from the summary card", () => {
+    renderPage();
+
+    const hiddenListingsCard = screen
+      .getByText("Published listings hidden from public view.")
+      .closest("button");
+
+    expect(hiddenListingsCard).not.toBeNull();
+
+    fireEvent.click(hiddenListingsCard as HTMLButtonElement);
+
+    expect(screen.getByLabelText("Triage")).toHaveValue("hidden_listing");
+    expect(screen.getByLabelText("Target type")).toHaveValue("all");
+  });
 });
