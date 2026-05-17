@@ -79,3 +79,17 @@ export const getFulfilmentModeCopy = (
         "This listing is intended to start with creator review or confirmation before work begins.",
       primaryLabel: "Request this listing soon",
     };
+
+export const isAdminHiddenListing = (listing: {
+  admin_hidden_at?: string | null;
+}): boolean => Boolean(listing.admin_hidden_at);
+
+export const getListingVisibilityLabel = (listing: {
+  is_active: boolean;
+  admin_hidden_at?: string | null;
+}): string =>
+  isAdminHiddenListing(listing)
+    ? "Hidden by admin"
+    : listing.is_active
+      ? "Visible"
+      : "Inactive";
