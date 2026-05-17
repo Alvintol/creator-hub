@@ -59,6 +59,7 @@ const fetchMarketListings = async (): Promise<MarketListingItem[]> => {
     `)
     .eq("status", "published")
     .eq("is_active", true)
+    .is("admin_hidden_at", null)
     .order("created_at", { ascending: false });
 
   if (listingsError) throw listingsError;

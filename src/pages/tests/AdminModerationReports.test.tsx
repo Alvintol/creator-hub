@@ -9,10 +9,23 @@ import type {
 
 const mocks = vi.hoisted(() => ({
   useAdminModerationReports: vi.fn(),
+  useAdminModerationReportSummary: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminModerationReports", () => ({
   useAdminModerationReports: mocks.useAdminModerationReports,
+}));
+
+vi.mock("../../hooks/admin/useAdminModerationReportSummary", () => ({
+  emptyAdminModerationReportSummary: {
+    submitted_count: 0,
+    active_count: 0,
+    resolved_count: 0,
+    unread_reporter_update_count: 0,
+    profile_under_review_count: 0,
+    hidden_listing_count: 0,
+  },
+  useAdminModerationReportSummary: mocks.useAdminModerationReportSummary,
 }));
 
 const createReport = (
@@ -31,6 +44,7 @@ const createReport = (
   status: "submitted",
   reporter_status_message: null,
   reporter_status_updated_at: null,
+  reporter_seen_at: null,
   resolution_code: null,
   resolved_at: null,
   reviewed_at: null,
@@ -99,6 +113,19 @@ describe("<AdminModerationReports />", () => {
       isLoading: false,
       error: null,
     });
+
+    mocks.useAdminModerationReportSummary.mockReturnValue({
+      data: {
+        submitted_count: 3,
+        active_count: 5,
+        resolved_count: 8,
+        unread_reporter_update_count: 2,
+        profile_under_review_count: 1,
+        hidden_listing_count: 4,
+      },
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("shows an empty state when no reports match", () => {
@@ -162,6 +189,9 @@ describe("<AdminModerationReports />", () => {
             is_active: true,
             created_at: "2026-05-10T12:00:00.000Z",
             updated_at: "2026-05-10T12:05:00.000Z",
+            admin_hidden_at: null,
+            admin_hidden_by_user_id: null,
+            admin_hidden_report_id: null,
           },
         }),
       ]),
@@ -199,6 +229,9 @@ describe("<AdminModerationReports />", () => {
             is_active: false,
             created_at: "2026-05-10T12:00:00.000Z",
             updated_at: "2026-05-10T12:05:00.000Z",
+            admin_hidden_at: "2026-05-13T12:00:00.000Z",
+            admin_hidden_by_user_id: "admin-1",
+            admin_hidden_report_id: "report-1",
           },
         }),
       ]),
@@ -283,15 +316,23 @@ describe("<AdminModerationReports />", () => {
       },
     });
 
+    fireEvent.change(screen.getByLabelText("Triage"), {
+      target: {
+        value: "hidden_listing",
+      },
+    });
+
     expect(screen.getByLabelText("Reporter username")).toHaveValue(
       "@reporteruser"
     );
     expect(screen.getByLabelText("Target type")).toHaveValue("listing");
+    expect(screen.getByLabelText("Triage")).toHaveValue("hidden_listing");
 
     fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
 
     expect(screen.getByLabelText("Reporter username")).toHaveValue("");
     expect(screen.getByLabelText("Target type")).toHaveValue("all");
+    expect(screen.getByLabelText("Triage")).toHaveValue("all");
   });
 
   it("shows an error state when reports fail to load", () => {
@@ -306,5 +347,124 @@ describe("<AdminModerationReports />", () => {
     expect(
       screen.getByText("Reports could not be loaded right now.")
     ).toBeInTheDocument();
+  });
+
+  it("shows global moderation summary cards", () => {
+    renderPage();
+
+    expect(screen.getByText("Reports waiting for first review.")).toBeInTheDocument();
+    expect(screen.getByText("Reports not resolved yet.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Reports with completed investigations.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Reporter-visible updates not seen yet.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Profiles currently flagged for admin review.")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Published listings hidden from public view.")
+    ).toBeInTheDocument();
+  });
+
+  it("shows a summary error when summary counts fail to load", () => {
+    mocks.useAdminModerationReportSummary.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: new Error("Failed to load summary."),
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText("Summary counts could not be loaded right now.")
+    ).toBeInTheDocument();
+  });
+
+  it("filters to submitted reports from the submitted summary card", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Submitted/i }));
+
+    expect(screen.getByLabelText("Status")).toHaveValue("submitted");
+    expect(screen.getByLabelText("Triage")).toHaveValue("all");
+  });
+
+  it("filters to resolved reports from the resolved summary card", () => {
+    renderPage();
+
+    const resolvedCard = screen
+      .getByText("Reports with completed investigations.")
+      .closest("button");
+
+    expect(resolvedCard).not.toBeNull();
+
+    fireEvent.click(resolvedCard as HTMLButtonElement);
+
+    expect(screen.getByLabelText("Status")).toHaveValue("resolved");
+    expect(screen.getByLabelText("Triage")).toHaveValue("all");
+  });
+
+  it("filters to profile-under-review reports from the summary card", () => {
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Profiles under review/i })
+    );
+
+    expect(screen.getByLabelText("Triage")).toHaveValue(
+      "profile_under_review"
+    );
+    expect(screen.getByLabelText("Target type")).toHaveValue("all");
+  });
+
+  it("filters to active reports from the active summary card", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: /Active/i }));
+
+    expect(screen.getByLabelText("Triage")).toHaveValue("active");
+    expect(screen.getByLabelText("Status")).toHaveValue("all");
+  });
+
+  it("filters to unread reporter updates from the summary card", () => {
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Unread reporter updates/i })
+    );
+
+    expect(screen.getByLabelText("Triage")).toHaveValue(
+      "unread_reporter_updates"
+    );
+  });
+
+  it("filters to profile-under-review reports from the summary card", () => {
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Profiles under review/i })
+    );
+
+    expect(screen.getByLabelText("Triage")).toHaveValue(
+      "profile_under_review"
+    );
+    expect(screen.getByLabelText("Target type")).toHaveValue("all");
+  });
+
+  it("filters to hidden-listing reports from the summary card", () => {
+    renderPage();
+
+    const hiddenListingsCard = screen
+      .getByText("Published listings hidden from public view.")
+      .closest("button");
+
+    expect(hiddenListingsCard).not.toBeNull();
+
+    fireEvent.click(hiddenListingsCard as HTMLButtonElement);
+
+    expect(screen.getByLabelText("Triage")).toHaveValue("hidden_listing");
+    expect(screen.getByLabelText("Target type")).toHaveValue("all");
   });
 });

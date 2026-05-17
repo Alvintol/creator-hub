@@ -17,10 +17,12 @@ export const useMoveListingToDraft = () => {
         .update({
           status: "draft",
           is_active: false,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", listingId)
         .eq("user_id", user.id)
         .eq("status", "published")
+        .is("admin_hidden_at", null)
         .select("id")
         .maybeSingle();
 
@@ -29,10 +31,12 @@ export const useMoveListingToDraft = () => {
       }
 
       if (!data?.id) {
-        throw new Error("Only published listings can be moved back to draft.");
+        throw new Error(
+          "This listing could not be moved to draft. It may be locked by moderation."
+        );
       }
 
-      return data.id;
+      return data.id as string;
     },
 
     onSuccess: async (listingId) => {

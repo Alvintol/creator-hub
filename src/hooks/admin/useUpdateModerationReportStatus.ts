@@ -57,6 +57,9 @@ export const useUpdateModerationReportStatus = () => {
         queryClient.invalidateQueries({
           queryKey: ["myModerationReports"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["adminModerationReportSummary"],
+        }),
       ]);
     },
   });

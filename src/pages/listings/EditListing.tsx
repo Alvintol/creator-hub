@@ -8,7 +8,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../providers/AuthProvider";
 import { useMyListing } from "../../hooks/listings/useMyListing";
-import { getAllowedFulfilmentModes, ListingFulfilmentMode, listingFulfilmentModeOptions, normaliseFulfilmentMode } from '../../domain/listings/listings';
+import { getAllowedFulfilmentModes, isAdminHiddenListing, ListingFulfilmentMode, listingFulfilmentModeOptions, normaliseFulfilmentMode } from '../../domain/listings/listings';
 
 type ListingOfferingType = "digital" | "commission" | "service";
 type ListingPriceType = "fixed" | "starting_at" | "range";
@@ -74,6 +74,8 @@ const classes = {
     "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
 
   loadingText: "text-sm text-zinc-600",
+  warningCard:
+    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900",
 } as const;
 
 const offeringTypeOptions: Array<{
@@ -387,6 +389,32 @@ const EditListing = () => {
     );
   }
 
+  const isAdminHidden = isAdminHiddenListing(listing);
+
+  if (isAdminHidden) {
+    return (
+      <div className={classes.page}>
+        <Link to="/creator/listings" className={classes.backLink}>
+          ← Back to my listings
+        </Link>
+
+        <div className={classes.card}>
+          <h1 className={classes.h1}>Listing locked by moderation</h1>
+
+          <p className={classes.sub}>
+            This listing has been hidden by an admin and cannot be edited,
+            published, restored, or deleted by the creator account right now.
+          </p>
+
+          <div className={classes.warningCard}>
+            Check your reports page for moderator updates, or wait for an admin to
+            restore the listing.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (listing.status !== "draft" || listing.is_active) {
     return (
       <div className={classes.page}>
@@ -403,6 +431,7 @@ const EditListing = () => {
       </div>
     );
   }
+
 
   return (
     <div className={classes.page}>

@@ -21,6 +21,9 @@ export type MyListingRow = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  admin_hidden_at: string | null;
+  admin_hidden_by_user_id: string | null;
+  admin_hidden_report_id: string | null;
 };
 
 const emptyResult: MyListingRow[] = [];
@@ -46,7 +49,10 @@ const fetchMyListings = async (userId: string): Promise<MyListingRow[]> => {
       status,
       is_active,
       created_at,
-      updated_at
+      updated_at,
+      admin_hidden_at,
+      admin_hidden_by_user_id,
+      admin_hidden_report_id
     `)
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });

@@ -2,25 +2,25 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
 import type { ProfilePlatformAccountRow } from "../profile/useProfilePlatformAccounts";
 
-  export type PublicListingRow = {
-    id: string;
-    user_id: string;
-    title: string;
-    short: string;
-    offering_type: string;
-    fulfilment_mode: "request" | "instant";
-    category: string;
-    video_subtype: string | null;
-    price_type: "fixed" | "starting_at" | "range";
-    price_min: number;
-    price_max: number | null;
-    deliverables: string[];
-    tags: string[];
-    preview_url: string | null;
-    status: string;
-    is_active: boolean;
-    updated_at: string;
-  };
+export type PublicListingRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  short: string;
+  offering_type: string;
+  fulfilment_mode: "request" | "instant";
+  category: string;
+  video_subtype: string | null;
+  price_type: "fixed" | "starting_at" | "range";
+  price_min: number;
+  price_max: number | null;
+  deliverables: string[];
+  tags: string[];
+  preview_url: string | null;
+  status: string;
+  is_active: boolean;
+  updated_at: string;
+};
 
 export type PublicListingCreator = {
   user_id: string;
@@ -68,6 +68,7 @@ const fetchPublicListing = async (
     .eq("id", id)
     .eq("status", "published")
     .eq("is_active", true)
+    .is("admin_hidden_at", null)
     .maybeSingle();
 
   if (listingError) throw listingError;

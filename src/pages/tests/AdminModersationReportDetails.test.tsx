@@ -79,6 +79,9 @@ type ReportDataOptions = {
   listing?: {
     status: string;
     isActive: boolean;
+    adminHiddenAt?: string | null;
+    adminHiddenByUserId?: string | null;
+    adminHiddenReportId?: string | null;
   } | null;
   listingModerationActions?: Array<{
     id: string;
@@ -147,6 +150,9 @@ const createReportData = ({
       is_active: listing.isActive,
       created_at: "2026-05-07T12:00:00.000Z",
       updated_at: "2026-05-07T12:05:00.000Z",
+      admin_hidden_at: listing.adminHiddenAt ?? null,
+      admin_hidden_by_user_id: listing.adminHiddenByUserId ?? null,
+      admin_hidden_report_id: listing.adminHiddenReportId ?? null,
     }
     : null,
   listingModerationActions: listingModerationActions.map((action) => ({
@@ -476,12 +482,15 @@ describe("<AdminModerationReportDetails />", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the restore action for hidden published listings", () => {
+  it("shows the restore action for admin-hidden published listings", () => {
     mocks.useAdminModerationReport.mockReturnValue({
       data: createReportData({
         listing: {
           status: "published",
           isActive: false,
+          adminHiddenAt: "2026-05-13T12:00:00.000Z",
+          adminHiddenByUserId: "admin-1",
+          adminHiddenReportId: "report-1",
         },
       }),
       isLoading: false,
@@ -492,7 +501,7 @@ describe("<AdminModerationReportDetails />", () => {
 
     expect(screen.getByText("Listing moderation")).toBeInTheDocument();
     expect(screen.getByText("Visibility:").closest("p")).toHaveTextContent(
-      "Hidden"
+      "Hidden by admin"
     );
     expect(
       screen.getByRole("button", { name: "Restore listing" })
@@ -502,12 +511,15 @@ describe("<AdminModerationReportDetails />", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("restores a hidden published listing through the admin RPC hook", async () => {
+  it("restores an admin-hidden published listing through the admin RPC hook", async () => {
     mocks.useAdminModerationReport.mockReturnValue({
       data: createReportData({
         listing: {
           status: "published",
           isActive: false,
+          adminHiddenAt: "2026-05-13T12:00:00.000Z",
+          adminHiddenByUserId: "admin-1",
+          adminHiddenReportId: "report-1",
         },
       }),
       isLoading: false,

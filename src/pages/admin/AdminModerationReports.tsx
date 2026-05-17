@@ -11,10 +11,12 @@ import {
   type ModerationReportTargetType,
 } from "../../domain/moderation/moderationReports";
 import {
+  AdminModerationReportTriageFilter,
   useAdminModerationReports,
   type AdminModerationReportFilters,
   type AdminModerationReportItem,
 } from "../../hooks/admin/useAdminModerationReports";
+import { emptyAdminModerationReportSummary, useAdminModerationReportSummary } from '../../hooks/admin/useAdminModerationReportSummary';
 
 const classes = {
   page: "space-y-6",
@@ -29,7 +31,7 @@ const classes = {
   sectionTitle: "text-base font-extrabold tracking-tight",
   text: "text-sm text-zinc-600",
 
-  filtersGrid: "grid gap-4 md:grid-cols-2 xl:grid-cols-5",
+  filtersGrid: "grid gap-4 md:grid-cols-2 xl:grid-cols-6",
   field: "space-y-2",
   label: "text-sm font-bold text-zinc-900",
   input:
@@ -75,6 +77,18 @@ const classes = {
     "border-amber-200 bg-amber-50 text-amber-800",
   statusUnknown:
     "border-zinc-300 bg-zinc-100 text-zinc-700",
+
+  summaryGrid: "grid gap-4 md:grid-cols-2 xl:grid-cols-3",
+  summaryCard: "card p-5",
+  summaryLabel: "text-xs font-bold uppercase tracking-wide text-zinc-500",
+  summaryValue: "mt-2 text-3xl font-extrabold tracking-tight text-zinc-900",
+  summaryText: "mt-1 text-sm text-zinc-600",
+  summaryError:
+    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900",
+  summaryButton:
+    "w-full text-left transition hover:-translate-y-[1px] hover:shadow-[0_8px_22px_rgba(0,0,0,0.10)] focus:outline-none focus:ring-2 focus:ring-zinc-300",
+  summaryCardDisabled: "card p-5",
+  summaryHint: "mt-3 text-xs font-semibold text-zinc-500",
 } as const;
 
 const pageSize = 20;
@@ -85,6 +99,7 @@ const initialFilters: AdminModerationReportFilters = {
   status: "all",
   reason: "all",
   targetType: "all",
+  triage: "all",
 };
 
 const targetTypeOptions: Array<{
@@ -95,6 +110,17 @@ const targetTypeOptions: Array<{
     { value: "conversation_message", label: "Message" },
     { value: "listing", label: "Listing" },
     { value: "profile", label: "Profile" },
+  ];
+
+const triageOptions: Array<{
+  value: AdminModerationReportTriageFilter;
+  label: string;
+}> = [
+    { value: "all", label: "All triage" },
+    { value: "active", label: "Active reports" },
+    { value: "unread_reporter_updates", label: "Unread reporter updates" },
+    { value: "profile_under_review", label: "Profiles under review" },
+    { value: "hidden_listing", label: "Hidden listings" },
   ];
 
 const dateText = (value: string) => {
@@ -190,6 +216,12 @@ const AdminModerationReports = () => {
     pageSize,
   });
 
+  const {
+    data: summary = emptyAdminModerationReportSummary,
+    isLoading: isSummaryLoading,
+    error: summaryError,
+  } = useAdminModerationReportSummary();
+
   const setField = <Key extends keyof AdminModerationReportFilters>(
     key: Key,
     value: AdminModerationReportFilters[Key]
@@ -202,9 +234,62 @@ const AdminModerationReports = () => {
     setPage(1);
   };
 
+  const applySummaryFilter = (patch: Partial<AdminModerationReportFilters>) => {
+    setFilters((current) => ({
+      ...current,
+      status: "all",
+      targetType: "all",
+      triage: "all",
+      ...patch,
+    }));
+
+    setPage(1);
+  };
+
   const items = data?.items ?? [];
   const totalCount = data?.totalCount ?? 0;
   const pageCount = data?.pageCount ?? 0;
+
+  const summaryItems = [
+    {
+      label: "Submitted",
+      value: summary.submitted_count,
+      text: "Reports waiting for first review.",
+      onClick: () => applySummaryFilter({ status: "submitted" }),
+    },
+    {
+      label: "Active",
+      value: summary.active_count,
+      text: "Reports not resolved yet.",
+      onClick: () => applySummaryFilter({ triage: "active" }),
+    },
+    {
+      label: "Resolved",
+      value: summary.resolved_count,
+      text: "Reports with completed investigations.",
+      onClick: () => applySummaryFilter({ status: "resolved" }),
+    },
+    {
+      label: "Unread reporter updates",
+      value: summary.unread_reporter_update_count,
+      text: "Reporter-visible updates not seen yet.",
+      onClick: () =>
+        applySummaryFilter({ triage: "unread_reporter_updates" }),
+    },
+    {
+      label: "Profiles under review",
+      value: summary.profile_under_review_count,
+      text: "Profiles currently flagged for admin review.",
+      onClick: () => applySummaryFilter({ triage: "profile_under_review" }),
+    },
+    {
+      label: "Hidden listings",
+      value: summary.hidden_listing_count,
+      text: "Published listings hidden from public view.",
+      onClick: () => applySummaryFilter({ triage: "hidden_listing" }),
+    },
+  ];
+
 
   return (
     <div className={classes.page}>
@@ -219,6 +304,41 @@ const AdminModerationReports = () => {
           Review reports across conversations, messages, listings, and profiles.
         </p>
       </div>
+
+      <div className={classes.summaryGrid}>
+        {summaryItems.map((item) => {
+          const content = (
+            <>
+              <div className={classes.summaryLabel}>{item.label}</div>
+
+              <div className={classes.summaryValue}>
+                {isSummaryLoading ? "…" : item.value.toLocaleString()}
+              </div>
+
+              <p className={classes.summaryText}>{item.text}</p>
+
+              <div className={classes.summaryHint}>Click to filter reports</div>
+            </>
+          );
+
+          return (
+            <button
+              key={item.label}
+              className={`${classes.summaryCard} ${classes.summaryButton}`}
+              type="button"
+              onClick={item.onClick}
+            >
+              {content}
+            </button>
+          );
+        })}
+      </div>
+
+      {summaryError && (
+        <div className={classes.summaryError}>
+          Summary counts could not be loaded right now.
+        </div>
+      )}
 
       <div className={classes.card}>
         <div className={classes.section}>
@@ -276,6 +396,30 @@ const AdminModerationReports = () => {
                 <option value="all">All targets</option>
 
                 {targetTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={classes.field}>
+              <label className={classes.label} htmlFor="triage">
+                Triage
+              </label>
+
+              <select
+                id="triage"
+                className={classes.select}
+                value={filters.triage}
+                onChange={(event) =>
+                  setField(
+                    "triage",
+                    event.target.value as AdminModerationReportTriageFilter
+                  )
+                }
+              >
+                {triageOptions.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>

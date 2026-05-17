@@ -17,11 +17,13 @@ export const usePublishListing = () => {
         .update({
           status: "published",
           is_active: true,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", listingId)
         .eq("user_id", user.id)
         .eq("status", "draft")
         .eq("is_active", false)
+        .is("admin_hidden_at", null)
         .select("id")
         .maybeSingle();
 
@@ -30,10 +32,12 @@ export const usePublishListing = () => {
       }
 
       if (!data?.id) {
-        throw new Error("Only inactive draft listings can be published.");
+        throw new Error(
+          "This listing could not be published. It may no longer be an editable draft or it may be locked by moderation."
+        );
       }
 
-      return data.id;
+      return data.id as string;
     },
 
     onSuccess: async (listingId) => {

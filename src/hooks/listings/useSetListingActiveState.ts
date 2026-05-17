@@ -23,10 +23,12 @@ export const useSetListingActiveState = () => {
         .from("listings")
         .update({
           is_active: isActive,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", listingId)
         .eq("user_id", user.id)
         .eq("status", "published")
+        .is("admin_hidden_at", null)
         .select("id, is_active")
         .maybeSingle();
 
@@ -35,7 +37,9 @@ export const useSetListingActiveState = () => {
       }
 
       if (!data?.id) {
-        throw new Error("Only published listings can change visibility right now.");
+        throw new Error(
+          "This listing visibility could not be updated. It may be locked by moderation."
+        );
       }
 
       return data;

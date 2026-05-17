@@ -7,6 +7,7 @@ import { useSetListingActiveState } from '../../hooks/listings/useSetListingActi
 import { useMoveListingToDraft } from '../../hooks/listings/useMoveListingToDraft';
 import { ListingRevisionRow, useListingRevisions } from '../../hooks/listings/useListingRevisions';
 import { getListingRevisionChanges } from '../../lib/listings/listingRevisionDiff';
+import { getListingVisibilityLabel, isAdminHiddenListing } from '../../domain/listings/listings';
 
 const classes = {
   page: "space-y-6",
@@ -40,6 +41,10 @@ const classes = {
     "rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800",
   inactivePill:
     "rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700",
+  adminHiddenPill:
+    "rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-800",
+  warningCard:
+    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900",
 
   list: "space-y-2",
   listItem:
@@ -267,7 +272,9 @@ const CreatorListingDetails = () => {
     );
   }
 
-  const isDraftInactive = listing.status === "draft" && !listing.is_active;
+  const isAdminHidden = isAdminHiddenListing(listing);
+  const isDraftInactive =
+    listing.status === "draft" && !listing.is_active && !isAdminHidden;
 
   const publishReadiness = getListingPublishReadiness(listing);
 
@@ -375,12 +382,27 @@ const CreatorListingDetails = () => {
                   <span className={classes.pill}>Published</span>
                 )}
 
-                {listing.is_active ? (
-                  <span className={classes.activePill}>Active</span>
+                {isAdminHidden ? (
+                  <span className={classes.adminHiddenPill}>
+                    {getListingVisibilityLabel(listing)}
+                  </span>
+                ) : listing.is_active ? (
+                  <span className={classes.activePill}>
+                    {getListingVisibilityLabel(listing)}
+                  </span>
                 ) : (
-                  <span className={classes.inactivePill}>Inactive</span>
+                  <span className={classes.inactivePill}>
+                    {getListingVisibilityLabel(listing)}
+                  </span>
                 )}
               </div>
+
+              {isAdminHidden && (
+                <div className={classes.warningCard}>
+                  This listing has been hidden by moderation and cannot be edited, published,
+                  restored, activated, or deleted until an admin restores it.
+                </div>
+              )}
             </div>
 
             <div className={classes.metaGrid}>
@@ -537,13 +559,18 @@ const CreatorListingDetails = () => {
               <h2 className={classes.sectionTitle}>Actions</h2>
 
               <p className={classes.text}>
-                Manage this listing here. Drafts can be edited or published, and published
-                listings can be hidden, restored, or moved back to draft for further edits.
+                {isAdminHidden
+                  ? "This listing is locked by moderation. You can view it here, but creator actions are disabled until an admin restores it."
+                  : "Manage this listing here. Drafts can be edited or published, and published listings can be hidden, restored, or moved back to draft for further edits."}
               </p>
             </div>
 
             <div className={classes.row}>
-              {isDraftInactive ? (
+              {isAdminHidden ? (
+                <button className={classes.btnDisabled} type="button" disabled>
+                  Locked by admin
+                </button>
+              ) : isDraftInactive ? (
                 <>
                   <Link
                     className={classes.btnOutline}

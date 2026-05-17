@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useMyListings, type MyListingRow } from "../../hooks/listings/useMyListings";
 import { useDeleteListingDraft } from '../../hooks/listings/useDeleteListingDraft';
+import { getListingVisibilityLabel, isAdminHiddenListing } from '../../domain/listings/listings';
 
 const classes = {
   page: "space-y-6",
@@ -31,6 +32,8 @@ const classes = {
     "rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800",
   inactivePill:
     "rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700",
+  adminHiddenPill:
+    "rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-800",
 
   footer: "flex flex-wrap items-center justify-between gap-3",
   dateText: "text-xs text-zinc-500",
@@ -48,6 +51,8 @@ const classes = {
   loadingText: "text-sm text-zinc-600",
   errorCard:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+  warningText:
+    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900",
 } as const;
 
 // Formats the listing price for creator-facing cards
@@ -143,89 +148,114 @@ const CreatorListings = () => {
 
       {(data?.length ?? 0) > 0 && (
         <div className={classes.grid}>
-          {data?.map((listing) => (
-            <div key={listing.id} className={classes.card}>
-              <div className={classes.cardTop}>
-                <div className={classes.cardTitleWrap}>
-                  <h2 className={classes.cardTitle}>{listing.title}</h2>
-                  <p className={classes.cardText}>{priceText(listing)}</p>
+          {data?.map((listing) => {
+            const isAdminHidden = isAdminHiddenListing(listing);
+            const canEditDraft =
+              listing.status === "draft" && !listing.is_active && !isAdminHidden;
+
+            return (
+              <div key={listing.id} className={classes.card}>
+                <div className={classes.cardTop}>
+                  <div className={classes.cardTitleWrap}>
+                    <h2 className={classes.cardTitle}>{listing.title}</h2>
+                    <p className={classes.cardText}>{priceText(listing)}</p>
+                  </div>
+
+                  <div className={classes.metaRow}>
+                    {listing.status === "draft" ? (
+                      <span className={classes.draftPill}>Draft</span>
+                    ) : (
+                      <span className={classes.pill}>Published</span>
+                    )}
+
+                    {isAdminHidden ? (
+                      <span className={classes.adminHiddenPill}>
+                        {getListingVisibilityLabel(listing)}
+                      </span>
+                    ) : listing.is_active ? (
+                      <span className={classes.activePill}>
+                        {getListingVisibilityLabel(listing)}
+                      </span>
+                    ) : (
+                      <span className={classes.inactivePill}>
+                        {getListingVisibilityLabel(listing)}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {listing.preview_url ? (
+                  <img
+                    src={listing.preview_url}
+                    alt=""
+                    className={classes.thumb}
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className={classes.thumbEmpty}>No preview image</div>
+                )}
+
+                <p className={classes.cardText}>{listing.short}</p>
+
+                {isAdminHidden && (
+                  <p className={classes.warningText}>
+                    This listing has been hidden by moderation and cannot be edited, restored,
+                    published, or deleted until an admin reviews it.
+                  </p>
+                )}
 
                 <div className={classes.metaRow}>
-                  {listing.status === "draft" ? (
-                    <span className={classes.draftPill}>Draft</span>
-                  ) : (
-                    <span className={classes.pill}>Published</span>
-                  )}
+                  <span className={classes.pill}>{listing.offering_type}</span>
+                  <span className={classes.pill}>{listing.category}</span>
 
-                  {listing.is_active ? (
-                    <span className={classes.activePill}>Active</span>
-                  ) : (
-                    <span className={classes.inactivePill}>Inactive</span>
+                  {listing.video_subtype && (
+                    <span className={classes.pill}>{listing.video_subtype}</span>
                   )}
                 </div>
-              </div>
 
-              {listing.preview_url ? (
-                <img
-                  src={listing.preview_url}
-                  alt=""
-                  className={classes.thumb}
-                  loading="lazy"
-                />
-              ) : (
-                <div className={classes.thumbEmpty}>No preview image</div>
-              )}
+                <div className={classes.footer}>
+                  <div className={classes.dateText}>
+                    Updated: {updatedText(listing.updated_at)}
+                  </div>
 
-              <p className={classes.cardText}>{listing.short}</p>
+                  <div className={classes.row}>
+                    <Link
+                      className={classes.btnOutline}
+                      to={`/creator/listings/${listing.id}`}
+                    >
+                      View details
+                    </Link>
 
-              <div className={classes.metaRow}>
-                <span className={classes.pill}>{listing.offering_type}</span>
-                <span className={classes.pill}>{listing.category}</span>
-
-                {listing.video_subtype && (
-                  <span className={classes.pill}>{listing.video_subtype}</span>
-                )}
-              </div>
-
-              <div className={classes.footer}>
-                <div className={classes.dateText}>
-                  Updated: {updatedText(listing.updated_at)}
-                </div>
-
-                <div className={classes.row}>
-                  <Link
-                    className={classes.btnOutline}
-                    to={`/creator/listings/${listing.id}`}
-                  >
-                    View details
-                  </Link>
-
-                  {listing.status === "draft" && !listing.is_active ? (
-                    <>
-                      <Link
-                        className={classes.btnOutline}
-                        to={`/creator/listings/${listing.id}/edit`}
-                      >
-                        Edit draft
-                      </Link>
-
-                      <button
-                        className={classes.btnDanger}
-                        type="button"
-                        onClick={() => handleDeleteDraft(listing.id, listing.title)}
-                        disabled={deleteDraftMutation.isPending}
-                      >
-                        {deleteDraftMutation.isPending ? "Deleting…" : "Delete draft"}
+                    {isAdminHidden ? (
+                      <button className={classes.btnDisabled} type="button" disabled>
+                        Locked by admin
                       </button>
-                    </>
-                  ) : (
-                    <span className={classes.btnDisabled}>Edit later</span>
-                  )}
+                    ) : canEditDraft ? (
+                      <>
+                        <Link
+                          className={classes.btnOutline}
+                          to={`/creator/listings/${listing.id}/edit`}
+                        >
+                          Edit draft
+                        </Link>
+
+                        <button
+                          className={classes.btnDanger}
+                          type="button"
+                          onClick={() => handleDeleteDraft(listing.id, listing.title)}
+                          disabled={deleteDraftMutation.isPending}
+                        >
+                          {deleteDraftMutation.isPending ? "Deleting…" : "Delete draft"}
+                        </button>
+                      </>
+                    ) : (
+                      <span className={classes.btnDisabled}>Edit later</span>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

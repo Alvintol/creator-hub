@@ -27,7 +27,10 @@ const fetchMyListing = async (
       status,
       is_active,
       created_at,
-      updated_at
+      updated_at,
+      admin_hidden_at,
+      admin_hidden_by_user_id,
+      admin_hidden_report_id
     `)
     .eq("user_id", userId)
     .eq("id", id)
