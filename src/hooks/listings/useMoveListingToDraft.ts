@@ -17,6 +17,7 @@ export const useMoveListingToDraft = () => {
         .update({
           status: "draft",
           is_active: false,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", listingId)
         .eq("user_id", user.id)
@@ -35,7 +36,7 @@ export const useMoveListingToDraft = () => {
         );
       }
 
-      return data.id;
+      return data.id as string;
     },
 
     onSuccess: async (listingId) => {

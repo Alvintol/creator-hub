@@ -17,6 +17,7 @@ export const usePublishListing = () => {
         .update({
           status: "published",
           is_active: true,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", listingId)
         .eq("user_id", user.id)
@@ -36,7 +37,7 @@ export const usePublishListing = () => {
         );
       }
 
-      return data.id;
+      return data.id as string;
     },
 
     onSuccess: async (listingId) => {

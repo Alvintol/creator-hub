@@ -23,6 +23,7 @@ export const useSetListingActiveState = () => {
         .from("listings")
         .update({
           is_active: isActive,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", listingId)
         .eq("user_id", user.id)
@@ -34,7 +35,7 @@ export const useSetListingActiveState = () => {
       if (error) {
         throw error;
       }
-      
+
       if (!data?.id) {
         throw new Error(
           "This listing visibility could not be updated. It may be locked by moderation."
