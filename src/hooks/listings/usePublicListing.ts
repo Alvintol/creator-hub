@@ -68,6 +68,7 @@ const fetchPublicListing = async (
     .eq("id", id)
     .eq("status", "published")
     .eq("is_active", true)
+    .is("admin_hidden_at", null)
     .maybeSingle();
 
   if (listingError) throw listingError;

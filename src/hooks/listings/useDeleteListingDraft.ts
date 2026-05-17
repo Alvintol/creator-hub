@@ -12,25 +12,39 @@ export const useDeleteListingDraft = () => {
         throw new Error("You must be signed in to delete a listing.");
       }
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("listings")
         .delete()
         .eq("id", listingId)
         .eq("user_id", user.id)
         .eq("status", "draft")
-        .eq("is_active", false);
+        .eq("is_active", false)
+        .is("admin_hidden_at", null)
+        .select("id")
+        .maybeSingle();
 
       if (error) {
         throw error;
       }
 
-      return listingId;
+      if (!data?.id) {
+        throw new Error(
+          "This draft could not be deleted. It may be locked by moderation."
+        );
+      }
+
+      return data.id as string;
     },
 
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["myListings", user?.id ?? null],
-      });
+    onSuccess: async (listingId) => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["myListings", user?.id ?? null],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["myListing", user?.id ?? null, listingId],
+        }),
+      ]);
     },
   });
 };

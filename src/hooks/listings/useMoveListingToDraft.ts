@@ -21,6 +21,7 @@ export const useMoveListingToDraft = () => {
         .eq("id", listingId)
         .eq("user_id", user.id)
         .eq("status", "published")
+        .is("admin_hidden_at", null)
         .select("id")
         .maybeSingle();
 
@@ -29,7 +30,9 @@ export const useMoveListingToDraft = () => {
       }
 
       if (!data?.id) {
-        throw new Error("Only published listings can be moved back to draft.");
+        throw new Error(
+          "This listing could not be moved to draft. It may be locked by moderation."
+        );
       }
 
       return data.id;
