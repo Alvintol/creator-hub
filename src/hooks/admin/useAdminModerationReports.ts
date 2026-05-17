@@ -35,6 +35,9 @@ export type AdminModerationReportListing = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  admin_hidden_at: string | null;
+  admin_hidden_by_user_id: string | null;
+  admin_hidden_report_id: string | null;
 };
 
 export type AdminProfileModerationStateSummary = {
@@ -222,8 +225,7 @@ const fetchTriageFilterScope = async (
     const { data, error } = await supabase
       .from("listings")
       .select("id")
-      .eq("status", "published")
-      .eq("is_active", false);
+      .not("admin_hidden_at", "is", null);
 
     if (error) {
       throw error;
@@ -432,7 +434,10 @@ const fetchAdminModerationReports = async (
           status,
           is_active,
           created_at,
-          updated_at
+          updated_at,
+          admin_hidden_at, 
+          admin_hidden_by_user_id,
+          admin_hidden_report_id
         `)
         .in("id", listingIds)
       : Promise.resolve({ data: [], error: null }),

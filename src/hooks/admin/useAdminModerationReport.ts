@@ -23,7 +23,7 @@ export type AdminModerationReportRow = {
   reason_code: ModerationReportReasonCode;
   reason_details: string | null;
   status: ModerationReportStatus;
-  reporter_seen_at: string | null;  
+  reporter_seen_at: string | null;
   reporter_status_message: string | null;
   reporter_status_updated_at: string | null;
   resolution_code: ModerationReportResolutionCode | null;
@@ -51,6 +51,9 @@ export type AdminModerationReportListing = {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  admin_hidden_at: string | null;
+  admin_hidden_by_user_id: string | null;
+  admin_hidden_report_id: string | null;
 };
 
 export type AdminListingModerationAction = {
@@ -215,7 +218,10 @@ const fetchAdminModerationReport = async (
           status,
           is_active,
           created_at,
-          updated_at
+          updated_at,
+          admin_hidden_at,
+          admin_hidden_by_user_id,
+          admin_hidden_report_id
         `)
       .eq("id", reportRow.listing_id)
       .maybeSingle()
@@ -382,8 +388,8 @@ const fetchAdminModerationReport = async (
     profilesByUserId,
     updates: updateRows,
     profileModerationState:
-  (profileModerationState ?? null) as AdminProfileModerationState | null,
-profileModerationActions: profileModerationActionRows,
+      (profileModerationState ?? null) as AdminProfileModerationState | null,
+    profileModerationActions: profileModerationActionRows,
   };
 };
 

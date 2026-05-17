@@ -193,6 +193,7 @@ const AdminModerationReportDetails = () => {
   const messages = data?.messages ?? [];
   const listing = data?.listing ?? null;
   const listingModerationActions = data?.listingModerationActions ?? [];
+  const isListingAdminHidden = Boolean(listing?.admin_hidden_at);
   const reporter = data?.reporter ?? null;
   const reportedUser = data?.reportedUser ?? null;
   const profilesByUserId = data?.profilesByUserId ?? {};
@@ -305,7 +306,10 @@ const AdminModerationReportDetails = () => {
   const canModerateListing = Boolean(report?.id && listing?.id);
   const isListingPublished = listing?.status === "published";
   const isListingVisible = Boolean(listing?.is_active);
-  const canRestoreListing = isListingPublished && !isListingVisible;
+  const canRestoreListing =
+    Boolean(listing) &&
+    listing?.status === "published" &&
+    isListingAdminHidden;
 
   const profileActionBusy =
     markProfileUnderReviewMutation.isPending ||
@@ -674,8 +678,18 @@ const AdminModerationReportDetails = () => {
                   <div className={classes.metaBlock}>
                     <div className={classes.metaLabel}>Listing visibility</div>
                     <div className={classes.metaValue}>
-                      {listing.is_active ? "Visible" : "Hidden"}
+                      {isListingAdminHidden
+                        ? "Hidden by admin"
+                        : listing.is_active
+                          ? "Visible"
+                          : "Inactive"}
                     </div>
+                    {isListingAdminHidden && (
+                      <p className={classes.actionText}>
+                        This listing is locked by moderation. The creator cannot reactivate or edit
+                        it until an admin restores it.
+                      </p>
+                    )}
                   </div>
 
                   <div className={classes.metaBlock}>
@@ -883,13 +897,18 @@ const AdminModerationReportDetails = () => {
                   <p className={classes.actionText}>
                     Visibility:{" "}
                     <span className="font-bold">
-                      {isListingVisible ? "Visible" : "Hidden"}
+                      {isListingAdminHidden
+                        ? "Hidden by admin"
+                        : isListingVisible
+                          ? "Visible"
+                          : "Inactive"}
                     </span>
                   </p>
 
                   <p className={classes.actionText}>
-                    Hiding removes the listing from public marketplace surfaces without
-                    deleting it or changing its draft/published status.
+                    {isListingAdminHidden
+                      ? "This listing is locked by moderation. The creator cannot reactivate or edit it until an admin restores it."
+                      : "Hiding removes the listing from public marketplace surfaces without deleting it or changing its draft/published status."}
                   </p>
                 </div>
 
