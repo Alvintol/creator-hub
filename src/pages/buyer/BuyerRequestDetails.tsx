@@ -3,6 +3,7 @@ import { useBuyerRequest } from "../../hooks/creatorRequests/useBuyerRequest";
 import { getListingRequestStatusLabel } from "../../domain/listings/listingRequests";
 import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
 import RequestConversationThread from '../../components/RequestConversationThread';
+import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
 
 const classes = {
   page: "space-y-6",
@@ -125,8 +126,15 @@ const BuyerRequestDetails = () => {
       <div className={classes.grid}>
         <div className={classes.card}>
           <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Request summary</h2>
-            <p className={classes.text}>{request.message}</p>
+            <ListingRequestSubmissionDetails
+              heading="Request summary"
+              requestTitle={request.request_title}
+              requestDetails={request.request_details}
+              fallbackMessage={request.message}
+              requestedTimeline={request.requested_timeline}
+              budgetAmount={request.budget_amount}
+              referenceLinks={request.reference_links}
+            />
           </div>
 
           <ListingRequestStatusCard

@@ -33,7 +33,12 @@ const fetchCreatorRequest = async (
       creator_status_reason,
       listing_snapshot,
       created_at,
-      updated_at
+      updated_at,
+      request_title,
+      request_details,
+      requested_timeline,
+      budget_amount,
+      reference_links
     `)
     .eq("id", requestId)
     .eq("creator_user_id", userId)

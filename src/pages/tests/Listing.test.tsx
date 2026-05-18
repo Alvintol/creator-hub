@@ -188,4 +188,14 @@ describe("<ListingPage /> report UI", () => {
       screen.queryByRole("button", { name: "Report listing" })
     ).not.toBeInTheDocument();
   });
+
+  it("points request-mode listing CTA to the buyer request flow", () => {
+    renderPage();
+
+    expect(screen.getByRole("link", { name: "Submit request" })).toHaveAttribute(
+      "href",
+      "/listing/listing-1/request"
+    );
+  });
+  
 });

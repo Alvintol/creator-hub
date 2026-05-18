@@ -49,16 +49,17 @@ export const useCreateListingRequest = () => {
           creator_user_id: input.creatorUserId,
           status: "submitted",
 
-          // Keep message populated for existing request inbox/details UI.
+          // Keep the original message populated for existing inbox/detail UI.
           message: requestDetails,
 
-          // Structured request fields.
+          // Structured request fields for the new buyer submission flow.
           request_title: requestTitle,
           request_details: requestDetails,
           requested_timeline: cleanOptionalText(input.requestedTimeline),
           budget_amount: input.budgetAmount ?? null,
           reference_links: cleanReferenceLinks(input.referenceLinks),
 
+          // Frozen listing state for disputes/admin review.
           listing_snapshot: input.listingSnapshot,
         })
         .select("id")
@@ -78,13 +79,16 @@ export const useCreateListingRequest = () => {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({
-          queryKey: ["myBuyerRequests", user?.id ?? null],
+          queryKey: ["myBuyerRequests"],
         }),
         queryClient.invalidateQueries({
           queryKey: ["myCreatorRequests"],
         }),
         queryClient.invalidateQueries({
           queryKey: ["messagesInbox"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["requestConversation"],
         }),
       ]);
     },
