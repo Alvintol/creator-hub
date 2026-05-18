@@ -7,6 +7,7 @@ import {
   getListingRequestStatusSummary,
   getListingRequestStatusTone,
 } from "../listings/listingRequests";
+import { getListingRequestDisplayPreview, getListingRequestDisplayTitle } from '../listings/listings';
 
 describe("listing request status helpers", () => {
   it("maps statuses to the correct labels", () => {
@@ -56,5 +57,68 @@ describe("listing request status helpers", () => {
     expect(canArchiveListingRequest("accepted")).toBe(true);
     expect(canArchiveListingRequest("declined")).toBe(true);
     expect(canArchiveListingRequest("archived")).toBe(false);
+  });
+});
+
+describe("listing request display helpers", () => {
+  it("uses the structured request title before the listing snapshot title", () => {
+    expect(
+      getListingRequestDisplayTitle({
+        request_title: " Custom cozy emote pack ",
+        listing_snapshot: {
+          title: "Custom Emote Pack",
+        },
+      })
+    ).toBe("Custom cozy emote pack");
+  });
+
+  it("falls back to the listing snapshot title for legacy requests", () => {
+    expect(
+      getListingRequestDisplayTitle({
+        request_title: null,
+        listing_snapshot: {
+          title: "Custom Emote Pack",
+        },
+      })
+    ).toBe("Custom Emote Pack");
+  });
+
+  it("falls back to an untitled label when no title context exists", () => {
+    expect(
+      getListingRequestDisplayTitle({
+        request_title: "   ",
+        listing_snapshot: null,
+      })
+    ).toBe("Untitled request");
+  });
+
+  it("uses structured request details before the legacy message", () => {
+    expect(
+      getListingRequestDisplayPreview({
+        request_details: " I need three cozy emotes. ",
+        message: "Legacy request message.",
+      })
+    ).toBe("I need three cozy emotes.");
+  });
+
+  it("falls back to the legacy message for old requests", () => {
+    expect(
+      getListingRequestDisplayPreview({
+        request_details: null,
+        message: " Legacy request message. ",
+      })
+    ).toBe("Legacy request message.");
+  });
+
+  it("truncates long previews", () => {
+    expect(
+      getListingRequestDisplayPreview(
+        {
+          request_details: "This preview is longer than the limit.",
+          message: null,
+        },
+        12
+      )
+    ).toBe("This preview…");
   });
 });

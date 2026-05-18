@@ -9,6 +9,7 @@ import {
   getListingRequestStatusLabel,
   getListingRequestStatusTone,
 } from "../../domain/listings/listingRequests";
+import { getListingRequestDisplayPreview, getListingRequestDisplayTitle } from '../../domain/listings/listings';
 
 const classes = {
   page: "space-y-6",
@@ -295,8 +296,18 @@ const AdminRequests = () => {
             {items.map((item) => (
               <div key={item.request.id} className={classes.requestCard}>
                 <h2 className={classes.title}>
-                  {item.request.listing_snapshot.title}
+                  {getListingRequestDisplayTitle(item.request)}
                 </h2>
+
+                <p className={classes.textMuted}>
+                  Listing: {item.request.listing_snapshot.title}
+                </p>
+
+                {getListingRequestDisplayPreview(item.request) && (
+                  <p className={classes.textMuted}>
+                    {getListingRequestDisplayPreview(item.request)}
+                  </p>
+                )}
 
                 <p className={classes.textMuted}>
                   Buyer: {profileText(item.buyer, item.request.buyer_user_id)}

@@ -10,6 +10,7 @@ import {
 import { useEffect, useState } from 'react';
 import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
 import RequestConversationThread from '../../components/RequestConversationThread';
+import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
 
 const classes = {
   page: "space-y-6",
@@ -229,10 +230,15 @@ const CreatorRequestDetails = () => {
 
       <div className={classes.grid}>
         <div className={classes.card}>
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Buyer message</h2>
-            <p className={classes.text}>{request.message}</p>
-          </div>
+          <ListingRequestSubmissionDetails
+            heading="Buyer request"
+            requestTitle={request.request_title}
+            requestDetails={request.request_details}
+            fallbackMessage={request.message}
+            requestedTimeline={request.requested_timeline}
+            budgetAmount={request.budget_amount}
+            referenceLinks={request.reference_links}
+          />
 
           <ListingRequestStatusCard
             status={request.status}

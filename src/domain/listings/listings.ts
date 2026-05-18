@@ -93,3 +93,33 @@ export const getListingVisibilityLabel = (listing: {
     : listing.is_active
       ? "Visible"
       : "Inactive";
+
+export type ListingRequestDisplayInput = {
+  request_title?: string | null;
+  request_details?: string | null;
+  message?: string | null;
+  listing_snapshot?: {
+    title?: string | null;
+  } | null;
+};
+
+export const getListingRequestDisplayTitle = (
+  request: ListingRequestDisplayInput
+): string => {
+  const requestTitle = request.request_title?.trim();
+  const listingTitle = request.listing_snapshot?.title?.trim();
+
+  return requestTitle || listingTitle || "Untitled request";
+};
+
+export const getListingRequestDisplayPreview = (
+  request: ListingRequestDisplayInput,
+  maxLength = 140
+): string => {
+  const previewText =
+    request.request_details?.trim() || request.message?.trim() || "";
+
+  return previewText.length > maxLength
+    ? `${previewText.slice(0, maxLength)}…`
+    : previewText;
+};

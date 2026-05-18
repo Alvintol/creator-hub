@@ -5,6 +5,7 @@ import {
   getListingRequestStatusLabel,
   getListingRequestStatusTone,
 } from "../../domain/listings/listingRequests";
+import { getListingRequestDisplayPreview, getListingRequestDisplayTitle } from '../../domain/listings/listings';
 
 type BuyerRequestsProps = {
   archived?: boolean;
@@ -180,8 +181,18 @@ const BuyerRequests = (props: BuyerRequestsProps) => {
               <div key={item.request.id} className={classes.card}>
                 <div className={classes.titleRow}>
                   <h2 className={classes.title}>
-                    {item.request.listing_snapshot.title}
+                    {getListingRequestDisplayTitle(item.request)}
                   </h2>
+
+                  <p className={classes.text}>
+                    Listing: {item.request.listing_snapshot.title}
+                  </p>
+
+                  {getListingRequestDisplayPreview(item.request) && (
+                    <p className={classes.text}>
+                      {getListingRequestDisplayPreview(item.request)}
+                    </p>
+                  )}
 
                   {item.conversation.has_unread && (
                     <span className={classes.unreadPill}>New message</span>
