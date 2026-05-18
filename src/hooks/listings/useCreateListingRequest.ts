@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../providers/AuthProvider";
 
 import type { ListingRequestSnapshot } from "../../lib/listings/listingRequestSnapshot";
+import { getCreateListingRequestErrorMessage } from '../../domain/listings/listingRequestErrors';
 
 export type CreateListingRequestInput = {
   listingId: string;
@@ -66,7 +67,7 @@ export const useCreateListingRequest = () => {
         .maybeSingle();
 
       if (error) {
-        throw error;
+        throw new Error(getCreateListingRequestErrorMessage(error));
       }
 
       if (!data?.id) {

@@ -216,4 +216,28 @@ describe("useCreateListingRequest", () => {
       })
     ).rejects.toThrow("The request could not be created.");
   });
+
+  it("throws buyer-friendly copy when Supabase blocks the insert", async () => {
+    mocks.maybeSingle.mockResolvedValue({
+      data: null,
+      error: {
+        code: "42501",
+        message: "new row violates row-level security policy",
+      },
+    });
+
+    const { result } = renderHook(() => useCreateListingRequest(), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(
+      result.current.mutateAsync({
+        listingId: "listing-1",
+        creatorUserId: "creator-1",
+        requestTitle: "Simple emote request",
+        requestDetails: "Please make a simple cozy emote.",
+        listingSnapshot,
+      })
+    ).rejects.toThrow("This listing is no longer available for buyer requests.");
+  });
 });
