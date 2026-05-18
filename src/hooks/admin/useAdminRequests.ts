@@ -25,6 +25,11 @@ export type AdminRequestRow = {
   listing_snapshot: ListingRequestSnapshot;
   created_at: string;
   updated_at: string;
+  request_title: string | null;
+  request_details: string | null;
+  requested_timeline: string | null;
+  budget_amount: number | null;
+  reference_links: string[];
 };
 
 export type AdminRequestConversation = {
@@ -179,7 +184,12 @@ const fetchAdminRequests = async (
           creator_status_reason,
           listing_snapshot,
           created_at,
-          updated_at
+          updated_at,
+          request_title,
+          request_details,
+          requested_timeline,
+          budget_amount,
+          reference_links
         )
       `,
       { count: "exact" }

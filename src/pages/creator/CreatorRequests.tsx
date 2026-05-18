@@ -5,18 +5,10 @@ import {
   getListingRequestStatusLabel,
   getListingRequestStatusTone,
 } from "../../domain/listings/listingRequests";
+import { getListingRequestDisplayPreview, getListingRequestDisplayTitle } from '../../domain/listings/listings';
 
 type CreatorRequestsProps = {
   archived?: boolean;
-};
-
-type RequestCardRequest = {
-  request_title?: string | null;
-  request_details?: string | null;
-  message: string;
-  listing_snapshot: {
-    title: string;
-  };
 };
 
 const classes = {
@@ -67,16 +59,6 @@ const classes = {
 } as const;
 
 const pageSize = 12;
-
-
-const requestTitleText = (request: RequestCardRequest): string =>
-  request.request_title?.trim() || request.listing_snapshot.title;
-
-const requestPreviewText = (request: RequestCardRequest): string => {
-  const text = request.request_details?.trim() || request.message.trim();
-
-  return text.length > 140 ? `${text.slice(0, 140)}…` : text;
-};
 
 // Prefers handle for buyer display, then display name, then user id
 const buyerText = (
@@ -198,16 +180,20 @@ const CreatorRequests = (props: CreatorRequestsProps) => {
             {items.map((item) => (
               <div key={item.request.id} className={classes.card}>
                 <div className={classes.titleRow}>
-                  <h2 className={classes.title}>{requestTitleText(item.request)}</h2>
+                  <h2 className={classes.title}>
+                    {getListingRequestDisplayTitle(item.request)}
+                  </h2>
 
                   <p className={classes.text}>
                     Listing: {item.request.listing_snapshot.title}
                   </p>
 
-                  {requestPreviewText(item.request) && (
-                    <p className={classes.text}>{requestPreviewText(item.request)}</p>
+                  {getListingRequestDisplayPreview(item.request) && (
+                    <p className={classes.text}>
+                      {getListingRequestDisplayPreview(item.request)}
+                    </p>
                   )}
-                  
+
                   {item.conversation.has_unread && (
                     <span className={classes.unreadPill}>New message</span>
                   )}

@@ -8,22 +8,7 @@ import {
 } from "../../hooks/listings/usePublicListing";
 import { buildListingRequestSnapshot } from "../../lib/listings/listingRequestSnapshot";
 import { useAuth } from "../../providers/AuthProvider";
-
-type FormErrors = {
-  requestTitle?: string;
-  requestDetails?: string;
-  requestedTimeline?: string;
-  budgetAmount?: string;
-  referenceLinks?: string;
-};
-
-type ValidRequestForm = {
-  requestTitle: string;
-  requestDetails: string;
-  requestedTimeline?: string;
-  budgetAmount: number | null;
-  referenceLinks: string[];
-};
+import { ListingRequestFormErrors, validateListingRequestForm } from '../../domain/listings/listingRequestForm';
 
 const classes = {
   page: "space-y-6",
@@ -73,23 +58,6 @@ const priceText = (listing: PublicListingRow): string =>
       ? `From $${listing.price_min}`
       : `$${listing.price_min}–${listing.price_max ?? listing.price_min}`;
 
-const parseReferenceLinks = (value: string): string[] =>
-  value
-    .split("\n")
-    .map((link) => link.trim())
-    .filter(Boolean)
-    .slice(0, 5);
-
-const isValidReferenceUrl = (value: string): boolean => {
-  try {
-    const url = new URL(value);
-
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-};
-
 const RequestListing = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -103,7 +71,7 @@ const RequestListing = () => {
   const [requestedTimeline, setRequestedTimeline] = useState("");
   const [budgetText, setBudgetText] = useState("");
   const [referenceLinksText, setReferenceLinksText] = useState("");
-  const [formErrors, setFormErrors] = useState<FormErrors>({});
+  const [formErrors, setFormErrors] = useState<ListingRequestFormErrors>({});
 
   const listing = data?.listing ?? null;
   const creator = data?.creator ?? null;
@@ -112,64 +80,18 @@ const RequestListing = () => {
     ? `@${creator.handle}`
     : creator?.display_name ?? "this creator";
 
-  const validate = (): ValidRequestForm | null => {
-    const nextErrors: FormErrors = {};
+  const validate = () => {
+    const result = validateListingRequestForm({
+      requestTitle,
+      requestDetails,
+      requestedTimeline,
+      budgetText,
+      referenceLinksText,
+    });
 
-    const trimmedTitle = requestTitle.trim();
-    const trimmedDetails = requestDetails.trim();
-    const trimmedTimeline = requestedTimeline.trim();
-    const trimmedBudget = budgetText.trim();
-    const referenceLinks = parseReferenceLinks(referenceLinksText);
+    setFormErrors(result.errors);
 
-    if (trimmedTitle.length < 3 || trimmedTitle.length > 120) {
-      nextErrors.requestTitle =
-        "Summary must be between 3 and 120 characters.";
-    }
-
-    if (trimmedDetails.length < 10 || trimmedDetails.length > 2000) {
-      nextErrors.requestDetails =
-        "Details must be between 10 and 2000 characters.";
-    }
-
-    if (trimmedTimeline.length > 160) {
-      nextErrors.requestedTimeline =
-        "Timeline must be 160 characters or fewer.";
-    }
-
-    const budgetAmount = trimmedBudget ? Number(trimmedBudget) : null;
-
-    if (
-      trimmedBudget &&
-      (!Number.isFinite(budgetAmount) ||
-        Number(budgetAmount) < 0 ||
-        Number(budgetAmount) > 999999.99)
-    ) {
-      nextErrors.budgetAmount =
-        "Budget must be a valid amount between 0 and 999999.99.";
-    }
-
-    if (referenceLinks.length > 5) {
-      nextErrors.referenceLinks = "Add up to 5 reference links.";
-    }
-
-    if (referenceLinks.some((link) => !isValidReferenceUrl(link))) {
-      nextErrors.referenceLinks =
-        "Reference links must start with http:// or https://.";
-    }
-
-    setFormErrors(nextErrors);
-
-    if (Object.keys(nextErrors).length > 0) {
-      return null;
-    }
-
-    return {
-      requestTitle: trimmedTitle,
-      requestDetails: trimmedDetails,
-      requestedTimeline: trimmedTimeline || undefined,
-      budgetAmount,
-      referenceLinks,
-    };
+    return result.values;
   };
 
   const handleSubmit = async (event: FormEvent) => {
