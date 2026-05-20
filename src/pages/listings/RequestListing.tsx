@@ -9,6 +9,7 @@ import {
 import { buildListingRequestSnapshot } from "../../lib/listings/listingRequestSnapshot";
 import { useAuth } from "../../providers/AuthProvider";
 import { ListingRequestFormErrors, validateListingRequestForm } from '../../domain/listings/listingRequestForm';
+import { useActiveListingRequestForListing } from '../../hooks/listings/useActiveListingRequestForListing';
 
 const classes = {
   page: "space-y-6",
@@ -65,6 +66,7 @@ const RequestListing = () => {
 
   const { data, isLoading, error } = usePublicListing(id ?? null);
   const createRequestMutation = useCreateListingRequest();
+  const activeRequestQuery = useActiveListingRequestForListing(id ?? null);
 
   const [requestTitle, setRequestTitle] = useState("");
   const [requestDetails, setRequestDetails] = useState("");
@@ -202,6 +204,40 @@ const RequestListing = () => {
           <p className={classes.text}>
             You cannot submit a buyer request for your own listing.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeRequestQuery.isLoading) {
+    return <div className={classes.loadingText}>Checking request status…</div>;
+  }
+
+  if (activeRequestQuery.data) {
+    const activeRequest = activeRequestQuery.data;
+
+    return (
+      <div className={classes.page}>
+        <Link className={classes.backLink} to={`/listing/${listing.id}`}>
+          ← Back to listing
+        </Link>
+
+        <div className={classes.card}>
+          <h1 className={classes.h1}>Request already submitted</h1>
+          <p className={classes.text}>
+            You already have an active request for this listing. You can review it
+            or continue the conversation from your request detail page.
+          </p>
+
+          <div className={classes.row}>
+            <Link className={classes.btnPrimary} to={`/requests/${activeRequest.id}`}>
+              View existing request
+            </Link>
+
+            <Link className={classes.btnOutline} to={`/listing/${listing.id}`}>
+              Back to listing
+            </Link>
+          </div>
         </div>
       </div>
     );

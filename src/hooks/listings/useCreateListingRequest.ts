@@ -91,6 +91,9 @@ export const useCreateListingRequest = () => {
         queryClient.invalidateQueries({
           queryKey: ["requestConversation"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["activeListingRequestForListing", user?.id ?? null],
+        }),
       ]);
     },
   });

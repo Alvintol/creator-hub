@@ -30,20 +30,23 @@ const createInboxItem = () => ({
   listing: {
     id: "listing-1",
     title: "Custom Emote Pack",
+    preview_url: null,
   },
   conversation: {
     id: "conversation-1",
-    conversation_type: "listing_inquiry",
-    listing_request_id: null,
-    subject: "Question about emotes",
-    initiation_reason_code: "availability",
-    status: "open",
-    updated_at: "2026-05-09T12:00:00.000Z",
-    last_message_at: "2026-05-09T12:00:00.000Z",
-    last_message_preview: "Can you make these in my style?",
-    last_message_sender_user_id: "creator-1",
+    conversation_type: "listing_request",
     buyer_user_id: "buyer-1",
     creator_user_id: "creator-1",
+    listing_id: "listing-1",
+    listing_request_id: "request-1",
+    subject: "Custom cozy emote pack",
+    initiation_reason_code: null,
+    status: "open",
+    last_message_at: null,
+    last_message_sender_user_id: null,
+    last_message_preview: null,
+    updated_at: "2026-05-20T12:00:00.000Z",
+    created_at: "2026-05-20T12:00:00.000Z",
   },
 });
 
@@ -169,14 +172,18 @@ describe("<MessagesInbox />", () => {
 
     renderPage();
 
-    expect(screen.getByText("Custom Emote Pack")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Custom cozy emote pack" })
+    ).toBeInTheDocument();
+
+    expect(screen.getByText(/Listing:\s*Custom Emote Pack/)).toBeInTheDocument();
     expect(screen.getByText(/@creatoruser/)).toBeInTheDocument();
     expect(screen.getByText("2 new messages")).toBeInTheDocument();
     expect(screen.getByText("Open")).toBeInTheDocument();
 
     expect(
       screen.getByRole("link", { name: "Open conversation" })
-    ).toHaveAttribute("href", "/messages/conversation-1");
+    ).toHaveAttribute("href", "/requests/request-1");
   });
 
   it("shows the unread report update count", () => {

@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { ModerationReportReasonCode, moderationReportReasonOptions } from '../../domain/moderation/moderationReports';
 import { useSubmitListingModerationReport } from '../../hooks/moderation/useSubmitListingModerationReport';
 import { useAuth } from '../../providers/AuthProvider';
+import { useActiveListingRequestForListing } from '../../hooks/listings/useActiveListingRequestForListing';
 
 const classes = {
   notFoundWrap: "space-y-4",
@@ -133,6 +134,19 @@ const ListingPage = () => {
     !submitListingReport.isPending;
 
   const isOwnListing = Boolean(user?.id && listing?.user_id === user.id);
+
+  const shouldCheckActiveBuyerRequest = Boolean(
+    user?.id &&
+    listing?.id &&
+    listing.fulfilment_mode === "request" &&
+    listing.user_id !== user.id
+  );
+
+  const activeRequestQuery = useActiveListingRequestForListing(
+    shouldCheckActiveBuyerRequest ? listing?.id : null
+  );
+
+  const activeListingRequest = activeRequestQuery.data ?? null;
 
   const handleSubmitListingReport = async () => {
     if (!listing?.id || !reportReason || !canSubmitListingReport) return;
@@ -285,11 +299,21 @@ const ListingPage = () => {
             <p className={classes.ctaText}>{fulfilmentCopy.text}</p>
 
             {listing.fulfilment_mode === "request" ? (
-              <Link to={`/listing/${listing.id}/request`} className={classes.ctaLink}>
-                Submit request
-              </Link>
+              activeRequestQuery.isLoading ? (
+                <span className={classes.ctaLink}>Checking request…</span>
+              ) : activeListingRequest ? (
+                <Link className={classes.ctaLink} to={`/requests/${activeListingRequest.id}`}>
+                  View existing request
+                </Link>
+              ) : (
+                <Link className={classes.ctaLink} to={`/listing/${listing.id}/request`}>
+                  Submit request
+                </Link>
+              )
             ) : (
-              <span className={classes.ctaLink}>{fulfilmentCopy.primaryLabel}</span>
+              <Link className={classes.ctaLink} to="#">
+                {fulfilmentCopy.primaryLabel}
+              </Link>
             )}
           </div>
 

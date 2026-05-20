@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
   usePublicListing: vi.fn(),
   createRequest: vi.fn(),
+  useActiveListingRequestForListing: vi.fn(),
 }));
 
 vi.mock("../../providers/AuthProvider", () => ({
@@ -24,6 +25,10 @@ vi.mock("../../hooks/listings/useCreateListingRequest", () => ({
     isPending: false,
     error: null,
   }),
+}));
+
+vi.mock("../../hooks/listings/useActiveListingRequestForListing", () => ({
+  useActiveListingRequestForListing: mocks.useActiveListingRequestForListing,
 }));
 
 const createListingData = (overrides = {}) => ({
@@ -83,6 +88,12 @@ describe("RequestListing", () => {
     });
 
     mocks.createRequest.mockResolvedValue("request-1");
+
+    mocks.useActiveListingRequestForListing.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("shows a sign-in prompt for signed-out users", () => {
@@ -207,5 +218,34 @@ describe("RequestListing", () => {
     fireEvent.click(screen.getByRole("button", { name: "Submit request" }));
 
     expect(await screen.findByText("Request detail loaded")).toBeInTheDocument();
+  });
+
+  it("shows a link to the existing request when the buyer already has an active request", () => {
+    mocks.useActiveListingRequestForListing.mockReturnValue({
+      data: {
+        id: "request-1",
+        listing_id: "listing-1",
+        buyer_user_id: "buyer-1",
+        status: "submitted",
+        created_at: "2026-05-20T12:00:00.000Z",
+        updated_at: "2026-05-20T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByRole("heading", { name: "Request already submitted" })
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("link", { name: "View existing request" })
+    ).toHaveAttribute("href", "/requests/request-1");
+
+    expect(
+      screen.queryByRole("button", { name: "Submit request" })
+    ).not.toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   useTwitchStreams: vi.fn(),
   useAuth: vi.fn(),
   submitListingReport: vi.fn(),
+  useActiveListingRequestForListing: vi.fn(),
 }));
 
 vi.mock("../../hooks/listings/usePublicListing", () => ({
@@ -22,14 +23,15 @@ vi.mock("../../providers/AuthProvider", () => ({
   useAuth: mocks.useAuth,
 }));
 
-// Match this path to the exact path used by Listing.tsx.
-// If your component still imports `useSubmitListingModerationRepotr` with the typo,
-// use that typo path here too.
 vi.mock("../../hooks/moderation/useSubmitListingModerationReport", () => ({
   useSubmitListingModerationReport: () => ({
     mutateAsync: mocks.submitListingReport,
     isPending: false,
   }),
+}));
+
+vi.mock("../../hooks/listings/useActiveListingRequestForListing", () => ({
+  useActiveListingRequestForListing: mocks.useActiveListingRequestForListing,
 }));
 
 const createListingData = () => ({
@@ -85,6 +87,12 @@ describe("<ListingPage /> report UI", () => {
     });
 
     mocks.submitListingReport.mockResolvedValue("report-1");
+
+    mocks.useActiveListingRequestForListing.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("shows a sign-in prompt for signed-out users", () => {
@@ -197,5 +205,45 @@ describe("<ListingPage /> report UI", () => {
       "/listing/listing-1/request"
     );
   });
-  
+
+  it("points request-mode listing CTA to the existing active request when one exists", () => {
+    mocks.useActiveListingRequestForListing.mockReturnValue({
+      data: {
+        id: "request-1",
+        listing_id: "listing-1",
+        buyer_user_id: "buyer-1",
+        status: "submitted",
+        created_at: "2026-05-20T12:00:00.000Z",
+        updated_at: "2026-05-20T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByRole("link", { name: "View existing request" })
+    ).toHaveAttribute("href", "/requests/request-1");
+
+    expect(
+      screen.queryByRole("link", { name: "Submit request" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a checking state while loading the buyer active request", () => {
+    mocks.useActiveListingRequestForListing.mockReturnValue({
+      data: null,
+      isLoading: true,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Checking request…")).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("link", { name: "Submit request" })
+    ).not.toBeInTheDocument();
+  });
 });
