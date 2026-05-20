@@ -1,9 +1,7 @@
 import { Link } from "react-router-dom";
-import {
-  getConversationInitiationReasonLabel,
-} from "../../domain/conversations/conversations";
 import { useMessagesInbox } from "../../hooks/conversations/useMessagesInbox";
 import { useMyModerationReports } from '../../hooks/moderation/useMyModerationReports';
+import { getConversationDisplayContext, getConversationDisplayTitle } from '../../domain/conversations/conversationDisplay';
 
 const classes = {
   page: "space-y-6",
@@ -225,11 +223,7 @@ const MessagesInbox = () => {
           {items.map((item) => (
             <div key={item.conversation.id} className={classes.card}>
               <div className={classes.titleRow}>
-                <h2 className={classes.title}>
-                  {item.listing?.title ??
-                    item.conversation.subject ??
-                    conversationTypeText(item.conversation.conversation_type)}
-                </h2>
+                <h2 className={classes.title}>{getConversationDisplayTitle(item)}</h2>
 
                 {item.hasUnread && (
                   <span className={classes.unreadPill}>
@@ -250,14 +244,9 @@ const MessagesInbox = () => {
                   </div>
                 </div>
 
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Topic</div>
-                  <div className={classes.metaValue}>
-                    {getConversationInitiationReasonLabel(
-                      item.conversation.initiation_reason_code
-                    )}
-                  </div>
-                </div>
+                {getConversationDisplayContext(item) && (
+                  <p className={classes.text}>{getConversationDisplayContext(item)}</p>
+                )}
 
                 <div className={classes.metaBlock}>
                   <div className={classes.metaLabel}>Status</div>
@@ -275,16 +264,6 @@ const MessagesInbox = () => {
               </div>
 
               <div className={classes.activityBox}>
-                {/* <div className={classes.activityTitle}>Latest activity</div>
-
-                <div className={classes.activityText}>
-                  {dateTimeText(
-                    item.conversation.last_message_at ??
-                    item.conversation.updated_at
-                  )}
-                </div>
-                */}
-
                 <div className={classes.activityText}>
                   From:{" "}
                   {latestSenderText(

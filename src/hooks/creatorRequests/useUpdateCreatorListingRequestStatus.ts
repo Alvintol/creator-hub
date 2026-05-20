@@ -78,6 +78,12 @@ export const useUpdateCreatorListingRequestStatus = () => {
         queryClient.invalidateQueries({
           queryKey: ["adminRequests"],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["messagesInbox"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["activeListingRequestForListing"],
+        }),
       ]);
     },
   });
