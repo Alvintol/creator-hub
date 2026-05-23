@@ -5,6 +5,7 @@ import ListingRequestStatusCard from '../../components/ListingRequestStatusCard'
 import RequestConversationThread from '../../components/RequestConversationThread';
 import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
 import { useArchiveBuyerListingRequest } from '../../hooks/creatorRequests/useArchiveBuyerListingRequest';
+import { useState } from 'react';
 
 const classes = {
   page: "space-y-6",
@@ -36,6 +37,10 @@ const classes = {
   loadingText: "text-sm text-zinc-600",
   errorBox:
     "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+  warningBox:
+    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900",
+  btnDanger:
+    "inline-flex items-center justify-center rounded-full border border-red-300 bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-red-400 hover:bg-red-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
 } as const;
 
 // Prefers handle for creator display, then display name, then user id
@@ -76,6 +81,9 @@ const priceText = (
       : `$${priceMin}–$${priceMax ?? priceMin}`;
 
 const BuyerRequestDetails = () => {
+
+  const [isArchiveConfirming, setIsArchiveConfirming] = useState(false);
+
   const { id } = useParams<{ id: string }>();
 
   const { data, isLoading, error } = useBuyerRequest(id ?? null);
@@ -92,6 +100,8 @@ const BuyerRequestDetails = () => {
     await archiveRequestMutation.mutateAsync({
       requestId: request.id,
     });
+
+    setIsArchiveConfirming(false);
   };
 
   if (isLoading) {
@@ -167,16 +177,45 @@ const BuyerRequestDetails = () => {
                 </div>
               )}
 
-              <button
-                className={classes.btnOutline}
-                type="button"
-                disabled={archiveRequestMutation.isPending}
-                onClick={() => void handleArchiveRequest()}
-              >
-                {archiveRequestMutation.isPending
-                  ? "Archiving request…"
-                  : "Archive request"}
-              </button>
+              {isArchiveConfirming ? (
+                <div className={classes.warningBox}>
+                  <p>
+                    Are you sure you want to archive this request? The creator will no
+                    longer see it as an active request.
+                  </p>
+
+                  <div className={classes.row}>
+                    <button
+                      className={classes.btnDanger}
+                      type="button"
+                      disabled={archiveRequestMutation.isPending}
+                      onClick={() => void handleArchiveRequest()}
+                    >
+                      {archiveRequestMutation.isPending
+                        ? "Archiving request…"
+                        : "Confirm archive"}
+                    </button>
+
+                    <button
+                      className={classes.btnOutline}
+                      type="button"
+                      disabled={archiveRequestMutation.isPending}
+                      onClick={() => setIsArchiveConfirming(false)}
+                    >
+                      Keep request
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className={classes.btnOutline}
+                  type="button"
+                  disabled={archiveRequestMutation.isPending}
+                  onClick={() => setIsArchiveConfirming(true)}
+                >
+                  Archive request
+                </button>
+              )}
             </div>
           )}
 

@@ -111,15 +111,41 @@ describe("<BuyerRequestDetails />", () => {
     expect(screen.getByText("Conversation thread loaded")).toBeInTheDocument();
   });
 
-  it("lets the buyer archive a submitted request", async () => {
+  it("asks for confirmation before archiving a submitted request", async () => {
     renderPage();
 
     fireEvent.click(screen.getByRole("button", { name: "Archive request" }));
+
+    expect(
+      screen.getByText(
+        "Are you sure you want to archive this request? The creator will no longer see it as an active request."
+      )
+    ).toBeInTheDocument();
+
+    expect(mocks.archiveRequest).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
 
     await waitFor(() => {
       expect(mocks.archiveRequest).toHaveBeenCalledWith({
         requestId: "request-1",
       });
     });
+  });
+
+  it("lets the buyer cancel archive confirmation", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive request" }));
+
+    expect(screen.getByRole("button", { name: "Confirm archive" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Keep request" }));
+
+    expect(
+      screen.queryByRole("button", { name: "Confirm archive" })
+    ).not.toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: "Archive request" })).toBeInTheDocument();
   });
 });
