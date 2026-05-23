@@ -4,6 +4,7 @@ import { getListingRequestStatusLabel } from "../../domain/listings/listingReque
 import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
 import RequestConversationThread from '../../components/RequestConversationThread';
 import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
+import { useArchiveBuyerListingRequest } from '../../hooks/creatorRequests/useArchiveBuyerListingRequest';
 
 const classes = {
   page: "space-y-6",
@@ -33,6 +34,8 @@ const classes = {
     "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
 
   loadingText: "text-sm text-zinc-600",
+  errorBox:
+    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
 } as const;
 
 // Prefers handle for creator display, then display name, then user id
@@ -76,9 +79,20 @@ const BuyerRequestDetails = () => {
   const { id } = useParams<{ id: string }>();
 
   const { data, isLoading, error } = useBuyerRequest(id ?? null);
+  const archiveRequestMutation = useArchiveBuyerListingRequest();
 
   const request = data?.request ?? null;
   const creator = data?.creator ?? null;
+
+  const handleArchiveRequest = async () => {
+    if (!request) {
+      return;
+    }
+
+    await archiveRequestMutation.mutateAsync({
+      requestId: request.id,
+    });
+  };
 
   if (isLoading) {
     return <div className={classes.loadingText}>Loading…</div>;
@@ -136,6 +150,35 @@ const BuyerRequestDetails = () => {
               referenceLinks={request.reference_links}
             />
           </div>
+
+          {request.status === "submitted" && (
+            <div className={classes.section}>
+              <h2 className={classes.sectionTitle}>Request actions</h2>
+              <p className={classes.text}>
+                Archive this request if you no longer want the creator to review it. You
+                can submit a new request for this listing after archiving.
+              </p>
+
+              {archiveRequestMutation.error && (
+                <div className={classes.errorBox}>
+                  {archiveRequestMutation.error instanceof Error
+                    ? archiveRequestMutation.error.message
+                    : "This request could not be archived."}
+                </div>
+              )}
+
+              <button
+                className={classes.btnOutline}
+                type="button"
+                disabled={archiveRequestMutation.isPending}
+                onClick={() => void handleArchiveRequest()}
+              >
+                {archiveRequestMutation.isPending
+                  ? "Archiving request…"
+                  : "Archive request"}
+              </button>
+            </div>
+          )}
 
           <ListingRequestStatusCard
             status={request.status}

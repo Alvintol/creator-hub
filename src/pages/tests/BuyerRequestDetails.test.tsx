@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,6 +6,7 @@ import BuyerRequestDetails from "../buyer/BuyerRequestDetails";
 
 const mocks = vi.hoisted(() => ({
   useBuyerRequest: vi.fn(),
+  archiveRequest: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
@@ -14,6 +15,14 @@ vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
 
 vi.mock("../../components/RequestConversationThread", () => ({
   default: () => <div>Conversation thread loaded</div>,
+}));
+
+vi.mock("../../hooks/creatorRequests/useArchiveBuyerListingRequest", () => ({
+  useArchiveBuyerListingRequest: () => ({
+    mutateAsync: mocks.archiveRequest,
+    isPending: false,
+    error: null,
+  }),
 }));
 
 const request = {
@@ -78,6 +87,8 @@ describe("<BuyerRequestDetails />", () => {
       isLoading: false,
       error: null,
     });
+
+    mocks.archiveRequest.mockResolvedValue("request-1");
   });
 
   it("renders structured buyer request details", () => {
@@ -98,5 +109,17 @@ describe("<BuyerRequestDetails />", () => {
 
     expect(screen.getByText("Custom Emote Pack")).toBeInTheDocument();
     expect(screen.getByText("Conversation thread loaded")).toBeInTheDocument();
+  });
+
+  it("lets the buyer archive a submitted request", async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive request" }));
+
+    await waitFor(() => {
+      expect(mocks.archiveRequest).toHaveBeenCalledWith({
+        requestId: "request-1",
+      });
+    });
   });
 });
