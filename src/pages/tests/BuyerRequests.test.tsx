@@ -37,6 +37,8 @@ const createRequestItem = (overrides = {}) => ({
     creator_status_reason: null,
     created_at: "2026-05-17T12:00:00.000Z",
     updated_at: "2026-05-17T12:00:00.000Z",
+    archived_at: null,
+    archived_by_user_id: null,
     listing_snapshot: {
       listing_id: "listing-1",
       creator_user_id: "creator-1",
@@ -119,5 +121,27 @@ describe("<BuyerRequests />", () => {
 
     expect(screen.getByRole("heading", { name: "Custom Emote Pack" })).toBeInTheDocument();
     expect(screen.getByText("Legacy request message.")).toBeInTheDocument();
+  });
+
+  it("labels buyer-cancelled archived requests", () => {
+    mocks.useMyBuyerRequests.mockReturnValue({
+      data: {
+        items: [
+          createRequestItem({
+            status: "archived",
+            archived_at: "2026-05-23T12:00:00.000Z",
+            archived_by_user_id: "buyer-1",
+          }),
+        ],
+        totalCount: 1,
+        pageCount: 1,
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Cancelled by buyer")).toBeInTheDocument();
   });
 });

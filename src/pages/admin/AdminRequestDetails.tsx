@@ -135,6 +135,7 @@ const AdminRequestDetails = () => {
           <ListingRequestStatusCard
             status={request.status}
             reason={request.creator_status_reason}
+            archiveContext={request}
           />
 
           <div className={classes.metaGrid}>
@@ -155,7 +156,7 @@ const AdminRequestDetails = () => {
             <div className={classes.metaBlock}>
               <div className={classes.metaLabel}>Status</div>
               <div className={classes.metaValue}>
-                {getListingRequestStatusLabel(request.status)}
+                {getListingRequestStatusLabel(request.status, request)}
               </div>
             </div>
 

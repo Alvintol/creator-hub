@@ -120,4 +120,26 @@ describe("<CreatorRequests />", () => {
     expect(screen.getByRole("heading", { name: "Custom Emote Pack" })).toBeInTheDocument();
     expect(screen.getByText("Legacy request message.")).toBeInTheDocument();
   });
+
+  it("labels creator-archived requests", () => {
+    mocks.useMyCreatorRequests.mockReturnValue({
+      data: {
+        items: [
+          createRequestItem({
+            status: "archived",
+            archived_at: "2026-05-23T12:00:00.000Z",
+            archived_by_user_id: "creator-1",
+          }),
+        ],
+        totalCount: 1,
+        pageCount: 1,
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Archived by creator")).toBeInTheDocument();
+  });
 });

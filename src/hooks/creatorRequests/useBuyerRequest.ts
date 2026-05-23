@@ -33,7 +33,9 @@ const fetchBuyerRequest = async (
       creator_status_reason,
       listing_snapshot,
       created_at,
-      updated_at
+      updated_at,
+      archived_at,
+      archived_by_user_id
     `)
     .eq("id", requestId)
     .eq("buyer_user_id", userId)

@@ -94,7 +94,7 @@ export const getListingVisibilityLabel = (listing: {
       ? "Visible"
       : "Inactive";
 
-export type ListingRequestDisplayInput = {
+      export type ListingRequestDisplayInput = {
   request_title?: string | null;
   request_details?: string | null;
   message?: string | null;

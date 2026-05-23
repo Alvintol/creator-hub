@@ -10,6 +10,12 @@ export type ListingRequestStatusTone =
   | "danger"
   | "muted";
 
+export type ListingRequestArchiveContext = {
+  buyer_user_id?: string | null;
+  creator_user_id?: string | null;
+  archived_by_user_id?: string | null;
+};
+
 export const listingRequestStatusOptions: Array<{
   value: ListingRequestStatus;
   label: string;
@@ -21,7 +27,8 @@ export const listingRequestStatusOptions: Array<{
   ];
 
 export const getListingRequestStatusLabel = (
-  status: ListingRequestStatus
+  status: ListingRequestStatus,
+  archiveContext?: ListingRequestArchiveContext
 ): string =>
   status === "submitted"
     ? "Under review"
@@ -29,7 +36,16 @@ export const getListingRequestStatusLabel = (
       ? "Accepted"
       : status === "declined"
         ? "Declined"
-        : "Archived";
+        : archiveContext?.archived_by_user_id &&
+          archiveContext.buyer_user_id &&
+          archiveContext.archived_by_user_id === archiveContext.buyer_user_id
+          ? "Cancelled by buyer"
+          : archiveContext?.archived_by_user_id &&
+            archiveContext.creator_user_id &&
+            archiveContext.archived_by_user_id ===
+            archiveContext.creator_user_id
+            ? "Archived by creator"
+            : "Archived";
 
 export const getListingRequestStatusTone = (
   status: ListingRequestStatus
@@ -43,7 +59,8 @@ export const getListingRequestStatusTone = (
         : "muted";
 
 export const getListingRequestStatusSummary = (
-  status: ListingRequestStatus
+  status: ListingRequestStatus,
+  archiveContext?: ListingRequestArchiveContext
 ): string =>
   status === "submitted"
     ? "This request is currently under review by the creator."
@@ -51,7 +68,16 @@ export const getListingRequestStatusSummary = (
       ? "The creator has accepted this request."
       : status === "declined"
         ? "The creator has declined this request."
-        : "This request has been archived.";
+        : archiveContext?.archived_by_user_id &&
+          archiveContext.buyer_user_id &&
+          archiveContext.archived_by_user_id === archiveContext.buyer_user_id
+          ? "The buyer cancelled this request."
+          : archiveContext?.archived_by_user_id &&
+            archiveContext.creator_user_id &&
+            archiveContext.archived_by_user_id ===
+            archiveContext.creator_user_id
+            ? "The creator archived this request."
+            : "This request has been archived.";
 
 export const canAcceptListingRequest = (
   status: ListingRequestStatus
@@ -63,4 +89,4 @@ export const canDeclineListingRequest = (
 
 export const canArchiveListingRequest = (
   status: ListingRequestStatus
-): boolean => status !== "archived";
+): boolean => status === "submitted";
