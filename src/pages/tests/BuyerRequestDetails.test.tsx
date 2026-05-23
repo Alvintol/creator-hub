@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,6 +6,7 @@ import BuyerRequestDetails from "../buyer/BuyerRequestDetails";
 
 const mocks = vi.hoisted(() => ({
   useBuyerRequest: vi.fn(),
+  archiveRequest: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
@@ -14,6 +15,14 @@ vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
 
 vi.mock("../../components/RequestConversationThread", () => ({
   default: () => <div>Conversation thread loaded</div>,
+}));
+
+vi.mock("../../hooks/creatorRequests/useArchiveBuyerListingRequest", () => ({
+  useArchiveBuyerListingRequest: () => ({
+    mutateAsync: mocks.archiveRequest,
+    isPending: false,
+    error: null,
+  }),
 }));
 
 const request = {
@@ -31,6 +40,8 @@ const request = {
   creator_status_reason: null,
   created_at: "2026-05-17T12:00:00.000Z",
   updated_at: "2026-05-17T12:00:00.000Z",
+  archived_at: null,
+  archived_by_user_id: null,
   listing_snapshot: {
     listing_id: "listing-1",
     creator_user_id: "creator-1",
@@ -78,6 +89,8 @@ describe("<BuyerRequestDetails />", () => {
       isLoading: false,
       error: null,
     });
+
+    mocks.archiveRequest.mockResolvedValue("request-1");
   });
 
   it("renders structured buyer request details", () => {
@@ -98,5 +111,43 @@ describe("<BuyerRequestDetails />", () => {
 
     expect(screen.getByText("Custom Emote Pack")).toBeInTheDocument();
     expect(screen.getByText("Conversation thread loaded")).toBeInTheDocument();
+  });
+
+  it("asks for confirmation before archiving a submitted request", async () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive request" }));
+
+    expect(
+      screen.getByText(
+        "Are you sure you want to archive this request? The creator will no longer see it as an active request."
+      )
+    ).toBeInTheDocument();
+
+    expect(mocks.archiveRequest).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirm archive" }));
+
+    await waitFor(() => {
+      expect(mocks.archiveRequest).toHaveBeenCalledWith({
+        requestId: "request-1",
+      });
+    });
+  });
+
+  it("lets the buyer cancel archive confirmation", () => {
+    renderPage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive request" }));
+
+    expect(screen.getByRole("button", { name: "Confirm archive" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Keep request" }));
+
+    expect(
+      screen.queryByRole("button", { name: "Confirm archive" })
+    ).not.toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: "Archive request" })).toBeInTheDocument();
   });
 });

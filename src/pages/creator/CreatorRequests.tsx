@@ -207,7 +207,7 @@ const CreatorRequests = (props: CreatorRequestsProps) => {
                   <div className={classes.metaBlock}>
                     <div className={classes.metaLabel}>Status</div>
                     <div className={getStatusPillClass(item.request.status)}>
-                      {getListingRequestStatusLabel(item.request.status)}
+                      {getListingRequestStatusLabel(item.request.status, item.request)}
                     </div>
                   </div>
 

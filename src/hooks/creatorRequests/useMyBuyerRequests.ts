@@ -24,6 +24,8 @@ export type BuyerListingRequestRow = {
   requested_timeline: string | null;
   budget_amount: number | null;
   reference_links: string[];
+  archived_at: string | null;
+  archived_by_user_id: string | null;
 };
 
 export type BuyerListingRequestProfile = {
@@ -127,7 +129,9 @@ const fetchMyBuyerRequests = async (
           request_details,
           requested_timeline,
           budget_amount,
-          reference_links
+          reference_links,
+          archived_at,
+          archived_by_user_id
         )
       `,
       { count: "exact" }

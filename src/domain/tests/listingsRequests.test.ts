@@ -17,6 +17,32 @@ describe("listing request status helpers", () => {
     expect(getListingRequestStatusLabel("archived")).toBe("Archived");
   });
 
+  it("maps archived labels with archive actor context", () => {
+    expect(
+      getListingRequestStatusLabel("archived", {
+        buyer_user_id: "buyer-1",
+        creator_user_id: "creator-1",
+        archived_by_user_id: "buyer-1",
+      })
+    ).toBe("Cancelled by buyer");
+
+    expect(
+      getListingRequestStatusLabel("archived", {
+        buyer_user_id: "buyer-1",
+        creator_user_id: "creator-1",
+        archived_by_user_id: "creator-1",
+      })
+    ).toBe("Archived by creator");
+
+    expect(
+      getListingRequestStatusLabel("archived", {
+        buyer_user_id: "buyer-1",
+        creator_user_id: "creator-1",
+        archived_by_user_id: null,
+      })
+    ).toBe("Archived");
+  });
+
   it("maps statuses to the correct tones", () => {
     expect(getListingRequestStatusTone("submitted")).toBe("review");
     expect(getListingRequestStatusTone("accepted")).toBe("success");
@@ -39,6 +65,32 @@ describe("listing request status helpers", () => {
     );
   });
 
+  it("maps archived summaries with archive actor context", () => {
+    expect(
+      getListingRequestStatusSummary("archived", {
+        buyer_user_id: "buyer-1",
+        creator_user_id: "creator-1",
+        archived_by_user_id: "buyer-1",
+      })
+    ).toBe("The buyer cancelled this request.");
+
+    expect(
+      getListingRequestStatusSummary("archived", {
+        buyer_user_id: "buyer-1",
+        creator_user_id: "creator-1",
+        archived_by_user_id: "creator-1",
+      })
+    ).toBe("The creator archived this request.");
+
+    expect(
+      getListingRequestStatusSummary("archived", {
+        buyer_user_id: "buyer-1",
+        creator_user_id: "creator-1",
+        archived_by_user_id: null,
+      })
+    ).toBe("This request has been archived.");
+  });
+
   it("only allows accept and decline while the request is submitted", () => {
     expect(canAcceptListingRequest("submitted")).toBe(true);
     expect(canDeclineListingRequest("submitted")).toBe(true);
@@ -52,10 +104,10 @@ describe("listing request status helpers", () => {
     expect(canDeclineListingRequest("archived")).toBe(false);
   });
 
-  it("allows archive for every non-archived status only", () => {
+  it("only allows archive while the request is submitted", () => {
     expect(canArchiveListingRequest("submitted")).toBe(true);
-    expect(canArchiveListingRequest("accepted")).toBe(true);
-    expect(canArchiveListingRequest("declined")).toBe(true);
+    expect(canArchiveListingRequest("accepted")).toBe(false);
+    expect(canArchiveListingRequest("declined")).toBe(false);
     expect(canArchiveListingRequest("archived")).toBe(false);
   });
 });
@@ -122,3 +174,4 @@ describe("listing request display helpers", () => {
     ).toBe("This preview…");
   });
 });
+

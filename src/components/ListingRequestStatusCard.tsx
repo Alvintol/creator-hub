@@ -2,12 +2,14 @@ import {
   getListingRequestStatusLabel,
   getListingRequestStatusSummary,
   getListingRequestStatusTone,
+  type ListingRequestArchiveContext,
   type ListingRequestStatus,
-} from "../domain//listings/listingRequests";
+} from "../domain/listings/listingRequests";
 
 type ListingRequestStatusCardProps = {
   status: ListingRequestStatus;
   reason?: string | null;
+  archiveContext?: ListingRequestArchiveContext;
 };
 
 const classes = {
@@ -18,14 +20,10 @@ const classes = {
   reasonLabel: "text-xs font-bold uppercase tracking-wide text-zinc-500",
   reasonText: "mt-1 text-sm text-zinc-800",
 
-  review:
-    "border-amber-200 bg-amber-50 text-amber-900",
-  success:
-    "border-emerald-200 bg-emerald-50 text-emerald-900",
-  danger:
-    "border-red-200 bg-red-50 text-red-900",
-  muted:
-    "border-zinc-200 bg-zinc-50 text-zinc-900",
+  review: "border-amber-200 bg-amber-50 text-amber-900",
+  success: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  danger: "border-red-200 bg-red-50 text-red-900",
+  muted: "border-zinc-200 bg-zinc-50 text-zinc-900",
 } as const;
 
 const getToneClass = (status: ListingRequestStatus): string => {
@@ -41,15 +39,17 @@ const getToneClass = (status: ListingRequestStatus): string => {
 };
 
 const ListingRequestStatusCard = (props: ListingRequestStatusCardProps) => {
-  const { status, reason } = props;
+  const { status, reason, archiveContext } = props;
 
   return (
     <div className={`${classes.cardBase} ${getToneClass(status)}`}>
       <div className={classes.title}>
-        Status: {getListingRequestStatusLabel(status)}
+        Status: {getListingRequestStatusLabel(status, archiveContext)}
       </div>
 
-      <div className={classes.text}>{getListingRequestStatusSummary(status)}</div>
+      <div className={classes.text}>
+        {getListingRequestStatusSummary(status, archiveContext)}
+      </div>
 
       {status === "declined" && reason && (
         <div className={classes.reasonBox}>

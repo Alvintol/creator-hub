@@ -40,6 +40,8 @@ const request = {
   creator_status_reason: null,
   created_at: "2026-05-17T12:00:00.000Z",
   updated_at: "2026-05-17T12:00:00.000Z",
+  archived_at: null,
+  archived_by_user_id: null,
   listing_snapshot: {
     listing_id: "listing-1",
     creator_user_id: "creator-1",
