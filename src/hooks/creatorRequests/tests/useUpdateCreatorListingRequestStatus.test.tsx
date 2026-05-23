@@ -107,6 +107,7 @@ describe("useUpdateCreatorListingRequestStatus", () => {
 
     expect(mocks.eq).toHaveBeenCalledWith("id", "request-1");
     expect(mocks.eq).toHaveBeenCalledWith("creator_user_id", "creator-1");
+    expect(mocks.eq).toHaveBeenCalledWith("status", "submitted");
     expect(mocks.select).toHaveBeenCalledWith("id, status");
 
     expect(invalidateSpy).toHaveBeenCalledWith({
@@ -136,6 +137,33 @@ describe("useUpdateCreatorListingRequestStatus", () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ["activeListingRequestForListing"],
     });
+  });
+
+  it("throws clear copy when the request is no longer submitted", async () => {
+    mocks.maybeSingle.mockResolvedValue({
+      data: null,
+      error: null,
+    });
+
+    const { wrapper } = createWrapper();
+
+    const { result } = renderHook(() => useUpdateCreatorListingRequestStatus(), {
+      wrapper,
+    });
+
+    await expect(
+      result.current.mutateAsync({
+        requestId: "request-1",
+        status: "accepted",
+      })
+    ).rejects.toThrow(
+      "This request is no longer under review and cannot be updated."
+    );
+
+    expect(mocks.from).toHaveBeenCalledWith("listing_requests");
+    expect(mocks.eq).toHaveBeenCalledWith("id", "request-1");
+    expect(mocks.eq).toHaveBeenCalledWith("creator_user_id", "creator-1");
+    expect(mocks.eq).toHaveBeenCalledWith("status", "submitted");
   });
 
   it("requires a useful decline reason when declining", async () => {

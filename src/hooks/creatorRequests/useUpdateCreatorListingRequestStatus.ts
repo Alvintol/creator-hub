@@ -33,11 +33,11 @@ export const useUpdateCreatorListingRequestStatus = () => {
         .from("listing_requests")
         .update({
           status: input.status,
-          creator_status_reason:
-            input.status === "declined" ? trimmedReason : null,
+          creator_status_reason: trimmedReason || null,
         })
         .eq("id", input.requestId)
         .eq("creator_user_id", user.id)
+        .eq("status", "submitted")
         .select("id, status")
         .maybeSingle();
 
@@ -46,8 +46,11 @@ export const useUpdateCreatorListingRequestStatus = () => {
       }
 
       if (!data?.id) {
-        throw new Error("The request status could not be updated.");
+        throw new Error(
+          "This request is no longer under review and cannot be updated."
+        );
       }
+
 
       return {
         id: data.id as string,
