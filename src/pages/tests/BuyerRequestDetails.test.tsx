@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   useBuyerRequest: vi.fn(),
   archiveRequest: vi.fn(),
   useListingRequestAgreement: vi.fn(),
+  respondAgreement: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
@@ -28,6 +29,14 @@ vi.mock("../../hooks/creatorRequests/useArchiveBuyerListingRequest", () => ({
 
 vi.mock("../../hooks/creatorRequests/useListingRequestAgreement", () => ({
   useListingRequestAgreement: mocks.useListingRequestAgreement,
+}));
+
+vi.mock("../../hooks/creatorRequests/useRespondListingRequestAgreement", () => ({
+  useRespondListingRequestAgreement: () => ({
+    mutateAsync: mocks.respondAgreement,
+    isPending: false,
+    error: null,
+  }),
 }));
 
 const request = {
@@ -96,11 +105,17 @@ describe("<BuyerRequestDetails />", () => {
     });
 
     mocks.archiveRequest.mockResolvedValue("request-1");
-    
+
     mocks.useListingRequestAgreement.mockReturnValue({
       data: null,
       isLoading: false,
       error: null,
+    });
+
+    mocks.respondAgreement.mockResolvedValue({
+      id: "agreement-1",
+      status: "buyer_accepted",
+      starting_payment_status: "payment_required",
     });
   });
 

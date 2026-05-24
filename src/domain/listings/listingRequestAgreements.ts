@@ -331,3 +331,106 @@ export const requiresAcceptedChangeOrderForProjectTermChange = (input: {
     input.changesPaymentSchedule ||
     input.changesDeliverables
   );
+
+export type ListingRequestAgreementAcknowledgementInput = {
+  id: string;
+  scope_summary: string;
+  additional_cost_policy: string;
+  revision_policy?: string | null;
+  update_schedule_summary?: string | null;
+  estimated_completion_at: string;
+  adjusted_estimated_completion_at: string;
+  listing_request_agreement_items: Array<{
+    id: string;
+    title: string;
+    is_required: boolean;
+    is_selected: boolean;
+    sort_order: number;
+  }>;
+  listing_request_payment_schedule_items: Array<{
+    id: string;
+    title: string;
+    amount: number;
+    currency: string;
+    sort_order: number;
+  }>;
+};
+
+export type ListingRequestAgreementAcknowledgement = {
+  key: string;
+  label: string;
+};
+
+const sortBySortOrder = <T extends { sort_order: number }>(items: T[]): T[] =>
+  [...items].sort((a, b) => a.sort_order - b.sort_order);
+
+export const getRequiredListingRequestAgreementAcknowledgements = (
+  agreement: ListingRequestAgreementAcknowledgementInput
+): ListingRequestAgreementAcknowledgement[] => {
+  const requiredScopeItems = sortBySortOrder(
+    agreement.listing_request_agreement_items.filter(
+      (item) => item.is_required && item.is_selected
+    )
+  ).map((item) => ({
+    key: `scope_item:${item.id}`,
+    label: `I understand this scope item: ${item.title}`,
+  }));
+
+  const requiredPaymentItems = sortBySortOrder(
+    agreement.listing_request_payment_schedule_items
+  ).map((item) => ({
+    key: `payment_item:${item.id}`,
+    label: `I understand this payment item: ${item.title}`,
+  }));
+
+  return [
+    {
+      key: "agreement:scope_summary",
+      label: "I understand the project scope summary.",
+    },
+    ...requiredScopeItems,
+    {
+      key: "agreement:payment_schedule",
+      label: "I understand the payment schedule.",
+    },
+    ...requiredPaymentItems,
+    {
+      key: "agreement:timeline",
+      label:
+        "I understand the estimated completion date and buyer-side hold rules.",
+    },
+    {
+      key: "agreement:update_schedule",
+      label: "I understand the creator update schedule.",
+    },
+    {
+      key: "agreement:revision_policy",
+      label: "I understand the included revision policy.",
+    },
+    {
+      key: "agreement:additional_cost_policy",
+      label: "I understand the additional cost policy.",
+    },
+    {
+      key: "agreement:change_orders",
+      label:
+        "I understand scope, price, timeline, deliverable, or payment changes require an accepted change order.",
+    },
+    {
+      key: "agreement:final_release_payment",
+      label:
+        "I understand final files or deliverables may be held until required payments are complete.",
+    },
+  ];
+};
+
+export const areRequiredAgreementAcknowledgementsChecked = (input: {
+  requiredAcknowledgements: ListingRequestAgreementAcknowledgement[];
+  checkedKeys: string[];
+}): boolean => {
+  const checkedSet = new Set(input.checkedKeys);
+
+  return input.requiredAcknowledgements.every((acknowledgement) =>
+    checkedSet.has(acknowledgement.key)
+  );
+};

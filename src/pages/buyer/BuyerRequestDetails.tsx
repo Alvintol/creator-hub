@@ -8,6 +8,8 @@ import { useArchiveBuyerListingRequest } from '../../hooks/creatorRequests/useAr
 import { useState } from 'react';
 import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListingRequestAgreement';
 import ListingRequestAgreementSummary from '../../components/ListingRequestAgreementSummary';
+import { useRespondListingRequestAgreement } from '../../hooks/creatorRequests/useRespondListingRequestAgreement';
+import ListingRequestAgreementBuyerActions from '../../components/ListingRequestAgreementBuyerActions';
 
 const classes = {
   page: "space-y-6",
@@ -95,6 +97,7 @@ const BuyerRequestDetails = () => {
   const creator = data?.creator ?? null;
 
   const agreementQuery = useListingRequestAgreement(request?.id ?? null);
+  const respondAgreementMutation = useRespondListingRequestAgreement();
 
   const handleArchiveRequest = async () => {
     if (!request) {
@@ -135,6 +138,33 @@ const BuyerRequestDetails = () => {
     request.status === "archived"
       ? "/requests/archived"
       : "/requests";
+
+  const handleAcceptAgreement = async (acknowledgementKeys: string[]) => {
+    const agreement = agreementQuery.data;
+
+    if (!agreement) {
+      return;
+    }
+
+    await respondAgreementMutation.mutateAsync({
+      agreementId: agreement.id,
+      response: "buyer_accepted",
+      acknowledgementKeys,
+    });
+  };
+
+  const handleDeclineAgreement = async () => {
+    const agreement = agreementQuery.data;
+
+    if (!agreement) {
+      return;
+    }
+
+    await respondAgreementMutation.mutateAsync({
+      agreementId: agreement.id,
+      response: "buyer_declined",
+    });
+  };
 
   return (
     <div className={classes.page}>
@@ -234,6 +264,14 @@ const BuyerRequestDetails = () => {
             isLoading={agreementQuery.isLoading}
           />
 
+          <ListingRequestAgreementBuyerActions
+            agreement={agreementQuery.data ?? null}
+            isPending={respondAgreementMutation.isPending}
+            error={respondAgreementMutation.error}
+            onAccept={handleAcceptAgreement}
+            onDecline={handleDeclineAgreement}
+          />
+          
           <div className={classes.metaGrid}>
             <div className={classes.metaBlock}>
               <div className={classes.metaLabel}>Creator</div>
