@@ -7,6 +7,7 @@ import CreatorRequestDetails from "../creator/CreatorRequestDetails";
 const mocks = vi.hoisted(() => ({
   useCreatorRequest: vi.fn(),
   updateRequestStatus: vi.fn(),
+  useListingRequestAgreement: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useCreatorRequest", () => ({
@@ -23,6 +24,10 @@ vi.mock("../../hooks/creatorRequests/useUpdateCreatorListingRequestStatus", () =
 
 vi.mock("../../components/RequestConversationThread", () => ({
   default: () => <div>Conversation thread loaded</div>,
+}));
+
+vi.mock("../../hooks/creatorRequests/useListingRequestAgreement", () => ({
+  useListingRequestAgreement: mocks.useListingRequestAgreement,
 }));
 
 const request = {
@@ -94,6 +99,12 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     mocks.updateRequestStatus.mockResolvedValue(undefined);
+    
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("renders structured buyer request details for the creator", () => {

@@ -6,6 +6,7 @@ import AdminRequestDetails from "../admin/AdminRequestDetails";
 
 const mocks = vi.hoisted(() => ({
   useAdminRequest: vi.fn(),
+  useListingRequestAgreement: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminRequest", () => ({
@@ -14,6 +15,10 @@ vi.mock("../../hooks/admin/useAdminRequest", () => ({
 
 vi.mock("../../components/RequestConversationThread", () => ({
   default: () => <div>Conversation thread loaded</div>,
+}));
+
+vi.mock("../../hooks/creatorRequests/useListingRequestAgreement", () => ({
+  useListingRequestAgreement: mocks.useListingRequestAgreement,
 }));
 
 const request = {
@@ -83,6 +88,12 @@ describe("<AdminRequestDetails />", () => {
           avatar_url: null,
         },
       },
+      isLoading: false,
+      error: null,
+    });
+    
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: null,
       isLoading: false,
       error: null,
     });
