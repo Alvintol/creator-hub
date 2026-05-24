@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   allowsMilestonePayments,
+  areRequiredAgreementAcknowledgementsChecked,
   calculateRoundedBuyerHoldDays,
   calculateTotalRoundedBuyerHoldDays,
   canApplyListingRequestChangeOrder,
@@ -18,6 +19,7 @@ import {
   getListingRequestPaymentTimingLabel,
   getListingRequestPaymentTimingSummary,
   getMinimumCreatorUpdateRule,
+  getRequiredListingRequestAgreementAcknowledgements,
   requiresAcceptedChangeOrderForProjectTermChange,
   shouldStartBuyerTimelineHold,
 } from "../listings/listingRequestAgreements";
@@ -356,5 +358,133 @@ describe("listing request buyer timeline hold helpers", () => {
     ).toBe(true);
 
     expect(shouldStartBuyerTimelineHold({})).toBe(false);
+  });
+});
+
+describe("listing request agreement acknowledgement helpers", () => {
+  const agreement = {
+    id: "agreement-1",
+    scope_summary: "Create a custom overlay package.",
+    additional_cost_policy:
+      "Additional work requires an accepted change order.",
+    revision_policy: "Includes two revision passes.",
+    update_schedule_summary: "Weekly updates required.",
+    estimated_completion_at: "2026-06-15T12:00:00.000Z",
+    adjusted_estimated_completion_at: "2026-06-17T12:00:00.000Z",
+    listing_request_agreement_items: [
+      {
+        id: "item-2",
+        title: "BRB screen",
+        is_required: true,
+        is_selected: true,
+        sort_order: 1,
+      },
+      {
+        id: "item-1",
+        title: "Starting soon screen",
+        is_required: true,
+        is_selected: true,
+        sort_order: 0,
+      },
+      {
+        id: "item-3",
+        title: "Optional animated version",
+        is_required: false,
+        is_selected: false,
+        sort_order: 2,
+      },
+    ],
+    listing_request_payment_schedule_items: [
+      {
+        id: "payment-1",
+        title: "Deposit",
+        amount: 100,
+        currency: "cad",
+        sort_order: 0,
+      },
+    ],
+  };
+
+  it("builds required acknowledgement items from agreement scope, payments, and policies", () => {
+    const acknowledgements =
+      getRequiredListingRequestAgreementAcknowledgements(agreement);
+
+    expect(acknowledgements).toEqual([
+      {
+        key: "agreement:scope_summary",
+        label: "I understand the project scope summary.",
+      },
+      {
+        key: "scope_item:item-1",
+        label: "I understand this scope item: Starting soon screen",
+      },
+      {
+        key: "scope_item:item-2",
+        label: "I understand this scope item: BRB screen",
+      },
+      {
+        key: "agreement:payment_schedule",
+        label: "I understand the payment schedule.",
+      },
+      {
+        key: "payment_item:payment-1",
+        label: "I understand this payment item: Deposit",
+      },
+      {
+        key: "agreement:timeline",
+        label:
+          "I understand the estimated completion date and buyer-side hold rules.",
+      },
+      {
+        key: "agreement:update_schedule",
+        label: "I understand the creator update schedule.",
+      },
+      {
+        key: "agreement:revision_policy",
+        label: "I understand the included revision policy.",
+      },
+      {
+        key: "agreement:additional_cost_policy",
+        label: "I understand the additional cost policy.",
+      },
+      {
+        key: "agreement:change_orders",
+        label:
+          "I understand scope, price, timeline, deliverable, or payment changes require an accepted change order.",
+      },
+      {
+        key: "agreement:final_release_payment",
+        label:
+          "I understand final files or deliverables may be held until required payments are complete.",
+      },
+    ]);
+  });
+
+  it("confirms when every required acknowledgement is checked", () => {
+    const requiredAcknowledgements =
+      getRequiredListingRequestAgreementAcknowledgements(agreement);
+
+    expect(
+      areRequiredAgreementAcknowledgementsChecked({
+        requiredAcknowledgements,
+        checkedKeys: requiredAcknowledgements.map(
+          (acknowledgement) => acknowledgement.key
+        ),
+      })
+    ).toBe(true);
+  });
+
+  it("does not confirm when a required acknowledgement is missing", () => {
+    const requiredAcknowledgements =
+      getRequiredListingRequestAgreementAcknowledgements(agreement);
+
+    expect(
+      areRequiredAgreementAcknowledgementsChecked({
+        requiredAcknowledgements,
+        checkedKeys: requiredAcknowledgements
+          .map((acknowledgement) => acknowledgement.key)
+          .filter((key) => key !== "agreement:payment_schedule"),
+      })
+    ).toBe(false);
   });
 });
