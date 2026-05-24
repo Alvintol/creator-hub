@@ -7,6 +7,7 @@ import BuyerRequestDetails from "../buyer/BuyerRequestDetails";
 const mocks = vi.hoisted(() => ({
   useBuyerRequest: vi.fn(),
   archiveRequest: vi.fn(),
+  useListingRequestAgreement: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
@@ -23,6 +24,10 @@ vi.mock("../../hooks/creatorRequests/useArchiveBuyerListingRequest", () => ({
     isPending: false,
     error: null,
   }),
+}));
+
+vi.mock("../../hooks/creatorRequests/useListingRequestAgreement", () => ({
+  useListingRequestAgreement: mocks.useListingRequestAgreement,
 }));
 
 const request = {
@@ -91,6 +96,12 @@ describe("<BuyerRequestDetails />", () => {
     });
 
     mocks.archiveRequest.mockResolvedValue("request-1");
+    
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("renders structured buyer request details", () => {

@@ -11,6 +11,8 @@ import { useEffect, useState } from 'react';
 import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
 import RequestConversationThread from '../../components/RequestConversationThread';
 import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
+import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListingRequestAgreement';
+import ListingRequestAgreementSummary from '../../components/ListingRequestAgreementSummary';
 
 const classes = {
   page: "space-y-6",
@@ -103,6 +105,8 @@ const CreatorRequestDetails = () => {
 
   const request = data?.request ?? null;
   const buyer = data?.buyer ?? null;
+
+  const agreementQuery = useListingRequestAgreement(request?.id ?? null);
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -244,6 +248,11 @@ const CreatorRequestDetails = () => {
             status={request.status}
             reason={request.creator_status_reason}
             archiveContext={request}
+          />
+
+          <ListingRequestAgreementSummary
+            agreement={agreementQuery.data ?? null}
+            isLoading={agreementQuery.isLoading}
           />
 
           <div className={classes.metaGrid}>

@@ -4,6 +4,8 @@ import { getListingRequestStatusLabel } from "../../domain/listings/listingReque
 import ListingRequestStatusCard from "../../components/ListingRequestStatusCard";
 import RequestConversationThread from '../../components/RequestConversationThread';
 import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
+import ListingRequestAgreementSummary from '../../components/ListingRequestAgreementSummary';
+import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListingRequestAgreement';
 
 const classes = {
   page: "space-y-6",
@@ -83,6 +85,8 @@ const AdminRequestDetails = () => {
   const buyer = data?.buyer ?? null;
   const creator = data?.creator ?? null;
 
+  const agreementQuery = useListingRequestAgreement(request?.id ?? null);
+
   if (isLoading) {
     return <div className={classes.loadingText}>Loading…</div>;
   }
@@ -136,6 +140,11 @@ const AdminRequestDetails = () => {
             status={request.status}
             reason={request.creator_status_reason}
             archiveContext={request}
+          />
+
+          <ListingRequestAgreementSummary
+            agreement={agreementQuery.data ?? null}
+            isLoading={agreementQuery.isLoading}
           />
 
           <div className={classes.metaGrid}>

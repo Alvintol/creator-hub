@@ -6,6 +6,8 @@ import RequestConversationThread from '../../components/RequestConversationThrea
 import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
 import { useArchiveBuyerListingRequest } from '../../hooks/creatorRequests/useArchiveBuyerListingRequest';
 import { useState } from 'react';
+import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListingRequestAgreement';
+import ListingRequestAgreementSummary from '../../components/ListingRequestAgreementSummary';
 
 const classes = {
   page: "space-y-6",
@@ -91,6 +93,8 @@ const BuyerRequestDetails = () => {
 
   const request = data?.request ?? null;
   const creator = data?.creator ?? null;
+
+  const agreementQuery = useListingRequestAgreement(request?.id ?? null);
 
   const handleArchiveRequest = async () => {
     if (!request) {
@@ -223,6 +227,11 @@ const BuyerRequestDetails = () => {
             status={request.status}
             reason={request.creator_status_reason}
             archiveContext={request}
+          />
+
+          <ListingRequestAgreementSummary
+            agreement={agreementQuery.data ?? null}
+            isLoading={agreementQuery.isLoading}
           />
 
           <div className={classes.metaGrid}>
