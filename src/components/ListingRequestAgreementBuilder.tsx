@@ -1,0 +1,623 @@
+import { useMemo, useState, type SubmitEventHandler } from "react";
+
+import {
+  getMinimumCreatorUpdateRule,
+  listingRequestPaymentStructureOptions,
+  type ListingRequestPaymentStructure,
+} from "../domain/listings/listingRequestAgreements";
+import type { CreateListingRequestAgreementInput } from "../hooks/creatorRequests/useCreateListingRequestAgreement";
+import type { ListingRequestRow } from "../hooks/creatorRequests/useMyCreatorRequests";
+
+type ListingRequestAgreementBuilderProps = {
+  request: Pick<ListingRequestRow, "id" | "status"> | null;
+  isPending?: boolean;
+  error?: unknown;
+  currency?: string;
+  onCreateAgreement: (
+    input: CreateListingRequestAgreementInput
+  ) => Promise<unknown> | unknown;
+};
+
+type BuilderFormState = {
+  scopeSummary: string;
+  includedDeliverablesText: string;
+  checklistText: string;
+  totalAmount: string;
+  paymentStructure: ListingRequestPaymentStructure;
+  depositAmount: string;
+  estimatedWorkDays: string;
+  estimatedCompletionDate: string;
+  includedRevisionCount: string;
+  additionalCostPolicy: string;
+  revisionPolicy: string;
+  sendNow: boolean;
+};
+
+type BuilderValidationErrors = Partial<Record<keyof BuilderFormState, string>>;
+
+const classes = {
+  card: "card p-6",
+  section: "space-y-5",
+  header: "space-y-1",
+  title: "text-base font-extrabold tracking-tight",
+  text: "text-sm text-zinc-600",
+  grid: "grid gap-4 sm:grid-cols-2",
+  field: "space-y-2",
+  label: "text-sm font-bold text-zinc-900",
+  help: "text-xs text-zinc-500",
+  input:
+    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-[rgb(var(--brand))] focus:ring-2 focus:ring-[rgba(244,92,44,0.18)]",
+  textarea:
+    "min-h-28 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-[rgb(var(--brand))] focus:ring-2 focus:ring-[rgba(244,92,44,0.18)]",
+  checkboxRow:
+    "flex items-start gap-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3",
+  checkbox: "mt-1 h-4 w-4 rounded border-zinc-300",
+  checkboxLabel: "text-sm font-semibold text-zinc-800",
+  errorText: "text-xs font-semibold text-red-600",
+  errorBox:
+    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+  updateBox:
+    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700",
+  row: "flex flex-wrap items-center gap-3",
+  btnPrimary:
+    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
+} as const;
+
+const defaultFormState: BuilderFormState = {
+  scopeSummary: "",
+  includedDeliverablesText: "",
+  checklistText: "",
+  totalAmount: "",
+  paymentStructure: "deposit_balance",
+  depositAmount: "",
+  estimatedWorkDays: "14",
+  estimatedCompletionDate: "",
+  includedRevisionCount: "2",
+  additionalCostPolicy:
+    "Any additional scope, deliverables, timeline, price, payment schedule, or milestone changes require an accepted change order before work continues.",
+  revisionPolicy:
+    "This agreement includes the listed revision rounds. Extra revisions require an accepted change order before additional work continues.",
+  sendNow: true,
+};
+
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error
+    ? error.message
+    : "The project agreement could not be created.";
+
+const splitTextareaLines = (value: string): string[] =>
+  value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+const parsePositiveNumber = (value: string): number =>
+  Number.parseFloat(value.trim());
+
+const parseWholeNumber = (value: string): number =>
+  Number.parseInt(value.trim(), 10);
+
+const getIsoFromDateInput = (dateInput: string): string =>
+  new Date(`${dateInput}T12:00:00.000Z`).toISOString();
+
+const validateForm = (form: BuilderFormState): BuilderValidationErrors => {
+  const errors: BuilderValidationErrors = {};
+  const totalAmount = parsePositiveNumber(form.totalAmount);
+  const depositAmount = parsePositiveNumber(form.depositAmount);
+  const estimatedWorkDays = parseWholeNumber(form.estimatedWorkDays);
+  const includedRevisionCount = parseWholeNumber(form.includedRevisionCount);
+
+  if (!form.scopeSummary.trim()) {
+    errors.scopeSummary = "Add a scope summary.";
+  }
+
+  if (splitTextareaLines(form.includedDeliverablesText).length === 0) {
+    errors.includedDeliverablesText = "Add at least one included deliverable.";
+  }
+
+  if (splitTextareaLines(form.checklistText).length === 0) {
+    errors.checklistText = "Add at least one required checklist item.";
+  }
+
+  if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+    errors.totalAmount = "Enter a total amount greater than 0.";
+  }
+
+  if (form.paymentStructure === "deposit_balance") {
+    if (!Number.isFinite(depositAmount) || depositAmount <= 0) {
+      errors.depositAmount = "Enter a deposit amount greater than 0.";
+    } else if (Number.isFinite(totalAmount) && depositAmount >= totalAmount) {
+      errors.depositAmount = "Deposit must be less than the total amount.";
+    }
+  }
+
+  if (!Number.isFinite(estimatedWorkDays) || estimatedWorkDays <= 0) {
+    errors.estimatedWorkDays = "Enter estimated work days greater than 0.";
+  }
+
+  if (!form.estimatedCompletionDate) {
+    errors.estimatedCompletionDate = "Choose an estimated completion date.";
+  }
+
+  if (!Number.isFinite(includedRevisionCount) || includedRevisionCount < 0) {
+    errors.includedRevisionCount = "Enter 0 or more included revisions.";
+  }
+
+  if (!form.additionalCostPolicy.trim()) {
+    errors.additionalCostPolicy = "Add an additional cost policy.";
+  }
+
+  if (!form.revisionPolicy.trim()) {
+    errors.revisionPolicy = "Add a revision policy.";
+  }
+
+  return errors;
+};
+
+const buildPaymentScheduleItems = (input: {
+  paymentStructure: ListingRequestPaymentStructure;
+  totalAmount: number;
+  depositAmount: number | null;
+  currency: string;
+}): CreateListingRequestAgreementInput["paymentScheduleItems"] => {
+  if (input.paymentStructure === "full_prepayment") {
+    return [
+      {
+        title: "Full project payment",
+        description: "Due before work starts.",
+        amount: input.totalAmount,
+        currency: input.currency,
+        payment_timing: "due_before_work_starts",
+        status: "payment_required",
+        due_at: null,
+        sort_order: 0,
+      },
+    ];
+  }
+
+  if (input.paymentStructure === "deposit_balance") {
+    const safeDepositAmount = input.depositAmount ?? 0;
+
+    return [
+      {
+        title: "Project deposit",
+        description: "Due before work starts.",
+        amount: safeDepositAmount,
+        currency: input.currency,
+        payment_timing: "due_before_work_starts",
+        status: "payment_required",
+        due_at: null,
+        sort_order: 0,
+      },
+      {
+        title: "Remaining balance",
+        description: "Due before final deliverables are released.",
+        amount: Math.max(0, input.totalAmount - safeDepositAmount),
+        currency: input.currency,
+        payment_timing: "due_before_final_release",
+        status: "pending",
+        due_at: null,
+        sort_order: 1,
+      },
+    ];
+  }
+
+  return [
+    {
+      title: "Milestone payment plan",
+      description:
+        "Milestone details can be expanded in the future milestone flow. Payment is due when each agreed milestone is approved.",
+      amount: input.totalAmount,
+      currency: input.currency,
+      payment_timing: "due_at_milestone_approval",
+      status: "pending",
+      due_at: null,
+      sort_order: 0,
+    },
+  ];
+};
+
+const ListingRequestAgreementBuilder = ({
+  request,
+  isPending = false,
+  error,
+  currency = "cad",
+  onCreateAgreement,
+}: ListingRequestAgreementBuilderProps) => {
+  const [form, setForm] = useState<BuilderFormState>(defaultFormState);
+  const [validationErrors, setValidationErrors] =
+    useState<BuilderValidationErrors>({});
+
+  const estimatedWorkDays = parseWholeNumber(form.estimatedWorkDays);
+  const safeEstimatedWorkDays = Number.isFinite(estimatedWorkDays)
+    ? estimatedWorkDays
+    : 1;
+
+  const updateRule = useMemo(
+    () => getMinimumCreatorUpdateRule(safeEstimatedWorkDays),
+    [safeEstimatedWorkDays]
+  );
+
+  if (!request || request.status !== "accepted") {
+    return null;
+  }
+
+  const updateField = <Key extends keyof BuilderFormState>(
+    key: Key,
+    value: BuilderFormState[Key]
+  ) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      [key]: value,
+    }));
+
+    setValidationErrors((currentErrors) => ({
+      ...currentErrors,
+      [key]: undefined,
+    }));
+  };
+
+  const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
+    event.preventDefault();
+
+    const nextErrors = validateForm(form);
+    setValidationErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      return;
+    }
+
+    const totalAmount = parsePositiveNumber(form.totalAmount);
+    const depositAmount =
+      form.paymentStructure === "deposit_balance"
+        ? parsePositiveNumber(form.depositAmount)
+        : null;
+    const estimatedWorkDays = parseWholeNumber(form.estimatedWorkDays);
+    const includedRevisionCount = parseWholeNumber(form.includedRevisionCount);
+    const estimatedCompletionAt = getIsoFromDateInput(
+      form.estimatedCompletionDate
+    );
+
+    const input: CreateListingRequestAgreementInput = {
+      listingRequestId: request.id,
+      status: form.sendNow ? "sent" : "draft",
+      paymentStructure: form.paymentStructure,
+      startingPaymentStatus: "payment_required",
+      currency,
+      baseAmount: totalAmount,
+      totalAmount,
+      depositAmount,
+      estimatedStartAt: null,
+      estimatedCompletionAt,
+      lateDeliveryGraceDays: 3,
+      includedRevisionCount,
+      minimumUpdateRule: updateRule,
+      scopeSummary: form.scopeSummary.trim(),
+      includedDeliverables: splitTextareaLines(form.includedDeliverablesText),
+      additionalCostPolicy: form.additionalCostPolicy.trim(),
+      revisionPolicy: form.revisionPolicy.trim(),
+      updateScheduleSummary: updateRule.summary,
+      items: splitTextareaLines(form.checklistText).map((title, index) => ({
+        title,
+        description: null,
+        item_type: "included",
+        price_amount: null,
+        timeline_impact_days: 0,
+        payment_timing: "included_no_extra_charge",
+        is_required: true,
+        is_selected: true,
+        sort_order: index,
+      })),
+      paymentScheduleItems: buildPaymentScheduleItems({
+        paymentStructure: form.paymentStructure,
+        totalAmount,
+        depositAmount,
+        currency,
+      }),
+    };
+
+    await onCreateAgreement(input);
+  };
+
+  const createErrorMessage = error ? getErrorMessage(error) : null;
+
+  return (
+    <form className={classes.card} onSubmit={handleSubmit}>
+      <div className={classes.section}>
+        <div className={classes.header}>
+          <h2 className={classes.title}>Create project agreement</h2>
+          <p className={classes.text}>
+            Turn the accepted request into a formal agreement the buyer must
+            review and accept before payment or work begins.
+          </p>
+        </div>
+
+        {createErrorMessage && (
+          <div className={classes.errorBox}>{createErrorMessage}</div>
+        )}
+
+        <div className={classes.field}>
+          <label className={classes.label} htmlFor="agreement-scope-summary">
+            Scope summary
+          </label>
+          <textarea
+            className={classes.textarea}
+            id="agreement-scope-summary"
+            value={form.scopeSummary}
+            onChange={(event) =>
+              updateField("scopeSummary", event.currentTarget.value)
+            }
+          />
+          {validationErrors.scopeSummary && (
+            <p className={classes.errorText}>
+              {validationErrors.scopeSummary}
+            </p>
+          )}
+        </div>
+
+        <div className={classes.grid}>
+          <div className={classes.field}>
+            <label
+              className={classes.label}
+              htmlFor="agreement-included-deliverables"
+            >
+              Included deliverables
+            </label>
+            <textarea
+              className={classes.textarea}
+              id="agreement-included-deliverables"
+              value={form.includedDeliverablesText}
+              onChange={(event) =>
+                updateField(
+                  "includedDeliverablesText",
+                  event.currentTarget.value
+                )
+              }
+            />
+            <p className={classes.help}>Add one deliverable per line.</p>
+            {validationErrors.includedDeliverablesText && (
+              <p className={classes.errorText}>
+                {validationErrors.includedDeliverablesText}
+              </p>
+            )}
+          </div>
+
+          <div className={classes.field}>
+            <label className={classes.label} htmlFor="agreement-checklist">
+              Required checklist items
+            </label>
+            <textarea
+              className={classes.textarea}
+              id="agreement-checklist"
+              value={form.checklistText}
+              onChange={(event) =>
+                updateField("checklistText", event.currentTarget.value)
+              }
+            />
+            <p className={classes.help}>Add one required scope item per line.</p>
+            {validationErrors.checklistText && (
+              <p className={classes.errorText}>
+                {validationErrors.checklistText}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className={classes.grid}>
+          <div className={classes.field}>
+            <label className={classes.label} htmlFor="agreement-total-amount">
+              Total amount
+            </label>
+            <input
+              className={classes.input}
+              id="agreement-total-amount"
+              min="0"
+              step="0.01"
+              type="number"
+              value={form.totalAmount}
+              onChange={(event) =>
+                updateField("totalAmount", event.currentTarget.value)
+              }
+            />
+            {validationErrors.totalAmount && (
+              <p className={classes.errorText}>
+                {validationErrors.totalAmount}
+              </p>
+            )}
+          </div>
+
+          <div className={classes.field}>
+            <label
+              className={classes.label}
+              htmlFor="agreement-payment-structure"
+            >
+              Payment structure
+            </label>
+            <select
+              className={classes.input}
+              id="agreement-payment-structure"
+              value={form.paymentStructure}
+              onChange={(event) =>
+                updateField(
+                  "paymentStructure",
+                  event.currentTarget.value as ListingRequestPaymentStructure
+                )
+              }
+            >
+              {listingRequestPaymentStructureOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {form.paymentStructure === "deposit_balance" && (
+            <div className={classes.field}>
+              <label
+                className={classes.label}
+                htmlFor="agreement-deposit-amount"
+              >
+                Deposit amount
+              </label>
+              <input
+                className={classes.input}
+                id="agreement-deposit-amount"
+                min="0"
+                step="0.01"
+                type="number"
+                value={form.depositAmount}
+                onChange={(event) =>
+                  updateField("depositAmount", event.currentTarget.value)
+                }
+              />
+              {validationErrors.depositAmount && (
+                <p className={classes.errorText}>
+                  {validationErrors.depositAmount}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className={classes.field}>
+            <label className={classes.label} htmlFor="agreement-work-days">
+              Estimated work days
+            </label>
+            <input
+              className={classes.input}
+              id="agreement-work-days"
+              min="1"
+              type="number"
+              value={form.estimatedWorkDays}
+              onChange={(event) =>
+                updateField("estimatedWorkDays", event.currentTarget.value)
+              }
+            />
+            {validationErrors.estimatedWorkDays && (
+              <p className={classes.errorText}>
+                {validationErrors.estimatedWorkDays}
+              </p>
+            )}
+          </div>
+
+          <div className={classes.field}>
+            <label
+              className={classes.label}
+              htmlFor="agreement-estimated-completion"
+            >
+              Estimated completion date
+            </label>
+            <input
+              className={classes.input}
+              id="agreement-estimated-completion"
+              type="date"
+              value={form.estimatedCompletionDate}
+              onChange={(event) =>
+                updateField("estimatedCompletionDate", event.currentTarget.value)
+              }
+            />
+            {validationErrors.estimatedCompletionDate && (
+              <p className={classes.errorText}>
+                {validationErrors.estimatedCompletionDate}
+              </p>
+            )}
+          </div>
+
+          <div className={classes.field}>
+            <label className={classes.label} htmlFor="agreement-revision-count">
+              Included revision count
+            </label>
+            <input
+              className={classes.input}
+              id="agreement-revision-count"
+              min="0"
+              type="number"
+              value={form.includedRevisionCount}
+              onChange={(event) =>
+                updateField("includedRevisionCount", event.currentTarget.value)
+              }
+            />
+            {validationErrors.includedRevisionCount && (
+              <p className={classes.errorText}>
+                {validationErrors.includedRevisionCount}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className={classes.updateBox}>
+          <strong>{updateRule.label}</strong>
+          <p>{updateRule.summary}</p>
+        </div>
+
+        <div className={classes.field}>
+          <label className={classes.label} htmlFor="agreement-additional-cost">
+            Additional cost policy
+          </label>
+          <textarea
+            className={classes.textarea}
+            id="agreement-additional-cost"
+            value={form.additionalCostPolicy}
+            onChange={(event) =>
+              updateField("additionalCostPolicy", event.currentTarget.value)
+            }
+          />
+          {validationErrors.additionalCostPolicy && (
+            <p className={classes.errorText}>
+              {validationErrors.additionalCostPolicy}
+            </p>
+          )}
+        </div>
+
+        <div className={classes.field}>
+          <label className={classes.label} htmlFor="agreement-revision-policy">
+            Revision policy
+          </label>
+          <textarea
+            className={classes.textarea}
+            id="agreement-revision-policy"
+            value={form.revisionPolicy}
+            onChange={(event) =>
+              updateField("revisionPolicy", event.currentTarget.value)
+            }
+          />
+          {validationErrors.revisionPolicy && (
+            <p className={classes.errorText}>
+              {validationErrors.revisionPolicy}
+            </p>
+          )}
+        </div>
+
+        <label className={classes.checkboxRow}>
+          <input
+            checked={form.sendNow}
+            className={classes.checkbox}
+            type="checkbox"
+            onChange={(event) =>
+              updateField("sendNow", event.currentTarget.checked)
+            }
+          />
+          <span className={classes.checkboxLabel}>
+            Send to buyer now. Uncheck to save as a draft.
+          </span>
+        </label>
+
+        <div className={classes.row}>
+          <button
+            className={classes.btnPrimary}
+            disabled={isPending}
+            type="submit"
+          >
+            {isPending
+              ? "Saving agreement…"
+              : form.sendNow
+                ? "Create and send agreement"
+                : "Save agreement draft"}
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+};
+
+export default ListingRequestAgreementBuilder;
