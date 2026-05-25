@@ -39,6 +39,7 @@ const agreement: ListingRequestAgreementRow = {
   cancelled_at: null,
   created_at: "2026-05-24T12:00:00.000Z",
   updated_at: "2026-05-24T12:00:00.000Z",
+  listing_request_agreement_acknowledgements: [],
   listing_request_agreement_items: [
     {
       id: "item-1",

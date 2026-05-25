@@ -53,12 +53,19 @@ const formatMoney = (amount: number | null, currency: string): string => {
 const formatDate = (value?: string | null): string =>
   value
     ? new Intl.DateTimeFormat("en-CA", {
-        dateStyle: "medium",
-      }).format(new Date(value))
+      dateStyle: "medium",
+    }).format(new Date(value))
     : "Not set";
 
 const sortedBySortOrder = <T extends { sort_order: number }>(items: T[]): T[] =>
   [...items].sort((a, b) => a.sort_order - b.sort_order);
+
+const sortedAcknowledgements = (
+  acknowledgements: ListingRequestAgreementRow["listing_request_agreement_acknowledgements"]
+) =>
+  [...acknowledgements].sort((a, b) =>
+    a.created_at.localeCompare(b.created_at)
+  );
 
 const ListingRequestAgreementSummary = ({
   agreement,
@@ -203,9 +210,8 @@ const ListingRequestAgreementSummary = ({
                       ? ` · ${formatMoney(item.price_amount, agreement.currency)}`
                       : ""}
                     {item.timeline_impact_days
-                      ? ` · +${item.timeline_impact_days} day${
-                          item.timeline_impact_days === 1 ? "" : "s"
-                        }`
+                      ? ` · +${item.timeline_impact_days} day${item.timeline_impact_days === 1 ? "" : "s"
+                      }`
                       : ""}
                   </p>
                 </div>
@@ -265,6 +271,28 @@ const ListingRequestAgreementSummary = ({
         )}
       </div>
 
+      {agreement.listing_request_agreement_acknowledgements.length > 0 && (
+        <div className={classes.section}>
+          <h3 className={classes.h3}>Buyer confirmations</h3>
+
+          <div className={classes.list}>
+            {sortedAcknowledgements(
+              agreement.listing_request_agreement_acknowledgements
+            ).map((acknowledgement) => (
+              <div key={acknowledgement.id} className={classes.item}>
+                <div className={classes.itemTitle}>
+                  {acknowledgement.acknowledgement_label}
+                </div>
+
+                <p className={classes.itemText}>
+                  Confirmed on {formatDate(acknowledgement.created_at)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {agreement.listing_request_timeline_holds.some((hold) => !hold.ended_at) && (
         <div className={classes.warning}>
           This project is currently waiting on buyer action. The estimated
@@ -284,9 +312,8 @@ const ListingRequestAgreementSummary = ({
                 </div>
                 <p className={classes.itemText}>
                   {hold.ended_at
-                    ? `Resolved with +${hold.rounded_extension_days} day${
-                        hold.rounded_extension_days === 1 ? "" : "s"
-                      } added.`
+                    ? `Resolved with +${hold.rounded_extension_days} day${hold.rounded_extension_days === 1 ? "" : "s"
+                    } added.`
                     : "Currently active."}
                 </p>
               </div>

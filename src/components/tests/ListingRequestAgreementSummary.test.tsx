@@ -39,6 +39,16 @@ const agreement: ListingRequestAgreementRow = {
   cancelled_at: null,
   created_at: "2026-05-24T12:00:00.000Z",
   updated_at: "2026-05-24T12:00:00.000Z",
+  listing_request_agreement_acknowledgements: [
+    {
+      id: "ack-1",
+      agreement_id: "agreement-1",
+      buyer_user_id: "buyer-1",
+      acknowledgement_key: "agreement:scope_summary",
+      acknowledgement_label: "I understand the project scope summary.",
+      created_at: "2026-05-24T12:00:00.000Z",
+    },
+  ],
   listing_request_agreement_items: [
     {
       id: "item-1",
@@ -121,6 +131,11 @@ describe("<ListingRequestAgreementSummary />", () => {
       screen.getByText("Includes +2 days from buyer-side holds.")
     ).toBeInTheDocument();
     expect(screen.getByText("Agreement acceptance pending")).toBeInTheDocument();
+    expect(screen.getByText("Buyer confirmations")).toBeInTheDocument();
+    expect(
+      screen.getByText("I understand the project scope summary.")
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Confirmed on/)).toBeInTheDocument();
   });
 
   it("renders an active timeline hold warning", () => {

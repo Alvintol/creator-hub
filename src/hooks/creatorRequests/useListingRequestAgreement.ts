@@ -53,17 +53,26 @@ export type ListingRequestTimelineHoldRow = {
   agreement_id: string | null;
   payment_schedule_item_id: string | null;
   reason:
-    | "agreement_acceptance_pending"
-    | "starting_payment_pending"
-    | "milestone_approval_pending"
-    | "milestone_payment_pending"
-    | "change_order_response_pending"
-    | "balance_payment_pending";
+  | "agreement_acceptance_pending"
+  | "starting_payment_pending"
+  | "milestone_approval_pending"
+  | "milestone_payment_pending"
+  | "change_order_response_pending"
+  | "balance_payment_pending";
   started_at: string;
   ended_at: string | null;
   rounded_extension_days: number;
   created_at: string;
   updated_at: string;
+};
+
+export type ListingRequestAgreementAcknowledgementRow = {
+  id: string;
+  agreement_id: string;
+  buyer_user_id: string;
+  acknowledgement_key: string;
+  acknowledgement_label: string;
+  created_at: string;
 };
 
 export type ListingRequestAgreementRow = {
@@ -102,6 +111,7 @@ export type ListingRequestAgreementRow = {
   listing_request_agreement_items: ListingRequestAgreementItemRow[];
   listing_request_payment_schedule_items: ListingRequestPaymentScheduleItemRow[];
   listing_request_timeline_holds: ListingRequestTimelineHoldRow[];
+  listing_request_agreement_acknowledgements: ListingRequestAgreementAcknowledgementRow[];
 };
 
 export const useListingRequestAgreement = (listingRequestId?: string | null) => {
@@ -192,6 +202,14 @@ export const useListingRequestAgreement = (listingRequestId?: string | null) => 
             rounded_extension_days,
             created_at,
             updated_at
+          ),
+          listing_request_agreement_acknowledgements (
+            id,
+            agreement_id,
+            buyer_user_id,
+            acknowledgement_key,
+            acknowledgement_label,
+            created_at
           )
         `
         )
