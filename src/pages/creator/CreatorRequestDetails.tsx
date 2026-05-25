@@ -15,6 +15,8 @@ import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListi
 import ListingRequestAgreementSummary from '../../components/ListingRequestAgreementSummary';
 import { useCreateListingRequestAgreement } from '../../hooks/creatorRequests/useCreateListingRequestAgreement';
 import ListingRequestAgreementBuilder from '../../components/ListingRequestAgreementBuilder';
+import { useSendDraftListingRequestAgreement } from '../../hooks/creatorRequests/useSendDraftListingRequestAgreement';
+import ListingRequestAgreementCreatorActions from '../../components/ListingRequestAgreementCreatorActions';
 
 const classes = {
   page: "space-y-6",
@@ -110,6 +112,7 @@ const CreatorRequestDetails = () => {
 
   const agreementQuery = useListingRequestAgreement(request?.id ?? null);
   const createAgreementMutation = useCreateListingRequestAgreement();
+  const sendDraftAgreementMutation = useSendDraftListingRequestAgreement();
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -257,6 +260,15 @@ const CreatorRequestDetails = () => {
           <ListingRequestAgreementSummary
             agreement={agreementQuery.data ?? null}
             isLoading={agreementQuery.isLoading}
+          />
+
+          <ListingRequestAgreementCreatorActions
+            agreement={agreement}
+            isPending={sendDraftAgreementMutation.isPending}
+            error={sendDraftAgreementMutation.error}
+            onSendAgreement={(agreementId) =>
+              sendDraftAgreementMutation.mutateAsync({ agreementId })
+            }
           />
 
           <div className={classes.metaGrid}>

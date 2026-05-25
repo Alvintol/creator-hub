@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   useCreatorRequest: vi.fn(),
   updateRequestStatus: vi.fn(),
   createAgreement: vi.fn(),
+  sendDraftAgreement: vi.fn(),
   useListingRequestAgreement: vi.fn(),
 }));
 
@@ -72,6 +73,14 @@ vi.mock("../../components/ListingRequestAgreementBuilder", () => ({
       Mock agreement builder
     </button>
   ),
+}));
+
+vi.mock("../../hooks/creatorRequests/useSendDraftListingRequestAgreement", () => ({
+  useSendDraftListingRequestAgreement: () => ({
+    mutateAsync: mocks.sendDraftAgreement,
+    isPending: false,
+    error: null,
+  }),
 }));
 
 const request = {
@@ -253,4 +262,40 @@ describe("<CreatorRequestDetails />", () => {
     expect(screen.getByText("Mock agreement summary")).toBeInTheDocument();
     expect(screen.queryByText("Mock agreement builder")).not.toBeInTheDocument();
   });
+
+  it("sends a draft agreement from the creator request detail page", () => {
+  mocks.useCreatorRequest.mockReturnValue({
+    data: {
+      request: {
+        ...request,
+        status: "accepted",
+      },
+      buyer: {
+        user_id: "buyer-1",
+        handle: "buyeruser",
+        display_name: "Buyer User",
+        avatar_url: null,
+      },
+    },
+    isLoading: false,
+    error: null,
+  });
+
+  mocks.useListingRequestAgreement.mockReturnValue({
+    data: {
+      id: "agreement-1",
+      status: "draft",
+    },
+    isLoading: false,
+    error: null,
+  });
+
+  renderPage();
+
+  screen.getByRole("button", { name: "Send draft to buyer" }).click();
+
+  expect(mocks.sendDraftAgreement).toHaveBeenCalledWith({
+    agreementId: "agreement-1",
+  });
+});
 });
