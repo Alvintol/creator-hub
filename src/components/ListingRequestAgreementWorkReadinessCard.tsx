@@ -14,6 +14,7 @@ type ListingRequestAgreementWorkReadinessCardProps = {
     | "deposit_amount"
     | "total_amount"
     | "currency"
+    | "estimated_start_at"
   > | null;
 };
 
@@ -40,6 +41,11 @@ const formatMoney = (amount: number | null, currency: string): string => {
     currency: currency.toUpperCase(),
   }).format(amount);
 };
+
+const formatDate = (value: string): string =>
+  new Intl.DateTimeFormat("en-CA", {
+    dateStyle: "medium",
+  }).format(new Date(value));
 
 const getStartingPaymentAmount = (
   agreement: Pick<
@@ -69,6 +75,12 @@ const ListingRequestAgreementWorkReadinessCard = ({
       : `${classes.card} ${classes.mutedCard}`;
 
   const startingPaymentAmount = getStartingPaymentAmount(agreement);
+
+  const workStartText = agreement.estimated_start_at
+    ? formatDate(agreement.estimated_start_at)
+    : canStartWork
+      ? "Available immediately"
+      : "Pending payment";
 
   return (
     <div className={cardClass}>
@@ -102,6 +114,14 @@ const ListingRequestAgreementWorkReadinessCard = ({
               : agreement.starting_payment_status === "paid"
                 ? "Paid"
                 : formatMoney(startingPaymentAmount, agreement.currency)}
+          </div>
+        </div>
+
+        <div className={classes.metaBlock}>
+          <div className={classes.metaLabel}>Work start</div>
+
+          <div className={classes.metaValue}>
+            {workStartText}
           </div>
         </div>
       </div>

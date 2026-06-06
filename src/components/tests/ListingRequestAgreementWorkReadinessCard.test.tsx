@@ -102,11 +102,16 @@ describe("ListingRequestAgreementWorkReadinessCard", () => {
     render(
       <ListingRequestAgreementWorkReadinessCard
         requestStatus="accepted"
-        agreement={createAgreement({ starting_payment_status: "paid" })}
+        agreement={createAgreement({
+          starting_payment_status: "paid",
+          estimated_start_at: "2026-06-06T12:00:00.000Z",
+        })}
       />
     );
 
     expect(screen.getByText("Work may begin")).toBeInTheDocument();
+    expect(screen.getByText("Work start")).toBeInTheDocument();
+    expect(screen.getByText("Jun 6, 2026")).toBeInTheDocument();
 
     expect(
       screen.getByText(
@@ -127,6 +132,7 @@ describe("ListingRequestAgreementWorkReadinessCard", () => {
 
     expect(screen.getByText("Work may begin")).toBeInTheDocument();
     expect(screen.getByText("Not required")).toBeInTheDocument();
+    expect(screen.getByText("Available immediately")).toBeInTheDocument();
   });
 
   it("does not mark work ready when the request is no longer accepted", () => {
