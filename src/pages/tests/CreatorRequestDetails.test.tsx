@@ -312,4 +312,38 @@ describe("<CreatorRequestDetails />", () => {
       agreementId: "agreement-1",
     });
   });
+
+  it("passes accepted request and buyer accepted agreement state into the work readiness card", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText("Mock work readiness card: accepted / buyer_accepted")
+    ).toBeInTheDocument();
+  });
 });

@@ -7,6 +7,7 @@ import AdminRequestDetails from "../admin/AdminRequestDetails";
 const mocks = vi.hoisted(() => ({
   useAdminRequest: vi.fn(),
   useListingRequestAgreement: vi.fn(),
+  confirmStartingPayment: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminRequest", () => ({
@@ -20,6 +21,57 @@ vi.mock("../../components/RequestConversationThread", () => ({
 vi.mock("../../hooks/creatorRequests/useListingRequestAgreement", () => ({
   useListingRequestAgreement: mocks.useListingRequestAgreement,
 }));
+
+vi.mock(
+  "../../hooks/admin/useAdminConfirmListingRequestStartingPayment",
+  () => ({
+    useAdminConfirmListingRequestStartingPayment: () => ({
+      mutateAsync: mocks.confirmStartingPayment,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock("../../components/ListingRequestAgreementSummary", () => ({
+  default: () => <div>Mock agreement summary</div>,
+}));
+
+vi.mock("../../components/ListingRequestAgreementWorkReadinessCard", () => ({
+  default: ({
+    requestStatus,
+    agreement,
+  }: {
+    requestStatus: string;
+    agreement: { status: string } | null;
+  }) => (
+    <div>
+      Mock work readiness card: {requestStatus} /{" "}
+      {agreement?.status ?? "none"}
+    </div>
+  ),
+}));
+
+vi.mock(
+  "../../components/ListingRequestAgreementAdminPaymentActions",
+  () => ({
+    default: ({
+      agreement,
+      onConfirmPayment,
+    }: {
+      agreement: { id: string } | null;
+      onConfirmPayment: (agreementId: string) => void;
+    }) =>
+      agreement ? (
+        <button
+          type="button"
+          onClick={() => onConfirmPayment(agreement.id)}
+        >
+          Mock confirm starting payment
+        </button>
+      ) : null,
+  })
+);
 
 const request = {
   id: "request-1",
@@ -91,7 +143,7 @@ describe("<AdminRequestDetails />", () => {
       isLoading: false,
       error: null,
     });
-    
+
     mocks.useListingRequestAgreement.mockReturnValue({
       data: null,
       isLoading: false,
@@ -119,5 +171,58 @@ describe("<AdminRequestDetails />", () => {
     expect(screen.getByText("@creatoruser")).toBeInTheDocument();
     expect(screen.getByText("Custom Emote Pack")).toBeInTheDocument();
     expect(screen.getByText("Conversation thread loaded")).toBeInTheDocument();
+  });
+
+  it("confirms the starting payment from the admin request detail page", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "payment_required",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen
+      .getByRole("button", {
+        name: "Mock confirm starting payment",
+      })
+      .click();
+
+    expect(mocks.confirmStartingPayment).toHaveBeenCalledWith({
+      agreementId: "agreement-1",
+    });
+
+    expect(
+      screen.getByText(
+        "Mock work readiness card: accepted / buyer_accepted"
+      )
+    ).toBeInTheDocument();
   });
 });

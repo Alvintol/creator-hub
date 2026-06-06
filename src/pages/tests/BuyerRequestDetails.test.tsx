@@ -39,6 +39,20 @@ vi.mock("../../hooks/creatorRequests/useRespondListingRequestAgreement", () => (
   }),
 }));
 
+vi.mock("../../components/ListingRequestAgreementWorkReadinessCard", () => ({
+  default: ({
+    requestStatus,
+    agreement,
+  }: {
+    requestStatus: string;
+    agreement: { status: string } | null;
+  }) => (
+    <div>
+      Mock work readiness card: {requestStatus} / {agreement?.status ?? "none"}
+    </div>
+  ),
+}));
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -340,5 +354,40 @@ describe("<BuyerRequestDetails />", () => {
     expect(
       screen.queryByRole("button", { name: "Decline agreement" })
     ).not.toBeInTheDocument();
+  });
+
+  it("passes the accepted request and buyer accepted agreement into the work readiness card", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        buyer_accepted_at: "2026-05-25T13:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText("Mock work readiness card: accepted / buyer_accepted")
+    ).toBeInTheDocument();
   });
 });

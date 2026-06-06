@@ -10,6 +10,7 @@ import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListi
 import ListingRequestAgreementSummary from '../../components/ListingRequestAgreementSummary';
 import { useRespondListingRequestAgreement } from '../../hooks/creatorRequests/useRespondListingRequestAgreement';
 import ListingRequestAgreementBuyerActions from '../../components/ListingRequestAgreementBuyerActions';
+import ListingRequestAgreementWorkReadinessCard from '../../components/ListingRequestAgreementWorkReadinessCard';
 
 const classes = {
   page: "space-y-6",
@@ -272,6 +273,11 @@ const BuyerRequestDetails = () => {
             error={respondAgreementMutation.error}
             onAccept={handleAcceptAgreement}
             onDecline={handleDeclineAgreement}
+          />
+
+          <ListingRequestAgreementWorkReadinessCard
+            requestStatus={request.status}
+            agreement={buyerVisibleAgreement}
           />
 
           <div className={classes.metaGrid}>
