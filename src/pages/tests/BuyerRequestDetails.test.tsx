@@ -311,4 +311,34 @@ describe("<BuyerRequestDetails />", () => {
       });
     });
   });
+
+  it("does not show creator draft agreements to the buyer", () => {
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "draft",
+        sent_at: null,
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText("No project agreement has been created for this request yet.")
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByText("Create a custom overlay package for the buyer.")
+    ).not.toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", { name: "Accept project agreement" })
+    ).not.toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", { name: "Decline agreement" })
+    ).not.toBeInTheDocument();
+  });
 });

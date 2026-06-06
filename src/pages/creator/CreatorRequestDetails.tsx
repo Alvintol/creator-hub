@@ -17,6 +17,7 @@ import { useCreateListingRequestAgreement } from '../../hooks/creatorRequests/us
 import ListingRequestAgreementBuilder from '../../components/ListingRequestAgreementBuilder';
 import { useSendDraftListingRequestAgreement } from '../../hooks/creatorRequests/useSendDraftListingRequestAgreement';
 import ListingRequestAgreementCreatorActions from '../../components/ListingRequestAgreementCreatorActions';
+import ListingRequestAgreementWorkReadinessCard from '../../components/ListingRequestAgreementWorkReadinessCard';
 
 const classes = {
   page: "space-y-6",
@@ -269,6 +270,11 @@ const CreatorRequestDetails = () => {
             onSendAgreement={(agreementId) =>
               sendDraftAgreementMutation.mutateAsync({ agreementId })
             }
+          />
+
+          <ListingRequestAgreementWorkReadinessCard
+            requestStatus={request.status}
+            agreement={agreement}
           />
 
           <div className={classes.metaGrid}>

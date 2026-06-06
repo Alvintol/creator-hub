@@ -83,6 +83,20 @@ vi.mock("../../hooks/creatorRequests/useSendDraftListingRequestAgreement", () =>
   }),
 }));
 
+vi.mock("../../components/ListingRequestAgreementWorkReadinessCard", () => ({
+  default: ({
+    requestStatus,
+    agreement,
+  }: {
+    requestStatus: string;
+    agreement: { status: string } | null;
+  }) => (
+    <div>
+      Mock work readiness card: {requestStatus} / {agreement?.status ?? "none"}
+    </div>
+  ),
+}));
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -264,38 +278,38 @@ describe("<CreatorRequestDetails />", () => {
   });
 
   it("sends a draft agreement from the creator request detail page", () => {
-  mocks.useCreatorRequest.mockReturnValue({
-    data: {
-      request: {
-        ...request,
-        status: "accepted",
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
       },
-      buyer: {
-        user_id: "buyer-1",
-        handle: "buyeruser",
-        display_name: "Buyer User",
-        avatar_url: null,
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "draft",
       },
-    },
-    isLoading: false,
-    error: null,
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen.getByRole("button", { name: "Send draft to buyer" }).click();
+
+    expect(mocks.sendDraftAgreement).toHaveBeenCalledWith({
+      agreementId: "agreement-1",
+    });
   });
-
-  mocks.useListingRequestAgreement.mockReturnValue({
-    data: {
-      id: "agreement-1",
-      status: "draft",
-    },
-    isLoading: false,
-    error: null,
-  });
-
-  renderPage();
-
-  screen.getByRole("button", { name: "Send draft to buyer" }).click();
-
-  expect(mocks.sendDraftAgreement).toHaveBeenCalledWith({
-    agreementId: "agreement-1",
-  });
-});
 });

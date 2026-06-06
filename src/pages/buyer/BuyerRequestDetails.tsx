@@ -133,6 +133,12 @@ const BuyerRequestDetails = () => {
   }
 
   const snapshot = request.listing_snapshot;
+  const agreement = agreementQuery.data ?? null;
+
+  // Buyers should not see creator drafts.
+  // RLS should block these too, but this keeps the UI safe if stale mocked data exists.
+  const buyerVisibleAgreement =
+    agreement?.status === "draft" ? null : agreement;
 
   const backTo =
     request.status === "archived"
@@ -140,28 +146,24 @@ const BuyerRequestDetails = () => {
       : "/requests";
 
   const handleAcceptAgreement = async (acknowledgementKeys: string[]) => {
-    const agreement = agreementQuery.data;
-
-    if (!agreement) {
+    if (!buyerVisibleAgreement || buyerVisibleAgreement.status !== "sent") {
       return;
     }
 
     await respondAgreementMutation.mutateAsync({
-      agreementId: agreement.id,
+      agreementId: buyerVisibleAgreement.id,
       response: "buyer_accepted",
       acknowledgementKeys,
     });
   };
 
   const handleDeclineAgreement = async () => {
-    const agreement = agreementQuery.data;
-
-    if (!agreement) {
+    if (!buyerVisibleAgreement || buyerVisibleAgreement.status !== "sent") {
       return;
     }
 
     await respondAgreementMutation.mutateAsync({
-      agreementId: agreement.id,
+      agreementId: buyerVisibleAgreement.id,
       response: "buyer_declined",
     });
   };
@@ -260,18 +262,18 @@ const BuyerRequestDetails = () => {
           />
 
           <ListingRequestAgreementSummary
-            agreement={agreementQuery.data ?? null}
+            agreement={buyerVisibleAgreement}
             isLoading={agreementQuery.isLoading}
           />
 
           <ListingRequestAgreementBuyerActions
-            agreement={agreementQuery.data ?? null}
+            agreement={buyerVisibleAgreement}
             isPending={respondAgreementMutation.isPending}
             error={respondAgreementMutation.error}
             onAccept={handleAcceptAgreement}
             onDecline={handleDeclineAgreement}
           />
-          
+
           <div className={classes.metaGrid}>
             <div className={classes.metaBlock}>
               <div className={classes.metaLabel}>Creator</div>
