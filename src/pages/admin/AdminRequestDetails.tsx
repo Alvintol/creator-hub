@@ -6,6 +6,9 @@ import RequestConversationThread from '../../components/RequestConversationThrea
 import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
 import ListingRequestAgreementSummary from '../../components/ListingRequestAgreementSummary';
 import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListingRequestAgreement';
+import { useAdminConfirmListingRequestStartingPayment } from '../../hooks/admin/useAdminConfirmListingRequestStartingPayment';
+import ListingRequestAgreementWorkReadinessCard from '../../components/ListingRequestAgreementWorkReadinessCard';
+import ListingRequestAgreementAdminPaymentActions from '../../components/ListingRequestAgreementAdminPaymentActions';
 
 const classes = {
   page: "space-y-6",
@@ -87,6 +90,9 @@ const AdminRequestDetails = () => {
 
   const agreementQuery = useListingRequestAgreement(request?.id ?? null);
 
+  const confirmStartingPaymentMutation =
+    useAdminConfirmListingRequestStartingPayment();
+
   if (isLoading) {
     return <div className={classes.loadingText}>Loading…</div>;
   }
@@ -109,6 +115,7 @@ const AdminRequestDetails = () => {
   }
 
   const snapshot = request.listing_snapshot;
+  const agreement = agreementQuery.data ?? null;
 
   return (
     <div className={classes.page}>
@@ -143,8 +150,22 @@ const AdminRequestDetails = () => {
           />
 
           <ListingRequestAgreementSummary
-            agreement={agreementQuery.data ?? null}
+            agreement={agreement}
             isLoading={agreementQuery.isLoading}
+          />
+
+          <ListingRequestAgreementAdminPaymentActions
+            agreement={agreement}
+            isPending={confirmStartingPaymentMutation.isPending}
+            error={confirmStartingPaymentMutation.error}
+            onConfirmPayment={(agreementId) =>
+              confirmStartingPaymentMutation.mutateAsync({ agreementId })
+            }
+          />
+
+          <ListingRequestAgreementWorkReadinessCard
+            requestStatus={request.status}
+            agreement={agreement}
           />
 
           <div className={classes.metaGrid}>

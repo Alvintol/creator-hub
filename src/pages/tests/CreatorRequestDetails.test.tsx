@@ -7,6 +7,8 @@ import CreatorRequestDetails from "../creator/CreatorRequestDetails";
 const mocks = vi.hoisted(() => ({
   useCreatorRequest: vi.fn(),
   updateRequestStatus: vi.fn(),
+  createAgreement: vi.fn(),
+  sendDraftAgreement: vi.fn(),
   useListingRequestAgreement: vi.fn(),
 }));
 
@@ -28,6 +30,71 @@ vi.mock("../../components/RequestConversationThread", () => ({
 
 vi.mock("../../hooks/creatorRequests/useListingRequestAgreement", () => ({
   useListingRequestAgreement: mocks.useListingRequestAgreement,
+}));
+
+vi.mock("../../hooks/creatorRequests/useCreateListingRequestAgreement", () => ({
+  useCreateListingRequestAgreement: () => ({
+    mutateAsync: mocks.createAgreement,
+    isPending: false,
+    error: null,
+  }),
+}));
+
+vi.mock("../../components/ListingRequestAgreementSummary", () => ({
+  default: ({
+    agreement,
+    isLoading,
+  }: {
+    agreement: unknown;
+    isLoading?: boolean;
+  }) => (
+    <div>
+      {isLoading
+        ? "Mock agreement loading"
+        : agreement
+          ? "Mock agreement summary"
+          : "Mock no agreement summary"}
+    </div>
+  ),
+}));
+
+vi.mock("../../components/ListingRequestAgreementBuilder", () => ({
+  default: ({
+    request,
+    onCreateAgreement,
+  }: {
+    request: { id: string };
+    onCreateAgreement: (input: { listingRequestId: string }) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => onCreateAgreement({ listingRequestId: request.id })}
+    >
+      Mock agreement builder
+    </button>
+  ),
+}));
+
+vi.mock("../../hooks/creatorRequests/useSendDraftListingRequestAgreement", () => ({
+  useSendDraftListingRequestAgreement: () => ({
+    mutateAsync: mocks.sendDraftAgreement,
+    isPending: false,
+    error: null,
+  }),
+}));
+
+vi.mock("../../components/ListingRequestAgreementWorkReadinessCard", () => ({
+  default: ({
+    requestStatus,
+    agreement,
+  }: {
+    requestStatus: string;
+    agreement: { status: string } | null;
+  }) => (
+    <div>
+      Mock work readiness card: {requestStatus} / {agreement?.status ?? "none"}
+    </div>
+  ),
 }));
 
 const request = {
@@ -99,7 +166,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     mocks.updateRequestStatus.mockResolvedValue(undefined);
-    
+
     mocks.useListingRequestAgreement.mockReturnValue({
       data: null,
       isLoading: false,
@@ -125,5 +192,158 @@ describe("<CreatorRequestDetails />", () => {
 
     expect(screen.getByText("@buyeruser")).toBeInTheDocument();
     expect(screen.getByText("Conversation thread loaded")).toBeInTheDocument();
+  });
+
+  it("renders the agreement builder for an accepted request without an agreement", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Mock no agreement summary")).toBeInTheDocument();
+    expect(screen.getByText("Mock agreement builder")).toBeInTheDocument();
+  });
+
+  it("creates an agreement from the creator request detail page", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen.getByRole("button", { name: "Mock agreement builder" }).click();
+
+    expect(mocks.createAgreement).toHaveBeenCalledWith({
+      listingRequestId: "request-1",
+    });
+  });
+
+  it("does not render the agreement builder when an agreement already exists", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByText("Mock agreement summary")).toBeInTheDocument();
+    expect(screen.queryByText("Mock agreement builder")).not.toBeInTheDocument();
+  });
+
+  it("sends a draft agreement from the creator request detail page", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "draft",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen.getByRole("button", { name: "Send draft to buyer" }).click();
+
+    expect(mocks.sendDraftAgreement).toHaveBeenCalledWith({
+      agreementId: "agreement-1",
+    });
+  });
+
+  it("passes accepted request and buyer accepted agreement state into the work readiness card", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText("Mock work readiness card: accepted / buyer_accepted")
+    ).toBeInTheDocument();
   });
 });

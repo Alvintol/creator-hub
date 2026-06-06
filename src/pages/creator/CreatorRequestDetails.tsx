@@ -13,6 +13,11 @@ import RequestConversationThread from '../../components/RequestConversationThrea
 import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
 import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListingRequestAgreement';
 import ListingRequestAgreementSummary from '../../components/ListingRequestAgreementSummary';
+import { useCreateListingRequestAgreement } from '../../hooks/creatorRequests/useCreateListingRequestAgreement';
+import ListingRequestAgreementBuilder from '../../components/ListingRequestAgreementBuilder';
+import { useSendDraftListingRequestAgreement } from '../../hooks/creatorRequests/useSendDraftListingRequestAgreement';
+import ListingRequestAgreementCreatorActions from '../../components/ListingRequestAgreementCreatorActions';
+import ListingRequestAgreementWorkReadinessCard from '../../components/ListingRequestAgreementWorkReadinessCard';
 
 const classes = {
   page: "space-y-6",
@@ -107,6 +112,8 @@ const CreatorRequestDetails = () => {
   const buyer = data?.buyer ?? null;
 
   const agreementQuery = useListingRequestAgreement(request?.id ?? null);
+  const createAgreementMutation = useCreateListingRequestAgreement();
+  const sendDraftAgreementMutation = useSendDraftListingRequestAgreement();
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -205,6 +212,7 @@ const CreatorRequestDetails = () => {
   }
 
   const snapshot = request.listing_snapshot;
+  const agreement = agreementQuery.data ?? null;
 
   const backTo =
     request.status === "archived"
@@ -253,6 +261,20 @@ const CreatorRequestDetails = () => {
           <ListingRequestAgreementSummary
             agreement={agreementQuery.data ?? null}
             isLoading={agreementQuery.isLoading}
+          />
+
+          <ListingRequestAgreementCreatorActions
+            agreement={agreement}
+            isPending={sendDraftAgreementMutation.isPending}
+            error={sendDraftAgreementMutation.error}
+            onSendAgreement={(agreementId) =>
+              sendDraftAgreementMutation.mutateAsync({ agreementId })
+            }
+          />
+
+          <ListingRequestAgreementWorkReadinessCard
+            requestStatus={request.status}
+            agreement={agreement}
           />
 
           <div className={classes.metaGrid}>
@@ -380,6 +402,24 @@ const CreatorRequestDetails = () => {
             </div>
           )}
         </div>
+
+        {agreementQuery.error && (
+          <div className={classes.errorCard}>
+            Project agreement could not be loaded right now.
+          </div>
+        )}
+
+        {request.status === "accepted" &&
+          !agreement &&
+          !agreementQuery.isLoading &&
+          !agreementQuery.error && (
+            <ListingRequestAgreementBuilder
+              request={request}
+              isPending={createAgreementMutation.isPending}
+              error={createAgreementMutation.error}
+              onCreateAgreement={(input) => createAgreementMutation.mutateAsync(input)}
+            />
+          )}
 
         <div className={classes.card}>
           <div className={classes.section}>
