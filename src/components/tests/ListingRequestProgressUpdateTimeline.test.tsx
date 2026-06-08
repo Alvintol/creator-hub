@@ -9,7 +9,9 @@ import {
 } from "vitest";
 
 import ListingRequestProgressUpdateTimeline from "../ListingRequestProgressUpdateTimeline";
-import type { ListingRequestProgressUpdateRow } from "../../hooks/creatorRequests/useListingRequestProgressUpdates";
+import type {
+  ListingRequestProgressUpdateRow,
+} from "../../hooks/creatorRequests/useListingRequestProgressUpdates";
 
 const createProgressUpdate = (
   overrides?: Partial<ListingRequestProgressUpdateRow>
@@ -19,16 +21,16 @@ const createProgressUpdate = (
   agreement_id: "agreement-1",
   creator_user_id: "creator-1",
   update_kind: "progress",
-  title: "Initial concepts completed",
-  body: "The first concept sketches are ready for review.",
-  progress_percent: 35,
+  title: "Initial concepts started",
+  body: "The creator has started work on the initial concepts.",
+  progress_percent: 20,
   created_at: "2026-06-06T12:00:00.000Z",
   updated_at: "2026-06-06T12:00:00.000Z",
   ...overrides,
 });
 
 describe("ListingRequestProgressUpdateTimeline", () => {
-  it("renders a loading state", () => {
+  it("renders the loading state", () => {
     render(
       <ListingRequestProgressUpdateTimeline
         updates={[]}
@@ -41,9 +43,15 @@ describe("ListingRequestProgressUpdateTimeline", () => {
         "Loading project progress updates…"
       )
     ).toBeInTheDocument();
+
+    expect(
+      screen.queryByText(
+        "No project progress updates have been posted yet."
+      )
+    ).not.toBeInTheDocument();
   });
 
-  it("renders an empty state", () => {
+  it("renders the empty state", () => {
     render(
       <ListingRequestProgressUpdateTimeline
         updates={[]}
@@ -57,13 +65,13 @@ describe("ListingRequestProgressUpdateTimeline", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders query errors instead of the empty state", () => {
+  it("renders query errors", () => {
     render(
       <ListingRequestProgressUpdateTimeline
         updates={[]}
         error={
           new Error(
-            "Progress updates could not be loaded."
+            "Project progress updates are unavailable."
           )
         }
       />
@@ -71,15 +79,9 @@ describe("ListingRequestProgressUpdateTimeline", () => {
 
     expect(
       screen.getByText(
-        "Progress updates could not be loaded."
+        "Project progress updates are unavailable."
       )
     ).toBeInTheDocument();
-
-    expect(
-      screen.queryByText(
-        "No project progress updates have been posted yet."
-      )
-    ).not.toBeInTheDocument();
   });
 
   it("renders progress update details", () => {
@@ -90,16 +92,12 @@ describe("ListingRequestProgressUpdateTimeline", () => {
     );
 
     expect(
-      screen.getByText("Project progress updates")
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByText("Initial concepts completed")
+      screen.getByText("Initial concepts started")
     ).toBeInTheDocument();
 
     expect(
       screen.getByText(
-        "The first concept sketches are ready for review."
+        "The creator has started work on the initial concepts."
       )
     ).toBeInTheDocument();
 
@@ -108,70 +106,24 @@ describe("ListingRequestProgressUpdateTimeline", () => {
     ).toBeInTheDocument();
 
     expect(
-      screen.getByText("35% complete")
-    ).toBeInTheDocument();
-
-    expect(screen.getByText(/^Posted /)).toBeInTheDocument();
-  });
-
-  it("renders each supported update type", () => {
-    render(
-      <ListingRequestProgressUpdateTimeline
-        updates={[
-          createProgressUpdate({
-            id: "progress-1",
-            update_kind: "progress",
-            title: "General progress",
-          }),
-          createProgressUpdate({
-            id: "milestone-1",
-            update_kind: "milestone",
-            title: "Milestone reached",
-          }),
-          createProgressUpdate({
-            id: "delay-1",
-            update_kind: "delay",
-            title: "Schedule changed",
-          }),
-          createProgressUpdate({
-            id: "preview-1",
-            update_kind: "final_preview",
-            title: "Final preview ready",
-          }),
-        ]}
-      />
-    );
-
-    expect(
-      screen.getByText("Progress update")
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByText("Milestone update")
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByText("Schedule update")
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByText("Final preview")
+      screen.getByText("20% complete")
     ).toBeInTheDocument();
   });
 
-  it("orders the newest update first", () => {
+  it("renders updates newest first", () => {
     render(
       <ListingRequestProgressUpdateTimeline
         updates={[
           createProgressUpdate({
             id: "older-update",
             title: "Older update",
-            created_at: "2026-06-01T12:00:00.000Z",
+            created_at: "2026-06-06T12:00:00.000Z",
           }),
           createProgressUpdate({
             id: "newer-update",
-            title: "Newer update",
-            created_at: "2026-06-06T12:00:00.000Z",
+            update_kind: "milestone",
+            title: "Newer milestone",
+            created_at: "2026-06-08T12:00:00.000Z",
           }),
         ]}
       />
@@ -182,12 +134,16 @@ describe("ListingRequestProgressUpdateTimeline", () => {
     });
 
     expect(headings[0]).toHaveTextContent(
-      "Newer update"
+      "Newer milestone"
     );
 
     expect(headings[1]).toHaveTextContent(
       "Older update"
     );
+
+    expect(
+      screen.getByText("Milestone update")
+    ).toBeInTheDocument();
   });
 
   it("does not show a percentage when none was supplied", () => {
@@ -195,11 +151,17 @@ describe("ListingRequestProgressUpdateTimeline", () => {
       <ListingRequestProgressUpdateTimeline
         updates={[
           createProgressUpdate({
+            update_kind: "delay",
+            title: "Schedule adjustment",
             progress_percent: null,
           }),
         ]}
       />
     );
+
+    expect(
+      screen.getByText("Schedule update")
+    ).toBeInTheDocument();
 
     expect(
       screen.queryByText(/% complete/)

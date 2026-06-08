@@ -17,48 +17,44 @@ export type ListingRequestProgressUpdateRow = {
   updated_at: string;
 };
 
-const fetchListingRequestProgressUpdates = async (
-  listingRequestId: string
-): Promise<ListingRequestProgressUpdateRow[]> => {
-  const { data, error } = await supabase
-    .from("listing_request_progress_updates")
-    .select(
-      `
-        id,
-        listing_request_id,
-        agreement_id,
-        creator_user_id,
-        update_kind,
-        title,
-        body,
-        progress_percent,
-        created_at,
-        updated_at
-      `
-    )
-    .eq("listing_request_id", listingRequestId)
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []) as ListingRequestProgressUpdateRow[];
-};
-
 export const useListingRequestProgressUpdates = (
   listingRequestId?: string | null
 ) => {
-  const { user, loading } = useAuth();
-  const userId = user?.id ?? null;
+  const { user } = useAuth();
 
   return useQuery({
     queryKey: ["listingRequestProgressUpdates", listingRequestId],
-    enabled: !loading && Boolean(userId && listingRequestId),
-    queryFn: () =>
-      listingRequestId
-        ? fetchListingRequestProgressUpdates(listingRequestId)
-        : Promise.resolve([]),
-    staleTime: 15_000,
+    enabled: Boolean(user?.id && listingRequestId),
+
+    queryFn: async (): Promise<ListingRequestProgressUpdateRow[]> => {
+      if (!user?.id || !listingRequestId) {
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .from("listing_request_progress_updates")
+        .select(
+          `
+            id,
+            listing_request_id,
+            agreement_id,
+            creator_user_id,
+            update_kind,
+            title,
+            body,
+            progress_percent,
+            created_at,
+            updated_at
+          `
+        )
+        .eq("listing_request_id", listingRequestId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return (data as ListingRequestProgressUpdateRow[] | null) ?? [];
+    },
   });
 };
