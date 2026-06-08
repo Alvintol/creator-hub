@@ -11,6 +11,7 @@ import ListingRequestAgreementWorkReadinessCard from '../../components/ListingRe
 import ListingRequestAgreementAdminPaymentActions from '../../components/ListingRequestAgreementAdminPaymentActions';
 import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/useListingRequestProgressUpdates';
 import ListingRequestProgressUpdateTimeline from '../../components/ListingRequestProgressUpdateTimeline';
+import ListingRequestProgressUpdateScheduleCard from '../../components/ListingRequestProgressUpdateScheduleCard';
 
 const classes = {
   page: "space-y-6",
@@ -295,6 +296,11 @@ const AdminRequestDetails = () => {
           </div>
         </div>
       </div>
+
+      <ListingRequestProgressUpdateScheduleCard
+        agreement={agreement}
+        updates={progressUpdatesQuery.data ?? []}
+      />
 
       {agreement?.status === "buyer_accepted" && (
         <ListingRequestProgressUpdateTimeline

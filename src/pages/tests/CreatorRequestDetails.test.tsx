@@ -183,6 +183,28 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../components/ListingRequestProgressUpdateScheduleCard",
+  () => ({
+    default: ({
+      agreement,
+      updates,
+    }: {
+      agreement: {
+        status: string;
+        starting_payment_status: string;
+      } | null;
+      updates: Array<{ id: string }>;
+    }) =>
+      agreement ? (
+        <div>
+          Mock progress schedule: {agreement.status} /{" "}
+          {agreement.starting_payment_status} / {updates.length}
+        </div>
+      ) : null,
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -613,4 +635,96 @@ describe("<CreatorRequestDetails />", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("passes the agreement and progress updates into the creator schedule card", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestProgressUpdates.mockReturnValue({
+      data: [
+        {
+          id: "progress-update-1",
+        },
+        {
+          id: "progress-update-2",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "Mock progress schedule: buyer_accepted / paid / 2"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("shows the creator schedule card while starting payment is pending", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "payment_required",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "Mock progress schedule: buyer_accepted / payment_required / 0"
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Mock post progress update",
+      })
+    ).not.toBeInTheDocument();
+  });
 });
