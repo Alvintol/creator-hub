@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   createAgreement: vi.fn(),
   sendDraftAgreement: vi.fn(),
   useListingRequestAgreement: vi.fn(),
+  useListingRequestProgressUpdates: vi.fn(),
+  createProgressUpdate: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useCreatorRequest", () => ({
@@ -97,6 +99,90 @@ vi.mock("../../components/ListingRequestAgreementWorkReadinessCard", () => ({
   ),
 }));
 
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestProgressUpdates",
+  () => ({
+    useListingRequestProgressUpdates:
+      mocks.useListingRequestProgressUpdates,
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestProgressUpdateTimeline",
+  () => ({
+    default: ({
+      updates,
+      isLoading,
+      error,
+    }: {
+      updates: Array<{ id: string }>;
+      isLoading?: boolean;
+      error?: unknown;
+    }) => (
+      <div>
+        Mock progress timeline: {updates.length} /{" "}
+        {isLoading ? "loading" : "ready"} /{" "}
+        {error ? "error" : "no error"}
+      </div>
+    ),
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useCreateListingRequestProgressUpdate",
+  () => ({
+    useCreateListingRequestProgressUpdate: () => ({
+      mutateAsync: mocks.createProgressUpdate,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestProgressUpdateForm",
+  () => ({
+    default: ({
+      requestStatus,
+      agreement,
+      onCreateProgressUpdate,
+    }: {
+      requestStatus: string;
+      agreement: {
+        id: string;
+        status: string;
+        starting_payment_status: string;
+      } | null;
+      onCreateProgressUpdate: (input: {
+        agreementId: string;
+        updateKind: "progress";
+        title: string;
+        body: string;
+        progressPercent: number;
+      }) => void;
+    }) =>
+      agreement?.status === "buyer_accepted" &&
+        agreement.starting_payment_status === "paid" &&
+        requestStatus === "accepted" ? (
+        <button
+          type="button"
+          onClick={() =>
+            onCreateProgressUpdate({
+              agreementId: agreement.id,
+              updateKind: "progress",
+              title: "Initial concepts completed",
+              body:
+                "The first concept sketches are ready for review.",
+              progressPercent: 35,
+            })
+          }
+        >
+          Mock post progress update
+        </button>
+      ) : null,
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -169,6 +255,12 @@ describe("<CreatorRequestDetails />", () => {
 
     mocks.useListingRequestAgreement.mockReturnValue({
       data: null,
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestProgressUpdates.mockReturnValue({
+      data: [],
       isLoading: false,
       error: null,
     });
@@ -346,4 +438,179 @@ describe("<CreatorRequestDetails />", () => {
       screen.getByText("Mock work readiness card: accepted / buyer_accepted")
     ).toBeInTheDocument();
   });
+
+  it("renders progress updates after the buyer accepts the agreement", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestProgressUpdates.mockReturnValue({
+      data: [
+        {
+          id: "progress-update-1",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestProgressUpdates
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock progress timeline: 1 / ready / no error"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("does not render progress updates before the buyer accepts the agreement", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "sent",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestProgressUpdates
+    ).toHaveBeenCalledWith(null);
+
+    expect(
+      screen.queryByText(/Mock progress timeline:/)
+    ).not.toBeInTheDocument();
+  });
+
+  it("posts a progress update from the creator request detail page", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen
+      .getByRole("button", {
+        name: "Mock post progress update",
+      })
+      .click();
+
+    expect(
+      mocks.createProgressUpdate
+    ).toHaveBeenCalledWith({
+      agreementId: "agreement-1",
+      updateKind: "progress",
+      title: "Initial concepts completed",
+      body:
+        "The first concept sketches are ready for review.",
+      progressPercent: 35,
+    });
+  });
+
+  it("does not show the progress update form while starting payment is required", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "payment_required",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Mock post progress update",
+      })
+    ).not.toBeInTheDocument();
+  });
+
 });

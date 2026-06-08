@@ -9,6 +9,8 @@ import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListi
 import { useAdminConfirmListingRequestStartingPayment } from '../../hooks/admin/useAdminConfirmListingRequestStartingPayment';
 import ListingRequestAgreementWorkReadinessCard from '../../components/ListingRequestAgreementWorkReadinessCard';
 import ListingRequestAgreementAdminPaymentActions from '../../components/ListingRequestAgreementAdminPaymentActions';
+import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/useListingRequestProgressUpdates';
+import ListingRequestProgressUpdateTimeline from '../../components/ListingRequestProgressUpdateTimeline';
 
 const classes = {
   page: "space-y-6",
@@ -116,6 +118,12 @@ const AdminRequestDetails = () => {
 
   const snapshot = request.listing_snapshot;
   const agreement = agreementQuery.data ?? null;
+
+  const progressUpdatesQuery = useListingRequestProgressUpdates(
+    agreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null
+  );
 
   return (
     <div className={classes.page}>
@@ -287,6 +295,14 @@ const AdminRequestDetails = () => {
           </div>
         </div>
       </div>
+
+      {agreement?.status === "buyer_accepted" && (
+        <ListingRequestProgressUpdateTimeline
+          updates={progressUpdatesQuery.data ?? []}
+          isLoading={progressUpdatesQuery.isLoading}
+          error={progressUpdatesQuery.error}
+        />
+      )}
 
       <RequestConversationThread
         requestId={request.id}

@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   useAdminRequest: vi.fn(),
   useListingRequestAgreement: vi.fn(),
   confirmStartingPayment: vi.fn(),
+  useListingRequestProgressUpdates: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminRequest", () => ({
@@ -70,6 +71,39 @@ vi.mock(
           Mock confirm starting payment
         </button>
       ) : null,
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestProgressUpdates",
+  () => ({
+    useListingRequestProgressUpdates:
+      mocks.useListingRequestProgressUpdates,
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestProgressUpdateTimeline",
+  () => ({
+    default: ({
+      updates,
+      isLoading,
+      error,
+    }: {
+      updates: Array<{ id: string }>;
+      isLoading?: boolean;
+      error?: unknown;
+    }) => {
+      const hasError = error !== null && error !== undefined;
+
+      return (
+        <div>
+          Mock progress timeline: {updates.length} /{" "}
+          {isLoading ? "loading" : "ready"} /{" "}
+          {hasError ? "error" : "no error"}
+        </div>
+      );
+    },
   })
 );
 
@@ -149,6 +183,12 @@ describe("<AdminRequestDetails />", () => {
       isLoading: false,
       error: null,
     });
+
+    mocks.useListingRequestProgressUpdates.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("renders structured request details for admin review", () => {
@@ -225,4 +265,107 @@ describe("<AdminRequestDetails />", () => {
       )
     ).toBeInTheDocument();
   });
+
+  it("renders progress updates after the buyer accepts the agreement", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestProgressUpdates.mockReturnValue({
+      data: [
+        {
+          id: "progress-update-1",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestProgressUpdates
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock progress timeline: 1 / ready / no error"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("does not render progress updates before the buyer accepts the agreement", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "sent",
+        starting_payment_status: "payment_required",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestProgressUpdates
+    ).toHaveBeenCalledWith(null);
+
+    expect(
+      screen.queryByText(/Mock progress timeline:/)
+    ).not.toBeInTheDocument();
+  });
+  
 });
