@@ -107,6 +107,28 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../components/ListingRequestProgressUpdateScheduleCard",
+  () => ({
+    default: ({
+      agreement,
+      updates,
+    }: {
+      agreement: {
+        status: string;
+        starting_payment_status: string;
+      } | null;
+      updates: Array<{ id: string }>;
+    }) =>
+      agreement?.status === "buyer_accepted" ? (
+        <div>
+          Mock progress schedule: {agreement.status} /{" "}
+          {agreement.starting_payment_status} / {updates.length}
+        </div>
+      ) : null,
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -367,5 +389,148 @@ describe("<AdminRequestDetails />", () => {
       screen.queryByText(/Mock progress timeline:/)
     ).not.toBeInTheDocument();
   });
-  
+
+  it("passes the agreement and progress updates into the admin schedule card", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestProgressUpdates.mockReturnValue({
+      data: [
+        {
+          id: "progress-update-1",
+        },
+        {
+          id: "progress-update-2",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "Mock progress schedule: buyer_accepted / paid / 2"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("shows the admin schedule while starting payment is pending", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "payment_required",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "Mock progress schedule: buyer_accepted / payment_required / 0"
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      mocks.useListingRequestProgressUpdates
+    ).toHaveBeenCalledWith("request-1");
+  });
+
+  it("does not show the admin schedule before buyer agreement acceptance", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "sent",
+        starting_payment_status: "payment_required",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.queryByText(/Mock progress schedule:/)
+    ).not.toBeInTheDocument();
+  });
 });

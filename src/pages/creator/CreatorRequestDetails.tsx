@@ -22,6 +22,7 @@ import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/us
 import ListingRequestProgressUpdateTimeline from '../../components/ListingRequestProgressUpdateTimeline';
 import { useCreateListingRequestProgressUpdate } from '../../hooks/creatorRequests/useCreateListingRequestProgressUpdate';
 import ListingRequestProgressUpdateForm from '../../components/ListingRequestProgressUpdateForm';
+import ListingRequestProgressUpdateScheduleCard from '../../components/ListingRequestProgressUpdateScheduleCard';
 
 const classes = {
   page: "space-y-6",
@@ -514,6 +515,11 @@ const CreatorRequestDetails = () => {
           </div>
         </div>
       </div>
+
+      <ListingRequestProgressUpdateScheduleCard
+        agreement={agreement}
+        updates={progressUpdatesQuery.data ?? []}
+      />
 
       <ListingRequestProgressUpdateForm
         requestStatus={request.status}
