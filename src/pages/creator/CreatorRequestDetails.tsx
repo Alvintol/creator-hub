@@ -23,6 +23,12 @@ import ListingRequestProgressUpdateTimeline from '../../components/ListingReques
 import { useCreateListingRequestProgressUpdate } from '../../hooks/creatorRequests/useCreateListingRequestProgressUpdate';
 import ListingRequestProgressUpdateForm from '../../components/ListingRequestProgressUpdateForm';
 import ListingRequestProgressUpdateScheduleCard from '../../components/ListingRequestProgressUpdateScheduleCard';
+import { useSendDraftListingRequestChangeOrder } from '../../hooks/creatorRequests/useSendDraftListingRequestChangeOrder';
+import { useCreateListingRequestChangeOrder } from '../../hooks/creatorRequests/useCreateListingRequestChangeOrder';
+import { useListingRequestChangeOrders } from '../../hooks/creatorRequests/useListingRequestChangeOrders';
+import ListingRequestChangeOrderBuilder from '../../components/ListingRequestChangeOrderBuilder';
+import ListingRequestChangeOrderSummary from '../../components/ListingRequestChangeOrderSummary';
+import ListingRequestChangeOrderCreatorActions from '../../components/ListingRequestChangeOrderCreatorActions';
 
 const classes = {
   page: "space-y-6",
@@ -121,6 +127,10 @@ const CreatorRequestDetails = () => {
   const sendDraftAgreementMutation = useSendDraftListingRequestAgreement();
   const createProgressUpdateMutation =
     useCreateListingRequestProgressUpdate();
+  const sendDraftChangeOrderMutation =
+    useSendDraftListingRequestChangeOrder();
+  const createChangeOrderMutation =
+    useCreateListingRequestChangeOrder();
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -137,6 +147,23 @@ const CreatorRequestDetails = () => {
     trimmedDeclineReason.length >= 10 &&
     trimmedDeclineReason.length <= 1000 &&
     !updateStatusMutation.isPending;
+
+  const agreement = agreementQuery.data ?? null;
+
+  const progressUpdatesQuery = useListingRequestProgressUpdates(
+    agreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null
+  );
+
+  const changeOrdersQuery = useListingRequestChangeOrders(
+    agreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null
+  );
+
+
+
 
   const handleAcceptRequest = async () => {
     if (!request) return;
@@ -219,18 +246,32 @@ const CreatorRequestDetails = () => {
   }
 
   const snapshot = request.listing_snapshot;
-  const agreement = agreementQuery.data ?? null;
 
-  const progressUpdatesQuery = useListingRequestProgressUpdates(
-    agreement?.status === "buyer_accepted"
-      ? request?.id ?? null
-      : null
-  );
 
   const backTo =
     request.status === "archived"
       ? "/creator/requests/archived"
       : "/creator/requests";
+
+  const changeOrders = changeOrdersQuery.data ?? [];
+
+  const hasPendingChangeOrder = changeOrders.some(
+    (changeOrder) =>
+      changeOrder.status === "draft" ||
+      changeOrder.status === "sent"
+  );
+
+  const canCreateChangeOrder =
+    request.status === "accepted" &&
+    agreement?.status === "buyer_accepted" &&
+    !hasPendingChangeOrder &&
+    !changeOrdersQuery.isLoading &&
+    !changeOrdersQuery.error;
+
+  const draftChangeOrder =
+    changeOrders.find(
+      (changeOrder) => changeOrder.status === "draft"
+    ) ?? null;
 
   return (
     <div className={classes.page}>
@@ -515,6 +556,40 @@ const CreatorRequestDetails = () => {
           </div>
         </div>
       </div>
+
+      {agreement?.status === "buyer_accepted" && (
+        <>
+          <ListingRequestChangeOrderSummary
+            changeOrders={changeOrders}
+            viewer="creator"
+            isLoading={changeOrdersQuery.isLoading}
+            error={changeOrdersQuery.error}
+          />
+
+          <ListingRequestChangeOrderCreatorActions
+            changeOrder={draftChangeOrder}
+            isPending={sendDraftChangeOrderMutation.isPending}
+            error={sendDraftChangeOrderMutation.error}
+            onSendChangeOrder={(changeOrderId) =>
+              sendDraftChangeOrderMutation.mutateAsync({
+                changeOrderId,
+              })
+            }
+          />
+
+          {canCreateChangeOrder && (
+            <ListingRequestChangeOrderBuilder
+              requestStatus={request.status}
+              agreement={agreement}
+              isPending={createChangeOrderMutation.isPending}
+              error={createChangeOrderMutation.error}
+              onCreateChangeOrder={(input) =>
+                createChangeOrderMutation.mutateAsync(input)
+              }
+            />
+          )}
+        </>
+      )}
 
       <ListingRequestProgressUpdateScheduleCard
         agreement={agreement}
