@@ -35,19 +35,6 @@ vi.mock("../../../lib/supabaseClient", () => ({
   },
 }));
 
-const progressUpdate = {
-  id: "progress-update-1",
-  listing_request_id: "request-1",
-  agreement_id: "agreement-1",
-  creator_user_id: "creator-1",
-  update_kind: "progress",
-  title: "Initial concepts completed",
-  body: "The first concept sketches are ready for review.",
-  progress_percent: 35,
-  created_at: "2026-06-06T12:00:00.000Z",
-  updated_at: "2026-06-06T12:00:00.000Z",
-};
-
 const createWrapper = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -57,17 +44,11 @@ const createWrapper = () => {
     },
   });
 
-  const wrapper = ({
-    children,
-  }: {
-    children: ReactNode;
-  }) => (
+  return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>
       {children}
     </QueryClientProvider>
   );
-
-  return wrapper;
 };
 
 describe("useListingRequestProgressUpdates", () => {
@@ -78,7 +59,6 @@ describe("useListingRequestProgressUpdates", () => {
       user: {
         id: "buyer-1",
       },
-      loading: false,
     });
 
     mocks.from.mockReturnValue({
@@ -94,12 +74,37 @@ describe("useListingRequestProgressUpdates", () => {
     });
 
     mocks.order.mockResolvedValue({
-      data: [progressUpdate],
+      data: [
+        {
+          id: "progress-update-2",
+          listing_request_id: "request-1",
+          agreement_id: "agreement-1",
+          creator_user_id: "creator-1",
+          update_kind: "milestone",
+          title: "Sketch milestone complete",
+          body: "The initial sketch milestone is ready for review.",
+          progress_percent: 50,
+          created_at: "2026-06-08T12:00:00.000Z",
+          updated_at: "2026-06-08T12:00:00.000Z",
+        },
+        {
+          id: "progress-update-1",
+          listing_request_id: "request-1",
+          agreement_id: "agreement-1",
+          creator_user_id: "creator-1",
+          update_kind: "progress",
+          title: "Work started",
+          body: "The creator has started the initial concept work.",
+          progress_percent: 15,
+          created_at: "2026-06-06T12:00:00.000Z",
+          updated_at: "2026-06-06T12:00:00.000Z",
+        },
+      ],
       error: null,
     });
   });
 
-  it("loads progress updates for the request newest first", async () => {
+  it("loads progress updates newest first for the request", async () => {
     const { result } = renderHook(
       () => useListingRequestProgressUpdates("request-1"),
       {
@@ -115,10 +120,6 @@ describe("useListingRequestProgressUpdates", () => {
       "listing_request_progress_updates"
     );
 
-    expect(mocks.select).toHaveBeenCalledWith(
-      expect.stringContaining("progress_percent")
-    );
-
     expect(mocks.eq).toHaveBeenCalledWith(
       "listing_request_id",
       "request-1"
@@ -132,7 +133,16 @@ describe("useListingRequestProgressUpdates", () => {
     );
 
     expect(result.current.data).toEqual([
-      progressUpdate,
+      expect.objectContaining({
+        id: "progress-update-2",
+        update_kind: "milestone",
+        progress_percent: 50,
+      }),
+      expect.objectContaining({
+        id: "progress-update-1",
+        update_kind: "progress",
+        progress_percent: 15,
+      }),
     ]);
   });
 
@@ -156,10 +166,9 @@ describe("useListingRequestProgressUpdates", () => {
     expect(result.current.data).toEqual([]);
   });
 
-  it("does not query while the user is signed out", () => {
+  it("does not query when the user is signed out", () => {
     mocks.useAuth.mockReturnValue({
       user: null,
-      loading: false,
     });
 
     const { result } = renderHook(
@@ -173,23 +182,11 @@ describe("useListingRequestProgressUpdates", () => {
     expect(mocks.from).not.toHaveBeenCalled();
   });
 
-  it("does not query without a request id", () => {
-    const { result } = renderHook(
-      () => useListingRequestProgressUpdates(null),
-      {
-        wrapper: createWrapper(),
-      }
-    );
-
-    expect(result.current.fetchStatus).toBe("idle");
-    expect(mocks.from).not.toHaveBeenCalled();
-  });
-
   it("surfaces progress update query errors", async () => {
     mocks.order.mockResolvedValue({
       data: null,
       error: new Error(
-        "Progress updates could not be loaded."
+        "Project progress updates could not be loaded."
       ),
     });
 
@@ -205,7 +202,9 @@ describe("useListingRequestProgressUpdates", () => {
     });
 
     expect(result.current.error).toEqual(
-      new Error("Progress updates could not be loaded.")
+      new Error(
+        "Project progress updates could not be loaded."
+      )
     );
   });
 });

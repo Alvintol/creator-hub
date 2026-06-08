@@ -103,6 +103,7 @@ const BuyerRequestDetails = () => {
   const agreementQuery = useListingRequestAgreement(request?.id ?? null);
   const respondAgreementMutation = useRespondListingRequestAgreement();
 
+
   const handleArchiveRequest = async () => {
     if (!request) {
       return;
