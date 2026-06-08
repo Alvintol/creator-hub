@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   archiveRequest: vi.fn(),
   useListingRequestAgreement: vi.fn(),
   respondAgreement: vi.fn(),
+  useListingRequestProgressUpdates: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
@@ -52,6 +53,37 @@ vi.mock("../../components/ListingRequestAgreementWorkReadinessCard", () => ({
     </div>
   ),
 }));
+
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestProgressUpdates",
+  () => ({
+    useListingRequestProgressUpdates:
+      mocks.useListingRequestProgressUpdates,
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestProgressUpdateTimeline",
+  () => ({
+    default: ({
+      updates,
+      isLoading,
+      error,
+    }: {
+      updates: Array<{ id: string }>;
+      isLoading?: boolean;
+      error?: unknown;
+    }) => (
+      <div>
+        Mock progress timeline: {updates.length} /{" "}
+        {isLoading ? "loading" : "ready"} /{" "}
+        {error !== null && error !== undefined
+          ? "error"
+          : "no error"}
+      </div>
+    ),
+  })
+);
 
 const request = {
   id: "request-1",
@@ -204,6 +236,12 @@ describe("<BuyerRequestDetails />", () => {
       status: "buyer_accepted",
       starting_payment_status: "payment_required",
     });
+
+    mocks.useListingRequestProgressUpdates.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("renders structured buyer request details", () => {
@@ -354,6 +392,15 @@ describe("<BuyerRequestDetails />", () => {
     expect(
       screen.queryByRole("button", { name: "Decline agreement" })
     ).not.toBeInTheDocument();
+    
+    expect(
+      mocks.useListingRequestProgressUpdates
+    ).toHaveBeenCalledWith(null);
+
+    expect(
+      screen.queryByText(/Mock progress timeline:/)
+    ).not.toBeInTheDocument();
+
   });
 
   it("passes the accepted request and buyer accepted agreement into the work readiness card", () => {
@@ -389,5 +436,96 @@ describe("<BuyerRequestDetails />", () => {
     expect(
       screen.getByText("Mock work readiness card: accepted / buyer_accepted")
     ).toBeInTheDocument();
+  });
+
+  it("renders progress updates after the buyer accepts the agreement", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        buyer_accepted_at: "2026-06-06T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestProgressUpdates.mockReturnValue({
+      data: [
+        {
+          id: "progress-update-1",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestProgressUpdates
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock progress timeline: 1 / ready / no error"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("does not render progress updates before the buyer accepts the agreement", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "sent",
+        buyer_accepted_at: null,
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestProgressUpdates
+    ).toHaveBeenCalledWith(null);
+
+    expect(
+      screen.queryByText(/Mock progress timeline:/)
+    ).not.toBeInTheDocument();
   });
 });

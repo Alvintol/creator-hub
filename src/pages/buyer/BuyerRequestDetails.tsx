@@ -11,6 +11,8 @@ import ListingRequestAgreementSummary from '../../components/ListingRequestAgree
 import { useRespondListingRequestAgreement } from '../../hooks/creatorRequests/useRespondListingRequestAgreement';
 import ListingRequestAgreementBuyerActions from '../../components/ListingRequestAgreementBuyerActions';
 import ListingRequestAgreementWorkReadinessCard from '../../components/ListingRequestAgreementWorkReadinessCard';
+import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/useListingRequestProgressUpdates';
+import ListingRequestProgressUpdateTimeline from '../../components/ListingRequestProgressUpdateTimeline';
 
 const classes = {
   page: "space-y-6",
@@ -145,6 +147,12 @@ const BuyerRequestDetails = () => {
     request.status === "archived"
       ? "/requests/archived"
       : "/requests";
+
+  const progressUpdatesQuery = useListingRequestProgressUpdates(
+    buyerVisibleAgreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null
+  );
 
   const handleAcceptAgreement = async (acknowledgementKeys: string[]) => {
     if (!buyerVisibleAgreement || buyerVisibleAgreement.status !== "sent") {
@@ -392,6 +400,14 @@ const BuyerRequestDetails = () => {
           </div>
         </div>
       </div>
+
+      {buyerVisibleAgreement?.status === "buyer_accepted" && (
+        <ListingRequestProgressUpdateTimeline
+          updates={progressUpdatesQuery.data ?? []}
+          isLoading={progressUpdatesQuery.isLoading}
+          error={progressUpdatesQuery.error}
+        />
+      )}
 
       <RequestConversationThread
         requestId={request.id}

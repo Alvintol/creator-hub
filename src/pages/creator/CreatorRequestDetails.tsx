@@ -18,6 +18,10 @@ import ListingRequestAgreementBuilder from '../../components/ListingRequestAgree
 import { useSendDraftListingRequestAgreement } from '../../hooks/creatorRequests/useSendDraftListingRequestAgreement';
 import ListingRequestAgreementCreatorActions from '../../components/ListingRequestAgreementCreatorActions';
 import ListingRequestAgreementWorkReadinessCard from '../../components/ListingRequestAgreementWorkReadinessCard';
+import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/useListingRequestProgressUpdates';
+import ListingRequestProgressUpdateTimeline from '../../components/ListingRequestProgressUpdateTimeline';
+import { useCreateListingRequestProgressUpdate } from '../../hooks/creatorRequests/useCreateListingRequestProgressUpdate';
+import ListingRequestProgressUpdateForm from '../../components/ListingRequestProgressUpdateForm';
 
 const classes = {
   page: "space-y-6",
@@ -114,6 +118,8 @@ const CreatorRequestDetails = () => {
   const agreementQuery = useListingRequestAgreement(request?.id ?? null);
   const createAgreementMutation = useCreateListingRequestAgreement();
   const sendDraftAgreementMutation = useSendDraftListingRequestAgreement();
+  const createProgressUpdateMutation =
+    useCreateListingRequestProgressUpdate();
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -213,6 +219,12 @@ const CreatorRequestDetails = () => {
 
   const snapshot = request.listing_snapshot;
   const agreement = agreementQuery.data ?? null;
+
+  const progressUpdatesQuery = useListingRequestProgressUpdates(
+    agreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null
+  );
 
   const backTo =
     request.status === "archived"
@@ -502,6 +514,24 @@ const CreatorRequestDetails = () => {
           </div>
         </div>
       </div>
+
+      <ListingRequestProgressUpdateForm
+        requestStatus={request.status}
+        agreement={agreement}
+        isPending={createProgressUpdateMutation.isPending}
+        error={createProgressUpdateMutation.error}
+        onCreateProgressUpdate={(input) =>
+          createProgressUpdateMutation.mutateAsync(input)
+        }
+      />
+
+      {agreement?.status === "buyer_accepted" && (
+        <ListingRequestProgressUpdateTimeline
+          updates={progressUpdatesQuery.data ?? []}
+          isLoading={progressUpdatesQuery.isLoading}
+          error={progressUpdatesQuery.error}
+        />
+      )}
 
       <RequestConversationThread
         requestId={request.id}
