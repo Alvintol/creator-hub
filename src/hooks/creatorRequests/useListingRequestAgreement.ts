@@ -101,6 +101,9 @@ export type ListingRequestAgreementRow = {
   additional_cost_policy: string;
   revision_policy: string | null;
   update_schedule_summary: string | null;
+  last_progress_update_at: string | null;
+  next_progress_update_due_at: string | null;
+  progress_update_requirement_satisfied_at: string | null;
   sent_at: string | null;
   buyer_accepted_at: string | null;
   buyer_declined_at: string | null;
@@ -154,6 +157,9 @@ export const useListingRequestAgreement = (listingRequestId?: string | null) => 
           additional_cost_policy,
           revision_policy,
           update_schedule_summary,
+          last_progress_update_at,
+          next_progress_update_due_at,
+          progress_update_requirement_satisfied_at,
           sent_at,
           buyer_accepted_at,
           buyer_declined_at,
