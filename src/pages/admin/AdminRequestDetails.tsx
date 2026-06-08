@@ -12,6 +12,8 @@ import ListingRequestAgreementAdminPaymentActions from '../../components/Listing
 import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/useListingRequestProgressUpdates';
 import ListingRequestProgressUpdateTimeline from '../../components/ListingRequestProgressUpdateTimeline';
 import ListingRequestProgressUpdateScheduleCard from '../../components/ListingRequestProgressUpdateScheduleCard';
+import { useListingRequestChangeOrders } from '../../hooks/creatorRequests/useListingRequestChangeOrders';
+import ListingRequestChangeOrderSummary from '../../components/ListingRequestChangeOrderSummary';
 
 const classes = {
   page: "space-y-6",
@@ -96,6 +98,20 @@ const AdminRequestDetails = () => {
   const confirmStartingPaymentMutation =
     useAdminConfirmListingRequestStartingPayment();
 
+  const agreement = agreementQuery.data ?? null;
+
+  const progressUpdatesQuery = useListingRequestProgressUpdates(
+    agreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null
+  );
+
+  const changeOrdersQuery = useListingRequestChangeOrders(
+    agreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null
+  );
+
   if (isLoading) {
     return <div className={classes.loadingText}>Loading…</div>;
   }
@@ -118,13 +134,6 @@ const AdminRequestDetails = () => {
   }
 
   const snapshot = request.listing_snapshot;
-  const agreement = agreementQuery.data ?? null;
-
-  const progressUpdatesQuery = useListingRequestProgressUpdates(
-    agreement?.status === "buyer_accepted"
-      ? request?.id ?? null
-      : null
-  );
 
   return (
     <div className={classes.page}>
@@ -297,17 +306,26 @@ const AdminRequestDetails = () => {
         </div>
       </div>
 
-      <ListingRequestProgressUpdateScheduleCard
-        agreement={agreement}
-        updates={progressUpdatesQuery.data ?? []}
-      />
-
       {agreement?.status === "buyer_accepted" && (
-        <ListingRequestProgressUpdateTimeline
-          updates={progressUpdatesQuery.data ?? []}
-          isLoading={progressUpdatesQuery.isLoading}
-          error={progressUpdatesQuery.error}
-        />
+        <>
+          <ListingRequestChangeOrderSummary 
+            changeOrders={changeOrdersQuery.data ?? []}
+            viewer="admin"
+            isLoading={changeOrdersQuery.isLoading}
+            error={changeOrdersQuery.error}
+          />
+
+          <ListingRequestProgressUpdateScheduleCard
+            agreement={agreement}
+            updates={progressUpdatesQuery.data ?? []}
+          />
+
+          <ListingRequestProgressUpdateTimeline
+            updates={progressUpdatesQuery.data ?? []}
+            isLoading={progressUpdatesQuery.isLoading}
+            error={progressUpdatesQuery.error}
+          />
+        </>
       )}
 
       <RequestConversationThread

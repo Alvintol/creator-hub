@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   useListingRequestAgreement: vi.fn(),
   respondAgreement: vi.fn(),
   useListingRequestProgressUpdates: vi.fn(),
+  useListingRequestChangeOrders: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
@@ -104,6 +105,40 @@ vi.mock(
           {agreement.starting_payment_status} / {updates.length}
         </div>
       ) : null,
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestChangeOrders",
+  () => ({
+    useListingRequestChangeOrders:
+      mocks.useListingRequestChangeOrders,
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestChangeOrderSummary",
+  () => ({
+    default: ({
+      changeOrders,
+      viewer,
+      isLoading,
+      error,
+    }: {
+      changeOrders: Array<{ id: string }>;
+      viewer: string;
+      isLoading?: boolean;
+      error?: unknown;
+    }) => (
+      <div>
+        Mock change-order summary: {viewer} /{" "}
+        {changeOrders.length} /{" "}
+        {isLoading ? "loading" : "ready"} /{" "}
+        {error !== null && error !== undefined
+          ? "error"
+          : "no error"}
+      </div>
+    ),
   })
 );
 
@@ -260,6 +295,12 @@ describe("<BuyerRequestDetails />", () => {
     });
 
     mocks.useListingRequestProgressUpdates.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestChangeOrders.mockReturnValue({
       data: [],
       isLoading: false,
       error: null,
@@ -646,5 +687,67 @@ describe("<BuyerRequestDetails />", () => {
     expect(
       mocks.useListingRequestProgressUpdates
     ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      mocks.useListingRequestChangeOrders
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock change-order summary: buyer / 0 / ready / no error"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("renders buyer-visible change orders after agreement acceptance", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        buyer_accepted_at: "2026-06-06T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestChangeOrders.mockReturnValue({
+      data: [
+        {
+          id: "change-order-1",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestChangeOrders
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock change-order summary: buyer / 1 / ready / no error"
+      )
+    ).toBeInTheDocument();
   });
 });

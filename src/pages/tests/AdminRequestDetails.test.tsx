@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   useListingRequestAgreement: vi.fn(),
   confirmStartingPayment: vi.fn(),
   useListingRequestProgressUpdates: vi.fn(),
+  useListingRequestChangeOrders: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminRequest", () => ({
@@ -129,6 +130,40 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestChangeOrders",
+  () => ({
+    useListingRequestChangeOrders:
+      mocks.useListingRequestChangeOrders,
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestChangeOrderSummary",
+  () => ({
+    default: ({
+      changeOrders,
+      viewer,
+      isLoading,
+      error,
+    }: {
+      changeOrders: Array<{ id: string }>;
+      viewer: string;
+      isLoading?: boolean;
+      error?: unknown;
+    }) => (
+      <div>
+        Mock change-order summary: {viewer} /{" "}
+        {changeOrders.length} /{" "}
+        {isLoading ? "loading" : "ready"} /{" "}
+        {error !== null && error !== undefined
+          ? "error"
+          : "no error"}
+      </div>
+    ),
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -207,6 +242,12 @@ describe("<AdminRequestDetails />", () => {
     });
 
     mocks.useListingRequestProgressUpdates.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestChangeOrders.mockReturnValue({
       data: [],
       isLoading: false,
       error: null,
@@ -532,5 +573,65 @@ describe("<AdminRequestDetails />", () => {
     expect(
       screen.queryByText(/Mock progress schedule:/)
     ).not.toBeInTheDocument();
+  });
+
+  it("renders change orders for admin review", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestChangeOrders.mockReturnValue({
+      data: [
+        {
+          id: "change-order-1",
+        },
+        {
+          id: "change-order-2",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestChangeOrders
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock change-order summary: admin / 2 / ready / no error"
+      )
+    ).toBeInTheDocument();
   });
 });

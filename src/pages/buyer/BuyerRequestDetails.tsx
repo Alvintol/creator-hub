@@ -14,6 +14,8 @@ import ListingRequestAgreementWorkReadinessCard from '../../components/ListingRe
 import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/useListingRequestProgressUpdates';
 import ListingRequestProgressUpdateTimeline from '../../components/ListingRequestProgressUpdateTimeline';
 import ListingRequestProgressUpdateScheduleCard from '../../components/ListingRequestProgressUpdateScheduleCard';
+import { useListingRequestChangeOrders } from '../../hooks/creatorRequests/useListingRequestChangeOrders';
+import ListingRequestChangeOrderSummary from '../../components/ListingRequestChangeOrderSummary';
 
 const classes = {
   page: "space-y-6",
@@ -103,6 +105,24 @@ const BuyerRequestDetails = () => {
   const agreementQuery = useListingRequestAgreement(request?.id ?? null);
   const respondAgreementMutation = useRespondListingRequestAgreement();
 
+  const agreement = agreementQuery.data ?? null;
+
+  // Buyers should not see creator drafts.
+  // RLS should block these too, but this keeps the UI safe if stale mocked data exists.
+  const buyerVisibleAgreement =
+    agreement?.status === "draft" ? null : agreement;
+  const progressUpdatesQuery = useListingRequestProgressUpdates(
+    buyerVisibleAgreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null
+  );
+
+  const changeOrdersQuery = useListingRequestChangeOrders(
+    buyerVisibleAgreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null
+  );
+
 
   const handleArchiveRequest = async () => {
     if (!request) {
@@ -138,23 +158,11 @@ const BuyerRequestDetails = () => {
   }
 
   const snapshot = request.listing_snapshot;
-  const agreement = agreementQuery.data ?? null;
-
-  // Buyers should not see creator drafts.
-  // RLS should block these too, but this keeps the UI safe if stale mocked data exists.
-  const buyerVisibleAgreement =
-    agreement?.status === "draft" ? null : agreement;
 
   const backTo =
     request.status === "archived"
       ? "/requests/archived"
       : "/requests";
-
-  const progressUpdatesQuery = useListingRequestProgressUpdates(
-    buyerVisibleAgreement?.status === "buyer_accepted"
-      ? request?.id ?? null
-      : null
-  );
 
   const handleAcceptAgreement = async (acknowledgementKeys: string[]) => {
     if (!buyerVisibleAgreement || buyerVisibleAgreement.status !== "sent") {
@@ -403,17 +411,26 @@ const BuyerRequestDetails = () => {
         </div>
       </div>
 
-      <ListingRequestProgressUpdateScheduleCard
-        agreement={buyerVisibleAgreement}
-        updates={progressUpdatesQuery.data ?? []}
-      />
-
       {buyerVisibleAgreement?.status === "buyer_accepted" && (
-        <ListingRequestProgressUpdateTimeline
-          updates={progressUpdatesQuery.data ?? []}
-          isLoading={progressUpdatesQuery.isLoading}
-          error={progressUpdatesQuery.error}
-        />
+        <>
+          <ListingRequestChangeOrderSummary
+            changeOrders={changeOrdersQuery.data ?? []}
+            viewer="buyer"
+            isLoading={changeOrdersQuery.isLoading}
+            error={changeOrdersQuery.error}
+          />
+
+          <ListingRequestProgressUpdateScheduleCard
+            agreement={buyerVisibleAgreement}
+            updates={progressUpdatesQuery.data ?? []}
+          />
+
+          <ListingRequestProgressUpdateTimeline
+            updates={progressUpdatesQuery.data ?? []}
+            isLoading={progressUpdatesQuery.isLoading}
+            error={progressUpdatesQuery.error}
+          />
+        </>
       )}
 
       <RequestConversationThread

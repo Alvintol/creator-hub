@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
   useListingRequestAgreement: vi.fn(),
   useListingRequestProgressUpdates: vi.fn(),
   createProgressUpdate: vi.fn(),
+  useListingRequestChangeOrders: vi.fn(),
+  createChangeOrder: vi.fn(),
+  sendDraftChangeOrder: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useCreatorRequest", () => ({
@@ -205,6 +208,109 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestChangeOrders",
+  () => ({
+    useListingRequestChangeOrders:
+      mocks.useListingRequestChangeOrders,
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useCreateListingRequestChangeOrder",
+  () => ({
+    useCreateListingRequestChangeOrder: () => ({
+      mutateAsync: mocks.createChangeOrder,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestChangeOrderSummary",
+  () => ({
+    default: ({
+      changeOrders,
+      viewer,
+    }: {
+      changeOrders: Array<{ id: string }>;
+      viewer: string;
+    }) => (
+      <div>
+        Mock change-order summary: {viewer} /{" "}
+        {changeOrders.length}
+      </div>
+    ),
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestChangeOrderBuilder",
+  () => ({
+    default: ({
+      agreement,
+      onCreateChangeOrder,
+    }: {
+      agreement: { id: string } | null;
+      onCreateChangeOrder: (input: {
+        agreementId: string;
+      }) => unknown;
+    }) =>
+      agreement ? (
+        <button
+          type="button"
+          onClick={() =>
+            onCreateChangeOrder({
+              agreementId: agreement.id,
+            })
+          }
+        >
+          Mock change-order builder
+        </button>
+      ) : null,
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useSendDraftListingRequestChangeOrder",
+  () => ({
+    useSendDraftListingRequestChangeOrder: () => ({
+      mutateAsync: mocks.sendDraftChangeOrder,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestChangeOrderCreatorActions",
+  () => ({
+    default: ({
+      changeOrder,
+      onSendChangeOrder,
+    }: {
+      changeOrder: {
+        id: string;
+        status: string;
+      } | null;
+      onSendChangeOrder: (
+        changeOrderId: string
+      ) => unknown;
+    }) =>
+      changeOrder?.status === "draft" ? (
+        <button
+          type="button"
+          onClick={() =>
+            onSendChangeOrder(changeOrder.id)
+          }
+        >
+          Mock send draft change order
+        </button>
+      ) : null,
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -286,6 +392,18 @@ describe("<CreatorRequestDetails />", () => {
       isLoading: false,
       error: null,
     });
+
+    mocks.useListingRequestChangeOrders.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.createChangeOrder.mockResolvedValue(undefined);
+
+    mocks.sendDraftChangeOrder.mockResolvedValue(
+      undefined
+    );
   });
 
   it("renders structured buyer request details for the creator", () => {
@@ -724,6 +842,228 @@ describe("<CreatorRequestDetails />", () => {
     expect(
       screen.queryByRole("button", {
         name: "Mock post progress update",
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders change-order history and the builder for an accepted agreement", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        currency: "cad",
+        total_amount: 300,
+        adjusted_estimated_completion_at:
+          "2026-06-20T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestChangeOrders
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock change-order summary: creator / 0"
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("button", {
+        name: "Mock change-order builder",
+      })
+    ).toBeInTheDocument();
+  });
+
+  it("creates a change order from the creator request page", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        currency: "cad",
+        total_amount: 300,
+        adjusted_estimated_completion_at:
+          "2026-06-20T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen
+      .getByRole("button", {
+        name: "Mock change-order builder",
+      })
+      .click();
+
+    expect(mocks.createChangeOrder).toHaveBeenCalledWith({
+      agreementId: "agreement-1",
+    });
+  });
+
+  it.each(["draft", "sent"] as const)(
+    "hides the builder while a %s change order is pending",
+    (status) => {
+      mocks.useCreatorRequest.mockReturnValue({
+        data: {
+          request: {
+            ...request,
+            status: "accepted",
+          },
+          buyer: {
+            user_id: "buyer-1",
+            handle: "buyeruser",
+            display_name: "Buyer User",
+            avatar_url: null,
+          },
+        },
+        isLoading: false,
+        error: null,
+      });
+
+      mocks.useListingRequestAgreement.mockReturnValue({
+        data: {
+          id: "agreement-1",
+          status: "buyer_accepted",
+          starting_payment_status: "paid",
+          currency: "cad",
+          total_amount: 300,
+          adjusted_estimated_completion_at:
+            "2026-06-20T12:00:00.000Z",
+        },
+        isLoading: false,
+        error: null,
+      });
+
+      mocks.useListingRequestChangeOrders.mockReturnValue({
+        data: [
+          {
+            id: "change-order-1",
+            status,
+          },
+        ],
+        isLoading: false,
+        error: null,
+      });
+
+      renderPage();
+
+      expect(
+        screen.getByText(
+          "Mock change-order summary: creator / 1"
+        )
+      ).toBeInTheDocument();
+
+      expect(
+        screen.queryByRole("button", {
+          name: "Mock change-order builder",
+        })
+      ).not.toBeInTheDocument();
+    }
+  );
+
+  it("sends a draft change order from the creator request page", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        currency: "cad",
+        total_amount: 300,
+        adjusted_estimated_completion_at:
+          "2026-06-20T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestChangeOrders.mockReturnValue({
+      data: [
+        {
+          id: "change-order-1",
+          status: "draft",
+          title: "Additional animated overlay",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen
+      .getByRole("button", {
+        name: "Mock send draft change order",
+      })
+      .click();
+
+    expect(
+      mocks.sendDraftChangeOrder
+    ).toHaveBeenCalledWith({
+      changeOrderId: "change-order-1",
+    });
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Mock change-order builder",
       })
     ).not.toBeInTheDocument();
   });
