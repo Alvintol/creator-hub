@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   useListingRequestProgressUpdates: vi.fn(),
   useListingRequestChangeOrders: vi.fn(),
   confirmChangeOrderPayment: vi.fn(),
+  useListingRequestFinalDeliveries: vi.fn(),
+  confirmFinalBalancePayment: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminRequest", () => ({
@@ -216,6 +218,97 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestFinalDeliveries",
+  () => ({
+    useListingRequestFinalDeliveries:
+      mocks.useListingRequestFinalDeliveries,
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestFinalDeliverySummary",
+  () => ({
+    default: ({
+      finalDeliveries,
+      viewer,
+      isLoading,
+      error,
+    }: {
+      finalDeliveries: Array<{
+        id: string;
+      }>;
+      viewer: string;
+      isLoading?: boolean;
+      error?: unknown;
+    }) => (
+      <div>
+        Mock final delivery summary: {viewer} /{" "}
+        {finalDeliveries.length} /{" "}
+        {isLoading ? "loading" : "ready"} /{" "}
+        {error !== null && error !== undefined
+          ? "error"
+          : "no error"}
+      </div>
+    ),
+  })
+);
+
+vi.mock(
+  "../../hooks/admin/useAdminConfirmListingRequestFinalBalancePayment",
+  () => ({
+    useAdminConfirmListingRequestFinalBalancePayment:
+      () => ({
+        mutateAsync:
+          mocks.confirmFinalBalancePayment,
+        isPending: false,
+        error: null,
+      }),
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestFinalBalancePaymentAdminActions",
+  () => ({
+    default: ({
+      agreement,
+      onConfirmPayment,
+    }: {
+      agreement: {
+        listing_request_payment_schedule_items?: Array<{
+          id: string;
+          amount: number;
+          payment_timing: string;
+          status: string;
+        }>;
+      } | null;
+      onConfirmPayment: (
+        paymentScheduleItemId: string
+      ) => void;
+    }) => {
+      const paymentItem =
+        agreement?.listing_request_payment_schedule_items?.find(
+          (item) =>
+            item.payment_timing ===
+            "due_before_final_release" &&
+            item.status === "payment_required" &&
+            item.amount > 0
+        ) ?? null;
+
+      return paymentItem ? (
+        <button
+          type="button"
+          onClick={() =>
+            onConfirmPayment(paymentItem.id)
+          }
+        >
+          Mock confirm final-balance payment
+        </button>
+      ) : null;
+    },
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -306,6 +399,18 @@ describe("<AdminRequestDetails />", () => {
     });
 
     mocks.confirmChangeOrderPayment.mockResolvedValue(
+      undefined
+    );
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue(
+      {
+        data: [],
+        isLoading: false,
+        error: null,
+      }
+    );
+
+    mocks.confirmFinalBalancePayment.mockResolvedValue(
       undefined
     );
   });
@@ -484,6 +589,16 @@ describe("<AdminRequestDetails />", () => {
 
     expect(
       screen.queryByText(/Mock progress timeline:/)
+    ).not.toBeInTheDocument();
+
+    expect(
+      mocks.useListingRequestFinalDeliveries
+    ).toHaveBeenCalledWith(null);
+
+    expect(
+      screen.queryByText(
+        /Mock final delivery summary:/
+      )
     ).not.toBeInTheDocument();
   });
 
@@ -748,5 +863,125 @@ describe("<AdminRequestDetails />", () => {
     });
   });
 
-  
+  it("renders final deliveries for admin review", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        listing_request_payment_schedule_items:
+          [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue(
+      {
+        data: [
+          {
+            id: "final-delivery-1",
+          },
+          {
+            id: "final-delivery-2",
+          },
+        ],
+        isLoading: false,
+        error: null,
+      }
+    );
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestFinalDeliveries
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock final delivery summary: admin / 2 / ready / no error"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("confirms a pending final-balance payment from the admin request page", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        listing_request_payment_schedule_items: [
+          {
+            id: "payment-3",
+            amount: 150,
+            payment_timing:
+              "due_before_final_release",
+            status: "payment_required",
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen
+      .getByRole("button", {
+        name: "Mock confirm final-balance payment",
+      })
+      .click();
+
+    expect(
+      mocks.confirmFinalBalancePayment
+    ).toHaveBeenCalledWith({
+      paymentScheduleItemId: "payment-3",
+    });
+  });
 });

@@ -16,6 +16,10 @@ import { useListingRequestChangeOrders } from '../../hooks/creatorRequests/useLi
 import ListingRequestChangeOrderSummary from '../../components/ListingRequestChangeOrderSummary';
 import { useAdminConfirmListingRequestChangeOrderPayment } from '../../hooks/admin/useAdminConfirmListingRequestChangeOrderPayment';
 import ListingRequestChangeOrderPaymentAdminActions from '../../components/ListingRequestChangeOrderPaymentAdminActions';
+import { useListingRequestFinalDeliveries } from '../../hooks/creatorRequests/useListingRequestFinalDeliveries';
+import ListingRequestFinalDeliverySummary from '../../components/ListingRequestFinalDeliverySummary';
+import { useAdminConfirmListingRequestFinalBalancePayment } from '../../hooks/admin/useAdminConfirmListingRequestFinalBalancePayment';
+import ListingRequestFinalBalancePaymentAdminActions from '../../components/ListingRequestFinalBalancePaymentAdminActions';
 
 const classes = {
   page: "space-y-6",
@@ -101,6 +105,8 @@ const AdminRequestDetails = () => {
     useAdminConfirmListingRequestStartingPayment();
   const confirmChangeOrderPaymentMutation =
     useAdminConfirmListingRequestChangeOrderPayment();
+  const confirmFinalBalancePaymentMutation =
+    useAdminConfirmListingRequestFinalBalancePayment();
 
   const agreement = agreementQuery.data ?? null;
 
@@ -115,6 +121,13 @@ const AdminRequestDetails = () => {
       ? request?.id ?? null
       : null
   );
+
+  const finalDeliveriesQuery =
+    useListingRequestFinalDeliveries(
+      agreement?.status === "buyer_accepted"
+        ? request?.id ?? null
+        : null
+    );
 
 
   if (isLoading) {
@@ -192,6 +205,19 @@ const AdminRequestDetails = () => {
             error={confirmChangeOrderPaymentMutation.error}
             onConfirmPayment={(paymentScheduleItemId) =>
               confirmChangeOrderPaymentMutation.mutateAsync({
+                paymentScheduleItemId,
+              })
+            }
+          />
+
+          <ListingRequestFinalBalancePaymentAdminActions
+            agreement={agreement}
+            isPending={
+              confirmFinalBalancePaymentMutation.isPending
+            }
+            error={confirmFinalBalancePaymentMutation.error}
+            onConfirmPayment={(paymentScheduleItemId) =>
+              confirmFinalBalancePaymentMutation.mutateAsync({
                 paymentScheduleItemId,
               })
             }
@@ -325,10 +351,23 @@ const AdminRequestDetails = () => {
       {agreement?.status === "buyer_accepted" && (
         <>
           <ListingRequestChangeOrderSummary
-            changeOrders={changeOrdersQuery.data ?? []}
+            changeOrders={
+              changeOrdersQuery.data ?? []
+            }
             viewer="admin"
             isLoading={changeOrdersQuery.isLoading}
             error={changeOrdersQuery.error}
+          />
+
+          <ListingRequestFinalDeliverySummary
+            finalDeliveries={
+              finalDeliveriesQuery.data ?? []
+            }
+            viewer="admin"
+            isLoading={
+              finalDeliveriesQuery.isLoading
+            }
+            error={finalDeliveriesQuery.error}
           />
 
           <ListingRequestProgressUpdateScheduleCard

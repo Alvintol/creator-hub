@@ -18,6 +18,8 @@ import { useListingRequestChangeOrders } from '../../hooks/creatorRequests/useLi
 import ListingRequestChangeOrderSummary from '../../components/ListingRequestChangeOrderSummary';
 import { useRespondListingRequestChangeOrder } from '../../hooks/creatorRequests/useRespondListingRequestChangeOrder';
 import ListingRequestChangeOrderBuyerActions from '../../components/ListingRequestChangeOrderBuyerActions';
+import { useListingRequestFinalDeliveries } from '../../hooks/creatorRequests/useListingRequestFinalDeliveries';
+import ListingRequestFinalDeliverySummary from '../../components/ListingRequestFinalDeliverySummary';
 
 const classes = {
   page: "space-y-6",
@@ -133,6 +135,15 @@ const BuyerRequestDetails = () => {
     changeOrders.find(
       (changeOrder) => changeOrder.status === "sent"
     ) ?? null;
+
+  const finalDeliveriesQuery =
+    useListingRequestFinalDeliveries(
+      buyerVisibleAgreement?.status ===
+        "buyer_accepted"
+        ? request?.id ?? null
+        : null
+    );
+
 
   const handleArchiveRequest = async () => {
     if (!request) {
@@ -421,46 +432,63 @@ const BuyerRequestDetails = () => {
         </div>
       </div>
 
-      {buyerVisibleAgreement?.status === "buyer_accepted" && (
-        <>
-          <ListingRequestChangeOrderSummary
-            changeOrders={changeOrders}
-            viewer="buyer"
-            isLoading={changeOrdersQuery.isLoading}
-            error={changeOrdersQuery.error}
-          />
+      {buyerVisibleAgreement?.status ===
+        "buyer_accepted" && (
+          <>
+            <ListingRequestChangeOrderSummary
+              changeOrders={changeOrders}
+              viewer="buyer"
+              isLoading={changeOrdersQuery.isLoading}
+              error={changeOrdersQuery.error}
+            />
 
-          <ListingRequestChangeOrderBuyerActions
-            changeOrder={activeSentChangeOrder}
-            isPending={respondChangeOrderMutation.isPending}
-            error={respondChangeOrderMutation.error}
-            onAccept={(changeOrderId) =>
-              respondChangeOrderMutation.mutateAsync({
+            <ListingRequestChangeOrderBuyerActions
+              changeOrder={activeSentChangeOrder}
+              isPending={
+                respondChangeOrderMutation.isPending
+              }
+              error={respondChangeOrderMutation.error}
+              onAccept={(changeOrderId) =>
+                respondChangeOrderMutation.mutateAsync({
+                  changeOrderId,
+                  response: "buyer_accepted",
+                })
+              }
+              onDecline={(
                 changeOrderId,
-                response: "buyer_accepted",
-              })
-            }
-            onDecline={(changeOrderId, responseReason) =>
-              respondChangeOrderMutation.mutateAsync({
-                changeOrderId,
-                response: "buyer_declined",
-                responseReason,
-              })
-            }
-          />
+                responseReason
+              ) =>
+                respondChangeOrderMutation.mutateAsync({
+                  changeOrderId,
+                  response: "buyer_declined",
+                  responseReason,
+                })
+              }
+            />
 
-          <ListingRequestProgressUpdateScheduleCard
-            agreement={buyerVisibleAgreement}
-            updates={progressUpdatesQuery.data ?? []}
-          />
+            <ListingRequestFinalDeliverySummary
+              finalDeliveries={
+                finalDeliveriesQuery.data ?? []
+              }
+              viewer="buyer"
+              isLoading={
+                finalDeliveriesQuery.isLoading
+              }
+              error={finalDeliveriesQuery.error}
+            />
 
-          <ListingRequestProgressUpdateTimeline
-            updates={progressUpdatesQuery.data ?? []}
-            isLoading={progressUpdatesQuery.isLoading}
-            error={progressUpdatesQuery.error}
-          />
-        </>
-      )}
+            <ListingRequestProgressUpdateScheduleCard
+              agreement={buyerVisibleAgreement}
+              updates={progressUpdatesQuery.data ?? []}
+            />
+
+            <ListingRequestProgressUpdateTimeline
+              updates={progressUpdatesQuery.data ?? []}
+              isLoading={progressUpdatesQuery.isLoading}
+              error={progressUpdatesQuery.error}
+            />
+          </>
+        )}
 
       <RequestConversationThread
         requestId={request.id}
