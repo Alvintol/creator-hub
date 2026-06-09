@@ -28,6 +28,7 @@ export type ListingRequestAgreementItemRow = {
 export type ListingRequestPaymentScheduleItemRow = {
   id: string;
   agreement_id: string;
+  change_order_id: string | null;
   title: string;
   description: string | null;
   amount: number;
@@ -186,6 +187,7 @@ export const useListingRequestAgreement = (listingRequestId?: string | null) => 
           listing_request_payment_schedule_items (
             id,
             agreement_id,
+            change_order_id,
             title,
             description,
             amount,

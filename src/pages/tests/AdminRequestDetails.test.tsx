@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   confirmStartingPayment: vi.fn(),
   useListingRequestProgressUpdates: vi.fn(),
   useListingRequestChangeOrders: vi.fn(),
+  confirmChangeOrderPayment: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminRequest", () => ({
@@ -164,6 +165,57 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../hooks/admin/useAdminConfirmListingRequestChangeOrderPayment",
+  () => ({
+    useAdminConfirmListingRequestChangeOrderPayment: () => ({
+      mutateAsync: mocks.confirmChangeOrderPayment,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestChangeOrderPaymentAdminActions",
+  () => ({
+    default: ({
+      agreement,
+      onConfirmPayment,
+    }: {
+      agreement: {
+        listing_request_payment_schedule_items?: Array<{
+          id: string;
+          change_order_id: string | null;
+          payment_timing: string;
+          status: string;
+        }>;
+      } | null;
+      onConfirmPayment: (
+        paymentScheduleItemId: string
+      ) => void;
+    }) => {
+      const paymentItem =
+        agreement?.listing_request_payment_schedule_items?.find(
+          (item) =>
+            item.change_order_id &&
+            item.payment_timing ===
+            "due_on_change_order_acceptance" &&
+            item.status === "payment_required"
+        ) ?? null;
+
+      return paymentItem ? (
+        <button
+          type="button"
+          onClick={() => onConfirmPayment(paymentItem.id)}
+        >
+          Mock confirm change-order payment
+        </button>
+      ) : null;
+    },
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -252,6 +304,10 @@ describe("<AdminRequestDetails />", () => {
       isLoading: false,
       error: null,
     });
+
+    mocks.confirmChangeOrderPayment.mockResolvedValue(
+      undefined
+    );
   });
 
   it("renders structured request details for admin review", () => {
@@ -634,4 +690,63 @@ describe("<AdminRequestDetails />", () => {
       )
     ).toBeInTheDocument();
   });
+
+  it("confirms a pending change-order payment from the admin request detail page", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        listing_request_payment_schedule_items: [
+          {
+            id: "payment-2",
+            change_order_id: "change-order-1",
+            payment_timing: "due_on_change_order_acceptance",
+            status: "payment_required",
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen
+      .getByRole("button", {
+        name: "Mock confirm change-order payment",
+      })
+      .click();
+
+    expect(
+      mocks.confirmChangeOrderPayment
+    ).toHaveBeenCalledWith({
+      paymentScheduleItemId: "payment-2",
+    });
+  });
+
+  
 });
