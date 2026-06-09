@@ -14,6 +14,8 @@ import ListingRequestProgressUpdateTimeline from '../../components/ListingReques
 import ListingRequestProgressUpdateScheduleCard from '../../components/ListingRequestProgressUpdateScheduleCard';
 import { useListingRequestChangeOrders } from '../../hooks/creatorRequests/useListingRequestChangeOrders';
 import ListingRequestChangeOrderSummary from '../../components/ListingRequestChangeOrderSummary';
+import { useAdminConfirmListingRequestChangeOrderPayment } from '../../hooks/admin/useAdminConfirmListingRequestChangeOrderPayment';
+import ListingRequestChangeOrderPaymentAdminActions from '../../components/ListingRequestChangeOrderPaymentAdminActions';
 
 const classes = {
   page: "space-y-6",
@@ -97,6 +99,8 @@ const AdminRequestDetails = () => {
 
   const confirmStartingPaymentMutation =
     useAdminConfirmListingRequestStartingPayment();
+  const confirmChangeOrderPaymentMutation =
+    useAdminConfirmListingRequestChangeOrderPayment();
 
   const agreement = agreementQuery.data ?? null;
 
@@ -111,6 +115,7 @@ const AdminRequestDetails = () => {
       ? request?.id ?? null
       : null
   );
+
 
   if (isLoading) {
     return <div className={classes.loadingText}>Loading…</div>;
@@ -178,6 +183,17 @@ const AdminRequestDetails = () => {
             error={confirmStartingPaymentMutation.error}
             onConfirmPayment={(agreementId) =>
               confirmStartingPaymentMutation.mutateAsync({ agreementId })
+            }
+          />
+
+          <ListingRequestChangeOrderPaymentAdminActions
+            agreement={agreement}
+            isPending={confirmChangeOrderPaymentMutation.isPending}
+            error={confirmChangeOrderPaymentMutation.error}
+            onConfirmPayment={(paymentScheduleItemId) =>
+              confirmChangeOrderPaymentMutation.mutateAsync({
+                paymentScheduleItemId,
+              })
             }
           />
 
@@ -308,7 +324,7 @@ const AdminRequestDetails = () => {
 
       {agreement?.status === "buyer_accepted" && (
         <>
-          <ListingRequestChangeOrderSummary 
+          <ListingRequestChangeOrderSummary
             changeOrders={changeOrdersQuery.data ?? []}
             viewer="admin"
             isLoading={changeOrdersQuery.isLoading}
