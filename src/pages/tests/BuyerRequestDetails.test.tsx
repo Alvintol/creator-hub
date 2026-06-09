@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   respondAgreement: vi.fn(),
   useListingRequestProgressUpdates: vi.fn(),
   useListingRequestChangeOrders: vi.fn(),
+  respondChangeOrder: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
@@ -139,6 +140,64 @@ vi.mock(
           : "no error"}
       </div>
     ),
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useRespondListingRequestChangeOrder",
+  () => ({
+    useRespondListingRequestChangeOrder: () => ({
+      mutateAsync: mocks.respondChangeOrder,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestChangeOrderBuyerActions",
+  () => ({
+    default: ({
+      changeOrder,
+      onAccept,
+      onDecline,
+    }: {
+      changeOrder: {
+        id: string;
+        status: string;
+      } | null;
+      onAccept: (
+        changeOrderId: string
+      ) => unknown;
+      onDecline: (
+        changeOrderId: string,
+        responseReason: string | null
+      ) => unknown;
+    }) =>
+      changeOrder?.status === "sent" ? (
+        <div>
+          <button
+            type="button"
+            onClick={() =>
+              onAccept(changeOrder.id)
+            }
+          >
+            Mock accept change order
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              onDecline(
+                changeOrder.id,
+                "Not needed anymore."
+              )
+            }
+          >
+            Mock decline change order
+          </button>
+        </div>
+      ) : null,
   })
 );
 
@@ -305,6 +364,10 @@ describe("<BuyerRequestDetails />", () => {
       isLoading: false,
       error: null,
     });
+
+    mocks.respondChangeOrder.mockResolvedValue(
+      undefined
+    );
   });
 
   it("renders structured buyer request details", () => {
@@ -749,5 +812,122 @@ describe("<BuyerRequestDetails />", () => {
         "Mock change-order summary: buyer / 1 / ready / no error"
       )
     ).toBeInTheDocument();
+  });
+
+  it("accepts the active sent change order from the buyer page", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        buyer_accepted_at:
+          "2026-06-06T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestChangeOrders.mockReturnValue({
+      data: [
+        {
+          id: "change-order-1",
+          status: "sent",
+          title: "Additional animated overlay",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Mock accept change order",
+      })
+    );
+
+    expect(
+      mocks.respondChangeOrder
+    ).toHaveBeenCalledWith({
+      changeOrderId: "change-order-1",
+      response: "buyer_accepted",
+    });
+  });
+
+  it("declines the active sent change order from the buyer page", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        buyer_accepted_at:
+          "2026-06-06T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestChangeOrders.mockReturnValue({
+      data: [
+        {
+          id: "change-order-1",
+          status: "sent",
+          title: "Additional animated overlay",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Mock decline change order",
+      })
+    );
+
+    expect(
+      mocks.respondChangeOrder
+    ).toHaveBeenCalledWith({
+      changeOrderId: "change-order-1",
+      response: "buyer_declined",
+      responseReason: "Not needed anymore.",
+    });
   });
 });

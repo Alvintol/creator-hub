@@ -74,6 +74,7 @@ export type ListingRequestBuyerHoldReason =
   | "milestone_approval_pending"
   | "milestone_payment_pending"
   | "change_order_response_pending"
+  | "change_order_payment_pending"
   | "balance_payment_pending";
 
 export type ListingRequestTimelineHold = {
@@ -97,7 +98,9 @@ export const getListingRequestBuyerHoldReasonLabel = (
           ? "Milestone payment pending"
           : reason === "change_order_response_pending"
             ? "Change order response pending"
-            : "Balance payment pending";
+            : reason === "change_order_payment_pending"
+              ? "Change order payment pending"
+              : "Balance payment pending";
 
 export const calculateRoundedBuyerHoldDays = (input: {
   startedAt: string;

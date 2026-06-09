@@ -273,6 +273,12 @@ describe("listing request buyer timeline hold helpers", () => {
     expect(
       getListingRequestBuyerHoldReasonLabel("balance_payment_pending")
     ).toBe("Balance payment pending");
+
+    expect(
+      getListingRequestBuyerHoldReasonLabel(
+        "change_order_payment_pending"
+      )
+    ).toBe("Change order payment pending");
   });
 
   it("rounds buyer hold time up to full calendar days", () => {
