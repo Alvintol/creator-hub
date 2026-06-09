@@ -58,6 +58,7 @@ export type ListingRequestTimelineHoldRow = {
   | "milestone_approval_pending"
   | "milestone_payment_pending"
   | "change_order_response_pending"
+  | "change_order_payment_pending"
   | "balance_payment_pending";
   started_at: string;
   ended_at: string | null;

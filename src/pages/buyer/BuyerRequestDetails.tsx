@@ -16,6 +16,8 @@ import ListingRequestProgressUpdateTimeline from '../../components/ListingReques
 import ListingRequestProgressUpdateScheduleCard from '../../components/ListingRequestProgressUpdateScheduleCard';
 import { useListingRequestChangeOrders } from '../../hooks/creatorRequests/useListingRequestChangeOrders';
 import ListingRequestChangeOrderSummary from '../../components/ListingRequestChangeOrderSummary';
+import { useRespondListingRequestChangeOrder } from '../../hooks/creatorRequests/useRespondListingRequestChangeOrder';
+import ListingRequestChangeOrderBuyerActions from '../../components/ListingRequestChangeOrderBuyerActions';
 
 const classes = {
   page: "space-y-6",
@@ -104,6 +106,8 @@ const BuyerRequestDetails = () => {
 
   const agreementQuery = useListingRequestAgreement(request?.id ?? null);
   const respondAgreementMutation = useRespondListingRequestAgreement();
+  const respondChangeOrderMutation =
+    useRespondListingRequestChangeOrder();
 
   const agreement = agreementQuery.data ?? null;
 
@@ -123,6 +127,12 @@ const BuyerRequestDetails = () => {
       : null
   );
 
+  const changeOrders = changeOrdersQuery.data ?? [];
+
+  const activeSentChangeOrder =
+    changeOrders.find(
+      (changeOrder) => changeOrder.status === "sent"
+    ) ?? null;
 
   const handleArchiveRequest = async () => {
     if (!request) {
@@ -414,10 +424,29 @@ const BuyerRequestDetails = () => {
       {buyerVisibleAgreement?.status === "buyer_accepted" && (
         <>
           <ListingRequestChangeOrderSummary
-            changeOrders={changeOrdersQuery.data ?? []}
+            changeOrders={changeOrders}
             viewer="buyer"
             isLoading={changeOrdersQuery.isLoading}
             error={changeOrdersQuery.error}
+          />
+
+          <ListingRequestChangeOrderBuyerActions
+            changeOrder={activeSentChangeOrder}
+            isPending={respondChangeOrderMutation.isPending}
+            error={respondChangeOrderMutation.error}
+            onAccept={(changeOrderId) =>
+              respondChangeOrderMutation.mutateAsync({
+                changeOrderId,
+                response: "buyer_accepted",
+              })
+            }
+            onDecline={(changeOrderId, responseReason) =>
+              respondChangeOrderMutation.mutateAsync({
+                changeOrderId,
+                response: "buyer_declined",
+                responseReason,
+              })
+            }
           />
 
           <ListingRequestProgressUpdateScheduleCard
