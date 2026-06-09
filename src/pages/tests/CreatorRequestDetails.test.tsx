@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   useListingRequestChangeOrders: vi.fn(),
   createChangeOrder: vi.fn(),
   sendDraftChangeOrder: vi.fn(),
+  useListingRequestFinalDeliveries: vi.fn(),
+  createFinalDelivery: vi.fn(),
+  sendDraftFinalDelivery: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useCreatorRequest", () => ({
@@ -311,6 +314,121 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestFinalDeliveries",
+  () => ({
+    useListingRequestFinalDeliveries:
+      mocks.useListingRequestFinalDeliveries,
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useCreateListingRequestFinalDelivery",
+  () => ({
+    useCreateListingRequestFinalDelivery: () => ({
+      mutateAsync: mocks.createFinalDelivery,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestFinalDeliverySummary",
+  () => ({
+    default: ({
+      finalDeliveries,
+      viewer,
+      isLoading,
+      error,
+    }: {
+      finalDeliveries: Array<{
+        id: string;
+      }>;
+      viewer: string;
+      isLoading?: boolean;
+      error?: unknown;
+    }) => (
+      <div>
+        Mock final delivery summary: {viewer} /{" "}
+        {finalDeliveries.length} /{" "}
+        {isLoading ? "loading" : "ready"} /{" "}
+        {error ? "error" : "no error"}
+      </div>
+    ),
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestFinalDeliveryBuilder",
+  () => ({
+    default: ({
+      agreement,
+      onCreateFinalDelivery,
+    }: {
+      agreement: {
+        id: string;
+      } | null;
+      onCreateFinalDelivery: (input: {
+        agreementId: string;
+      }) => unknown;
+    }) =>
+      agreement ? (
+        <button
+          type="button"
+          onClick={() =>
+            onCreateFinalDelivery({
+              agreementId: agreement.id,
+            })
+          }
+        >
+          Mock final delivery builder
+        </button>
+      ) : null,
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useSendDraftListingRequestFinalDelivery",
+  () => ({
+    useSendDraftListingRequestFinalDelivery: () => ({
+      mutateAsync: mocks.sendDraftFinalDelivery,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestFinalDeliveryCreatorActions",
+  () => ({
+    default: ({
+      finalDelivery,
+      onSubmitFinalDelivery,
+    }: {
+      finalDelivery: {
+        id: string;
+        status: string;
+      } | null;
+      onSubmitFinalDelivery: (
+        finalDeliveryId: string
+      ) => unknown;
+    }) =>
+      finalDelivery?.status === "draft" ? (
+        <button
+          type="button"
+          onClick={() =>
+            onSubmitFinalDelivery(
+              finalDelivery.id
+            )
+          }
+        >
+          Mock submit final-delivery draft
+        </button>
+      ) : null,
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -402,6 +520,22 @@ describe("<CreatorRequestDetails />", () => {
     mocks.createChangeOrder.mockResolvedValue(undefined);
 
     mocks.sendDraftChangeOrder.mockResolvedValue(
+      undefined
+    );
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue(
+      {
+        data: [],
+        isLoading: false,
+        error: null,
+      }
+    );
+
+    mocks.createFinalDelivery.mockResolvedValue(
+      undefined
+    );
+
+    mocks.sendDraftFinalDelivery.mockResolvedValue(
       undefined
     );
   });
@@ -1064,6 +1198,272 @@ describe("<CreatorRequestDetails />", () => {
     expect(
       screen.queryByRole("button", {
         name: "Mock change-order builder",
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders final-delivery history and the builder for a work-ready agreement", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestFinalDeliveries
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock final delivery summary: creator / 0 / ready / no error"
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("button", {
+        name: "Mock final delivery builder",
+      })
+    ).toBeInTheDocument();
+  });
+
+  it("creates a final delivery from the creator request page", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen
+      .getByRole("button", {
+        name: "Mock final delivery builder",
+      })
+      .click();
+
+    expect(
+      mocks.createFinalDelivery
+    ).toHaveBeenCalledWith({
+      agreementId: "agreement-1",
+    });
+  });
+
+  it.each([
+    "draft",
+    "submitted",
+    "buyer_approved",
+  ] as const)(
+    "hides the final-delivery builder when the latest delivery is %s",
+    (status) => {
+      mocks.useCreatorRequest.mockReturnValue({
+        data: {
+          request: {
+            ...request,
+            status: "accepted",
+          },
+          buyer: {
+            user_id: "buyer-1",
+            handle: "buyeruser",
+            display_name: "Buyer User",
+            avatar_url: null,
+          },
+        },
+        isLoading: false,
+        error: null,
+      });
+
+      mocks.useListingRequestAgreement.mockReturnValue({
+        data: {
+          id: "agreement-1",
+          status: "buyer_accepted",
+          starting_payment_status: "paid",
+        },
+        isLoading: false,
+        error: null,
+      });
+
+      mocks.useListingRequestFinalDeliveries.mockReturnValue(
+        {
+          data: [
+            {
+              id: "final-delivery-1",
+              status,
+            },
+          ],
+          isLoading: false,
+          error: null,
+        }
+      );
+
+      renderPage();
+
+      expect(
+        screen.getByText(
+          "Mock final delivery summary: creator / 1 / ready / no error"
+        )
+      ).toBeInTheDocument();
+
+      expect(
+        screen.queryByRole("button", {
+          name: "Mock final delivery builder",
+        })
+      ).not.toBeInTheDocument();
+    }
+  );
+
+  it("allows a new final delivery after revisions are requested", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue(
+      {
+        data: [
+          {
+            id: "final-delivery-1",
+            status: "revision_requested",
+          },
+        ],
+        isLoading: false,
+        error: null,
+      }
+    );
+
+    renderPage();
+
+    expect(
+      screen.getByRole("button", {
+        name: "Mock final delivery builder",
+      })
+    ).toBeInTheDocument();
+  });
+
+  it("submits a final-delivery draft from the creator request page", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue(
+      {
+        data: [
+          {
+            id: "final-delivery-1",
+            status: "draft",
+            title: "Final overlay delivery",
+          },
+        ],
+        isLoading: false,
+        error: null,
+      }
+    );
+
+    renderPage();
+
+    screen
+      .getByRole("button", {
+        name: "Mock submit final-delivery draft",
+      })
+      .click();
+
+    expect(
+      mocks.sendDraftFinalDelivery
+    ).toHaveBeenCalledWith({
+      finalDeliveryId: "final-delivery-1",
+    });
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Mock final delivery builder",
       })
     ).not.toBeInTheDocument();
   });

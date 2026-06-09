@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   useListingRequestProgressUpdates: vi.fn(),
   useListingRequestChangeOrders: vi.fn(),
   respondChangeOrder: vi.fn(),
+  useListingRequestFinalDeliveries: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
@@ -201,6 +202,42 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestFinalDeliveries",
+  () => ({
+    useListingRequestFinalDeliveries:
+      mocks.useListingRequestFinalDeliveries,
+  })
+);
+
+vi.mock(
+  "../../components/ListingRequestFinalDeliverySummary",
+  () => ({
+    default: ({
+      finalDeliveries,
+      viewer,
+      isLoading,
+      error,
+    }: {
+      finalDeliveries: Array<{
+        id: string;
+      }>;
+      viewer: string;
+      isLoading?: boolean;
+      error?: unknown;
+    }) => (
+      <div>
+        Mock final delivery summary: {viewer} /{" "}
+        {finalDeliveries.length} /{" "}
+        {isLoading ? "loading" : "ready"} /{" "}
+        {error !== null && error !== undefined
+          ? "error"
+          : "no error"}
+      </div>
+    ),
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -367,6 +404,14 @@ describe("<BuyerRequestDetails />", () => {
 
     mocks.respondChangeOrder.mockResolvedValue(
       undefined
+    );
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue(
+      {
+        data: [],
+        isLoading: false,
+        error: null,
+      }
     );
   });
 
@@ -657,6 +702,16 @@ describe("<BuyerRequestDetails />", () => {
     expect(
       screen.queryByText(/Mock progress timeline:/)
     ).not.toBeInTheDocument();
+
+    expect(
+      mocks.useListingRequestFinalDeliveries
+    ).toHaveBeenCalledWith(null);
+
+    expect(
+      screen.queryByText(
+        /Mock final delivery summary:/
+      )
+    ).not.toBeInTheDocument();
   });
 
   it("passes the visible agreement and progress updates into the buyer schedule card", () => {
@@ -929,5 +984,60 @@ describe("<BuyerRequestDetails />", () => {
       response: "buyer_declined",
       responseReason: "Not needed anymore.",
     });
+  });
+
+  it("renders buyer-visible final deliveries after agreement acceptance", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        buyer_accepted_at:
+          "2026-06-06T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue(
+      {
+        data: [
+          {
+            id: "final-delivery-1",
+          },
+        ],
+        isLoading: false,
+        error: null,
+      }
+    );
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestFinalDeliveries
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock final delivery summary: buyer / 1 / ready / no error"
+      )
+    ).toBeInTheDocument();
   });
 });

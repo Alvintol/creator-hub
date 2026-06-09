@@ -29,6 +29,13 @@ import { useListingRequestChangeOrders } from '../../hooks/creatorRequests/useLi
 import ListingRequestChangeOrderBuilder from '../../components/ListingRequestChangeOrderBuilder';
 import ListingRequestChangeOrderSummary from '../../components/ListingRequestChangeOrderSummary';
 import ListingRequestChangeOrderCreatorActions from '../../components/ListingRequestChangeOrderCreatorActions';
+import { useCreateListingRequestFinalDelivery } from '../../hooks/creatorRequests/useCreateListingRequestFinalDelivery';
+import { useListingRequestFinalDeliveries } from '../../hooks/creatorRequests/useListingRequestFinalDeliveries';
+import { canCreateNextListingRequestFinalDelivery } from '../../domain/listings/listingRequestFinalDeliveries';
+import ListingRequestFinalDeliverySummary from '../../components/ListingRequestFinalDeliverySummary';
+import ListingRequestFinalDeliveryBuilder from '../../components/ListingRequestFinalDeliveryBuilder';
+import { useSendDraftListingRequestFinalDelivery } from '../../hooks/creatorRequests/useSendDraftListingRequestFinalDelivery';
+import ListingRequestFinalDeliveryCreatorActions from '../../components/ListingRequestFinalDeliveryCreatorActions';
 
 const classes = {
   page: "space-y-6",
@@ -131,6 +138,10 @@ const CreatorRequestDetails = () => {
     useSendDraftListingRequestChangeOrder();
   const createChangeOrderMutation =
     useCreateListingRequestChangeOrder();
+  const createFinalDeliveryMutation =
+    useCreateListingRequestFinalDelivery();
+  const sendDraftFinalDeliveryMutation =
+    useSendDraftListingRequestFinalDelivery();
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -162,7 +173,12 @@ const CreatorRequestDetails = () => {
       : null
   );
 
-
+  const finalDeliveriesQuery =
+    useListingRequestFinalDeliveries(
+      agreement?.status === "buyer_accepted"
+        ? request?.id ?? null
+        : null
+    );
 
 
   const handleAcceptRequest = async () => {
@@ -272,6 +288,33 @@ const CreatorRequestDetails = () => {
     changeOrders.find(
       (changeOrder) => changeOrder.status === "draft"
     ) ?? null;
+
+  const finalDeliveries =
+    finalDeliveriesQuery.data ?? [];
+
+  const latestFinalDelivery =
+    finalDeliveries[0] ?? null;
+
+  const draftFinalDelivery =
+    finalDeliveries.find(
+      (finalDelivery) =>
+        finalDelivery.status === "draft"
+    ) ?? null;
+
+  const startingPaymentResolved =
+    agreement?.starting_payment_status === "paid" ||
+    agreement?.starting_payment_status ===
+    "not_required";
+
+  const canCreateFinalDelivery =
+    request.status === "accepted" &&
+    agreement?.status === "buyer_accepted" &&
+    startingPaymentResolved &&
+    canCreateNextListingRequestFinalDelivery(
+      latestFinalDelivery?.status
+    ) &&
+    !finalDeliveriesQuery.isLoading &&
+    !finalDeliveriesQuery.error;
 
   return (
     <div className={classes.page}>
@@ -568,7 +611,9 @@ const CreatorRequestDetails = () => {
 
           <ListingRequestChangeOrderCreatorActions
             changeOrder={draftChangeOrder}
-            isPending={sendDraftChangeOrderMutation.isPending}
+            isPending={
+              sendDraftChangeOrderMutation.isPending
+            }
             error={sendDraftChangeOrderMutation.error}
             onSendChangeOrder={(changeOrderId) =>
               sendDraftChangeOrderMutation.mutateAsync({
@@ -581,10 +626,55 @@ const CreatorRequestDetails = () => {
             <ListingRequestChangeOrderBuilder
               requestStatus={request.status}
               agreement={agreement}
-              isPending={createChangeOrderMutation.isPending}
+              isPending={
+                createChangeOrderMutation.isPending
+              }
               error={createChangeOrderMutation.error}
               onCreateChangeOrder={(input) =>
-                createChangeOrderMutation.mutateAsync(input)
+                createChangeOrderMutation.mutateAsync(
+                  input
+                )
+              }
+            />
+          )}
+        </>
+      )}
+
+      {agreement?.status === "buyer_accepted" && (
+        <>
+          <ListingRequestFinalDeliverySummary
+            finalDeliveries={finalDeliveries}
+            viewer="creator"
+            isLoading={finalDeliveriesQuery.isLoading}
+            error={finalDeliveriesQuery.error}
+          />
+
+
+          <ListingRequestFinalDeliveryCreatorActions
+            finalDelivery={draftFinalDelivery}
+            isPending={
+              sendDraftFinalDeliveryMutation.isPending
+            }
+            error={sendDraftFinalDeliveryMutation.error}
+            onSubmitFinalDelivery={(finalDeliveryId) =>
+              sendDraftFinalDeliveryMutation.mutateAsync({
+                finalDeliveryId,
+              })
+            }
+          />
+
+          {canCreateFinalDelivery && (
+            <ListingRequestFinalDeliveryBuilder
+              requestStatus={request.status}
+              agreement={agreement}
+              isPending={
+                createFinalDeliveryMutation.isPending
+              }
+              error={createFinalDeliveryMutation.error}
+              onCreateFinalDelivery={(input) =>
+                createFinalDeliveryMutation.mutateAsync(
+                  input
+                )
               }
             />
           )}
