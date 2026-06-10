@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   canAcceptListingRequest,
   canArchiveListingRequest,
@@ -6,15 +7,41 @@ import {
   getListingRequestStatusLabel,
   getListingRequestStatusSummary,
   getListingRequestStatusTone,
+  listingRequestStatusOptions,
 } from "../listings/listingRequests";
-import { getListingRequestDisplayPreview, getListingRequestDisplayTitle } from '../listings/listings';
+import {
+  getListingRequestDisplayPreview,
+  getListingRequestDisplayTitle,
+} from "../listings/listings";
 
 describe("listing request status helpers", () => {
+  it("includes the completed status option", () => {
+    expect(listingRequestStatusOptions).toContainEqual({
+      value: "completed",
+      label: "Completed",
+    });
+  });
+
   it("maps statuses to the correct labels", () => {
-    expect(getListingRequestStatusLabel("submitted")).toBe("Under review");
-    expect(getListingRequestStatusLabel("accepted")).toBe("Accepted");
-    expect(getListingRequestStatusLabel("declined")).toBe("Declined");
-    expect(getListingRequestStatusLabel("archived")).toBe("Archived");
+    expect(
+      getListingRequestStatusLabel("submitted")
+    ).toBe("Under review");
+
+    expect(
+      getListingRequestStatusLabel("accepted")
+    ).toBe("Accepted");
+
+    expect(
+      getListingRequestStatusLabel("completed")
+    ).toBe("Completed");
+
+    expect(
+      getListingRequestStatusLabel("declined")
+    ).toBe("Declined");
+
+    expect(
+      getListingRequestStatusLabel("archived")
+    ).toBe("Archived");
   });
 
   it("maps archived labels with archive actor context", () => {
@@ -44,23 +71,55 @@ describe("listing request status helpers", () => {
   });
 
   it("maps statuses to the correct tones", () => {
-    expect(getListingRequestStatusTone("submitted")).toBe("review");
-    expect(getListingRequestStatusTone("accepted")).toBe("success");
-    expect(getListingRequestStatusTone("declined")).toBe("danger");
-    expect(getListingRequestStatusTone("archived")).toBe("muted");
+    expect(
+      getListingRequestStatusTone("submitted")
+    ).toBe("review");
+
+    expect(
+      getListingRequestStatusTone("accepted")
+    ).toBe("success");
+
+    expect(
+      getListingRequestStatusTone("completed")
+    ).toBe("success");
+
+    expect(
+      getListingRequestStatusTone("declined")
+    ).toBe("danger");
+
+    expect(
+      getListingRequestStatusTone("archived")
+    ).toBe("muted");
   });
 
   it("maps statuses to the correct summaries", () => {
-    expect(getListingRequestStatusSummary("submitted")).toBe(
+    expect(
+      getListingRequestStatusSummary("submitted")
+    ).toBe(
       "This request is currently under review by the creator."
     );
-    expect(getListingRequestStatusSummary("accepted")).toBe(
+
+    expect(
+      getListingRequestStatusSummary("accepted")
+    ).toBe(
       "The creator has accepted this request."
     );
-    expect(getListingRequestStatusSummary("declined")).toBe(
+
+    expect(
+      getListingRequestStatusSummary("completed")
+    ).toBe(
+      "The buyer approved the final delivery and the project is complete."
+    );
+
+    expect(
+      getListingRequestStatusSummary("declined")
+    ).toBe(
       "The creator has declined this request."
     );
-    expect(getListingRequestStatusSummary("archived")).toBe(
+
+    expect(
+      getListingRequestStatusSummary("archived")
+    ).toBe(
       "This request has been archived."
     );
   });
@@ -92,23 +151,67 @@ describe("listing request status helpers", () => {
   });
 
   it("only allows accept and decline while the request is submitted", () => {
-    expect(canAcceptListingRequest("submitted")).toBe(true);
-    expect(canDeclineListingRequest("submitted")).toBe(true);
+    expect(
+      canAcceptListingRequest("submitted")
+    ).toBe(true);
 
-    expect(canAcceptListingRequest("accepted")).toBe(false);
-    expect(canAcceptListingRequest("declined")).toBe(false);
-    expect(canAcceptListingRequest("archived")).toBe(false);
+    expect(
+      canDeclineListingRequest("submitted")
+    ).toBe(true);
 
-    expect(canDeclineListingRequest("accepted")).toBe(false);
-    expect(canDeclineListingRequest("declined")).toBe(false);
-    expect(canDeclineListingRequest("archived")).toBe(false);
+    expect(
+      canAcceptListingRequest("accepted")
+    ).toBe(false);
+
+    expect(
+      canAcceptListingRequest("completed")
+    ).toBe(false);
+
+    expect(
+      canAcceptListingRequest("declined")
+    ).toBe(false);
+
+    expect(
+      canAcceptListingRequest("archived")
+    ).toBe(false);
+
+    expect(
+      canDeclineListingRequest("accepted")
+    ).toBe(false);
+
+    expect(
+      canDeclineListingRequest("completed")
+    ).toBe(false);
+
+    expect(
+      canDeclineListingRequest("declined")
+    ).toBe(false);
+
+    expect(
+      canDeclineListingRequest("archived")
+    ).toBe(false);
   });
 
   it("only allows archive while the request is submitted", () => {
-    expect(canArchiveListingRequest("submitted")).toBe(true);
-    expect(canArchiveListingRequest("accepted")).toBe(false);
-    expect(canArchiveListingRequest("declined")).toBe(false);
-    expect(canArchiveListingRequest("archived")).toBe(false);
+    expect(
+      canArchiveListingRequest("submitted")
+    ).toBe(true);
+
+    expect(
+      canArchiveListingRequest("accepted")
+    ).toBe(false);
+
+    expect(
+      canArchiveListingRequest("completed")
+    ).toBe(false);
+
+    expect(
+      canArchiveListingRequest("declined")
+    ).toBe(false);
+
+    expect(
+      canArchiveListingRequest("archived")
+    ).toBe(false);
   });
 });
 
@@ -147,7 +250,8 @@ describe("listing request display helpers", () => {
   it("uses structured request details before the legacy message", () => {
     expect(
       getListingRequestDisplayPreview({
-        request_details: " I need three cozy emotes. ",
+        request_details:
+          " I need three cozy emotes. ",
         message: "Legacy request message.",
       })
     ).toBe("I need three cozy emotes.");
@@ -166,7 +270,8 @@ describe("listing request display helpers", () => {
     expect(
       getListingRequestDisplayPreview(
         {
-          request_details: "This preview is longer than the limit.",
+          request_details:
+            "This preview is longer than the limit.",
           message: null,
         },
         12
@@ -174,4 +279,3 @@ describe("listing request display helpers", () => {
     ).toBe("This preview…");
   });
 });
-

@@ -1,6 +1,7 @@
 export type ListingRequestStatus =
   | "submitted"
   | "accepted"
+  | "completed"
   | "declined"
   | "archived";
 
@@ -20,10 +21,26 @@ export const listingRequestStatusOptions: Array<{
   value: ListingRequestStatus;
   label: string;
 }> = [
-    { value: "submitted", label: "Under review" },
-    { value: "accepted", label: "Accepted" },
-    { value: "declined", label: "Declined" },
-    { value: "archived", label: "Archived" },
+    {
+      value: "submitted",
+      label: "Under review",
+    },
+    {
+      value: "accepted",
+      label: "Accepted",
+    },
+    {
+      value: "completed",
+      label: "Completed",
+    },
+    {
+      value: "declined",
+      label: "Declined",
+    },
+    {
+      value: "archived",
+      label: "Archived",
+    },
   ];
 
 export const getListingRequestStatusLabel = (
@@ -34,25 +51,29 @@ export const getListingRequestStatusLabel = (
     ? "Under review"
     : status === "accepted"
       ? "Accepted"
-      : status === "declined"
-        ? "Declined"
-        : archiveContext?.archived_by_user_id &&
-          archiveContext.buyer_user_id &&
-          archiveContext.archived_by_user_id === archiveContext.buyer_user_id
-          ? "Cancelled by buyer"
+      : status === "completed"
+        ? "Completed"
+        : status === "declined"
+          ? "Declined"
           : archiveContext?.archived_by_user_id &&
-            archiveContext.creator_user_id &&
+            archiveContext.buyer_user_id &&
             archiveContext.archived_by_user_id ===
-            archiveContext.creator_user_id
-            ? "Archived by creator"
-            : "Archived";
+            archiveContext.buyer_user_id
+            ? "Cancelled by buyer"
+            : archiveContext?.archived_by_user_id &&
+              archiveContext.creator_user_id &&
+              archiveContext.archived_by_user_id ===
+              archiveContext.creator_user_id
+              ? "Archived by creator"
+              : "Archived";
 
 export const getListingRequestStatusTone = (
   status: ListingRequestStatus
 ): ListingRequestStatusTone =>
   status === "submitted"
     ? "review"
-    : status === "accepted"
+    : status === "accepted" ||
+      status === "completed"
       ? "success"
       : status === "declined"
         ? "danger"
@@ -66,18 +87,21 @@ export const getListingRequestStatusSummary = (
     ? "This request is currently under review by the creator."
     : status === "accepted"
       ? "The creator has accepted this request."
-      : status === "declined"
-        ? "The creator has declined this request."
-        : archiveContext?.archived_by_user_id &&
-          archiveContext.buyer_user_id &&
-          archiveContext.archived_by_user_id === archiveContext.buyer_user_id
-          ? "The buyer cancelled this request."
+      : status === "completed"
+        ? "The buyer approved the final delivery and the project is complete."
+        : status === "declined"
+          ? "The creator has declined this request."
           : archiveContext?.archived_by_user_id &&
-            archiveContext.creator_user_id &&
+            archiveContext.buyer_user_id &&
             archiveContext.archived_by_user_id ===
-            archiveContext.creator_user_id
-            ? "The creator archived this request."
-            : "This request has been archived.";
+            archiveContext.buyer_user_id
+            ? "The buyer cancelled this request."
+            : archiveContext?.archived_by_user_id &&
+              archiveContext.creator_user_id &&
+              archiveContext.archived_by_user_id ===
+              archiveContext.creator_user_id
+              ? "The creator archived this request."
+              : "This request has been archived.";
 
 export const canAcceptListingRequest = (
   status: ListingRequestStatus

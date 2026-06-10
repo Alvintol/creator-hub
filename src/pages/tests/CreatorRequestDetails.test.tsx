@@ -32,9 +32,32 @@ vi.mock("../../hooks/creatorRequests/useUpdateCreatorListingRequestStatus", () =
   }),
 }));
 
-vi.mock("../../components/RequestConversationThread", () => ({
-  default: () => <div>Conversation thread loaded</div>,
-}));
+vi.mock(
+  "../../components/RequestConversationThread",
+  () => ({
+    default: ({
+      requestReadOnly,
+      requestReadOnlyMessage,
+    }: {
+      requestReadOnly?: boolean;
+      requestReadOnlyMessage?: string;
+    }) => (
+      <div>
+        <div>Conversation thread loaded</div>
+
+        <div>
+          {requestReadOnly
+            ? "Conversation is read-only"
+            : "Conversation is writable"}
+        </div>
+
+        {requestReadOnlyMessage && (
+          <div>{requestReadOnlyMessage}</div>
+        )}
+      </div>
+    ),
+  })
+);
 
 vi.mock("../../hooks/creatorRequests/useListingRequestAgreement", () => ({
   useListingRequestAgreement: mocks.useListingRequestAgreement,
@@ -446,6 +469,8 @@ const request = {
   updated_at: "2026-05-17T12:00:00.000Z",
   archived_at: null,
   archived_by_user_id: null,
+  completed_at: null,
+  completed_by_user_id: null,
   listing_snapshot: {
     listing_id: "listing-1",
     creator_user_id: "creator-1",
@@ -1464,6 +1489,56 @@ describe("<CreatorRequestDetails />", () => {
     expect(
       screen.queryByRole("button", {
         name: "Mock final delivery builder",
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it("makes a completed creator project read-only", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "completed",
+          completed_at:
+            "2026-06-09T15:00:00.000Z",
+          completed_by_user_id: "buyer-1",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText("Completed")
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Conversation is read-only")
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText(
+        "Completed projects are read-only because the buyer approved the final delivery."
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Accept request",
+      })
+    ).not.toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Decline request",
       })
     ).not.toBeInTheDocument();
   });

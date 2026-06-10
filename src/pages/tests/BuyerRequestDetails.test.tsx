@@ -13,15 +13,39 @@ const mocks = vi.hoisted(() => ({
   useListingRequestChangeOrders: vi.fn(),
   respondChangeOrder: vi.fn(),
   useListingRequestFinalDeliveries: vi.fn(),
+  respondFinalDelivery: vi.fn(),
 }));
 
 vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
   useBuyerRequest: mocks.useBuyerRequest,
 }));
 
-vi.mock("../../components/RequestConversationThread", () => ({
-  default: () => <div>Conversation thread loaded</div>,
-}));
+vi.mock(
+  "../../components/RequestConversationThread",
+  () => ({
+    default: ({
+      requestReadOnly,
+      requestReadOnlyMessage,
+    }: {
+      requestReadOnly?: boolean;
+      requestReadOnlyMessage?: string;
+    }) => (
+      <div>
+        <div>Conversation thread loaded</div>
+
+        <div>
+          {requestReadOnly
+            ? "Conversation is read-only"
+            : "Conversation is writable"}
+        </div>
+
+        {requestReadOnlyMessage && (
+          <div>{requestReadOnlyMessage}</div>
+        )}
+      </div>
+    ),
+  })
+);
 
 vi.mock("../../hooks/creatorRequests/useArchiveBuyerListingRequest", () => ({
   useArchiveBuyerListingRequest: () => ({
@@ -238,6 +262,17 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../hooks/creatorRequests/useRespondListingRequestFinalDelivery",
+  () => ({
+    useRespondListingRequestFinalDelivery: () => ({
+      mutateAsync: mocks.respondFinalDelivery,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -255,6 +290,8 @@ const request = {
   updated_at: "2026-05-17T12:00:00.000Z",
   archived_at: null,
   archived_by_user_id: null,
+  completed_at: null,
+  completed_by_user_id: null,
   listing_snapshot: {
     listing_id: "listing-1",
     creator_user_id: "creator-1",
@@ -413,6 +450,8 @@ describe("<BuyerRequestDetails />", () => {
         error: null,
       }
     );
+
+    mocks.respondFinalDelivery.mockResolvedValue(undefined);
   });
 
   it("renders structured buyer request details", () => {
@@ -1039,5 +1078,49 @@ describe("<BuyerRequestDetails />", () => {
         "Mock final delivery summary: buyer / 1 / ready / no error"
       )
     ).toBeInTheDocument();
+  });
+
+  it("makes a completed buyer project read-only", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "completed",
+          completed_at:
+            "2026-06-09T15:00:00.000Z",
+          completed_by_user_id: "buyer-1",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText("Completed")
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Conversation is read-only")
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText(
+        "Completed projects are read-only because the buyer approved the final delivery."
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Archive request",
+      })
+    ).not.toBeInTheDocument();
   });
 });

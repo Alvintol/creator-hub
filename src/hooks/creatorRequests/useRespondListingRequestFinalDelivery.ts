@@ -55,9 +55,9 @@ export const useRespondListingRequestFinalDelivery =
 
             p_revision_request_reason:
               input.response ===
-              "revision_requested"
+                "revision_requested"
                 ? input.revisionRequestReason?.trim() ||
-                  null
+                null
                 : null,
           }
         );
@@ -68,8 +68,8 @@ export const useRespondListingRequestFinalDelivery =
 
         const finalDelivery = Array.isArray(data)
           ? (data[0] as
-              | RespondedListingRequestFinalDeliveryRow
-              | undefined)
+            | RespondedListingRequestFinalDeliveryRow
+            | undefined)
           : undefined;
 
         if (!finalDelivery?.id) {
@@ -135,6 +135,18 @@ export const useRespondListingRequestFinalDelivery =
 
           queryClient.invalidateQueries({
             queryKey: ["messagesInbox"],
+          }),
+          
+          queryClient.invalidateQueries({
+            queryKey: ["myBuyerRequests"],
+          }),
+
+          queryClient.invalidateQueries({
+            queryKey: ["myCreatorRequests"],
+          }),
+
+          queryClient.invalidateQueries({
+            queryKey: ["adminRequests"],
           }),
         ]);
       },

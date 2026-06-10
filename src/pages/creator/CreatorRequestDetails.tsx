@@ -316,6 +316,20 @@ const CreatorRequestDetails = () => {
     !finalDeliveriesQuery.isLoading &&
     !finalDeliveriesQuery.error;
 
+  const requestReadOnly =
+    request.status === "archived" ||
+    request.status === "declined" ||
+    request.status === "completed";
+
+  const requestReadOnlyMessage =
+    request.status === "archived"
+      ? "Archived requests are read-only."
+      : request.status === "declined"
+        ? "Declined requests are read-only because the conversation has been ended."
+        : request.status === "completed"
+          ? "Completed projects are read-only because the buyer approved the final delivery."
+          : undefined;
+
   return (
     <div className={classes.page}>
       <Link to={backTo} className={classes.backLink}>
@@ -708,17 +722,14 @@ const CreatorRequestDetails = () => {
         requestId={request.id}
         buyerUserId={request.buyer_user_id}
         creatorUserId={request.creator_user_id}
-        buyerLabel={buyerText(buyer, request.buyer_user_id)}
+        buyerLabel={buyerText(
+          buyer,
+          request.buyer_user_id
+        )}
         creatorLabel="You"
         viewer="creator"
-        requestReadOnly={
-          request.status === "archived" || request.status === "declined"
-        }
-        requestReadOnlyMessage={
-          request.status === "archived"
-            ? "Archived requests are read-only."
-            : "Declined requests are read-only because the conversation has been ended."
-        }
+        requestReadOnly={requestReadOnly}
+        requestReadOnlyMessage={requestReadOnlyMessage}
       />
 
       <div className={classes.row}>

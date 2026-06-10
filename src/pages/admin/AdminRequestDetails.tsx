@@ -129,6 +129,9 @@ const AdminRequestDetails = () => {
         : null
     );
 
+  const finalDeliveries =
+    finalDeliveriesQuery.data ?? [];
+
 
   if (isLoading) {
     return <div className={classes.loadingText}>Loading…</div>;
@@ -360,13 +363,9 @@ const AdminRequestDetails = () => {
           />
 
           <ListingRequestFinalDeliverySummary
-            finalDeliveries={
-              finalDeliveriesQuery.data ?? []
-            }
+            finalDeliveries={finalDeliveries}
             viewer="admin"
-            isLoading={
-              finalDeliveriesQuery.isLoading
-            }
+            isLoading={finalDeliveriesQuery.isLoading}
             error={finalDeliveriesQuery.error}
           />
 
