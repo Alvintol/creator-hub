@@ -26,6 +26,8 @@ export type ListingRequestRow = {
   reference_links: string[];
   archived_at: string | null;
   archived_by_user_id: string | null;
+  completed_at: string | null;
+  completed_by_user_id: string | null;
 };
 
 export type ListingRequestProfile = {
@@ -130,7 +132,9 @@ const fetchMyCreatorRequests = async (
           budget_amount,
           reference_links,
           archived_at,
-          archived_by_user_id
+          archived_by_user_id,
+          completed_at,
+          completed_by_user_id
         )
       `,
       { count: "exact" }

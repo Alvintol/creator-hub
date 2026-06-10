@@ -4,6 +4,7 @@ import { useMyBuyerRequests } from "../../hooks/creatorRequests/useMyBuyerReques
 import {
   getListingRequestStatusLabel,
   getListingRequestStatusTone,
+  ListingRequestStatus,
 } from "../../domain/listings/listingRequests";
 import { getListingRequestDisplayPreview, getListingRequestDisplayTitle } from '../../domain/listings/listings';
 
@@ -85,7 +86,7 @@ const dateText = (value: string) => {
 };
 
 const getStatusPillClass = (
-  status: "submitted" | "accepted" | "declined" | "archived"
+  status: ListingRequestStatus
 ) => {
   const tone = getListingRequestStatusTone(status);
 

@@ -22,6 +22,8 @@ export type AdminRequestDetailsRow = {
   reference_links: string[];
   archived_at: string | null;
   archived_by_user_id: string | null;
+  completed_at: string | null;
+  completed_by_user_id: string | null;
 };
 
 export type AdminRequestDetails = {
@@ -58,7 +60,9 @@ const fetchAdminRequest = async (
       budget_amount,
       reference_links,
       archived_at,
-      archived_by_user_id
+      archived_by_user_id,
+      completed_at,
+      completed_by_user_id
     `)
     .eq("id", requestId)
     .maybeSingle();

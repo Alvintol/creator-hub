@@ -20,6 +20,8 @@ import { useRespondListingRequestChangeOrder } from '../../hooks/creatorRequests
 import ListingRequestChangeOrderBuyerActions from '../../components/ListingRequestChangeOrderBuyerActions';
 import { useListingRequestFinalDeliveries } from '../../hooks/creatorRequests/useListingRequestFinalDeliveries';
 import ListingRequestFinalDeliverySummary from '../../components/ListingRequestFinalDeliverySummary';
+import { useRespondListingRequestFinalDelivery } from '../../hooks/creatorRequests/useRespondListingRequestFinalDelivery';
+import ListingRequestFinalDeliveryBuyerActions from '../../components/ListingRequestFinalDeliveryBuyerActions';
 
 const classes = {
   page: "space-y-6",
@@ -110,6 +112,8 @@ const BuyerRequestDetails = () => {
   const respondAgreementMutation = useRespondListingRequestAgreement();
   const respondChangeOrderMutation =
     useRespondListingRequestChangeOrder();
+  const respondFinalDeliveryMutation =
+    useRespondListingRequestFinalDelivery();
 
   const agreement = agreementQuery.data ?? null;
 
@@ -144,6 +148,50 @@ const BuyerRequestDetails = () => {
         : null
     );
 
+  const finalDeliveries =
+    finalDeliveriesQuery.data ?? [];
+
+  const activeSubmittedFinalDelivery =
+    finalDeliveries.find(
+      (finalDelivery) =>
+        finalDelivery.status === "submitted"
+    ) ?? null;
+
+  const hasOutstandingFinalBalance =
+    buyerVisibleAgreement
+      ?.listing_request_payment_schedule_items
+      ?.some(
+        (paymentItem) =>
+          paymentItem.payment_timing ===
+          "due_before_final_release" &&
+          paymentItem.amount > 0 &&
+          (
+            paymentItem.status === "pending" ||
+            paymentItem.status ===
+            "payment_required"
+          )
+      ) ?? false;
+
+  const hasActiveFinalBalanceHold =
+    buyerVisibleAgreement
+      ?.listing_request_timeline_holds
+      ?.some(
+        (timelineHold) =>
+          timelineHold.reason ===
+          "balance_payment_pending" &&
+          timelineHold.ended_at === null
+      ) ?? false;
+
+  const canApproveFinalDelivery =
+    !hasOutstandingFinalBalance &&
+    !hasActiveFinalBalanceHold;
+
+  const finalDeliveryApprovalBlockedReason =
+    hasOutstandingFinalBalance
+      ? "The final balance must be confirmed as paid before you can approve this delivery."
+      : hasActiveFinalBalanceHold
+        ? "The final balance payment is still awaiting confirmation."
+        : null;
 
   const handleArchiveRequest = async () => {
     if (!request) {
@@ -207,6 +255,20 @@ const BuyerRequestDetails = () => {
       response: "buyer_declined",
     });
   };
+
+  const requestReadOnly =
+    request.status === "archived" ||
+    request.status === "declined" ||
+    request.status === "completed";
+
+  const requestReadOnlyMessage =
+    request.status === "archived"
+      ? "Archived requests are read-only."
+      : request.status === "declined"
+        ? "Declined requests are read-only because the conversation has been ended."
+        : request.status === "completed"
+          ? "Completed projects are read-only because the buyer approved the final delivery."
+          : undefined;
 
   return (
     <div className={classes.page}>
@@ -467,14 +529,38 @@ const BuyerRequestDetails = () => {
             />
 
             <ListingRequestFinalDeliverySummary
-              finalDeliveries={
-                finalDeliveriesQuery.data ?? []
-              }
+              finalDeliveries={finalDeliveries}
               viewer="buyer"
-              isLoading={
-                finalDeliveriesQuery.isLoading
-              }
+              isLoading={finalDeliveriesQuery.isLoading}
               error={finalDeliveriesQuery.error}
+            />
+
+            <ListingRequestFinalDeliveryBuyerActions
+              finalDelivery={activeSubmittedFinalDelivery}
+              canApprove={canApproveFinalDelivery}
+              approvalBlockedReason={
+                finalDeliveryApprovalBlockedReason
+              }
+              isPending={
+                respondFinalDeliveryMutation.isPending
+              }
+              error={respondFinalDeliveryMutation.error}
+              onApprove={(finalDeliveryId) =>
+                respondFinalDeliveryMutation.mutateAsync({
+                  finalDeliveryId,
+                  response: "buyer_approved",
+                })
+              }
+              onRequestRevision={(
+                finalDeliveryId,
+                revisionRequestReason
+              ) =>
+                respondFinalDeliveryMutation.mutateAsync({
+                  finalDeliveryId,
+                  response: "revision_requested",
+                  revisionRequestReason,
+                })
+              }
             />
 
             <ListingRequestProgressUpdateScheduleCard
@@ -495,16 +581,13 @@ const BuyerRequestDetails = () => {
         buyerUserId={request.buyer_user_id}
         creatorUserId={request.creator_user_id}
         buyerLabel="You"
-        creatorLabel={creatorText(creator, request.creator_user_id)}
+        creatorLabel={creatorText(
+          creator,
+          request.creator_user_id
+        )}
         viewer="buyer"
-        requestReadOnly={
-          request.status === "archived" || request.status === "declined"
-        }
-        requestReadOnlyMessage={
-          request.status === "archived"
-            ? "Archived requests are read-only."
-            : "Declined requests are read-only because the conversation has been ended."
-        }
+        requestReadOnly={requestReadOnly}
+        requestReadOnlyMessage={requestReadOnlyMessage}
       />
 
       <div className={classes.row}>
