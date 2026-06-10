@@ -1,48 +1,52 @@
-import { Routes, Route, Navigate } from "react-router-dom";
-import Layout from "./components/Layout";
-import ScrollToTop from "./components/ScrollToTop";
-import ProfileSetupRedirect from "./components/ProfileSetupRedirect";
-import RequireAuth from "./components/RequireAuth";
-import RequireAdminAccess from "./components/RequireAdminAccess";
+import {
+  Navigate,
+  Route,
+  Routes,
+} from "react-router-dom";
 
+import Layout from "./components/Layout";
+import ProfileSetupRedirect from "./components/ProfileSetupRedirect";
+import RequireAdminAccess from "./components/RequireAdminAccess";
+import RequireAuth from "./components/RequireAuth";
+import RequireCreatorAccess from "./components/RequireCreatorAccess";
+import ScrollToTop from "./components/ScrollToTop";
+import About from "./pages/About";
 import Home from "./pages/Home";
 import Live from "./pages/Live";
-import Creators from "./pages/creator/Creators";
-import CreatorProfile from "./pages/creator/CreatorProfile";
 import Market from "./pages/Market";
-import Listing from "./pages/listings/Listing";
 import NotFound from "./pages/NotFound";
-import About from "./pages/About";
-import SignIn from "./pages/SignIn";
 import ProfileSettings from "./pages/ProfileSettings";
-import ApplyCreator from "./pages/creator/ApplyCreator";
+import SignIn from "./pages/SignIn";
 import AdminCreatorApplications from "./pages/admin/AdminCreatorApplications";
-import RequireCreatorAccess from './components/RequireCreatorAccess';
-import CreatorDashboard from './pages/creator/CreatorDashboard';
-import Legal from './pages/legal/Legal';
-import Terms from './pages/legal/Terms';
-import Privacy from './pages/legal/Privacy';
-import CreatorTerms from './pages/legal/CreatorTerms';
-import CreateListing from './pages/listings/CreateListing';
-import CreatorListings from './pages/listings/CreatorListings';
-import EditListing from './pages/listings/EditListing';
-import CreatorListingDetails from './pages/listings/CreatorListingDetails';
-import CreatorListingRevisions from './pages/listings/CreatorListingRevisions';
-import AdminListingRevisions from './pages/admin/AdminListingRevisions';
-import AdminListings from './pages/admin/AdminListings';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import RequestListing from './pages/listings/RequestListing';
-import CreatorRequestDetails from './pages/creator/CreatorRequestDetails';
-import CreatorRequests from './pages/creator/CreatorRequests';
-import BuyerRequestDetails from './pages/buyer/BuyerRequestDetails';
-import BuyerRequests from './pages/buyer/BuyerRequests';
-import AdminRequestDetails from './pages/admin/AdminRequestDetails';
-import AdminRequests from './pages/admin/AdminRequests';
-import AdminModerationReportDetails from './pages/admin/AdminModerationReportDetails';
-import AdminModerationReports from './pages/admin/AdminModerationReports';
-import MessageDetails from './pages/messages/MessageDetails';
-import MessagesInbox from './pages/messages/MessagesInbox';
-import MyReports from './pages/reports/MyReports';
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminListingRevisions from "./pages/admin/AdminListingRevisions";
+import AdminListings from "./pages/admin/AdminListings";
+import AdminModerationReportDetails from "./pages/admin/AdminModerationReportDetails";
+import AdminModerationReports from "./pages/admin/AdminModerationReports";
+import AdminRequestDetails from "./pages/admin/AdminRequestDetails";
+import AdminRequests from "./pages/admin/AdminRequests";
+import BuyerRequestDetails from "./pages/buyer/BuyerRequestDetails";
+import BuyerRequests from "./pages/buyer/BuyerRequests";
+import ApplyCreator from "./pages/creator/ApplyCreator";
+import CreatorDashboard from "./pages/creator/CreatorDashboard";
+import CreatorListingDetails from "./pages/listings/CreatorListingDetails";
+import CreatorProfile from "./pages/creator/CreatorProfile";
+import CreatorRequestDetails from "./pages/creator/CreatorRequestDetails";
+import CreatorRequests from "./pages/creator/CreatorRequests";
+import Creators from "./pages/creator/Creators";
+import CreateListing from "./pages/listings/CreateListing";
+import CreatorListingRevisions from "./pages/listings/CreatorListingRevisions";
+import CreatorListings from "./pages/listings/CreatorListings";
+import EditListing from "./pages/listings/EditListing";
+import Listing from "./pages/listings/Listing";
+import RequestListing from "./pages/listings/RequestListing";
+import CreatorTerms from "./pages/legal/CreatorTerms";
+import Legal from "./pages/legal/Legal";
+import Privacy from "./pages/legal/Privacy";
+import Terms from "./pages/legal/Terms";
+import MessageDetails from "./pages/messages/MessageDetails";
+import MessagesInbox from "./pages/messages/MessagesInbox";
+import MyReports from "./pages/reports/MyReports";
 
 const App = () => {
   return (
@@ -50,7 +54,7 @@ const App = () => {
       <ScrollToTop />
       <ProfileSetupRedirect />
 
-      <Routes>
+      <Route >
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
           <Route path="/signin" element={<SignIn />} />
@@ -64,55 +68,48 @@ const App = () => {
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms/creator" element={<CreatorTerms />} />
-
           <Route element={<RequireAuth />}>
             <Route path="/settings/profile" element={<ProfileSettings />} />
             <Route path="/apply/creator" element={<ApplyCreator />} />
             <Route path="/listing/:id/request" element={<RequestListing />} />
-            <Route path="/requests" element={<BuyerRequests />} />
-            <Route path="/requests/archived" element={<BuyerRequests archived />} />
+            <Route path="/requests" element={<BuyerRequests view="active" />} />
+            <Route path="/requests/completed" element={<BuyerRequests view="completed" />} />
+            <Route path="/requests/archived" element={<BuyerRequests view="archived" />} />
             <Route path="/requests/:id" element={<BuyerRequestDetails />} />
             <Route path="/messages" element={<MessagesInbox />} />
             <Route path="/messages/:id" element={<MessageDetails />} />
             <Route path="/settings/reports" element={<MyReports />} />
           </Route>
 
-          <Route element={<RequireAdminAccess />}>
-            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route element={<RequireAdminAccess />}
+          >
+            <Route path="/admin" element={<Navigate replace to="/admin/dashboard" />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route
-              path="/admin/creator-applications"
-              element={<AdminCreatorApplications />}
-            />
+            <Route path="/admin/creator-applications" element={<AdminCreatorApplications />} />
             <Route path="/admin/listings" element={<AdminListings />} />
-            <Route
-              path="/admin/listing-revisions/:id"
-              element={<AdminListingRevisions />}
-            />
+            <Route path="/admin/listing-revisions/:id" element={<AdminListingRevisions />} />
             <Route path="/admin/requests" element={<AdminRequests />} />
             <Route path="/admin/requests/:id" element={<AdminRequestDetails />} />
             <Route path="/admin/reports" element={<AdminModerationReports />} />
             <Route path="/admin/reports/:id" element={<AdminModerationReportDetails />} />
           </Route>
 
-          <Route element={<RequireCreatorAccess />}>
-            <Route path="/creator/dashboard" element={<CreatorDashboard />} />
-            <Route path="/creator/listings" element={<CreatorListings />} />
-            <Route path="/creator/listings/new" element={<CreateListing />} />
-            <Route path="/creator/listings/:id" element={<CreatorListingDetails />} />
-            <Route
-              path="/creator/listings/:id/revisions"
-              element={<CreatorListingRevisions />}
-            />
-            <Route path="/creator/listings/:id/edit" element={<EditListing />} />
-            <Route path="/creator/requests" element={<CreatorRequests />} />
-            <Route path="/creator/requests/archived" element={<CreatorRequests archived />} />
-            <Route path="/creator/requests/:id" element={<CreatorRequestDetails />} />
-          </Route>
+          <Route element={<RequireCreatorAccess />} />
+          <Route path="/creator/dashboard" element={<CreatorDashboard />} />
+          <Route path="/creator/listings" element={<CreatorListings />} />
+          <Route path="/creator/listings/new" element={<CreateListing />} />
+          <Route path="/creator/listings/:id" element={<CreatorListingDetails />} />
+          <Route path="/creator/listings/:id/revisions" element={<CreatorListingRevisions />} />
+          <Route path="/creator/listings/:id/edit" element={<EditListing />} />
+          <Route path="/creator/requests" element={<CreatorRequests view="active" />} />
+          <Route path="/creator/requests/completed" element={<CreatorRequests view="completed" />} />
 
-          <Route path="*" element={<NotFound />} />
+          <Route path="/creator/requests/archived" element={<CreatorRequests view="archived" />} />
+          <Route path="/creator/requests/:id" element={<CreatorRequestDetails />} />
         </Route>
-      </Routes>
+
+        <Route path="*" element={<NotFound />} />
+      </Route>
     </>
   );
 };

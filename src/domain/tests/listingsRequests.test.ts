@@ -4,6 +4,7 @@ import {
   canAcceptListingRequest,
   canArchiveListingRequest,
   canDeclineListingRequest,
+  getListingRequestStatusesForView,
   getListingRequestStatusLabel,
   getListingRequestStatusSummary,
   getListingRequestStatusTone,
@@ -20,6 +21,20 @@ describe("listing request status helpers", () => {
       value: "completed",
       label: "Completed",
     });
+  });
+
+  it("maps request list views to their statuses", () => {
+    expect(
+      getListingRequestStatusesForView("active")
+    ).toEqual(["submitted", "accepted"]);
+
+    expect(
+      getListingRequestStatusesForView("completed")
+    ).toEqual(["completed"]);
+
+    expect(
+      getListingRequestStatusesForView("archived")
+    ).toEqual(["declined", "archived"]);
   });
 
   it("maps statuses to the correct labels", () => {
