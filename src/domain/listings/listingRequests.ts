@@ -5,6 +5,11 @@ export type ListingRequestStatus =
   | "declined"
   | "archived";
 
+export type ListingRequestListView =
+  | "active"
+  | "completed"
+  | "archived";
+
 export type ListingRequestStatusTone =
   | "review"
   | "success"
@@ -42,6 +47,15 @@ export const listingRequestStatusOptions: Array<{
       label: "Archived",
     },
   ];
+
+export const getListingRequestStatusesForView = (
+  view: ListingRequestListView
+): ListingRequestStatus[] =>
+  view === "active"
+    ? ["submitted", "accepted"]
+    : view === "completed"
+      ? ["completed"]
+      : ["declined", "archived"];
 
 export const getListingRequestStatusLabel = (
   status: ListingRequestStatus,

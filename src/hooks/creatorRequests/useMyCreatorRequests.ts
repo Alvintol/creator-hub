@@ -1,12 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "../../lib/supabaseClient";
-import { useAuth } from "../../providers/AuthProvider";
-import type { ListingRequestSnapshot } from "../../lib/listings/listingRequestSnapshot";
-import type { ListingRequestStatus } from "../../domain/listings/listingRequests";
+
 import type {
   BuyerImageUploadStatus,
   ConversationStatus,
 } from "../../domain/conversations/conversations";
+import {
+  getListingRequestStatusesForView,
+  type ListingRequestListView,
+  type ListingRequestStatus,
+} from "../../domain/listings/listingRequests";
+import type { ListingRequestSnapshot } from "../../lib/listings/listingRequestSnapshot";
+import { supabase } from "../../lib/supabaseClient";
+import { useAuth } from "../../providers/AuthProvider";
 
 export type ListingRequestRow = {
   id: string;
@@ -49,15 +54,18 @@ export type CreatorListingRequestConversation = {
   has_unread: boolean;
 };
 
-type CreatorListingRequestConversationRow = CreatorListingRequestConversation & {
-  listing_requests: ListingRequestRow | ListingRequestRow[] | null;
-};
+type CreatorListingRequestConversationRow =
+  CreatorListingRequestConversation & {
+    listing_requests:
+    | ListingRequestRow
+    | ListingRequestRow[]
+    | null;
+  };
 
 type CreatorListingRequestConversationItem = {
   conversation: CreatorListingRequestConversationRow;
   request: ListingRequestRow;
 };
-
 
 export type CreatorListingRequestItem = {
   request: ListingRequestRow;
@@ -71,11 +79,11 @@ export type CreatorListingRequestsResult = {
   page: number;
   pageSize: number;
   pageCount: number;
-  archived: boolean;
+  view: ListingRequestListView;
 };
 
 type UseMyCreatorRequestsInput = {
-  archived: boolean;
+  view: ListingRequestListView;
   page: number;
   pageSize?: number;
 };
@@ -86,7 +94,7 @@ const emptyResult: CreatorListingRequestsResult = {
   page: 1,
   pageSize: 12,
   pageCount: 0,
-  archived: false,
+  view: "active",
 };
 
 const getConversationRequest = (
@@ -97,12 +105,16 @@ const getConversationRequest = (
     : conversation.listing_requests;
 
 // Loads a paginated creator request inbox from request-linked conversations.
-// Conversation.updated_at drives inbox ordering, so new messages/activity move cards up.
+// Conversation.updated_at drives inbox ordering, so new activity moves cards up.
 const fetchMyCreatorRequests = async (
   userId: string,
   input: UseMyCreatorRequestsInput
 ): Promise<CreatorListingRequestsResult> => {
-  const { archived, page, pageSize = 12 } = input;
+  const {
+    view,
+    page,
+    pageSize = 12,
+  } = input;
 
   let query = supabase
     .from("conversations")
@@ -137,15 +149,23 @@ const fetchMyCreatorRequests = async (
           completed_by_user_id
         )
       `,
-      { count: "exact" }
+      {
+        count: "exact",
+      }
     )
-    .eq("conversation_type", "listing_request")
+    .eq(
+      "conversation_type",
+      "listing_request"
+    )
     .eq("creator_user_id", userId)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", {
+      ascending: false,
+    });
 
-  query = archived
-    ? query.eq("listing_requests.status", "archived")
-    : query.neq("listing_requests.status", "archived");
+  query = query.in(
+    "listing_requests.status",
+    getListingRequestStatusesForView(view)
+  );
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -166,36 +186,22 @@ const fetchMyCreatorRequests = async (
   const conversationItems = conversationRows
     .map((conversation) => ({
       conversation,
-      request: getConversationRequest(conversation),
+      request:
+        getConversationRequest(conversation),
     }))
     .filter(
-      (item): item is CreatorListingRequestConversationItem =>
+      (
+        item
+      ): item is CreatorListingRequestConversationItem =>
         Boolean(item.request)
     );
+
   const totalCount = count ?? 0;
-  const pageCount = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 0;
 
-  const conversationIds = conversationItems.map((item) => item.conversation.id);
-
-  const { data: participants, error: participantsError } = await supabase
-    .from("conversation_participants")
-    .select("conversation_id, last_read_at")
-    .eq("user_id", userId)
-    .in("conversation_id", conversationIds);
-
-  if (participantsError) {
-    throw participantsError;
-  }
-
-  const participantByConversationId = Object.fromEntries(
-    ((participants ?? []) as Array<{
-      conversation_id: string;
-      last_read_at: string | null;
-    }>).map((participant) => [
-      participant.conversation_id,
-      participant,
-    ])
-  );
+  const pageCount =
+    totalCount > 0
+      ? Math.ceil(totalCount / pageSize)
+      : 0;
 
   if (conversationItems.length === 0) {
     return {
@@ -204,86 +210,180 @@ const fetchMyCreatorRequests = async (
       page,
       pageSize,
       pageCount,
-      archived,
+      view,
     };
   }
+
+  const conversationIds =
+    conversationItems.map(
+      (item) => item.conversation.id
+    );
+
+  const {
+    data: participants,
+    error: participantsError,
+  } = await supabase
+    .from("conversation_participants")
+    .select(
+      "conversation_id, last_read_at"
+    )
+    .eq("user_id", userId)
+    .in("conversation_id", conversationIds);
+
+  if (participantsError) {
+    throw participantsError;
+  }
+
+  const participantByConversationId =
+    Object.fromEntries(
+      (
+        (participants ?? []) as Array<{
+          conversation_id: string;
+          last_read_at: string | null;
+        }>
+      ).map((participant) => [
+        participant.conversation_id,
+        participant,
+      ])
+    );
 
   const buyerIds = Array.from(
     new Set(
       conversationItems.map(
-        (item) => item.request.buyer_user_id
+        (item) =>
+          item.request.buyer_user_id
       )
     )
   );
 
-  const { data: profiles, error: profilesError } = await supabase
+  const {
+    data: profiles,
+    error: profilesError,
+  } = await supabase
     .from("profiles")
-    .select("user_id, handle, display_name, avatar_url")
+    .select(
+      "user_id, handle, display_name, avatar_url"
+    )
     .in("user_id", buyerIds);
 
   if (profilesError) {
     throw profilesError;
   }
 
-  const profileByUserId = Object.fromEntries(
-    ((profiles ?? []) as ListingRequestProfile[]).map((profile) => [
-      profile.user_id,
-      profile,
-    ])
-  ) as Record<string, ListingRequestProfile>;
+  const profileByUserId =
+    Object.fromEntries(
+      (
+        (profiles ??
+          []) as ListingRequestProfile[]
+      ).map((profile) => [
+        profile.user_id,
+        profile,
+      ])
+    ) as Record<
+      string,
+      ListingRequestProfile
+    >;
 
   return {
     items: conversationItems.map((item) => {
-      const participant = participantByConversationId[item.conversation.id] ?? null;
-      const lastReadAt = participant?.last_read_at ?? null;
-      const latestMessageAt = item.conversation.last_message_at;
-      const latestSenderUserId = item.conversation.last_message_sender_user_id;
+      const participant =
+        participantByConversationId[
+        item.conversation.id
+        ] ?? null;
+
+      const lastReadAt =
+        participant?.last_read_at ?? null;
+
+      const latestMessageAt =
+        item.conversation.last_message_at;
+
+      const latestSenderUserId =
+        item.conversation
+          .last_message_sender_user_id;
 
       const hasUnread =
         Boolean(latestMessageAt) &&
         latestSenderUserId !== userId &&
-        (!lastReadAt || latestMessageAt! > lastReadAt);
+        (
+          !lastReadAt ||
+          latestMessageAt! > lastReadAt
+        );
 
       return {
         request: item.request,
-        buyer: profileByUserId[item.request.buyer_user_id] ?? null,
+
+        buyer:
+          profileByUserId[
+          item.request.buyer_user_id
+          ] ?? null,
+
         conversation: {
           id: item.conversation.id,
           status: item.conversation.status,
-          last_message_at: item.conversation.last_message_at,
-          last_message_sender_user_id: item.conversation.last_message_sender_user_id,
-          last_message_preview: item.conversation.last_message_preview,
-          buyer_image_upload_status: item.conversation.buyer_image_upload_status,
-          updated_at: item.conversation.updated_at,
-          participant_last_read_at: lastReadAt,
+          last_message_at:
+            item.conversation
+              .last_message_at,
+          last_message_sender_user_id:
+            item.conversation
+              .last_message_sender_user_id,
+          last_message_preview:
+            item.conversation
+              .last_message_preview,
+          buyer_image_upload_status:
+            item.conversation
+              .buyer_image_upload_status,
+          updated_at:
+            item.conversation.updated_at,
+          participant_last_read_at:
+            lastReadAt,
           has_unread: hasUnread,
         },
       };
     }),
+
     totalCount,
     page,
     pageSize,
     pageCount,
-    archived,
+    view,
   };
 };
 
-export const useMyCreatorRequests = (input: UseMyCreatorRequestsInput) => {
-  const { user, loading } = useAuth();
+export const useMyCreatorRequests = (
+  input: UseMyCreatorRequestsInput
+) => {
+  const {
+    user,
+    loading,
+  } = useAuth();
+
   const userId = user?.id ?? null;
 
-  return useQuery<CreatorListingRequestsResult>({
-    queryKey: ["myCreatorRequests", userId, input],
-    enabled: !loading && Boolean(userId),
+  return useQuery({
+    queryKey: [
+      "myCreatorRequests",
+      userId,
+      input,
+    ],
+
+    enabled:
+      !loading && Boolean(userId),
+
     queryFn: () =>
       userId
-        ? fetchMyCreatorRequests(userId, input)
+        ? fetchMyCreatorRequests(
+          userId,
+          input
+        )
         : Promise.resolve({
           ...emptyResult,
-          archived: input.archived,
+          view: input.view,
           page: input.page,
-          pageSize: input.pageSize ?? emptyResult.pageSize,
+          pageSize:
+            input.pageSize ??
+            emptyResult.pageSize,
         }),
+
     staleTime: 15_000,
   });
 };

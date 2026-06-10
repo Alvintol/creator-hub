@@ -1,12 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "../../lib/supabaseClient";
-import { useAuth } from "../../providers/AuthProvider";
-import type { ListingRequestSnapshot } from "../../lib/listings/listingRequestSnapshot";
-import type { ListingRequestStatus } from "../../domain/listings/listingRequests";
+
 import type {
   BuyerImageUploadStatus,
   ConversationStatus,
 } from "../../domain/conversations/conversations";
+import {
+  getListingRequestStatusesForView,
+  type ListingRequestListView,
+  type ListingRequestStatus,
+} from "../../domain/listings/listingRequests";
+import type { ListingRequestSnapshot } from "../../lib/listings/listingRequestSnapshot";
+import { supabase } from "../../lib/supabaseClient";
+import { useAuth } from "../../providers/AuthProvider";
 
 export type BuyerListingRequestRow = {
   id: string;
@@ -49,9 +54,13 @@ export type BuyerListingRequestConversation = {
   has_unread: boolean;
 };
 
-type BuyerListingRequestConversationRow = BuyerListingRequestConversation & {
-  listing_requests: BuyerListingRequestRow | BuyerListingRequestRow[] | null;
-};
+type BuyerListingRequestConversationRow =
+  BuyerListingRequestConversation & {
+    listing_requests:
+    | BuyerListingRequestRow
+    | BuyerListingRequestRow[]
+    | null;
+  };
 
 type BuyerListingRequestConversationItem = {
   conversation: BuyerListingRequestConversationRow;
@@ -70,11 +79,11 @@ export type BuyerListingRequestsResult = {
   page: number;
   pageSize: number;
   pageCount: number;
-  archived: boolean;
+  view: ListingRequestListView;
 };
 
 type UseMyBuyerRequestsInput = {
-  archived: boolean;
+  view: ListingRequestListView;
   page: number;
   pageSize?: number;
 };
@@ -85,11 +94,10 @@ const emptyResult: BuyerListingRequestsResult = {
   page: 1,
   pageSize: 12,
   pageCount: 0,
-  archived: false,
+  view: "active",
 };
 
 // Supabase can type nested joins as arrays even when our relationship is one-to-one.
-// This safely normalises the nested request into one row.
 const getConversationRequest = (
   conversation: BuyerListingRequestConversationRow
 ): BuyerListingRequestRow | null =>
@@ -97,24 +105,28 @@ const getConversationRequest = (
     ? conversation.listing_requests[0] ?? null
     : conversation.listing_requests;
 
-// Loads a paginated client request inbox from request-linked conversations.
-// Conversation.updated_at drives inbox ordering, so new messages/activity move cards up.
+// Loads a paginated buyer request inbox from request-linked conversations.
+// Conversation.updated_at drives inbox ordering, so new activity moves cards up.
 const fetchMyBuyerRequests = async (
   userId: string,
   input: UseMyBuyerRequestsInput
 ): Promise<BuyerListingRequestsResult> => {
-  const { archived, page, pageSize = 12 } = input;
+  const {
+    view,
+    page,
+    pageSize = 12,
+  } = input;
 
   let query = supabase
     .from("conversations")
     .select(
       `
-      id,
-      status,
-      last_message_at,
-      last_message_sender_user_id,
-      last_message_preview,
-      buyer_image_upload_status,
+        id,
+        status,
+        last_message_at,
+        last_message_sender_user_id,
+        last_message_preview,
+        buyer_image_upload_status,
         updated_at,
         listing_requests!inner (
           id,
@@ -138,15 +150,23 @@ const fetchMyBuyerRequests = async (
           completed_by_user_id
         )
       `,
-      { count: "exact" }
+      {
+        count: "exact",
+      }
     )
-    .eq("conversation_type", "listing_request")
+    .eq(
+      "conversation_type",
+      "listing_request"
+    )
     .eq("buyer_user_id", userId)
-    .order("updated_at", { ascending: false });
+    .order("updated_at", {
+      ascending: false,
+    });
 
-  query = archived
-    ? query.eq("listing_requests.status", "archived")
-    : query.neq("listing_requests.status", "archived");
+  query = query.in(
+    "listing_requests.status",
+    getListingRequestStatusesForView(view)
+  );
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
@@ -167,36 +187,22 @@ const fetchMyBuyerRequests = async (
   const conversationItems = conversationRows
     .map((conversation) => ({
       conversation,
-      request: getConversationRequest(conversation),
+      request:
+        getConversationRequest(conversation),
     }))
     .filter(
-      (item): item is BuyerListingRequestConversationItem =>
+      (
+        item
+      ): item is BuyerListingRequestConversationItem =>
         Boolean(item.request)
     );
 
-  const conversationIds = conversationItems.map((item) => item.conversation.id);
-
-  const { data: participants, error: participantsError } = await supabase
-    .from("conversation_participants")
-    .select("conversation_id, last_read_at")
-    .eq("user_id", userId)
-    .in("conversation_id", conversationIds);
-
-  if (participantsError) {
-    throw participantsError;
-  }
-
-  const participantByConversationId = Object.fromEntries(
-    ((participants ?? []) as Array<{
-      conversation_id: string;
-      last_read_at: string | null;
-    }>).map((participant) => [
-      participant.conversation_id,
-      participant,
-    ])
-  );
   const totalCount = count ?? 0;
-  const pageCount = totalCount > 0 ? Math.ceil(totalCount / pageSize) : 0;
+
+  const pageCount =
+    totalCount > 0
+      ? Math.ceil(totalCount / pageSize)
+      : 0;
 
   if (conversationItems.length === 0) {
     return {
@@ -205,86 +211,180 @@ const fetchMyBuyerRequests = async (
       page,
       pageSize,
       pageCount,
-      archived,
+      view,
     };
   }
+
+  const conversationIds =
+    conversationItems.map(
+      (item) => item.conversation.id
+    );
+
+  const {
+    data: participants,
+    error: participantsError,
+  } = await supabase
+    .from("conversation_participants")
+    .select(
+      "conversation_id, last_read_at"
+    )
+    .eq("user_id", userId)
+    .in("conversation_id", conversationIds);
+
+  if (participantsError) {
+    throw participantsError;
+  }
+
+  const participantByConversationId =
+    Object.fromEntries(
+      (
+        (participants ?? []) as Array<{
+          conversation_id: string;
+          last_read_at: string | null;
+        }>
+      ).map((participant) => [
+        participant.conversation_id,
+        participant,
+      ])
+    );
 
   const creatorIds = Array.from(
     new Set(
       conversationItems.map(
-        (item) => item.request.creator_user_id
+        (item) =>
+          item.request.creator_user_id
       )
     )
   );
 
-  const { data: profiles, error: profilesError } = await supabase
+  const {
+    data: profiles,
+    error: profilesError,
+  } = await supabase
     .from("profiles")
-    .select("user_id, handle, display_name, avatar_url")
+    .select(
+      "user_id, handle, display_name, avatar_url"
+    )
     .in("user_id", creatorIds);
 
   if (profilesError) {
     throw profilesError;
   }
 
-  const profileByUserId = Object.fromEntries(
-    ((profiles ?? []) as BuyerListingRequestProfile[]).map((profile) => [
-      profile.user_id,
-      profile,
-    ])
-  ) as Record<string, BuyerListingRequestProfile>;
+  const profileByUserId =
+    Object.fromEntries(
+      (
+        (profiles ??
+          []) as BuyerListingRequestProfile[]
+      ).map((profile) => [
+        profile.user_id,
+        profile,
+      ])
+    ) as Record<
+      string,
+      BuyerListingRequestProfile
+    >;
 
   return {
     items: conversationItems.map((item) => {
-      const participant = participantByConversationId[item.conversation.id] ?? null;
-      const lastReadAt = participant?.last_read_at ?? null;
-      const latestMessageAt = item.conversation.last_message_at;
-      const latestSenderUserId = item.conversation.last_message_sender_user_id;
+      const participant =
+        participantByConversationId[
+        item.conversation.id
+        ] ?? null;
+
+      const lastReadAt =
+        participant?.last_read_at ?? null;
+
+      const latestMessageAt =
+        item.conversation.last_message_at;
+
+      const latestSenderUserId =
+        item.conversation
+          .last_message_sender_user_id;
 
       const hasUnread =
         Boolean(latestMessageAt) &&
         latestSenderUserId !== userId &&
-        (!lastReadAt || latestMessageAt! > lastReadAt);
+        (
+          !lastReadAt ||
+          latestMessageAt! > lastReadAt
+        );
 
       return {
         request: item.request,
-        creator: profileByUserId[item.request.creator_user_id] ?? null,
+
+        creator:
+          profileByUserId[
+          item.request.creator_user_id
+          ] ?? null,
+
         conversation: {
           id: item.conversation.id,
           status: item.conversation.status,
-          last_message_at: item.conversation.last_message_at,
-          last_message_sender_user_id: item.conversation.last_message_sender_user_id,
-          last_message_preview: item.conversation.last_message_preview,
-          buyer_image_upload_status: item.conversation.buyer_image_upload_status,
-          updated_at: item.conversation.updated_at,
-          participant_last_read_at: lastReadAt,
+          last_message_at:
+            item.conversation
+              .last_message_at,
+          last_message_sender_user_id:
+            item.conversation
+              .last_message_sender_user_id,
+          last_message_preview:
+            item.conversation
+              .last_message_preview,
+          buyer_image_upload_status:
+            item.conversation
+              .buyer_image_upload_status,
+          updated_at:
+            item.conversation.updated_at,
+          participant_last_read_at:
+            lastReadAt,
           has_unread: hasUnread,
         },
       };
     }),
+
     totalCount,
     page,
     pageSize,
     pageCount,
-    archived,
+    view,
   };
 };
 
-export const useMyBuyerRequests = (input: UseMyBuyerRequestsInput) => {
-  const { user, loading } = useAuth();
+export const useMyBuyerRequests = (
+  input: UseMyBuyerRequestsInput
+) => {
+  const {
+    user,
+    loading,
+  } = useAuth();
+
   const userId = user?.id ?? null;
 
-  return useQuery<BuyerListingRequestsResult>({
-    queryKey: ["myBuyerRequests", userId, input],
-    enabled: !loading && Boolean(userId),
+  return useQuery({
+    queryKey: [
+      "myBuyerRequests",
+      userId,
+      input,
+    ],
+
+    enabled:
+      !loading && Boolean(userId),
+
     queryFn: () =>
       userId
-        ? fetchMyBuyerRequests(userId, input)
+        ? fetchMyBuyerRequests(
+          userId,
+          input
+        )
         : Promise.resolve({
           ...emptyResult,
-          archived: input.archived,
+          view: input.view,
           page: input.page,
-          pageSize: input.pageSize ?? emptyResult.pageSize,
+          pageSize:
+            input.pageSize ??
+            emptyResult.pageSize,
         }),
+
     staleTime: 15_000,
   });
 };
