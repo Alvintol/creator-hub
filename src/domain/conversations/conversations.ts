@@ -18,6 +18,7 @@ export type ConversationCloseReasonCode =
   | "duplicate_conversation"
   | "unresponsive"
   | "unwanted_messages"
+  | "project_completed"
   | "other";
 
 export type BuyerImageUploadStatus =
@@ -213,8 +214,13 @@ export const conversationCloseReasonOptions: Array<{
 export const getConversationCloseReasonLabel = (
   reasonCode: ConversationCloseReasonCode | null
 ): string => {
+  if (reasonCode === "project_completed") {
+    return "Project completed";
+  }
+
   const option = conversationCloseReasonOptions.find(
-    (currentOption) => currentOption.value === reasonCode
+    (currentOption) =>
+      currentOption.value === reasonCode
   );
 
   return option?.label ?? "Unknown reason";

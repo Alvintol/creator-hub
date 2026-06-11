@@ -71,7 +71,7 @@ export const useSubmitModerationReport = () => {
           queryKey: ["moderationReports"],
         }),
         queryClient.invalidateQueries({
-          queryKey: ["myModerationReports", input.conversationId],
+          queryKey: ["myModerationReports"],
         }),
         queryClient.invalidateQueries({
           queryKey: ["adminModerationReports"],

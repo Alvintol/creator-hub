@@ -216,9 +216,8 @@ const RequestConversationThread = ({
 
   const lastMarkedReadMessageAtRef = useRef<string | null>(null);
 
-  const { data: myReports = [] } = useMyModerationReports(
-    conversation?.id ?? null
-  );
+  const { data: myReports = [] } =
+    useMyModerationReports();
 
   const { data: participants = [] } = useConversationParticipants(
     conversation?.id ?? null
@@ -242,14 +241,28 @@ const RequestConversationThread = ({
     !reportConversationMutation.isPending;
 
   const conversationReport =
-    myReports.find((report) => report.target_type === "conversation") ?? null;
+    conversation
+      ? myReports.find(
+        (report) =>
+          report.target_type === "conversation" &&
+          report.conversation_id ===
+          conversation.id
+      ) ?? null
+      : null;
 
-  const getMessageReport = (messageId: string) =>
-    myReports.find(
-      (report) =>
-        report.target_type === "conversation_message" &&
-        report.message_id === messageId
-    ) ?? null;
+  const getMessageReport = (
+    messageId: string
+  ) =>
+    conversation
+      ? myReports.find(
+        (report) =>
+          report.target_type ===
+          "conversation_message" &&
+          report.conversation_id ===
+          conversation.id &&
+          report.message_id === messageId
+      ) ?? null
+      : null;
 
   const hasReportedConversation = Boolean(conversationReport);
 
@@ -591,11 +604,12 @@ const RequestConversationThread = ({
         </div>
       )}
 
-      {requestReadOnly && conversation.status === "open" && (
-        <div className={classes.statusBox}>
-          Archived requests are read-only.
-        </div>
-      )}
+      {requestReadOnly &&
+        conversation.status === "open" && (
+          <div className={classes.warningBox}>
+            {requestReadOnlyMessage}
+          </div>
+        )}
 
       {viewer !== "admin" && (
         <div className={classes.row}>

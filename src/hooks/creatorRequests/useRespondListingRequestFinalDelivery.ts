@@ -126,18 +126,6 @@ export const useRespondListingRequestFinalDelivery =
           }),
 
           queryClient.invalidateQueries({
-            queryKey: ["requestConversation"],
-          }),
-
-          queryClient.invalidateQueries({
-            queryKey: ["conversationMessages"],
-          }),
-
-          queryClient.invalidateQueries({
-            queryKey: ["messagesInbox"],
-          }),
-          
-          queryClient.invalidateQueries({
             queryKey: ["myBuyerRequests"],
           }),
 
@@ -147,6 +135,18 @@ export const useRespondListingRequestFinalDelivery =
 
           queryClient.invalidateQueries({
             queryKey: ["adminRequests"],
+          }),
+
+          queryClient.invalidateQueries({
+            queryKey: ["requestConversation"],
+          }),
+
+          queryClient.invalidateQueries({
+            queryKey: ["conversationMessages"],
+          }),
+
+          queryClient.invalidateQueries({
+            queryKey: ["messagesInbox"],
           }),
         ]);
       },
