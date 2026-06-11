@@ -10,6 +10,8 @@ import { supabase } from "../../lib/supabaseClient";
 export type MyModerationReport = {
   id: string;
   target_type: ModerationReportTargetType;
+  conversation_id: string | null;
+  message_id: string | null;
   target_label: string;
   reason_code: ModerationReportReasonCode;
   reason_details: string | null;
@@ -22,6 +24,7 @@ export type MyModerationReport = {
   resolved_at: string | null;
   created_at: string;
 };
+
 // Loads only the current user's own submitted reports
 const fetchMyModerationReports = async (): Promise<MyModerationReport[]> => {
   const { data, error } = await supabase.rpc("get_my_moderation_reports");

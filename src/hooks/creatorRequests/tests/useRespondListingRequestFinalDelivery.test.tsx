@@ -166,6 +166,18 @@ describe(
         ).toHaveBeenCalledWith({
           queryKey: ["conversationMessages"],
         });
+
+        expect(invalidateSpy).toHaveBeenCalledWith({
+          queryKey: ["myBuyerRequests"],
+        });
+
+        expect(invalidateSpy).toHaveBeenCalledWith({
+          queryKey: ["myCreatorRequests"],
+        });
+
+        expect(invalidateSpy).toHaveBeenCalledWith({
+          queryKey: ["adminRequests"],
+        });
       }
     );
 
