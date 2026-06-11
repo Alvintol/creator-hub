@@ -29,12 +29,12 @@ import BuyerRequestDetails from "./pages/buyer/BuyerRequestDetails";
 import BuyerRequests from "./pages/buyer/BuyerRequests";
 import ApplyCreator from "./pages/creator/ApplyCreator";
 import CreatorDashboard from "./pages/creator/CreatorDashboard";
-import CreatorListingDetails from "./pages/listings/CreatorListingDetails";
 import CreatorProfile from "./pages/creator/CreatorProfile";
 import CreatorRequestDetails from "./pages/creator/CreatorRequestDetails";
 import CreatorRequests from "./pages/creator/CreatorRequests";
 import Creators from "./pages/creator/Creators";
 import CreateListing from "./pages/listings/CreateListing";
+import CreatorListingDetails from "./pages/listings/CreatorListingDetails";
 import CreatorListingRevisions from "./pages/listings/CreatorListingRevisions";
 import CreatorListings from "./pages/listings/CreatorListings";
 import EditListing from "./pages/listings/EditListing";
@@ -54,7 +54,7 @@ const App = () => {
       <ScrollToTop />
       <ProfileSetupRedirect />
 
-      <Route >
+      <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<Home />} />
           <Route path="/signin" element={<SignIn />} />
@@ -63,53 +63,153 @@ const App = () => {
           <Route path="/market" element={<Market />} />
           <Route path="/creators" element={<Creators />} />
           <Route path="/listing/:id" element={<Listing />} />
-          <Route path="/creator/:handle" element={<CreatorProfile />} />
+          <Route
+            path="/creator/:handle"
+            element={<CreatorProfile />}
+          />
           <Route path="/legal" element={<Legal />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
-          <Route path="/terms/creator" element={<CreatorTerms />} />
+          <Route
+            path="/terms/creator"
+            element={<CreatorTerms />}
+          />
+
           <Route element={<RequireAuth />}>
-            <Route path="/settings/profile" element={<ProfileSettings />} />
-            <Route path="/apply/creator" element={<ApplyCreator />} />
-            <Route path="/listing/:id/request" element={<RequestListing />} />
-            <Route path="/requests" element={<BuyerRequests view="active" />} />
-            <Route path="/requests/completed" element={<BuyerRequests view="completed" />} />
-            <Route path="/requests/archived" element={<BuyerRequests view="archived" />} />
-            <Route path="/requests/:id" element={<BuyerRequestDetails />} />
-            <Route path="/messages" element={<MessagesInbox />} />
-            <Route path="/messages/:id" element={<MessageDetails />} />
-            <Route path="/settings/reports" element={<MyReports />} />
+            <Route
+              path="/settings/profile"
+              element={<ProfileSettings />}
+            />
+            <Route
+              path="/apply/creator"
+              element={<ApplyCreator />}
+            />
+            <Route
+              path="/listing/:id/request"
+              element={<RequestListing />}
+            />
+
+            <Route
+              path="/requests"
+              element={<BuyerRequests view="active" />}
+            />
+            <Route
+              path="/requests/completed"
+              element={<BuyerRequests view="completed" />}
+            />
+            <Route
+              path="/requests/archived"
+              element={<BuyerRequests view="archived" />}
+            />
+            <Route
+              path="/requests/:id"
+              element={<BuyerRequestDetails />}
+            />
+
+            <Route
+              path="/messages"
+              element={<MessagesInbox />}
+            />
+            <Route
+              path="/messages/:id"
+              element={<MessageDetails />}
+            />
+            <Route
+              path="/settings/reports"
+              element={<MyReports />}
+            />
           </Route>
 
-          <Route element={<RequireAdminAccess />}
-          >
-            <Route path="/admin" element={<Navigate replace to="/admin/dashboard" />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/creator-applications" element={<AdminCreatorApplications />} />
-            <Route path="/admin/listings" element={<AdminListings />} />
-            <Route path="/admin/listing-revisions/:id" element={<AdminListingRevisions />} />
-            <Route path="/admin/requests" element={<AdminRequests />} />
-            <Route path="/admin/requests/:id" element={<AdminRequestDetails />} />
-            <Route path="/admin/reports" element={<AdminModerationReports />} />
-            <Route path="/admin/reports/:id" element={<AdminModerationReportDetails />} />
+          <Route element={<RequireAdminAccess />}>
+            <Route
+              path="/admin"
+              element={
+                <Navigate
+                  replace
+                  to="/admin/dashboard"
+                />
+              }
+            />
+            <Route
+              path="/admin/dashboard"
+              element={<AdminDashboard />}
+            />
+            <Route
+              path="/admin/creator-applications"
+              element={<AdminCreatorApplications />}
+            />
+            <Route
+              path="/admin/listings"
+              element={<AdminListings />}
+            />
+            <Route
+              path="/admin/listing-revisions/:id"
+              element={<AdminListingRevisions />}
+            />
+            <Route
+              path="/admin/requests"
+              element={<AdminRequests />}
+            />
+            <Route
+              path="/admin/requests/:id"
+              element={<AdminRequestDetails />}
+            />
+            <Route
+              path="/admin/reports"
+              element={<AdminModerationReports />}
+            />
+            <Route
+              path="/admin/reports/:id"
+              element={<AdminModerationReportDetails />}
+            />
           </Route>
 
-          <Route element={<RequireCreatorAccess />} />
-          <Route path="/creator/dashboard" element={<CreatorDashboard />} />
-          <Route path="/creator/listings" element={<CreatorListings />} />
-          <Route path="/creator/listings/new" element={<CreateListing />} />
-          <Route path="/creator/listings/:id" element={<CreatorListingDetails />} />
-          <Route path="/creator/listings/:id/revisions" element={<CreatorListingRevisions />} />
-          <Route path="/creator/listings/:id/edit" element={<EditListing />} />
-          <Route path="/creator/requests" element={<CreatorRequests view="active" />} />
-          <Route path="/creator/requests/completed" element={<CreatorRequests view="completed" />} />
-
-          <Route path="/creator/requests/archived" element={<CreatorRequests view="archived" />} />
-          <Route path="/creator/requests/:id" element={<CreatorRequestDetails />} />
+          <Route element={<RequireCreatorAccess />}>
+            <Route
+              path="/creator/dashboard"
+              element={<CreatorDashboard />}
+            />
+            <Route
+              path="/creator/listings"
+              element={<CreatorListings />}
+            />
+            <Route
+              path="/creator/listings/new"
+              element={<CreateListing />}
+            />
+            <Route
+              path="/creator/listings/:id"
+              element={<CreatorListingDetails />}
+            />
+            <Route
+              path="/creator/listings/:id/revisions"
+              element={<CreatorListingRevisions />}
+            />
+            <Route
+              path="/creator/listings/:id/edit"
+              element={<EditListing />}
+            />
+            <Route
+              path="/creator/requests"
+              element={<CreatorRequests view="active" />}
+            />
+            <Route
+              path="/creator/requests/completed"
+              element={<CreatorRequests view="completed" />}
+            />
+            <Route
+              path="/creator/requests/archived"
+              element={<CreatorRequests view="archived" />}
+            />
+            <Route
+              path="/creator/requests/:id"
+              element={<CreatorRequestDetails />}
+            />
+          </Route>
         </Route>
 
         <Route path="*" element={<NotFound />} />
-      </Route>
+      </Routes>
     </>
   );
 };
