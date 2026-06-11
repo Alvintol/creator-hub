@@ -273,6 +273,67 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../components/ListingRequestFinalDeliveryBuyerActions",
+  () => ({
+    default: ({
+      finalDelivery,
+      canApprove,
+      approvalBlockedReason,
+      onApprove,
+      onRequestRevision,
+    }: {
+      finalDelivery: {
+        id: string;
+        status: string;
+      } | null;
+      canApprove: boolean;
+      approvalBlockedReason?: string | null;
+      onApprove: (
+        finalDeliveryId: string
+      ) => unknown;
+      onRequestRevision: (
+        finalDeliveryId: string,
+        revisionRequestReason: string
+      ) => unknown;
+    }) =>
+      finalDelivery?.status === "submitted" ? (
+        <div>
+          <div>
+            Mock final delivery approval:{" "}
+            {canApprove ? "ready" : "blocked"}
+          </div>
+
+          {approvalBlockedReason && (
+            <div>{approvalBlockedReason}</div>
+          )}
+
+          <button
+            disabled={!canApprove}
+            type="button"
+            onClick={() =>
+              onApprove(finalDelivery.id)
+            }
+          >
+            Mock approve final delivery
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              onRequestRevision(
+                finalDelivery.id,
+                "Please adjust the title alignment."
+              )
+            }
+          >
+            Mock request final revisions
+          </button>
+        </div>
+      ) : null,
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -1122,5 +1183,221 @@ describe("<BuyerRequestDetails />", () => {
         name: "Archive request",
       })
     ).not.toBeInTheDocument();
+  });
+
+  it("approves a submitted final delivery after the final balance is resolved", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        listing_request_payment_schedule_items: [
+          {
+            ...agreement
+              .listing_request_payment_schedule_items[0],
+            id: "final-payment-1",
+            amount: 150,
+            payment_timing:
+              "due_before_final_release",
+            status: "paid",
+            paid_at:
+              "2026-06-09T13:00:00.000Z",
+          },
+        ],
+        listing_request_timeline_holds: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue({
+      data: [
+        {
+          id: "final-delivery-1",
+          status: "submitted",
+          title: "Final overlay delivery",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "Mock final delivery approval: ready"
+      )
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Mock approve final delivery",
+      })
+    );
+
+    expect(
+      mocks.respondFinalDelivery
+    ).toHaveBeenCalledWith({
+      finalDeliveryId: "final-delivery-1",
+      response: "buyer_approved",
+    });
+  });
+
+  it("blocks final-delivery approval while the final balance is pending", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        listing_request_payment_schedule_items: [
+          {
+            ...agreement
+              .listing_request_payment_schedule_items[0],
+            id: "final-payment-1",
+            amount: 150,
+            payment_timing:
+              "due_before_final_release",
+            status: "payment_required",
+            paid_at: null,
+          },
+        ],
+        listing_request_timeline_holds: [
+          {
+            id: "hold-1",
+            reason: "balance_payment_pending",
+            ended_at: null,
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue({
+      data: [
+        {
+          id: "final-delivery-1",
+          status: "submitted",
+          title: "Final overlay delivery",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "Mock final delivery approval: blocked"
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("button", {
+        name: "Mock approve final delivery",
+      })
+    ).toBeDisabled();
+
+    expect(
+      screen.getByText(
+        "The final balance must be confirmed as paid before you can approve this delivery."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("requests revisions for a submitted final delivery", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        listing_request_payment_schedule_items: [],
+        listing_request_timeline_holds: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue({
+      data: [
+        {
+          id: "final-delivery-1",
+          status: "submitted",
+          title: "Final overlay delivery",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Mock request final revisions",
+      })
+    );
+
+    expect(
+      mocks.respondFinalDelivery
+    ).toHaveBeenCalledWith({
+      finalDeliveryId: "final-delivery-1",
+      response: "revision_requested",
+      revisionRequestReason:
+        "Please adjust the title alignment.",
+    });
   });
 });
