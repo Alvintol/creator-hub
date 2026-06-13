@@ -24,26 +24,26 @@ const fetchBuyerRequest = async (
   const { data: request, error: requestError } = await supabase
     .from("listing_requests")
     .select(`
-       id,
-       listing_id,
-       buyer_user_id,
-       creator_user_id,
-       status,
-       message,
-       creator_status_reason,
-       listing_snapshot,
-       created_at,
-       updated_at,
-       request_title,
-       request_details,
-       requested_timeline,
-       budget_amount,
-       reference_links,
-       archived_at,
-       archived_by_user_id,
-       completed_at,
-       completed_by_user_id
-    `)
+    id,
+    listing_id,
+    buyer_user_id,
+    creator_user_id,
+    status,
+    message,
+    creator_status_reason,
+    listing_snapshot,
+    created_at,
+    updated_at,
+    request_title,
+    request_details,
+    requested_timeline,
+    budget_amount,
+    reference_links,
+    archived_at,
+    archived_by_user_id,
+    completed_at,
+    completed_by_user_id
+  `)
     .eq("id", requestId)
     .eq("buyer_user_id", userId)
     .maybeSingle();

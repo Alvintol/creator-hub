@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -1516,8 +1516,18 @@ describe("<CreatorRequestDetails />", () => {
 
     renderPage();
 
+    const statusLabel = screen.getByText("Status", {
+      selector: "div",
+    });
+
+    const statusBlock = statusLabel.parentElement;
+
+    expect(statusBlock).not.toBeNull();
+
     expect(
-      screen.getByText("Completed")
+      within(statusBlock as HTMLElement).getByText(
+        "Completed"
+      )
     ).toBeInTheDocument();
 
     expect(
@@ -1541,5 +1551,19 @@ describe("<CreatorRequestDetails />", () => {
         name: "Decline request",
       })
     ).not.toBeInTheDocument();
+
+    expect(
+      screen.getByRole("link", {
+        name: "← Back to creator requests",
+      })
+    ).toHaveAttribute(
+      "href",
+      "/creator/requests/completed"
+    );
+
+    expect(
+      screen.getByText(/Jun 9, 2026/)
+    ).toBeInTheDocument();
   });
+
 });

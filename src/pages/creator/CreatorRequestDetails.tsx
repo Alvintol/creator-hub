@@ -267,7 +267,9 @@ const CreatorRequestDetails = () => {
   const backTo =
     request.status === "archived"
       ? "/creator/requests/archived"
-      : "/creator/requests";
+      : request.status === "completed"
+        ? "/creator/requests/completed"
+        : "/creator/requests";
 
   const changeOrders = changeOrdersQuery.data ?? [];
 
@@ -578,6 +580,19 @@ const CreatorRequestDetails = () => {
                 {dateText(snapshot.updated_at)}
               </div>
             </div>
+
+            {request.status === "completed" &&
+              request.completed_at && (
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>
+                    Completed
+                  </div>
+
+                  <div className={classes.metaValue}>
+                    {dateText(request.completed_at)}
+                  </div>
+                </div>
+              )}
           </div>
 
           <div className={classes.section}>
