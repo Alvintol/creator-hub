@@ -8,6 +8,7 @@ import {
 import {
   getListingRequestStatusLabel,
   getListingRequestStatusTone,
+  ListingRequestStatus,
 } from "../../domain/listings/listingRequests";
 import { getListingRequestDisplayPreview, getListingRequestDisplayTitle } from '../../domain/listings/listings';
 
@@ -99,7 +100,7 @@ const profileText = (
   profile?.handle ? `@${profile.handle}` : profile?.display_name ?? fallbackUserId;
 
 const getStatusPillClass = (
-  status: "submitted" | "accepted" | "declined" | "archived"
+  status: ListingRequestStatus
 ) => {
   const tone = getListingRequestStatusTone(status);
 
@@ -245,6 +246,7 @@ const AdminRequests = () => {
                 <option value="all">All</option>
                 <option value="submitted">Under review</option>
                 <option value="accepted">Accepted</option>
+                <option value="completed">Completed</option>
                 <option value="declined">Declined</option>
                 <option value="archived">Archived</option>
               </select>
@@ -326,9 +328,19 @@ const AdminRequests = () => {
                   </div>
 
                   <div className={classes.metaBlock}>
-                    <div className={classes.metaLabel}>Submitted</div>
+                    <div className={classes.metaLabel}>
+                      {item.request.status === "completed"
+                        ? "Completed"
+                        : "Submitted"}
+                    </div>
+
                     <div className={classes.metaValue}>
-                      {dateText(item.request.created_at)}
+                      {dateText(
+                        item.request.status === "completed"
+                          ? item.request.completed_at ??
+                          item.request.updated_at
+                          : item.request.created_at
+                      )}
                     </div>
                   </div>
 

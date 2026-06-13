@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -1164,8 +1164,18 @@ describe("<BuyerRequestDetails />", () => {
 
     renderPage();
 
+    const statusLabel = screen.getByText("Status", {
+      selector: "div",
+    });
+
+    const statusBlock = statusLabel.parentElement;
+
+    expect(statusBlock).not.toBeNull();
+
     expect(
-      screen.getByText("Completed")
+      within(statusBlock as HTMLElement).getByText(
+        "Completed"
+      )
     ).toBeInTheDocument();
 
     expect(
@@ -1183,6 +1193,19 @@ describe("<BuyerRequestDetails />", () => {
         name: "Archive request",
       })
     ).not.toBeInTheDocument();
+
+    expect(
+      screen.getByRole("link", {
+        name: "← Back to my requests",
+      })
+    ).toHaveAttribute(
+      "href",
+      "/requests/completed"
+    );
+
+    expect(
+      screen.getByText(/Jun 9, 2026/)
+    ).toBeInTheDocument();
   });
 
   it("approves a submitted final delivery after the final balance is resolved", () => {

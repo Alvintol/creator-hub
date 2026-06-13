@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -51,6 +51,8 @@ const createRequestItem = (overrides = {}) => ({
     updated_at: "2026-05-17T12:00:00.000Z",
     archived_at: null,
     archived_by_user_id: null,
+    completed_at: null,
+    completed_by_user_id: null,
     listing_snapshot: {
       listing_id: "listing-1",
       creator_user_id: "creator-1",
@@ -189,5 +191,52 @@ describe("<AdminRequests />", () => {
     renderPage();
 
     expect(screen.getByText("Archived by creator")).toBeInTheDocument();
+  });
+
+  it("renders completed requests and exposes the completed filter", () => {
+    mocks.useAdminRequests.mockReturnValue({
+      data: {
+        items: [
+          createRequestItem({
+            status: "completed",
+            completed_at:
+              "2026-06-09T15:00:00.000Z",
+            completed_by_user_id: "buyer-1",
+          }),
+        ],
+        totalCount: 1,
+        page: 1,
+        pageSize: 20,
+        pageCount: 1,
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByRole("option", {
+        name: "Completed",
+      })
+    ).toBeInTheDocument();
+
+    const statusLabel = screen.getByText("Status", {
+      selector: "div",
+    });
+
+    const statusBlock = statusLabel.parentElement;
+
+    expect(statusBlock).not.toBeNull();
+
+    expect(
+      within(statusBlock as HTMLElement).getByText(
+        "Completed"
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Jun 9, 2026")
+    ).toBeInTheDocument();
   });
 });

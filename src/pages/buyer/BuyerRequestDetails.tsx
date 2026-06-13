@@ -231,7 +231,9 @@ const BuyerRequestDetails = () => {
   const backTo =
     request.status === "archived"
       ? "/requests/archived"
-      : "/requests";
+      : request.status === "completed"
+        ? "/requests/completed"
+        : "/requests";
 
   const handleAcceptAgreement = async (acknowledgementKeys: string[]) => {
     if (!buyerVisibleAgreement || buyerVisibleAgreement.status !== "sent") {
@@ -409,6 +411,19 @@ const BuyerRequestDetails = () => {
                 {dateText(request.updated_at)}
               </div>
             </div>
+
+            {request.status === "completed" &&
+              request.completed_at && (
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>
+                    Completed
+                  </div>
+
+                  <div className={classes.metaValue}>
+                    {dateText(request.completed_at)}
+                  </div>
+                </div>
+              )}
           </div>
         </div>
 
