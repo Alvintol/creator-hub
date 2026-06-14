@@ -221,4 +221,297 @@ describe("ListingRequestAgreementBuilder", () => {
 
     expect(screen.getByText("Agreement RPC failed.")).toBeInTheDocument();
   });
+
+  it("shows the milestone editor for milestone payments", () => {
+    render(
+      <ListingRequestAgreementBuilder
+        request={createRequest()}
+        onCreateAgreement={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.queryByText(
+        "Milestone payment plan"
+      )
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(
+      screen.getByLabelText(
+        "Payment structure"
+      ),
+      {
+        target: {
+          value: "milestone_payments",
+        },
+      }
+    );
+
+    expect(
+      screen.getByText(
+        "Milestone payment plan"
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByLabelText("Deposit amount")
+    ).not.toBeInTheDocument();
+
+    expect(
+      screen.getByLabelText(
+        "Milestone 1 title"
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByLabelText(
+        "Milestone 2 title"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("creates a structured milestone payment agreement", () => {
+    const onCreateAgreement = vi.fn();
+
+    render(
+      <ListingRequestAgreementBuilder
+        request={createRequest()}
+        onCreateAgreement={onCreateAgreement}
+      />
+    );
+
+    fillValidAgreementForm();
+
+    fireEvent.change(
+      screen.getByLabelText(
+        "Payment structure"
+      ),
+      {
+        target: {
+          value: "milestone_payments",
+        },
+      }
+    );
+
+    fireEvent.change(
+      screen.getByLabelText(
+        "Estimated work days"
+      ),
+      {
+        target: {
+          value: "21",
+        },
+      }
+    );
+
+    fireEvent.change(
+      screen.getByLabelText(
+        "Milestone 1 title"
+      ),
+      {
+        target: {
+          value: "Initial design direction",
+        },
+      }
+    );
+
+    fireEvent.change(
+      screen.getByLabelText(
+        "Milestone 1 description"
+      ),
+      {
+        target: {
+          value:
+            "Deliver initial concepts for buyer review.",
+        },
+      }
+    );
+
+    fireEvent.change(
+      screen.getByLabelText(
+        "Milestone 1 amount"
+      ),
+      {
+        target: {
+          value: "100",
+        },
+      }
+    );
+
+    fireEvent.change(
+      screen.getByLabelText(
+        "Milestone 2 title"
+      ),
+      {
+        target: {
+          value: "Completed emote package",
+        },
+      }
+    );
+
+    fireEvent.change(
+      screen.getByLabelText(
+        "Milestone 2 description"
+      ),
+      {
+        target: {
+          value:
+            "Deliver all completed PNG exports.",
+        },
+      }
+    );
+
+    fireEvent.change(
+      screen.getByLabelText(
+        "Milestone 2 amount"
+      ),
+      {
+        target: {
+          value: "200",
+        },
+      }
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Create and send agreement",
+      })
+    );
+
+    expect(
+      onCreateAgreement
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentStructure:
+          "milestone_payments",
+
+        startingPaymentStatus:
+          "not_required",
+
+        depositAmount: null,
+
+        items: [
+          expect.objectContaining({
+            title: "Sketch approval",
+            item_type: "included",
+            sort_order: 0,
+          }),
+
+          expect.objectContaining({
+            title: "Final PNG delivery",
+            item_type: "included",
+            sort_order: 1,
+          }),
+
+          expect.objectContaining({
+            title:
+              "Initial design direction",
+            description:
+              "Deliver initial concepts for buyer review.",
+            item_type: "milestone",
+            price_amount: 100,
+            payment_timing:
+              "due_at_milestone_approval",
+            sort_order: 2,
+          }),
+
+          expect.objectContaining({
+            title:
+              "Completed emote package",
+            description:
+              "Deliver all completed PNG exports.",
+            item_type: "milestone",
+            price_amount: 200,
+            payment_timing:
+              "due_at_milestone_approval",
+            sort_order: 3,
+          }),
+        ],
+
+        paymentScheduleItems: [
+          expect.objectContaining({
+            title:
+              "Initial design direction",
+            amount: 100,
+            currency: "cad",
+            payment_timing:
+              "due_at_milestone_approval",
+            status: "pending",
+            due_at: null,
+            sort_order: 0,
+          }),
+
+          expect.objectContaining({
+            title:
+              "Completed emote package",
+            amount: 200,
+            currency: "cad",
+            payment_timing:
+              "due_at_milestone_approval",
+            status: "pending",
+            due_at: null,
+            sort_order: 1,
+          }),
+        ],
+      })
+    );
+  });
+
+  it("shows milestone validation errors before creating the agreement", () => {
+    const onCreateAgreement = vi.fn();
+
+    render(
+      <ListingRequestAgreementBuilder
+        request={createRequest()}
+        onCreateAgreement={onCreateAgreement}
+      />
+    );
+
+    fillValidAgreementForm();
+
+    fireEvent.change(
+      screen.getByLabelText(
+        "Payment structure"
+      ),
+      {
+        target: {
+          value: "milestone_payments",
+        },
+      }
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Create and send agreement",
+      })
+    );
+
+    expect(
+      screen.getByText(
+        "Review the milestone payment plan:"
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getAllByText(
+        "Milestone payments require an estimated project length greater than 14 days."
+      ).length
+    ).toBeGreaterThan(0);
+
+    expect(
+      screen.getByText(
+        "Milestone 1 title must be between 3 and 160 characters."
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText(
+        "Milestone amounts must equal the total agreement amount."
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      onCreateAgreement
+    ).not.toHaveBeenCalled();
+  });
 });

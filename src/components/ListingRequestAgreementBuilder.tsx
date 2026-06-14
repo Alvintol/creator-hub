@@ -7,6 +7,8 @@ import {
 } from "../domain/listings/listingRequestAgreements";
 import type { CreateListingRequestAgreementInput } from "../hooks/creatorRequests/useCreateListingRequestAgreement";
 import type { ListingRequestRow } from "../hooks/creatorRequests/useMyCreatorRequests";
+import { ListingRequestMilestonePlanItem, validateListingRequestMilestonePlan } from '../domain/listings/listingRequestMilestones';
+import ListingRequestMilestonePlanEditor from './ListingRequestMilestonePlanEditor';
 
 type ListingRequestAgreementBuilderProps = {
   request: Pick<ListingRequestRow, "id" | "status"> | null;
@@ -31,9 +33,17 @@ type BuilderFormState = {
   additionalCostPolicy: string;
   revisionPolicy: string;
   sendNow: boolean;
+  milestones: ListingRequestMilestonePlanItem[];
 };
 
-type BuilderValidationErrors = Partial<Record<keyof BuilderFormState, string>>;
+type BuilderValidationErrors = Partial<
+  Record<
+    Exclude<keyof BuilderFormState, "milestones">,
+    string
+  >
+> & {
+  milestones?: string[];
+};
 
 const classes = {
   card: "card p-6",
@@ -63,6 +73,22 @@ const classes = {
     "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
 } as const;
 
+const createDefaultMilestones =
+  (): ListingRequestMilestonePlanItem[] => [
+    {
+      title: "",
+      description: "",
+      amount: 0,
+      sortOrder: 0,
+    },
+    {
+      title: "",
+      description: "",
+      amount: 0,
+      sortOrder: 1,
+    },
+  ];
+
 const defaultFormState: BuilderFormState = {
   scopeSummary: "",
   includedDeliverablesText: "",
@@ -78,6 +104,7 @@ const defaultFormState: BuilderFormState = {
   revisionPolicy:
     "This agreement includes the listed revision rounds. Extra revisions require an accepted change order before additional work continues.",
   sendNow: true,
+  milestones: createDefaultMilestones(),
 };
 
 const getErrorMessage = (error: unknown): string =>
@@ -135,6 +162,20 @@ const validateForm = (form: BuilderFormState): BuilderValidationErrors => {
     errors.estimatedWorkDays = "Enter estimated work days greater than 0.";
   }
 
+  if (form.paymentStructure === "milestone_payments") {
+    const milestoneValidation =
+      validateListingRequestMilestonePlan({
+        estimatedWorkDays,
+        agreementTotal: totalAmount,
+        milestones: form.milestones,
+      });
+
+    if (!milestoneValidation.isValid) {
+      errors.milestones =
+        milestoneValidation.errors;
+    }
+  }
+
   if (!form.estimatedCompletionDate) {
     errors.estimatedCompletionDate = "Choose an estimated completion date.";
   }
@@ -159,6 +200,7 @@ const buildPaymentScheduleItems = (input: {
   totalAmount: number;
   depositAmount: number | null;
   currency: string;
+  milestones: ListingRequestMilestonePlanItem[];
 }): CreateListingRequestAgreementInput["paymentScheduleItems"] => {
   if (input.paymentStructure === "full_prepayment") {
     return [
@@ -202,19 +244,19 @@ const buildPaymentScheduleItems = (input: {
     ];
   }
 
-  return [
-    {
-      title: "Milestone payment plan",
-      description:
-        "Milestone details can be expanded in the future milestone flow. Payment is due when each agreed milestone is approved.",
-      amount: input.totalAmount,
-      currency: input.currency,
-      payment_timing: "due_at_milestone_approval",
-      status: "pending",
-      due_at: null,
-      sort_order: 0,
-    },
-  ];
+  return input.milestones.map((milestone) => ({
+    title: milestone.title.trim(),
+    description:
+      milestone.description?.trim() ||
+      "Payment becomes due after the buyer approves this milestone.",
+    amount: milestone.amount,
+    currency: input.currency,
+    payment_timing:
+      "due_at_milestone_approval",
+    status: "pending",
+    due_at: null,
+    sort_order: milestone.sortOrder,
+  }));
 };
 
 const ListingRequestAgreementBuilder = ({
@@ -232,6 +274,16 @@ const ListingRequestAgreementBuilder = ({
   const safeEstimatedWorkDays = Number.isFinite(estimatedWorkDays)
     ? estimatedWorkDays
     : 1;
+
+  const parsedTotalAmount =
+    parsePositiveNumber(form.totalAmount);
+
+  const safeTotalAmount = Number.isFinite(
+    parsedTotalAmount
+  )
+    ? parsedTotalAmount
+    : 0;
+
 
   const updateRule = useMemo(
     () => getMinimumCreatorUpdateRule(safeEstimatedWorkDays),
@@ -257,6 +309,20 @@ const ListingRequestAgreementBuilder = ({
     }));
   };
 
+  const updateMilestones = (
+    milestones: ListingRequestMilestonePlanItem[]
+  ) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      milestones,
+    }));
+
+    setValidationErrors((currentErrors) => ({
+      ...currentErrors,
+      milestones: undefined,
+    }));
+  };
+
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
 
@@ -278,11 +344,51 @@ const ListingRequestAgreementBuilder = ({
       form.estimatedCompletionDate
     );
 
+    const checklistItems = splitTextareaLines(
+      form.checklistText
+    ).map((title, index) => ({
+      title,
+      description: null,
+      item_type: "included" as const,
+      price_amount: null,
+      timeline_impact_days: 0,
+      payment_timing:
+        "included_no_extra_charge" as const,
+      is_required: true,
+      is_selected: true,
+      sort_order: index,
+    }));
+
+    const milestoneItems =
+      form.paymentStructure ===
+        "milestone_payments"
+        ? form.milestones.map((milestone) => ({
+          title: milestone.title.trim(),
+          description:
+            milestone.description?.trim() ||
+            null,
+          item_type: "milestone" as const,
+          price_amount: milestone.amount,
+          timeline_impact_days: 0,
+          payment_timing:
+            "due_at_milestone_approval" as const,
+          is_required: true,
+          is_selected: true,
+          sort_order:
+            checklistItems.length +
+            milestone.sortOrder,
+        }))
+        : [];
+
     const input: CreateListingRequestAgreementInput = {
       listingRequestId: request.id,
       status: form.sendNow ? "sent" : "draft",
       paymentStructure: form.paymentStructure,
-      startingPaymentStatus: "payment_required",
+      startingPaymentStatus:
+        form.paymentStructure ===
+          "milestone_payments"
+          ? "not_required"
+          : "payment_required",
       currency,
       baseAmount: totalAmount,
       totalAmount,
@@ -297,23 +403,19 @@ const ListingRequestAgreementBuilder = ({
       additionalCostPolicy: form.additionalCostPolicy.trim(),
       revisionPolicy: form.revisionPolicy.trim(),
       updateScheduleSummary: updateRule.summary,
-      items: splitTextareaLines(form.checklistText).map((title, index) => ({
-        title,
-        description: null,
-        item_type: "included",
-        price_amount: null,
-        timeline_impact_days: 0,
-        payment_timing: "included_no_extra_charge",
-        is_required: true,
-        is_selected: true,
-        sort_order: index,
-      })),
-      paymentScheduleItems: buildPaymentScheduleItems({
-        paymentStructure: form.paymentStructure,
-        totalAmount,
-        depositAmount,
-        currency,
-      }),
+      items: [
+        ...checklistItems,
+        ...milestoneItems,
+      ],
+      paymentScheduleItems:
+        buildPaymentScheduleItems({
+          paymentStructure:
+            form.paymentStructure,
+          totalAmount,
+          depositAmount,
+          currency,
+          milestones: form.milestones,
+        }),
     };
 
     await onCreateAgreement(input);
@@ -451,6 +553,23 @@ const ListingRequestAgreementBuilder = ({
               ))}
             </select>
           </div>
+
+          {form.paymentStructure ===
+            "milestone_payments" && (
+              <ListingRequestMilestonePlanEditor
+                agreementTotal={safeTotalAmount}
+                currency={currency}
+                disabled={isPending}
+                estimatedWorkDays={
+                  safeEstimatedWorkDays
+                }
+                milestones={form.milestones}
+                validationErrors={
+                  validationErrors.milestones ?? []
+                }
+                onChange={updateMilestones}
+              />
+            )}
 
           {form.paymentStructure === "deposit_balance" && (
             <div className={classes.field}>
