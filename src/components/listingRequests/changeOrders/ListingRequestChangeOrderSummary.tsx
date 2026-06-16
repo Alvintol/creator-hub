@@ -4,10 +4,10 @@ import {
   getListingRequestChangeOrderStatusSummary,
   getListingRequestChangeOrderStatusTone,
   isListingRequestChangeOrderBuyerVisible,
-} from "../domain/listings/listingRequestChangeOrders";
+} from "../../../domain/listings/listingRequestChangeOrders";
 import type {
   ListingRequestChangeOrderRow,
-} from "../hooks/creatorRequests/useListingRequestChangeOrders";
+} from "../../../hooks/creatorRequests/useListingRequestChangeOrders";
 
 type ListingRequestChangeOrderViewer =
   | "buyer"

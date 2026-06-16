@@ -1,5 +1,5 @@
-import { canSendListingRequestChangeOrder } from "../domain/listings/listingRequestChangeOrders";
-import type { ListingRequestChangeOrderRow } from "../hooks/creatorRequests/useListingRequestChangeOrders";
+import { canSendListingRequestChangeOrder } from "../../../domain/listings/listingRequestChangeOrders";
+import type { ListingRequestChangeOrderRow } from "../../../hooks/creatorRequests/useListingRequestChangeOrders";
 
 type ListingRequestChangeOrderCreatorActionsProps = {
   changeOrder: Pick<

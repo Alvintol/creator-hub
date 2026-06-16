@@ -1,10 +1,11 @@
 import {
   allowsMilestonePayments,
-} from "../domain/listings/listingRequestAgreements";
+} from '../../../domain/listings/listingRequestAgreements';
+
 import {
   getListingRequestMilestonePlanTotal,
   type ListingRequestMilestonePlanItem,
-} from "../domain/listings/listingRequestMilestones";
+} from '../../../domain/listings/listingRequestMilestones';
 
 type ListingRequestMilestonePlanEditorProps = {
   milestones: ListingRequestMilestonePlanItem[];
@@ -126,9 +127,9 @@ const ListingRequestMilestonePlanEditor = ({
       milestones.map((milestone, currentIndex) =>
         currentIndex === index
           ? {
-              ...milestone,
-              ...patch,
-            }
+            ...milestone,
+            ...patch,
+          }
           : milestone
       )
     );
@@ -171,9 +172,9 @@ const ListingRequestMilestonePlanEditor = ({
       nextMilestones[index],
       nextMilestones[targetIndex],
     ] = [
-      nextMilestones[targetIndex],
-      nextMilestones[index],
-    ];
+        nextMilestones[targetIndex],
+        nextMilestones[index],
+      ];
 
     onChange(
       normalizeSortOrders(nextMilestones)
@@ -230,9 +231,8 @@ const ListingRequestMilestonePlanEditor = ({
 
               <div className={classes.itemActions}>
                 <button
-                  aria-label={`Move milestone ${
-                    index + 1
-                  } up`}
+                  aria-label={`Move milestone ${index + 1
+                    } up`}
                   className={classes.btnOutline}
                   disabled={disabled || index === 0}
                   type="button"
@@ -244,9 +244,8 @@ const ListingRequestMilestonePlanEditor = ({
                 </button>
 
                 <button
-                  aria-label={`Move milestone ${
-                    index + 1
-                  } down`}
+                  aria-label={`Move milestone ${index + 1
+                    } down`}
                   className={classes.btnOutline}
                   disabled={
                     disabled ||
@@ -261,9 +260,8 @@ const ListingRequestMilestonePlanEditor = ({
                 </button>
 
                 <button
-                  aria-label={`Remove milestone ${
-                    index + 1
-                  }`}
+                  aria-label={`Remove milestone ${index + 1
+                    }`}
                   className={classes.btnDanger}
                   disabled={disabled}
                   type="button"

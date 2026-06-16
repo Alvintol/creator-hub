@@ -6,8 +6,8 @@ import {
   getListingRequestPaymentTimingLabel,
   getListingRequestPaymentTimingSummary,
   getListingRequestBuyerHoldReasonLabel,
-} from "../domain/listings/listingRequestAgreements";
-import type { ListingRequestAgreementRow } from "../hooks/creatorRequests/useListingRequestAgreement";
+} from "../../../domain/listings/listingRequestAgreements";
+import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
 
 type ListingRequestAgreementSummaryProps = {
   agreement: ListingRequestAgreementRow | null;

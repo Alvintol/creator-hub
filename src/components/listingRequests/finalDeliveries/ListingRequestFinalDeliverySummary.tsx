@@ -3,8 +3,8 @@ import {
   getListingRequestFinalDeliveryStatusSummary,
   getListingRequestFinalDeliveryStatusTone,
   isListingRequestFinalDeliveryBuyerVisible,
-} from "../domain/listings/listingRequestFinalDeliveries";
-import type { ListingRequestFinalDeliveryRow } from "../hooks/creatorRequests/useListingRequestFinalDeliveries";
+} from "../../../domain/listings/listingRequestFinalDeliveries";
+import type { ListingRequestFinalDeliveryRow } from "../../../hooks/creatorRequests/useListingRequestFinalDeliveries";
 
 type ListingRequestFinalDeliveryViewer =
   | "buyer"

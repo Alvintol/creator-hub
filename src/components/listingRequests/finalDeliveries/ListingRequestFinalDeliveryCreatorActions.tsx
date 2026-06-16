@@ -1,5 +1,5 @@
-import { canSubmitListingRequestFinalDelivery } from "../domain/listings/listingRequestFinalDeliveries";
-import type { ListingRequestFinalDeliveryRow } from "../hooks/creatorRequests/useListingRequestFinalDeliveries";
+import { canSubmitListingRequestFinalDelivery } from "../../../domain/listings/listingRequestFinalDeliveries";
+import type { ListingRequestFinalDeliveryRow } from "../../../hooks/creatorRequests/useListingRequestFinalDeliveries";
 
 type ListingRequestFinalDeliveryCreatorActionsProps = {
   finalDelivery: Pick<

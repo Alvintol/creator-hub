@@ -4,12 +4,18 @@ import {
   getMinimumCreatorUpdateRule,
   listingRequestPaymentStructureOptions,
   type ListingRequestPaymentStructure,
-} from "../domain/listings/listingRequestAgreements";
-import type { CreateListingRequestAgreementInput } from "../hooks/creatorRequests/useCreateListingRequestAgreement";
-import type { ListingRequestRow } from "../hooks/creatorRequests/useMyCreatorRequests";
-import { ListingRequestMilestonePlanItem, validateListingRequestMilestonePlan } from '../domain/listings/listingRequestMilestones';
-import ListingRequestMilestonePlanEditor from './ListingRequestMilestonePlanEditor';
+} from '../../../domain/listings/listingRequestAgreements';
 
+import {
+  validateListingRequestMilestonePlan,
+  type ListingRequestMilestonePlanItem,
+} from '../../../domain/listings/listingRequestMilestones';
+
+import type { ListingRequestRow } from '../../../hooks/creatorRequests/useMyCreatorRequests';
+
+import type { CreateListingRequestAgreementInput } from '../../../hooks/creatorRequests/useCreateListingRequestAgreement';
+
+import ListingRequestMilestonePlanEditor from '../milestones/ListingRequestMilestonePlanEditor';
 type ListingRequestAgreementBuilderProps = {
   request: Pick<ListingRequestRow, "id" | "status"> | null;
   isPending?: boolean;

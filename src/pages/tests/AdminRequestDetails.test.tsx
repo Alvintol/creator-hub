@@ -19,58 +19,86 @@ vi.mock("../../hooks/admin/useAdminRequest", () => ({
   useAdminRequest: mocks.useAdminRequest,
 }));
 
-vi.mock("../../components/RequestConversationThread", () => ({
-  default: () => <div>Conversation thread loaded</div>,
-}));
+vi.mock(
+  "../../components/listingRequests/conversations/RequestConversationThread",
+  () => ({
+    default: () => (
+      <div>Conversation thread loaded</div>
+    ),
+  })
+);
 
-vi.mock("../../hooks/creatorRequests/useListingRequestAgreement", () => ({
-  useListingRequestAgreement: mocks.useListingRequestAgreement,
-}));
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestAgreement",
+  () => ({
+    useListingRequestAgreement:
+      mocks.useListingRequestAgreement,
+  })
+);
 
 vi.mock(
   "../../hooks/admin/useAdminConfirmListingRequestStartingPayment",
   () => ({
-    useAdminConfirmListingRequestStartingPayment: () => ({
-      mutateAsync: mocks.confirmStartingPayment,
-      isPending: false,
-      error: null,
-    }),
+    useAdminConfirmListingRequestStartingPayment:
+      () => ({
+        mutateAsync:
+          mocks.confirmStartingPayment,
+        isPending: false,
+        error: null,
+      }),
   })
 );
 
-vi.mock("../../components/ListingRequestAgreementSummary", () => ({
-  default: () => <div>Mock agreement summary</div>,
-}));
-
-vi.mock("../../components/ListingRequestAgreementWorkReadinessCard", () => ({
-  default: ({
-    requestStatus,
-    agreement,
-  }: {
-    requestStatus: string;
-    agreement: { status: string } | null;
-  }) => (
-    <div>
-      Mock work readiness card: {requestStatus} /{" "}
-      {agreement?.status ?? "none"}
-    </div>
-  ),
-}));
+vi.mock(
+  "../../components/listingRequests/agreements/ListingRequestAgreementSummary",
+  () => ({
+    default: () => (
+      <div>Mock agreement summary</div>
+    ),
+  })
+);
 
 vi.mock(
-  "../../components/ListingRequestAgreementAdminPaymentActions",
+  "../../components/listingRequests/agreements/ListingRequestAgreementWorkReadinessCard",
+  () => ({
+    default: ({
+      requestStatus,
+      agreement,
+    }: {
+      requestStatus: string;
+      agreement: {
+        status: string;
+      } | null;
+    }) => (
+      <div>
+        Mock work readiness card:{" "}
+        {requestStatus} /{" "}
+        {agreement?.status ?? "none"}
+      </div>
+    ),
+  })
+);
+
+vi.mock(
+  "../../components/listingRequests/payments/ListingRequestAgreementAdminPaymentActions",
   () => ({
     default: ({
       agreement,
       onConfirmPayment,
     }: {
-      agreement: { id: string } | null;
-      onConfirmPayment: (agreementId: string) => void;
+      agreement: {
+        id: string;
+      } | null;
+      onConfirmPayment: (
+        agreementId: string
+      ) => void;
     }) =>
       agreement ? (
         <button
           type="button"
-          onClick={() => onConfirmPayment(agreement.id)}
+          onClick={() =>
+            onConfirmPayment(agreement.id)
+          }
         >
           Mock confirm starting payment
         </button>
@@ -87,24 +115,34 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestProgressUpdateTimeline",
+  "../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateTimeline",
   () => ({
     default: ({
       updates,
       isLoading,
       error,
     }: {
-      updates: Array<{ id: string }>;
+      updates: Array<{
+        id: string;
+      }>;
       isLoading?: boolean;
       error?: unknown;
     }) => {
-      const hasError = error !== null && error !== undefined;
+      const hasError =
+        error !== null &&
+        error !== undefined;
 
       return (
         <div>
-          Mock progress timeline: {updates.length} /{" "}
-          {isLoading ? "loading" : "ready"} /{" "}
-          {hasError ? "error" : "no error"}
+          Mock progress timeline:{" "}
+          {updates.length} /{" "}
+          {isLoading
+            ? "loading"
+            : "ready"}{" "}
+          /{" "}
+          {hasError
+            ? "error"
+            : "no error"}
         </div>
       );
     },
@@ -112,7 +150,7 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestProgressUpdateScheduleCard",
+  "../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateScheduleCard",
   () => ({
     default: ({
       agreement,
@@ -122,12 +160,19 @@ vi.mock(
         status: string;
         starting_payment_status: string;
       } | null;
-      updates: Array<{ id: string }>;
+      updates: Array<{
+        id: string;
+      }>;
     }) =>
-      agreement?.status === "buyer_accepted" ? (
+      agreement?.status ===
+        "buyer_accepted" ? (
         <div>
-          Mock progress schedule: {agreement.status} /{" "}
-          {agreement.starting_payment_status} / {updates.length}
+          Mock progress schedule:{" "}
+          {agreement.status} /{" "}
+          {
+            agreement.starting_payment_status
+          }{" "}
+          / {updates.length}
         </div>
       ) : null,
   })
@@ -142,7 +187,7 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestChangeOrderSummary",
+  "../../components/listingRequests/changeOrders/ListingRequestChangeOrderSummary",
   () => ({
     default: ({
       changeOrders,
@@ -150,16 +195,23 @@ vi.mock(
       isLoading,
       error,
     }: {
-      changeOrders: Array<{ id: string }>;
+      changeOrders: Array<{
+        id: string;
+      }>;
       viewer: string;
       isLoading?: boolean;
       error?: unknown;
     }) => (
       <div>
-        Mock change-order summary: {viewer} /{" "}
+        Mock change-order summary:{" "}
+        {viewer} /{" "}
         {changeOrders.length} /{" "}
-        {isLoading ? "loading" : "ready"} /{" "}
-        {error !== null && error !== undefined
+        {isLoading
+          ? "loading"
+          : "ready"}{" "}
+        /{" "}
+        {error !== null &&
+          error !== undefined
           ? "error"
           : "no error"}
       </div>
@@ -170,16 +222,18 @@ vi.mock(
 vi.mock(
   "../../hooks/admin/useAdminConfirmListingRequestChangeOrderPayment",
   () => ({
-    useAdminConfirmListingRequestChangeOrderPayment: () => ({
-      mutateAsync: mocks.confirmChangeOrderPayment,
-      isPending: false,
-      error: null,
-    }),
+    useAdminConfirmListingRequestChangeOrderPayment:
+      () => ({
+        mutateAsync:
+          mocks.confirmChangeOrderPayment,
+        isPending: false,
+        error: null,
+      }),
   })
 );
 
 vi.mock(
-  "../../components/ListingRequestChangeOrderPaymentAdminActions",
+  "../../components/listingRequests/payments/ListingRequestChangeOrderPaymentAdminActions",
   () => ({
     default: ({
       agreement,
@@ -188,7 +242,9 @@ vi.mock(
       agreement: {
         listing_request_payment_schedule_items?: Array<{
           id: string;
-          change_order_id: string | null;
+          change_order_id:
+          | string
+          | null;
           payment_timing: string;
           status: string;
         }>;
@@ -203,15 +259,21 @@ vi.mock(
             item.change_order_id &&
             item.payment_timing ===
             "due_on_change_order_acceptance" &&
-            item.status === "payment_required"
+            item.status ===
+            "payment_required"
         ) ?? null;
 
       return paymentItem ? (
         <button
           type="button"
-          onClick={() => onConfirmPayment(paymentItem.id)}
+          onClick={() =>
+            onConfirmPayment(
+              paymentItem.id
+            )
+          }
         >
-          Mock confirm change-order payment
+          Mock confirm change-order
+          payment
         </button>
       ) : null;
     },
@@ -227,7 +289,7 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestFinalDeliverySummary",
+  "../../components/listingRequests/finalDeliveries/ListingRequestFinalDeliverySummary",
   () => ({
     default: ({
       finalDeliveries,
@@ -243,10 +305,15 @@ vi.mock(
       error?: unknown;
     }) => (
       <div>
-        Mock final delivery summary: {viewer} /{" "}
+        Mock final delivery summary:{" "}
+        {viewer} /{" "}
         {finalDeliveries.length} /{" "}
-        {isLoading ? "loading" : "ready"} /{" "}
-        {error !== null && error !== undefined
+        {isLoading
+          ? "loading"
+          : "ready"}{" "}
+        /{" "}
+        {error !== null &&
+          error !== undefined
           ? "error"
           : "no error"}
       </div>
@@ -268,7 +335,7 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestFinalBalancePaymentAdminActions",
+  "../../components/listingRequests/payments/ListingRequestFinalBalancePaymentAdminActions",
   () => ({
     default: ({
       agreement,
@@ -291,7 +358,8 @@ vi.mock(
           (item) =>
             item.payment_timing ===
             "due_before_final_release" &&
-            item.status === "payment_required" &&
+            item.status ===
+            "payment_required" &&
             item.amount > 0
         ) ?? null;
 
@@ -299,10 +367,13 @@ vi.mock(
         <button
           type="button"
           onClick={() =>
-            onConfirmPayment(paymentItem.id)
+            onConfirmPayment(
+              paymentItem.id
+            )
           }
         >
-          Mock confirm final-balance payment
+          Mock confirm final-balance
+          payment
         </button>
       ) : null;
     },

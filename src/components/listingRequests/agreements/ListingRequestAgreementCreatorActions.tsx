@@ -1,5 +1,5 @@
-import { canSendListingRequestAgreement } from "../domain/listings/listingRequestAgreements";
-import type { ListingRequestAgreementRow } from "../hooks/creatorRequests/useListingRequestAgreement";
+import { canSendListingRequestAgreement } from "../../../domain/listings/listingRequestAgreements";
+import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
 
 type ListingRequestAgreementCreatorActionsProps = {
   agreement: Pick<ListingRequestAgreementRow, "id" | "status"> | null;
