@@ -3,7 +3,7 @@ import { useBuyerRequest } from "../../hooks/creatorRequests/useBuyerRequest";
 import { getListingRequestStatusLabel } from "../../domain/listings/listingRequests";
 import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
 import RequestConversationThread from '../../components/RequestConversationThread';
-import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
+import ListingRequestSubmissionDetails from '../../components/listingRequests/core/ListingRequestSubmissionDetails';
 import { useArchiveBuyerListingRequest } from '../../hooks/creatorRequests/useArchiveBuyerListingRequest';
 import { useState } from 'react';
 import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListingRequestAgreement';

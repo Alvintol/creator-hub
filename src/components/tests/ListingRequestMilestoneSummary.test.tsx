@@ -8,7 +8,7 @@ import {
   it,
 } from "vitest";
 
-import ListingRequestMilestoneSummary from "../ListingRequestMilestoneSummary";
+import ListingRequestMilestoneSummary from "../listingRequests/milestones/ListingRequestMilestoneSummary";
 import type { ListingRequestMilestoneRow } from "../../hooks/creatorRequests/useListingRequestMilestones";
 import type { ListingRequestMilestoneSubmissionRow } from "../../hooks/creatorRequests/useListingRequestMilestoneSubmissions";
 

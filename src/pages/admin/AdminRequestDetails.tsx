@@ -3,7 +3,7 @@ import { useAdminRequest } from "../../hooks/admin/useAdminRequest";
 import { getListingRequestStatusLabel } from "../../domain/listings/listingRequests";
 import ListingRequestStatusCard from "../../components/ListingRequestStatusCard";
 import RequestConversationThread from '../../components/RequestConversationThread';
-import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
+import ListingRequestSubmissionDetails from '../../components/listingRequests/core/ListingRequestSubmissionDetails';
 import ListingRequestAgreementSummary from '../../components/ListingRequestAgreementSummary';
 import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListingRequestAgreement';
 import { useAdminConfirmListingRequestStartingPayment } from '../../hooks/admin/useAdminConfirmListingRequestStartingPayment';

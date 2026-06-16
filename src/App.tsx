@@ -9,7 +9,7 @@ import ProfileSetupRedirect from "./components/ProfileSetupRedirect";
 import RequireAdminAccess from "./components/RequireAdminAccess";
 import RequireAuth from "./components/RequireAuth";
 import RequireCreatorAccess from "./components/RequireCreatorAccess";
-import ScrollToTop from "./components/ScrollToTop";
+import ScrollToTop from "./components/layout/ScrollToTop";
 import About from "./pages/About";
 import Home from "./pages/Home";
 import Live from "./pages/Live";

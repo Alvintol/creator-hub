@@ -10,7 +10,7 @@ import {
 import { useEffect, useState } from 'react';
 import ListingRequestStatusCard from '../../components/ListingRequestStatusCard';
 import RequestConversationThread from '../../components/RequestConversationThread';
-import ListingRequestSubmissionDetails from '../../components/ListingRequestSubmissionDetails';
+import ListingRequestSubmissionDetails from '../../components/listingRequests/core/ListingRequestSubmissionDetails';
 import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListingRequestAgreement';
 import ListingRequestAgreementSummary from '../../components/ListingRequestAgreementSummary';
 import { useCreateListingRequestAgreement } from '../../hooks/creatorRequests/useCreateListingRequestAgreement';
