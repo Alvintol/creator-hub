@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import Footer from "../Footer";
+import Footer from "../layout/Footer";
 import { describe, expect, it } from 'vitest';
 
 describe("<Footer />", () => {

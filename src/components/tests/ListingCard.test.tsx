@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import ListingCard, {
   type ListingCardListing,
   type ListingCardCreator,
-} from "../ListingCard";
+} from "../listings/ListingCard";
 import {
   HubActionsContext,
   HubStateContext,

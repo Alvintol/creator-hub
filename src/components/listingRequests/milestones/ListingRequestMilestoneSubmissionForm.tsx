@@ -6,9 +6,9 @@ import {
 
 import {
   canSubmitListingRequestMilestone,
-} from "../domain/listings/listingRequestMilestones";
-import type { ListingRequestMilestoneRow } from "../hooks/creatorRequests/useListingRequestMilestones";
-import type { SubmitListingRequestMilestoneInput } from "../hooks/creatorRequests/useSubmitListingRequestMilestone";
+} from "../../../domain/listings/listingRequestMilestones";
+import type { ListingRequestMilestoneRow } from "../../../hooks/creatorRequests/useListingRequestMilestones";
+import type { SubmitListingRequestMilestoneInput } from "../../../hooks/creatorRequests/useSubmitListingRequestMilestone";
 
 type SubmittableMilestone = Pick<
   ListingRequestMilestoneRow,

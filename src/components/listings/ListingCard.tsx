@@ -1,4 +1,4 @@
-import FavouriteButton from "./FavouriteButton";
+import FavouriteButton from "../FavouriteButton";
 import { Link } from "react-router-dom";
 
 const classes = {

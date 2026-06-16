@@ -11,7 +11,7 @@ import {
   vi,
 } from "vitest";
 
-import ListingRequestMilestoneSubmissionForm from "../ListingRequestMilestoneSubmissionForm";
+import ListingRequestMilestoneSubmissionForm from "../listingRequests/milestones/ListingRequestMilestoneSubmissionForm";
 
 const pendingMilestone = {
   id: "milestone-1",
