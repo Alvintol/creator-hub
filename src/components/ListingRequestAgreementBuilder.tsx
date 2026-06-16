@@ -245,6 +245,8 @@ const buildPaymentScheduleItems = (input: {
   }
 
   return input.milestones.map((milestone) => ({
+    agreement_item_client_key:
+      `milestone:${milestone.sortOrder}`,
     title: milestone.title.trim(),
     description:
       milestone.description?.trim() ||
@@ -363,6 +365,8 @@ const ListingRequestAgreementBuilder = ({
       form.paymentStructure ===
         "milestone_payments"
         ? form.milestones.map((milestone) => ({
+          client_key:
+            `milestone:${milestone.sortOrder}`,
           title: milestone.title.trim(),
           description:
             milestone.description?.trim() ||

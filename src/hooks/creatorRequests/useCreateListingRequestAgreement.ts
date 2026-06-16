@@ -11,9 +11,14 @@ import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../providers/AuthProvider";
 
 export type CreateListingRequestAgreementItemInput = {
+  client_key?: string | null;
   title: string;
   description?: string | null;
-  item_type: "included" | "optional_addon" | "required_payment_item" | "milestone";
+  item_type:
+  | "included"
+  | "optional_addon"
+  | "required_payment_item"
+  | "milestone";
   price_amount?: number | null;
   timeline_impact_days?: number | null;
   payment_timing: ListingRequestPaymentTiming;
@@ -23,6 +28,7 @@ export type CreateListingRequestAgreementItemInput = {
 };
 
 export type CreateListingRequestAgreementPaymentScheduleItemInput = {
+  agreement_item_client_key?: string | null;
   title: string;
   description?: string | null;
   amount: number;
@@ -34,7 +40,12 @@ export type CreateListingRequestAgreementPaymentScheduleItemInput = {
     | "due_before_final_release"
     | "due_on_change_order_acceptance"
   >;
-  status?: "pending" | "payment_required" | "paid" | "waived" | "cancelled";
+  status?:
+  | "pending"
+  | "payment_required"
+  | "paid"
+  | "waived"
+  | "cancelled";
   due_at?: string | null;
   sort_order?: number;
 };

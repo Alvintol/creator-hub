@@ -404,8 +404,8 @@ describe("ListingRequestAgreementBuilder", () => {
           }),
 
           expect.objectContaining({
-            title:
-              "Initial design direction",
+            client_key: "milestone:0",
+            title: "Initial design direction",
             description:
               "Deliver initial concepts for buyer review.",
             item_type: "milestone",
@@ -416,8 +416,8 @@ describe("ListingRequestAgreementBuilder", () => {
           }),
 
           expect.objectContaining({
-            title:
-              "Completed emote package",
+            client_key: "milestone:1",
+            title: "Completed emote package",
             description:
               "Deliver all completed PNG exports.",
             item_type: "milestone",
@@ -430,8 +430,11 @@ describe("ListingRequestAgreementBuilder", () => {
 
         paymentScheduleItems: [
           expect.objectContaining({
-            title:
-              "Initial design direction",
+            agreement_item_client_key:
+              "milestone:0",
+            title: "Initial design direction",
+            description:
+              "Deliver initial concepts for buyer review.",
             amount: 100,
             currency: "cad",
             payment_timing:
@@ -442,8 +445,11 @@ describe("ListingRequestAgreementBuilder", () => {
           }),
 
           expect.objectContaining({
-            title:
-              "Completed emote package",
+            agreement_item_client_key:
+              "milestone:1",
+            title: "Completed emote package",
+            description:
+              "Deliver all completed PNG exports.",
             amount: 200,
             currency: "cad",
             payment_timing:

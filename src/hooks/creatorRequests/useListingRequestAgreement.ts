@@ -28,6 +28,7 @@ export type ListingRequestAgreementItemRow = {
 export type ListingRequestPaymentScheduleItemRow = {
   id: string;
   agreement_id: string;
+  agreement_item_id: string | null;
   change_order_id: string | null;
   title: string;
   description: string | null;
@@ -40,7 +41,12 @@ export type ListingRequestPaymentScheduleItemRow = {
     | "due_before_final_release"
     | "due_on_change_order_acceptance"
   >;
-  status: "pending" | "payment_required" | "paid" | "waived" | "cancelled";
+  status:
+  | "pending"
+  | "payment_required"
+  | "paid"
+  | "waived"
+  | "cancelled";
   due_at: string | null;
   paid_at: string | null;
   sort_order: number;
@@ -184,9 +190,10 @@ export const useListingRequestAgreement = (listingRequestId?: string | null) => 
             created_at,
             updated_at
           ),
-          listing_request_payment_schedule_items (
+         listing_request_payment_schedule_items (
             id,
             agreement_id,
+            agreement_item_id,
             change_order_id,
             title,
             description,
