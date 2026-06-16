@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { canBuyerRespondToListingRequestFinalDelivery } from "../domain/listings/listingRequestFinalDeliveries";
-import type { ListingRequestFinalDeliveryRow } from "../hooks/creatorRequests/useListingRequestFinalDeliveries";
+import { canBuyerRespondToListingRequestFinalDelivery } from "../../../domain/listings/listingRequestFinalDeliveries";
+import type { ListingRequestFinalDeliveryRow } from "../../../hooks/creatorRequests/useListingRequestFinalDeliveries";
 
 type BuyerFinalDelivery = Pick<
   ListingRequestFinalDeliveryRow,

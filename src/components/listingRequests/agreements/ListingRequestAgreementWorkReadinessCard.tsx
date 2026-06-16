@@ -1,8 +1,8 @@
 import {
   canStartWorkForAcceptedRequest,
   getListingRequestPaymentStructureLabel,
-} from "../domain/listings/listingRequestAgreements";
-import type { ListingRequestAgreementRow } from "../hooks/creatorRequests/useListingRequestAgreement";
+} from "../../../domain/listings/listingRequestAgreements";
+import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
 
 type ListingRequestAgreementWorkReadinessCardProps = {
   requestStatus: string;

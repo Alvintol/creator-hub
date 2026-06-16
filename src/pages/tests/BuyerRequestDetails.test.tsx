@@ -9,19 +9,26 @@ const mocks = vi.hoisted(() => ({
   archiveRequest: vi.fn(),
   useListingRequestAgreement: vi.fn(),
   respondAgreement: vi.fn(),
-  useListingRequestProgressUpdates: vi.fn(),
-  useListingRequestChangeOrders: vi.fn(),
+  useListingRequestProgressUpdates:
+    vi.fn(),
+  useListingRequestChangeOrders:
+    vi.fn(),
   respondChangeOrder: vi.fn(),
-  useListingRequestFinalDeliveries: vi.fn(),
+  useListingRequestFinalDeliveries:
+    vi.fn(),
   respondFinalDelivery: vi.fn(),
 }));
 
-vi.mock("../../hooks/creatorRequests/useBuyerRequest", () => ({
-  useBuyerRequest: mocks.useBuyerRequest,
-}));
+vi.mock(
+  "../../hooks/creatorRequests/useBuyerRequest",
+  () => ({
+    useBuyerRequest:
+      mocks.useBuyerRequest,
+  })
+);
 
 vi.mock(
-  "../../components/RequestConversationThread",
+  "../../components/listingRequests/conversations/RequestConversationThread",
   () => ({
     default: ({
       requestReadOnly,
@@ -31,7 +38,9 @@ vi.mock(
       requestReadOnlyMessage?: string;
     }) => (
       <div>
-        <div>Conversation thread loaded</div>
+        <div>
+          Conversation thread loaded
+        </div>
 
         <div>
           {requestReadOnly
@@ -40,46 +49,69 @@ vi.mock(
         </div>
 
         {requestReadOnlyMessage && (
-          <div>{requestReadOnlyMessage}</div>
+          <div>
+            {requestReadOnlyMessage}
+          </div>
         )}
       </div>
     ),
   })
 );
 
-vi.mock("../../hooks/creatorRequests/useArchiveBuyerListingRequest", () => ({
-  useArchiveBuyerListingRequest: () => ({
-    mutateAsync: mocks.archiveRequest,
-    isPending: false,
-    error: null,
-  }),
-}));
+vi.mock(
+  "../../hooks/creatorRequests/useArchiveBuyerListingRequest",
+  () => ({
+    useArchiveBuyerListingRequest:
+      () => ({
+        mutateAsync:
+          mocks.archiveRequest,
+        isPending: false,
+        error: null,
+      }),
+  })
+);
 
-vi.mock("../../hooks/creatorRequests/useListingRequestAgreement", () => ({
-  useListingRequestAgreement: mocks.useListingRequestAgreement,
-}));
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestAgreement",
+  () => ({
+    useListingRequestAgreement:
+      mocks.useListingRequestAgreement,
+  })
+);
 
-vi.mock("../../hooks/creatorRequests/useRespondListingRequestAgreement", () => ({
-  useRespondListingRequestAgreement: () => ({
-    mutateAsync: mocks.respondAgreement,
-    isPending: false,
-    error: null,
-  }),
-}));
+vi.mock(
+  "../../hooks/creatorRequests/useRespondListingRequestAgreement",
+  () => ({
+    useRespondListingRequestAgreement:
+      () => ({
+        mutateAsync:
+          mocks.respondAgreement,
+        isPending: false,
+        error: null,
+      }),
+  })
+);
 
-vi.mock("../../components/ListingRequestAgreementWorkReadinessCard", () => ({
-  default: ({
-    requestStatus,
-    agreement,
-  }: {
-    requestStatus: string;
-    agreement: { status: string } | null;
-  }) => (
-    <div>
-      Mock work readiness card: {requestStatus} / {agreement?.status ?? "none"}
-    </div>
-  ),
-}));
+vi.mock(
+  "../../components/listingRequests/agreements/ListingRequestAgreementWorkReadinessCard",
+  () => ({
+    default: ({
+      requestStatus,
+      agreement,
+    }: {
+      requestStatus: string;
+      agreement: {
+        status: string;
+      } | null;
+    }) => (
+      <div>
+        Mock work readiness card:{" "}
+        {requestStatus} /{" "}
+        {agreement?.status ?? "none"}
+      </div>
+    ),
+  })
+);
 
 vi.mock(
   "../../hooks/creatorRequests/useListingRequestProgressUpdates",
@@ -90,21 +122,28 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestProgressUpdateTimeline",
+  "../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateTimeline",
   () => ({
     default: ({
       updates,
       isLoading,
       error,
     }: {
-      updates: Array<{ id: string }>;
+      updates: Array<{
+        id: string;
+      }>;
       isLoading?: boolean;
       error?: unknown;
     }) => (
       <div>
-        Mock progress timeline: {updates.length} /{" "}
-        {isLoading ? "loading" : "ready"} /{" "}
-        {error !== null && error !== undefined
+        Mock progress timeline:{" "}
+        {updates.length} /{" "}
+        {isLoading
+          ? "loading"
+          : "ready"}{" "}
+        /{" "}
+        {error !== null &&
+          error !== undefined
           ? "error"
           : "no error"}
       </div>
@@ -113,7 +152,7 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestProgressUpdateScheduleCard",
+  "../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateScheduleCard",
   () => ({
     default: ({
       agreement,
@@ -123,12 +162,18 @@ vi.mock(
         status: string;
         starting_payment_status: string;
       } | null;
-      updates: Array<{ id: string }>;
+      updates: Array<{
+        id: string;
+      }>;
     }) =>
       agreement ? (
         <div>
-          Mock progress schedule: {agreement.status} /{" "}
-          {agreement.starting_payment_status} / {updates.length}
+          Mock progress schedule:{" "}
+          {agreement.status} /{" "}
+          {
+            agreement.starting_payment_status
+          }{" "}
+          / {updates.length}
         </div>
       ) : null,
   })
@@ -143,7 +188,7 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestChangeOrderSummary",
+  "../../components/listingRequests/changeOrders/ListingRequestChangeOrderSummary",
   () => ({
     default: ({
       changeOrders,
@@ -151,16 +196,23 @@ vi.mock(
       isLoading,
       error,
     }: {
-      changeOrders: Array<{ id: string }>;
+      changeOrders: Array<{
+        id: string;
+      }>;
       viewer: string;
       isLoading?: boolean;
       error?: unknown;
     }) => (
       <div>
-        Mock change-order summary: {viewer} /{" "}
+        Mock change-order summary:{" "}
+        {viewer} /{" "}
         {changeOrders.length} /{" "}
-        {isLoading ? "loading" : "ready"} /{" "}
-        {error !== null && error !== undefined
+        {isLoading
+          ? "loading"
+          : "ready"}{" "}
+        /{" "}
+        {error !== null &&
+          error !== undefined
           ? "error"
           : "no error"}
       </div>
@@ -171,16 +223,18 @@ vi.mock(
 vi.mock(
   "../../hooks/creatorRequests/useRespondListingRequestChangeOrder",
   () => ({
-    useRespondListingRequestChangeOrder: () => ({
-      mutateAsync: mocks.respondChangeOrder,
-      isPending: false,
-      error: null,
-    }),
+    useRespondListingRequestChangeOrder:
+      () => ({
+        mutateAsync:
+          mocks.respondChangeOrder,
+        isPending: false,
+        error: null,
+      }),
   })
 );
 
 vi.mock(
-  "../../components/ListingRequestChangeOrderBuyerActions",
+  "../../components/listingRequests/changeOrders/ListingRequestChangeOrderBuyerActions",
   () => ({
     default: ({
       changeOrder,
@@ -235,7 +289,7 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestFinalDeliverySummary",
+  "../../components/listingRequests/finalDeliveries/ListingRequestFinalDeliverySummary",
   () => ({
     default: ({
       finalDeliveries,
@@ -251,10 +305,15 @@ vi.mock(
       error?: unknown;
     }) => (
       <div>
-        Mock final delivery summary: {viewer} /{" "}
+        Mock final delivery summary:{" "}
+        {viewer} /{" "}
         {finalDeliveries.length} /{" "}
-        {isLoading ? "loading" : "ready"} /{" "}
-        {error !== null && error !== undefined
+        {isLoading
+          ? "loading"
+          : "ready"}{" "}
+        /{" "}
+        {error !== null &&
+          error !== undefined
           ? "error"
           : "no error"}
       </div>
@@ -265,16 +324,18 @@ vi.mock(
 vi.mock(
   "../../hooks/creatorRequests/useRespondListingRequestFinalDelivery",
   () => ({
-    useRespondListingRequestFinalDelivery: () => ({
-      mutateAsync: mocks.respondFinalDelivery,
-      isPending: false,
-      error: null,
-    }),
+    useRespondListingRequestFinalDelivery:
+      () => ({
+        mutateAsync:
+          mocks.respondFinalDelivery,
+        isPending: false,
+        error: null,
+      }),
   })
 );
 
 vi.mock(
-  "../../components/ListingRequestFinalDeliveryBuyerActions",
+  "../../components/listingRequests/finalDeliveries/ListingRequestFinalDeliveryBuyerActions",
   () => ({
     default: ({
       finalDelivery,
@@ -288,7 +349,9 @@ vi.mock(
         status: string;
       } | null;
       canApprove: boolean;
-      approvalBlockedReason?: string | null;
+      approvalBlockedReason?:
+      | string
+      | null;
       onApprove: (
         finalDeliveryId: string
       ) => unknown;
@@ -297,15 +360,21 @@ vi.mock(
         revisionRequestReason: string
       ) => unknown;
     }) =>
-      finalDelivery?.status === "submitted" ? (
+      finalDelivery?.status ===
+        "submitted" ? (
         <div>
           <div>
-            Mock final delivery approval:{" "}
-            {canApprove ? "ready" : "blocked"}
+            Mock final delivery
+            approval:{" "}
+            {canApprove
+              ? "ready"
+              : "blocked"}
           </div>
 
           {approvalBlockedReason && (
-            <div>{approvalBlockedReason}</div>
+            <div>
+              {approvalBlockedReason}
+            </div>
           )}
 
           <button

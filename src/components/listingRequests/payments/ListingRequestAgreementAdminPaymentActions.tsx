@@ -1,5 +1,5 @@
-import { getListingRequestPaymentStructureLabel } from "../domain/listings/listingRequestAgreements";
-import type { ListingRequestAgreementRow } from "../hooks/creatorRequests/useListingRequestAgreement";
+import { getListingRequestPaymentStructureLabel } from "../../../domain/listings/listingRequestAgreements";
+import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
 
 type AdminPaymentAgreement = Pick<
   ListingRequestAgreementRow,

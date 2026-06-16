@@ -1,7 +1,7 @@
 import { useState } from "react";
 
-import { canBuyerRespondToListingRequestChangeOrder } from "../domain/listings/listingRequestChangeOrders";
-import type { ListingRequestChangeOrderRow } from "../hooks/creatorRequests/useListingRequestChangeOrders";
+import { canBuyerRespondToListingRequestChangeOrder } from "../../../domain/listings/listingRequestChangeOrders";
+import type { ListingRequestChangeOrderRow } from "../../../hooks/creatorRequests/useListingRequestChangeOrders";
 
 type BuyerChangeOrder = Pick<
   ListingRequestChangeOrderRow,

@@ -1,9 +1,9 @@
 import type {
   ListingRequestProgressUpdateKind,
-} from "../hooks/creatorRequests/useCreateListingRequestProgressUpdate";
+} from "../../../hooks/creatorRequests/useCreateListingRequestProgressUpdate";
 import type {
   ListingRequestProgressUpdateRow,
-} from "../hooks/creatorRequests/useListingRequestProgressUpdates";
+} from "../../../hooks/creatorRequests/useListingRequestProgressUpdates";
 
 type ListingRequestProgressUpdateTimelineProps = {
   updates: ListingRequestProgressUpdateRow[];

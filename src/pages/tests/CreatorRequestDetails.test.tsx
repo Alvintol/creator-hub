@@ -10,30 +10,42 @@ const mocks = vi.hoisted(() => ({
   createAgreement: vi.fn(),
   sendDraftAgreement: vi.fn(),
   useListingRequestAgreement: vi.fn(),
-  useListingRequestProgressUpdates: vi.fn(),
+  useListingRequestProgressUpdates:
+    vi.fn(),
   createProgressUpdate: vi.fn(),
-  useListingRequestChangeOrders: vi.fn(),
+  useListingRequestChangeOrders:
+    vi.fn(),
   createChangeOrder: vi.fn(),
   sendDraftChangeOrder: vi.fn(),
-  useListingRequestFinalDeliveries: vi.fn(),
+  useListingRequestFinalDeliveries:
+    vi.fn(),
   createFinalDelivery: vi.fn(),
   sendDraftFinalDelivery: vi.fn(),
 }));
 
-vi.mock("../../hooks/creatorRequests/useCreatorRequest", () => ({
-  useCreatorRequest: mocks.useCreatorRequest,
-}));
-
-vi.mock("../../hooks/creatorRequests/useUpdateCreatorListingRequestStatus", () => ({
-  useUpdateCreatorListingRequestStatus: () => ({
-    mutateAsync: mocks.updateRequestStatus,
-    isPending: false,
-    error: null,
-  }),
-}));
+vi.mock(
+  "../../hooks/creatorRequests/useCreatorRequest",
+  () => ({
+    useCreatorRequest:
+      mocks.useCreatorRequest,
+  })
+);
 
 vi.mock(
-  "../../components/RequestConversationThread",
+  "../../hooks/creatorRequests/useUpdateCreatorListingRequestStatus",
+  () => ({
+    useUpdateCreatorListingRequestStatus:
+      () => ({
+        mutateAsync:
+          mocks.updateRequestStatus,
+        isPending: false,
+        error: null,
+      }),
+  })
+);
+
+vi.mock(
+  "../../components/listingRequests/conversations/RequestConversationThread",
   () => ({
     default: ({
       requestReadOnly,
@@ -43,7 +55,9 @@ vi.mock(
       requestReadOnlyMessage?: string;
     }) => (
       <div>
-        <div>Conversation thread loaded</div>
+        <div>
+          Conversation thread loaded
+        </div>
 
         <div>
           {requestReadOnly
@@ -52,81 +66,119 @@ vi.mock(
         </div>
 
         {requestReadOnlyMessage && (
-          <div>{requestReadOnlyMessage}</div>
+          <div>
+            {requestReadOnlyMessage}
+          </div>
         )}
       </div>
     ),
   })
 );
 
-vi.mock("../../hooks/creatorRequests/useListingRequestAgreement", () => ({
-  useListingRequestAgreement: mocks.useListingRequestAgreement,
-}));
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestAgreement",
+  () => ({
+    useListingRequestAgreement:
+      mocks.useListingRequestAgreement,
+  })
+);
 
-vi.mock("../../hooks/creatorRequests/useCreateListingRequestAgreement", () => ({
-  useCreateListingRequestAgreement: () => ({
-    mutateAsync: mocks.createAgreement,
-    isPending: false,
-    error: null,
-  }),
-}));
+vi.mock(
+  "../../hooks/creatorRequests/useCreateListingRequestAgreement",
+  () => ({
+    useCreateListingRequestAgreement:
+      () => ({
+        mutateAsync:
+          mocks.createAgreement,
+        isPending: false,
+        error: null,
+      }),
+  })
+);
 
-vi.mock("../../components/ListingRequestAgreementSummary", () => ({
-  default: ({
-    agreement,
-    isLoading,
-  }: {
-    agreement: unknown;
-    isLoading?: boolean;
-  }) => (
-    <div>
-      {isLoading
-        ? "Mock agreement loading"
-        : agreement
-          ? "Mock agreement summary"
-          : "Mock no agreement summary"}
-    </div>
-  ),
-}));
+vi.mock(
+  "../../components/listingRequests/agreements/ListingRequestAgreementSummary",
+  () => ({
+    default: ({
+      agreement,
+      isLoading,
+    }: {
+      agreement: unknown;
+      isLoading?: boolean;
+    }) => (
+      <div>
+        {isLoading
+          ? "Mock agreement loading"
+          : agreement
+            ? "Mock agreement summary"
+            : "Mock no agreement summary"}
+      </div>
+    ),
+  })
+);
 
-vi.mock("../../components/ListingRequestAgreementBuilder", () => ({
-  default: ({
-    request,
-    onCreateAgreement,
-  }: {
-    request: { id: string };
-    onCreateAgreement: (input: { listingRequestId: string }) => void;
-  }) => (
-    <button
-      type="button"
-      onClick={() => onCreateAgreement({ listingRequestId: request.id })}
-    >
-      Mock agreement builder
-    </button>
-  ),
-}));
+vi.mock(
+  "../../components/listingRequests/agreements/ListingRequestAgreementBuilder",
+  () => ({
+    default: ({
+      request,
+      onCreateAgreement,
+    }: {
+      request: {
+        id: string;
+      };
+      onCreateAgreement: (input: {
+        listingRequestId: string;
+      }) => void;
+    }) => (
+      <button
+        type="button"
+        onClick={() =>
+          onCreateAgreement({
+            listingRequestId:
+              request.id,
+          })
+        }
+      >
+        Mock agreement builder
+      </button>
+    ),
+  })
+);
 
-vi.mock("../../hooks/creatorRequests/useSendDraftListingRequestAgreement", () => ({
-  useSendDraftListingRequestAgreement: () => ({
-    mutateAsync: mocks.sendDraftAgreement,
-    isPending: false,
-    error: null,
-  }),
-}));
+vi.mock(
+  "../../hooks/creatorRequests/useSendDraftListingRequestAgreement",
+  () => ({
+    useSendDraftListingRequestAgreement:
+      () => ({
+        mutateAsync:
+          mocks.sendDraftAgreement,
+        isPending: false,
+        error: null,
+      }),
+  })
+);
 
-vi.mock("../../components/ListingRequestAgreementWorkReadinessCard", () => ({
-  default: ({
-    requestStatus,
-    agreement,
-  }: {
-    requestStatus: string;
-    agreement: { status: string } | null;
-  }) => (
-    <div>
-      Mock work readiness card: {requestStatus} / {agreement?.status ?? "none"}
-    </div>
-  ),
-}));
+vi.mock(
+  "../../components/listingRequests/agreements/ListingRequestAgreementWorkReadinessCard",
+  () => ({
+    default: ({
+      requestStatus,
+      agreement,
+    }: {
+      requestStatus: string;
+      agreement: {
+        status: string;
+      } | null;
+    }) => (
+      <div>
+        Mock work readiness card:{" "}
+        {requestStatus} /{" "}
+        {agreement?.status ?? "none"}
+      </div>
+    ),
+  })
+);
 
 vi.mock(
   "../../hooks/creatorRequests/useListingRequestProgressUpdates",
@@ -137,21 +189,29 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestProgressUpdateTimeline",
+  "../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateTimeline",
   () => ({
     default: ({
       updates,
       isLoading,
       error,
     }: {
-      updates: Array<{ id: string }>;
+      updates: Array<{
+        id: string;
+      }>;
       isLoading?: boolean;
       error?: unknown;
     }) => (
       <div>
-        Mock progress timeline: {updates.length} /{" "}
-        {isLoading ? "loading" : "ready"} /{" "}
-        {error ? "error" : "no error"}
+        Mock progress timeline:{" "}
+        {updates.length} /{" "}
+        {isLoading
+          ? "loading"
+          : "ready"}{" "}
+        /{" "}
+        {error
+          ? "error"
+          : "no error"}
       </div>
     ),
   })
@@ -160,16 +220,18 @@ vi.mock(
 vi.mock(
   "../../hooks/creatorRequests/useCreateListingRequestProgressUpdate",
   () => ({
-    useCreateListingRequestProgressUpdate: () => ({
-      mutateAsync: mocks.createProgressUpdate,
-      isPending: false,
-      error: null,
-    }),
+    useCreateListingRequestProgressUpdate:
+      () => ({
+        mutateAsync:
+          mocks.createProgressUpdate,
+        isPending: false,
+        error: null,
+      }),
   })
 );
 
 vi.mock(
-  "../../components/ListingRequestProgressUpdateForm",
+  "../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateForm",
   () => ({
     default: ({
       requestStatus,
@@ -190,16 +252,20 @@ vi.mock(
         progressPercent: number;
       }) => void;
     }) =>
-      agreement?.status === "buyer_accepted" &&
-        agreement.starting_payment_status === "paid" &&
+      agreement?.status ===
+        "buyer_accepted" &&
+        agreement.starting_payment_status ===
+        "paid" &&
         requestStatus === "accepted" ? (
         <button
           type="button"
           onClick={() =>
             onCreateProgressUpdate({
-              agreementId: agreement.id,
+              agreementId:
+                agreement.id,
               updateKind: "progress",
-              title: "Initial concepts completed",
+              title:
+                "Initial concepts completed",
               body:
                 "The first concept sketches are ready for review.",
               progressPercent: 35,
@@ -213,7 +279,7 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestProgressUpdateScheduleCard",
+  "../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateScheduleCard",
   () => ({
     default: ({
       agreement,
@@ -223,12 +289,18 @@ vi.mock(
         status: string;
         starting_payment_status: string;
       } | null;
-      updates: Array<{ id: string }>;
+      updates: Array<{
+        id: string;
+      }>;
     }) =>
       agreement ? (
         <div>
-          Mock progress schedule: {agreement.status} /{" "}
-          {agreement.starting_payment_status} / {updates.length}
+          Mock progress schedule:{" "}
+          {agreement.status} /{" "}
+          {
+            agreement.starting_payment_status
+          }{" "}
+          / {updates.length}
         </div>
       ) : null,
   })
@@ -245,26 +317,31 @@ vi.mock(
 vi.mock(
   "../../hooks/creatorRequests/useCreateListingRequestChangeOrder",
   () => ({
-    useCreateListingRequestChangeOrder: () => ({
-      mutateAsync: mocks.createChangeOrder,
-      isPending: false,
-      error: null,
-    }),
+    useCreateListingRequestChangeOrder:
+      () => ({
+        mutateAsync:
+          mocks.createChangeOrder,
+        isPending: false,
+        error: null,
+      }),
   })
 );
 
 vi.mock(
-  "../../components/ListingRequestChangeOrderSummary",
+  "../../components/listingRequests/changeOrders/ListingRequestChangeOrderSummary",
   () => ({
     default: ({
       changeOrders,
       viewer,
     }: {
-      changeOrders: Array<{ id: string }>;
+      changeOrders: Array<{
+        id: string;
+      }>;
       viewer: string;
     }) => (
       <div>
-        Mock change-order summary: {viewer} /{" "}
+        Mock change-order summary:{" "}
+        {viewer} /{" "}
         {changeOrders.length}
       </div>
     ),
@@ -272,13 +349,15 @@ vi.mock(
 );
 
 vi.mock(
-  "../../components/ListingRequestChangeOrderBuilder",
+  "../../components/listingRequests/changeOrders/ListingRequestChangeOrderBuilder",
   () => ({
     default: ({
       agreement,
       onCreateChangeOrder,
     }: {
-      agreement: { id: string } | null;
+      agreement: {
+        id: string;
+      } | null;
       onCreateChangeOrder: (input: {
         agreementId: string;
       }) => unknown;
@@ -288,7 +367,8 @@ vi.mock(
           type="button"
           onClick={() =>
             onCreateChangeOrder({
-              agreementId: agreement.id,
+              agreementId:
+                agreement.id,
             })
           }
         >
@@ -301,16 +381,18 @@ vi.mock(
 vi.mock(
   "../../hooks/creatorRequests/useSendDraftListingRequestChangeOrder",
   () => ({
-    useSendDraftListingRequestChangeOrder: () => ({
-      mutateAsync: mocks.sendDraftChangeOrder,
-      isPending: false,
-      error: null,
-    }),
+    useSendDraftListingRequestChangeOrder:
+      () => ({
+        mutateAsync:
+          mocks.sendDraftChangeOrder,
+        isPending: false,
+        error: null,
+      }),
   })
 );
 
 vi.mock(
-  "../../components/ListingRequestChangeOrderCreatorActions",
+  "../../components/listingRequests/changeOrders/ListingRequestChangeOrderCreatorActions",
   () => ({
     default: ({
       changeOrder,
@@ -328,7 +410,9 @@ vi.mock(
         <button
           type="button"
           onClick={() =>
-            onSendChangeOrder(changeOrder.id)
+            onSendChangeOrder(
+              changeOrder.id
+            )
           }
         >
           Mock send draft change order
@@ -348,16 +432,18 @@ vi.mock(
 vi.mock(
   "../../hooks/creatorRequests/useCreateListingRequestFinalDelivery",
   () => ({
-    useCreateListingRequestFinalDelivery: () => ({
-      mutateAsync: mocks.createFinalDelivery,
-      isPending: false,
-      error: null,
-    }),
+    useCreateListingRequestFinalDelivery:
+      () => ({
+        mutateAsync:
+          mocks.createFinalDelivery,
+        isPending: false,
+        error: null,
+      }),
   })
 );
 
 vi.mock(
-  "../../components/ListingRequestFinalDeliverySummary",
+  "../../components/listingRequests/finalDeliveries/ListingRequestFinalDeliverySummary",
   () => ({
     default: ({
       finalDeliveries,
@@ -373,17 +459,23 @@ vi.mock(
       error?: unknown;
     }) => (
       <div>
-        Mock final delivery summary: {viewer} /{" "}
+        Mock final delivery summary:{" "}
+        {viewer} /{" "}
         {finalDeliveries.length} /{" "}
-        {isLoading ? "loading" : "ready"} /{" "}
-        {error ? "error" : "no error"}
+        {isLoading
+          ? "loading"
+          : "ready"}{" "}
+        /{" "}
+        {error
+          ? "error"
+          : "no error"}
       </div>
     ),
   })
 );
 
 vi.mock(
-  "../../components/ListingRequestFinalDeliveryBuilder",
+  "../../components/listingRequests/finalDeliveries/ListingRequestFinalDeliveryBuilder",
   () => ({
     default: ({
       agreement,
@@ -401,7 +493,8 @@ vi.mock(
           type="button"
           onClick={() =>
             onCreateFinalDelivery({
-              agreementId: agreement.id,
+              agreementId:
+                agreement.id,
             })
           }
         >
@@ -414,16 +507,18 @@ vi.mock(
 vi.mock(
   "../../hooks/creatorRequests/useSendDraftListingRequestFinalDelivery",
   () => ({
-    useSendDraftListingRequestFinalDelivery: () => ({
-      mutateAsync: mocks.sendDraftFinalDelivery,
-      isPending: false,
-      error: null,
-    }),
+    useSendDraftListingRequestFinalDelivery:
+      () => ({
+        mutateAsync:
+          mocks.sendDraftFinalDelivery,
+        isPending: false,
+        error: null,
+      }),
   })
 );
 
 vi.mock(
-  "../../components/ListingRequestFinalDeliveryCreatorActions",
+  "../../components/listingRequests/finalDeliveries/ListingRequestFinalDeliveryCreatorActions",
   () => ({
     default: ({
       finalDelivery,
@@ -437,7 +532,8 @@ vi.mock(
         finalDeliveryId: string
       ) => unknown;
     }) =>
-      finalDelivery?.status === "draft" ? (
+      finalDelivery?.status ===
+        "draft" ? (
         <button
           type="button"
           onClick={() =>
@@ -446,7 +542,8 @@ vi.mock(
             )
           }
         >
-          Mock submit final-delivery draft
+          Mock submit final-delivery
+          draft
         </button>
       ) : null,
   })

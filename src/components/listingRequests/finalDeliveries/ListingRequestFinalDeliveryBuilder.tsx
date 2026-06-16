@@ -3,8 +3,8 @@ import {
   type SubmitEventHandler,
 } from "react";
 
-import type { ListingRequestAgreementRow } from "../hooks/creatorRequests/useListingRequestAgreement";
-import type { CreateListingRequestFinalDeliveryInput } from "../hooks/creatorRequests/useCreateListingRequestFinalDelivery";
+import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
+import type { CreateListingRequestFinalDeliveryInput } from "../../../hooks/creatorRequests/useCreateListingRequestFinalDelivery";
 
 type FinalDeliveryAgreement = Pick<
   ListingRequestAgreementRow,

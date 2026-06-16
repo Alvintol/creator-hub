@@ -4,7 +4,7 @@ import {
   getListingRequestStatusTone,
   type ListingRequestArchiveContext,
   type ListingRequestStatus,
-} from "../domain/listings/listingRequests";
+} from "../../../domain/listings/listingRequests";
 
 type ListingRequestStatusCardProps = {
   status: ListingRequestStatus;

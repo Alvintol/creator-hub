@@ -3,8 +3,8 @@ import { useMemo, useState } from "react";
 import {
   areRequiredAgreementAcknowledgementsChecked,
   getRequiredListingRequestAgreementAcknowledgements,
-} from "../domain/listings/listingRequestAgreements";
-import type { ListingRequestAgreementRow } from "../hooks/creatorRequests/useListingRequestAgreement";
+} from "../../../domain/listings/listingRequestAgreements";
+import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
 
 type ListingRequestAgreementBuyerActionsProps = {
   agreement: ListingRequestAgreementRow | null;
