@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import ListingRequestAgreementBuyerActions from "../ListingRequestAgreementBuyerActions";
+import ListingRequestAgreementBuyerActions from "../listingRequests/agreements/ListingRequestAgreementBuyerActions";
 import type { ListingRequestAgreementRow } from "../../hooks/creatorRequests/useListingRequestAgreement";
 
 const agreement: ListingRequestAgreementRow = {

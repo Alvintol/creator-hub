@@ -11,7 +11,7 @@ import {
   vi,
 } from "vitest";
 
-import ListingRequestChangeOrderPaymentAdminActions from "../ListingRequestChangeOrderPaymentAdminActions";
+import ListingRequestChangeOrderPaymentAdminActions from "../listingRequests/payments/ListingRequestChangeOrderPaymentAdminActions";
 import type { ListingRequestAgreementRow } from "../../hooks/creatorRequests/useListingRequestAgreement";
 
 const createAgreement = (

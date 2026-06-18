@@ -4,11 +4,11 @@ import {
   Routes,
 } from "react-router-dom";
 
-import Layout from "./components/Layout";
-import ProfileSetupRedirect from "./components/ProfileSetupRedirect";
-import RequireAdminAccess from "./components/RequireAdminAccess";
-import RequireAuth from "./components/RequireAuth";
-import RequireCreatorAccess from "./components/RequireCreatorAccess";
+import Layout from "./components/layout/Layout";
+import ProfileSetupRedirect from "./components/auth/ProfileSetupRedirect";
+import RequireAdminAccess from "./components/auth/RequireAdminAccess";
+import RequireAuth from "./components/auth/RequireAuth";
+import RequireCreatorAccess from "./components/auth/RequireCreatorAccess";
 import ScrollToTop from "./components/layout/ScrollToTop";
 import About from "./pages/About";
 import Home from "./pages/Home";

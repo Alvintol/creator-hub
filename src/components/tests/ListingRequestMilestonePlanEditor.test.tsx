@@ -11,7 +11,7 @@ import {
   vi,
 } from "vitest";
 
-import ListingRequestMilestonePlanEditor from "../ListingRequestMilestonePlanEditor";
+import ListingRequestMilestonePlanEditor from "../listingRequests/milestones/ListingRequestMilestonePlanEditor";
 import type { ListingRequestMilestonePlanItem } from "../../domain/listings/listingRequestMilestones";
 
 const initialMilestones: ListingRequestMilestonePlanItem[] =

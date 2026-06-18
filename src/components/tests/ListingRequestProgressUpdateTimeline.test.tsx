@@ -8,7 +8,7 @@ import {
   it,
 } from "vitest";
 
-import ListingRequestProgressUpdateTimeline from "../ListingRequestProgressUpdateTimeline";
+import ListingRequestProgressUpdateTimeline from "../listingRequests/progressUpdates/ListingRequestProgressUpdateTimeline";
 import type {
   ListingRequestProgressUpdateRow,
 } from "../../hooks/creatorRequests/useListingRequestProgressUpdates";

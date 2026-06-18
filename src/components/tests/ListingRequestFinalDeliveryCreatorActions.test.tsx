@@ -10,7 +10,7 @@ import {
   vi,
 } from "vitest";
 
-import ListingRequestFinalDeliveryCreatorActions from "../ListingRequestFinalDeliveryCreatorActions";
+import ListingRequestFinalDeliveryCreatorActions from "../listingRequests/finalDeliveries/ListingRequestFinalDeliveryCreatorActions";
 
 const draftFinalDelivery = {
   id: "final-delivery-1",

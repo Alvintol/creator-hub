@@ -11,7 +11,7 @@ import {
   vi,
 } from "vitest";
 
-import ListingRequestProgressUpdateForm from "../ListingRequestProgressUpdateForm";
+import ListingRequestProgressUpdateForm from "../listingRequests/progressUpdates/ListingRequestProgressUpdateForm";
 import type { ListingRequestAgreementRow } from "../../hooks/creatorRequests/useListingRequestAgreement";
 
 type ProgressUpdateAgreement = Pick<

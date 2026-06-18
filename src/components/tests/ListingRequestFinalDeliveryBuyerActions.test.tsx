@@ -11,7 +11,7 @@ import {
   vi,
 } from "vitest";
 
-import ListingRequestFinalDeliveryBuyerActions from "../ListingRequestFinalDeliveryBuyerActions";
+import ListingRequestFinalDeliveryBuyerActions from "../listingRequests/finalDeliveries/ListingRequestFinalDeliveryBuyerActions";
 
 const submittedFinalDelivery = {
   id: "final-delivery-1",

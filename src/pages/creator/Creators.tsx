@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import CreatorCard, { type CreatorCardModel } from "../../components/CreatorCard";
+import CreatorCard, { type CreatorCardModel } from "../../components/creators/CreatorCard";
 import { normalizeTwitchLogin } from "../../domain/twitch";
 import { usePublicCreators, type PublicCreatorItem } from "../../hooks/usePublicCreators";
 import { useTwitchStreams } from "../../hooks/useTwitchStreams";

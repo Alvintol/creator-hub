@@ -5,13 +5,13 @@ import {
   useLocation,
 } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { CATEGORIES } from "../domain/catalog";
-import { useTwitchStreams } from "../hooks/useTwitchStreams";
-import { supabase } from "../lib/supabaseClient";
-import { useAuth } from "../providers/AuthProvider";
-import { useSellerAccess } from '../hooks/creatorApplication/useSellerAccess';
-import { useMyAdminAccess } from '../hooks/admin/useMyAdminAccess';
-import { useMessagesInbox } from '../hooks/conversations/useMessagesInbox';
+import { CATEGORIES } from "../../domain/catalog";
+import { useTwitchStreams } from "../../hooks/useTwitchStreams";
+import { supabase } from "../../lib/supabaseClient";
+import { useAuth } from "../../providers/AuthProvider";
+import { useSellerAccess } from '../../hooks/creatorApplication/useSellerAccess';
+import { useMyAdminAccess } from '../../hooks/admin/useMyAdminAccess';
+import { useMessagesInbox } from '../../hooks/conversations/useMessagesInbox';
 
 type CategoryLink = {
   key: string;

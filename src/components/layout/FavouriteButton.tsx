@@ -3,7 +3,7 @@ import {
   useHubActions,
   useHubState,
   type FavouritesState,
-} from "../providers/hub";
+} from "../../providers/hub";
 
 type FavouriteKind = "creator" | "listing";
 

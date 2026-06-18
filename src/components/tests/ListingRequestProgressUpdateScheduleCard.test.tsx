@@ -8,7 +8,7 @@ import {
   it,
 } from "vitest";
 
-import ListingRequestProgressUpdateScheduleCard from "../ListingRequestProgressUpdateScheduleCard";
+import ListingRequestProgressUpdateScheduleCard from "../listingRequests/progressUpdates/ListingRequestProgressUpdateScheduleCard";
 import type { ListingRequestAgreementRow } from "../../hooks/creatorRequests/useListingRequestAgreement";
 import type { ListingRequestProgressUpdateRow } from "../../hooks/creatorRequests/useListingRequestProgressUpdates";
 
