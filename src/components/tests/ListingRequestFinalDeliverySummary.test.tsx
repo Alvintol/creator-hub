@@ -8,7 +8,7 @@ import {
   it,
 } from "vitest";
 
-import ListingRequestFinalDeliverySummary from "../ListingRequestFinalDeliverySummary";
+import ListingRequestFinalDeliverySummary from "../listingRequests/finalDeliveries/ListingRequestFinalDeliverySummary";
 import type { ListingRequestFinalDeliveryRow } from "../../hooks/creatorRequests/useListingRequestFinalDeliveries";
 
 const createFinalDelivery = (

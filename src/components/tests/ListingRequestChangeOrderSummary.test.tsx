@@ -8,7 +8,7 @@ import {
   it,
 } from "vitest";
 
-import ListingRequestChangeOrderSummary from "../ListingRequestChangeOrderSummary";
+import ListingRequestChangeOrderSummary from "../listingRequests/changeOrders/ListingRequestChangeOrderSummary";
 import type {
   ListingRequestChangeOrderRow,
 } from "../../hooks/creatorRequests/useListingRequestChangeOrders";

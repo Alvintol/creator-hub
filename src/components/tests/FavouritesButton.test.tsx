@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import FavouriteButton from "../FavouriteButton";
 import {
   HubActionsContext,
   HubStateContext,
 } from "../../providers/hub/HubProvider";
 import React from "react";
 import type { HubActions, HubState } from "../../providers/hub";
+import FavouriteButton from '../layout/FavouriteButton';
 
 // Mock action functions so we can verify which one gets called
 const mockSetFilters = vi.fn();

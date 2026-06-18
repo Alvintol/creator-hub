@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import ListingRequestAgreementBuilder from "../ListingRequestAgreementBuilder";
+import ListingRequestAgreementBuilder from "../listingRequests/agreements/ListingRequestAgreementBuilder";
 import type { ListingRequestRow } from "../../hooks/creatorRequests/useMyCreatorRequests";
 
 const createRequest = (

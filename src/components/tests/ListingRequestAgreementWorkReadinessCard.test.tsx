@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import ListingRequestAgreementWorkReadinessCard from "../ListingRequestAgreementWorkReadinessCard";
+import ListingRequestAgreementWorkReadinessCard from "../listingRequests/agreements/ListingRequestAgreementWorkReadinessCard";
 import type { ListingRequestAgreementRow } from "../../hooks/creatorRequests/useListingRequestAgreement";
 
 const createAgreement = (

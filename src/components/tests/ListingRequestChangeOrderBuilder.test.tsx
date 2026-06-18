@@ -10,7 +10,7 @@ import {
   vi,
 } from "vitest";
 
-import ListingRequestChangeOrderBuilder from "../ListingRequestChangeOrderBuilder";
+import ListingRequestChangeOrderBuilder from "../listingRequests/changeOrders/ListingRequestChangeOrderBuilder";
 
 const agreement = {
   id: "agreement-1",

@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import ListingRequestStatusCard from "../ListingRequestStatusCard";
+import ListingRequestStatusCard from "../listingRequests/core/ListingRequestStatusCard";
 
 describe("<ListingRequestStatusCard />", () => {
   it("renders submitted request status", () => {

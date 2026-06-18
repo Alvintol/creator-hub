@@ -11,7 +11,7 @@ import {
   vi,
 } from "vitest";
 
-import ListingRequestFinalDeliveryBuilder from "../ListingRequestFinalDeliveryBuilder";
+import ListingRequestFinalDeliveryBuilder from "../listingRequests/finalDeliveries/ListingRequestFinalDeliveryBuilder";
 
 const agreement = {
   id: "agreement-1",

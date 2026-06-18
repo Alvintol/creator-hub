@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import FavouriteButton from "./FavouriteButton";
+import FavouriteButton from '../layout/FavouriteButton';
 
 const classes = {
   card: "group relative rounded-2xl border border-zinc-200 bg-white p-4 hover:bg-zinc-50",
