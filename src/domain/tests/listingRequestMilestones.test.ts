@@ -8,10 +8,12 @@ import {
   canBuyerRespondToListingRequestMilestone,
   canConfirmListingRequestMilestonePayment,
   canSubmitListingRequestMilestone,
+  getActiveListingRequestMilestone,
   getListingRequestMilestonePlanTotal,
   getListingRequestMilestoneStatusLabel,
   getListingRequestMilestoneStatusSummary,
   getListingRequestMilestoneStatusTone,
+  getOrderedListingRequestMilestones,
   validateListingRequestMilestonePlan,
 } from "../listings/listingRequestMilestones";
 
@@ -252,5 +254,71 @@ describe("listing request milestones", () => {
     expect(result.errors).toContain(
       "Milestone order values must be unique."
     );
+  });
+
+  it("orders milestones by sort order", () => {
+    const milestones = [
+      {
+        id: "milestone-2",
+        status: "pending" as const,
+        sort_order: 1,
+      },
+      {
+        id: "milestone-1",
+        status: "paid" as const,
+        sort_order: 0,
+      },
+    ];
+
+    expect(
+      getOrderedListingRequestMilestones(milestones).map(
+        (milestone) => milestone.id
+      )
+    ).toEqual(["milestone-1", "milestone-2"]);
+  });
+
+  it("returns the first unpaid active milestone", () => {
+    const milestones = [
+      {
+        id: "milestone-3",
+        status: "pending" as const,
+        sort_order: 2,
+      },
+      {
+        id: "milestone-1",
+        status: "paid" as const,
+        sort_order: 0,
+      },
+      {
+        id: "milestone-2",
+        status: "payment_required" as const,
+        sort_order: 1,
+      },
+    ];
+
+    expect(
+      getActiveListingRequestMilestone(milestones)
+    ).toEqual({
+      id: "milestone-2",
+      status: "payment_required",
+      sort_order: 1,
+    });
+  });
+
+  it("returns null when no milestone is active", () => {
+    expect(
+      getActiveListingRequestMilestone([
+        {
+          id: "milestone-1",
+          status: "paid" as const,
+          sort_order: 0,
+        },
+        {
+          id: "milestone-2",
+          status: "cancelled" as const,
+          sort_order: 1,
+        },
+      ])
+    ).toBeNull();
   });
 });

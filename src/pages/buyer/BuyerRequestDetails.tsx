@@ -29,6 +29,7 @@ import { useListingRequestMilestones } from '../../hooks/creatorRequests/useList
 import ListingRequestMilestoneBuyerActions from '../../components/listingRequests/milestones/ListingRequestMilestoneBuyerActions';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
 import { canApproveListingRequestFinalDelivery, getHasAllMilestonePaymentsPaid, getListingRequestFinalDeliveryApprovalBlockedReason } from '../../domain/listings/listingRequestFinalDeliveries';
+import { getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
 
 const classes = {
   page: "space-y-6",
@@ -187,18 +188,8 @@ const BuyerRequestDetails = () => {
   const milestoneSubmissions =
     milestoneSubmissionsQuery.data ?? [];
 
-  const orderedMilestones = [...milestones].sort(
-    (firstMilestone, secondMilestone) =>
-      firstMilestone.sort_order -
-      secondMilestone.sort_order
-  );
-
   const activeMilestone =
-    orderedMilestones.find(
-      (milestone) =>
-        milestone.status !== "paid" &&
-        milestone.status !== "cancelled"
-    ) ?? null;
+    getActiveListingRequestMilestone(milestones);
 
   const milestonesAreLoading =
     milestonesQuery.isLoading ||

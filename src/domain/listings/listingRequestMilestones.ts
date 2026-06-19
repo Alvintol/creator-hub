@@ -28,6 +28,11 @@ export type ListingRequestMilestonePlanValidation = {
   milestoneTotal: number;
 };
 
+export type ListingRequestMilestoneOrderable = {
+  status: ListingRequestMilestoneStatus;
+  sort_order: number;
+};
+
 const roundCurrencyAmount = (
   amount: number
 ): number =>
@@ -72,10 +77,10 @@ export const getListingRequestMilestoneStatusTone = (
   status: ListingRequestMilestoneStatus
 ): ListingRequestMilestoneTone =>
   status === "submitted" ||
-  status === "payment_required"
+    status === "payment_required"
     ? "review"
     : status === "buyer_approved" ||
-        status === "paid"
+      status === "paid"
       ? "success"
       : status === "revision_requested"
         ? "danger"
@@ -207,3 +212,25 @@ export const validateListingRequestMilestonePlan = (
     milestoneTotal,
   };
 };
+
+export const getOrderedListingRequestMilestones = <
+  TMilestone extends ListingRequestMilestoneOrderable,
+>(
+  milestones: TMilestone[]
+): TMilestone[] =>
+  [...milestones].sort(
+    (firstMilestone, secondMilestone) =>
+      firstMilestone.sort_order -
+      secondMilestone.sort_order
+  );
+
+export const getActiveListingRequestMilestone = <
+  TMilestone extends ListingRequestMilestoneOrderable,
+>(
+  milestones: TMilestone[]
+): TMilestone | null =>
+  getOrderedListingRequestMilestones(milestones).find(
+    (milestone) =>
+      milestone.status !== "paid" &&
+      milestone.status !== "cancelled"
+  ) ?? null;

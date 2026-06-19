@@ -44,7 +44,7 @@ import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorReques
 import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
 import ListingRequestMilestoneSubmissionForm from '../../components/listingRequests/milestones/ListingRequestMilestoneSubmissionForm';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
-import { canSubmitListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
+import { canSubmitListingRequestMilestone, getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
 
 const classes = {
   page: "space-y-6",
@@ -382,17 +382,8 @@ const CreatorRequestDetails = () => {
   const milestoneSubmissions =
     milestoneSubmissionsQuery.data ?? [];
 
-  const orderedMilestones = [...milestones].sort(
-    (firstMilestone, secondMilestone) =>
-      firstMilestone.sort_order -
-      secondMilestone.sort_order
-  );
   const activeMilestone =
-    orderedMilestones.find(
-      (milestone) =>
-        milestone.status !== "paid" &&
-        milestone.status !== "cancelled"
-    ) ?? null;
+    getActiveListingRequestMilestone(milestones);
 
   const canSubmitActiveMilestone =
     activeMilestone
