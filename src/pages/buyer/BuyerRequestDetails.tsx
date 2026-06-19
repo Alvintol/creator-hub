@@ -28,6 +28,7 @@ import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorReques
 import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
 import ListingRequestMilestoneBuyerActions from '../../components/listingRequests/milestones/ListingRequestMilestoneBuyerActions';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
+import { canApproveListingRequestFinalDelivery, getHasAllMilestonePaymentsPaid, getListingRequestFinalDeliveryApprovalBlockedReason } from '../../domain/listings/listingRequestFinalDeliveries';
 
 const classes = {
   page: "space-y-6",
@@ -207,41 +208,15 @@ const BuyerRequestDetails = () => {
     milestonesQuery.error ??
     milestoneSubmissionsQuery.error;
 
-  const hasOutstandingFinalBalance =
-    buyerVisibleAgreement
-      ?.listing_request_payment_schedule_items
-      ?.some(
-        (paymentItem) =>
-          paymentItem.payment_timing ===
-          "due_before_final_release" &&
-          paymentItem.amount > 0 &&
-          (
-            paymentItem.status === "pending" ||
-            paymentItem.status ===
-            "payment_required"
-          )
-      ) ?? false;
-
-  const hasActiveFinalBalanceHold =
-    buyerVisibleAgreement
-      ?.listing_request_timeline_holds
-      ?.some(
-        (timelineHold) =>
-          timelineHold.reason ===
-          "balance_payment_pending" &&
-          timelineHold.ended_at === null
-      ) ?? false;
+  const finalDeliveryApprovalBlockedReason =
+    getListingRequestFinalDeliveryApprovalBlockedReason(
+      buyerVisibleAgreement
+    );
 
   const canApproveFinalDelivery =
-    !hasOutstandingFinalBalance &&
-    !hasActiveFinalBalanceHold;
-
-  const finalDeliveryApprovalBlockedReason =
-    hasOutstandingFinalBalance
-      ? "The final balance must be confirmed as paid before you can approve this delivery."
-      : hasActiveFinalBalanceHold
-        ? "The final balance payment is still awaiting confirmation."
-        : null;
+    canApproveListingRequestFinalDelivery(
+      buyerVisibleAgreement
+    );
 
   const handleArchiveRequest = async () => {
     if (!request) {
