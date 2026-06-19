@@ -130,6 +130,34 @@ const priceText = (
       ? `From $${priceMin}`
       : `$${priceMin}–$${priceMax ?? priceMin}`;
 
+const getCreatorMilestoneWaitMessage = (
+  milestone: {
+    status: string;
+    sort_order: number;
+    title: string;
+  } | null
+): string | null => {
+  if (!milestone) {
+    return null;
+  }
+
+  const milestoneLabel = `Milestone ${milestone.sort_order + 1
+    }: ${milestone.title}`;
+
+  if (milestone.status === "submitted") {
+    return `${milestoneLabel} is waiting for buyer review. The next milestone will unlock after the buyer approves this one and payment is confirmed.`;
+  }
+
+  if (
+    milestone.status === "buyer_approved" ||
+    milestone.status === "payment_required"
+  ) {
+    return `${milestoneLabel} has been approved by the buyer and is waiting for admin payment confirmation. The next milestone will unlock after payment is confirmed.`;
+  }
+
+  return null;
+};
+
 const CreatorRequestDetails = () => {
   const { id } = useParams<{ id: string }>();
 
@@ -154,6 +182,7 @@ const CreatorRequestDetails = () => {
     useSendDraftListingRequestFinalDelivery();
   const submitMilestoneMutation =
     useSubmitListingRequestMilestone();
+
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -373,6 +402,9 @@ const CreatorRequestDetails = () => {
     milestonesQuery.error ??
     milestoneSubmissionsQuery.error;
 
+  const activeMilestoneWaitMessage =
+    getCreatorMilestoneWaitMessage(activeMilestone);
+
   const requestReadOnlyMessage =
     request.status === "archived"
       ? "Archived requests are read-only."
@@ -390,6 +422,7 @@ const CreatorRequestDetails = () => {
     !getHasAllMilestonePaymentsPaid(agreement) &&
     !finalDeliveriesQuery.isLoading &&
     !finalDeliveriesQuery.error;
+
 
   return (
     <div className={classes.page}>
@@ -755,6 +788,12 @@ const CreatorRequestDetails = () => {
                   }
                 />
               )}
+
+            {activeMilestoneWaitMessage && (
+              <div className={classes.infoCard}>
+                {activeMilestoneWaitMessage}
+              </div>
+            )}
           </>
         )}
 

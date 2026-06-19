@@ -642,6 +642,48 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../components/listingRequests/milestones/ListingRequestMilestoneSubmissionForm",
+  () => ({
+    default: ({
+      milestone,
+      onSubmitMilestone,
+    }: {
+      milestone: {
+        id: string;
+        status: string;
+        title: string;
+      } | null;
+      onSubmitMilestone: (input: {
+        milestoneId: string;
+        summary: string;
+        deliveryLinks: string[];
+      }) => unknown;
+    }) =>
+      milestone &&
+        (
+          milestone.status === "pending" ||
+          milestone.status === "revision_requested"
+        ) ? (
+        <button
+          type="button"
+          onClick={() =>
+            onSubmitMilestone({
+              milestoneId: milestone.id,
+              summary:
+                "Milestone work is ready for buyer review.",
+              deliveryLinks: [
+                "https://example.com/milestone",
+              ],
+            })
+          }
+        >
+          Mock submit milestone: {milestone.title}
+        </button>
+      ) : null,
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -2064,6 +2106,150 @@ describe("<CreatorRequestDetails />", () => {
 
     expect(
       screen.queryByText(/Mock milestone summary:/)
+    ).not.toBeInTheDocument();
+  });
+
+  it("explains when the active milestone is waiting for buyer review", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "not_required",
+        payment_structure: "milestone_payments",
+        listing_request_payment_schedule_items: [
+          {
+            id: "payment-1",
+            payment_timing:
+              "due_at_milestone_approval",
+            status: "pending",
+            amount: 100,
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestMilestones.mockReturnValue({
+      data: [
+        {
+          id: "milestone-1",
+          status: "submitted",
+          title: "Initial design direction",
+          sort_order: 0,
+        },
+        {
+          id: "milestone-2",
+          status: "pending",
+          title: "Completed project package",
+          sort_order: 1,
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        /Milestone 1: Initial design direction is waiting for buyer review./
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Mock submit milestone: Initial design direction",
+      })
+    ).not.toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Mock submit milestone: Completed project package",
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it("explains when the active milestone is waiting for payment confirmation", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "not_required",
+        payment_structure: "milestone_payments",
+        listing_request_payment_schedule_items: [
+          {
+            id: "payment-1",
+            payment_timing:
+              "due_at_milestone_approval",
+            status: "payment_required",
+            amount: 100,
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestMilestones.mockReturnValue({
+      data: [
+        {
+          id: "milestone-1",
+          status: "payment_required",
+          title: "Initial design direction",
+          sort_order: 0,
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        /Milestone 1: Initial design direction has been approved by the buyer and is waiting for admin payment confirmation./
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Mock submit milestone: Initial design direction",
+      })
     ).not.toBeInTheDocument();
   });
 });

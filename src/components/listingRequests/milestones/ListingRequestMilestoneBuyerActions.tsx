@@ -71,6 +71,40 @@ const getIsSubmittedMilestone = (
   milestone: ListingRequestMilestoneRow | null
 ): boolean => milestone?.status === "submitted";
 
+const getBuyerMilestoneStatusMessage = (
+  milestone: ListingRequestMilestoneRow
+): string => {
+  const milestoneLabel = getMilestonePosition(milestone);
+
+  if (milestone.status === "pending") {
+    return `${milestoneLabel} is waiting for the creator to submit work for buyer review.`;
+  }
+
+  if (milestone.status === "revision_requested") {
+    return `${milestoneLabel} has revisions requested. The creator needs to submit an updated version before you can review it again.`;
+  }
+
+  if (
+    milestone.status === "buyer_approved" ||
+    milestone.status === "payment_required"
+  ) {
+    return `${milestoneLabel} has been approved. Payment is now awaiting admin confirmation before the creator can continue.`;
+  }
+
+  if (milestone.status === "paid") {
+    return `${milestoneLabel} payment has been confirmed.`;
+  }
+
+  if (milestone.status === "cancelled") {
+    return `${milestoneLabel} was cancelled.`;
+  }
+
+  return `${milestoneLabel} is currently ${milestone.status.replaceAll(
+    "_",
+    " "
+  )}.`;
+};
+
 const ListingRequestMilestoneBuyerActions = ({
   milestone,
   isPending = false,
@@ -180,12 +214,13 @@ const ListingRequestMilestoneBuyerActions = ({
         </p>
 
         <h2 className={classes.title}>
-          No buyer response is needed.
+          No milestone response needed
         </h2>
 
         <p className={classes.description}>
-          {getMilestonePosition(currentMilestone)} is currently{" "}
-          {currentMilestone.status.replaceAll("_", " ")}.
+          {getBuyerMilestoneStatusMessage(
+            currentMilestone
+          )}
         </p>
       </section>
     );
