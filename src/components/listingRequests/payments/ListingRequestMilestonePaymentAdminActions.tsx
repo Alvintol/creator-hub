@@ -52,20 +52,84 @@ const getErrorMessage = (
   return "The milestone payment could not be confirmed.";
 };
 
+const getSortedMilestones = (
+  milestones: ListingRequestMilestoneRow[]
+) =>
+  [...milestones].sort(
+    (firstMilestone, secondMilestone) =>
+      firstMilestone.sort_order -
+      secondMilestone.sort_order
+  );
+
 const getPaymentRequiredMilestone = (
   milestones: ListingRequestMilestoneRow[]
 ) =>
-  [...milestones]
-    .sort(
-      (firstMilestone, secondMilestone) =>
-        firstMilestone.sort_order -
-        secondMilestone.sort_order
-    )
-    .find(
+  getSortedMilestones(milestones).find(
+    (milestone) =>
+      milestone.status ===
+      "payment_required"
+  ) ?? null;
+
+const getAdminMilestonePaymentStatusMessage = (
+  milestones: ListingRequestMilestoneRow[]
+): string => {
+  if (milestones.length === 0) {
+    return "No milestone payments are configured for this request yet.";
+  }
+
+  const sortedMilestones =
+    getSortedMilestones(milestones);
+
+  const submittedMilestone =
+    sortedMilestones.find(
+      (milestone) =>
+        milestone.status === "submitted"
+    ) ?? null;
+
+  if (submittedMilestone) {
+    return `Milestone ${submittedMilestone.sort_order + 1
+      }: ${submittedMilestone.title
+      } is waiting for buyer review before payment is required.`;
+  }
+
+  const revisionMilestone =
+    sortedMilestones.find(
       (milestone) =>
         milestone.status ===
-        "payment_required"
+        "revision_requested"
     ) ?? null;
+
+  if (revisionMilestone) {
+    return `Milestone ${revisionMilestone.sort_order + 1
+      }: ${revisionMilestone.title
+      } has revisions requested. Payment is not required until the buyer approves the revised work.`;
+  }
+
+  const pendingMilestone =
+    sortedMilestones.find(
+      (milestone) =>
+        milestone.status === "pending"
+    ) ?? null;
+
+  if (pendingMilestone) {
+    return `Milestone ${pendingMilestone.sort_order + 1
+      }: ${pendingMilestone.title
+      } is waiting for creator submission.`;
+  }
+
+  const allMilestonesPaid =
+    sortedMilestones.every(
+      (milestone) =>
+        milestone.status === "paid" ||
+        milestone.status === "cancelled"
+    );
+
+  if (allMilestonesPaid) {
+    return "All milestone payments have been confirmed.";
+  }
+
+  return "No milestone payment is awaiting admin confirmation right now.";
+};
 
 const ListingRequestMilestonePaymentAdminActions =
   ({
@@ -77,12 +141,34 @@ const ListingRequestMilestonePaymentAdminActions =
     const milestone =
       getPaymentRequiredMilestone(milestones);
 
-    if (!milestone) {
-      return null;
-    }
-
     const errorMessage =
       getErrorMessage(error);
+
+    if (!milestone) {
+      return (
+        <section className={classes.card}>
+          <p className={classes.eyebrow}>
+            Milestone payment
+          </p>
+
+          <h2 className={classes.title}>
+            No milestone payment to confirm
+          </h2>
+
+          <p className={classes.description}>
+            {getAdminMilestonePaymentStatusMessage(
+              milestones
+            )}
+          </p>
+
+          {errorMessage && (
+            <div className={classes.error}>
+              {errorMessage}
+            </div>
+          )}
+        </section>
+      );
+    }
 
     return (
       <section className={classes.card}>

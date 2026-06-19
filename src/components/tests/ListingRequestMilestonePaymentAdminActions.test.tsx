@@ -55,8 +55,8 @@ describe(
       vi.clearAllMocks();
     });
 
-    it("renders nothing when no milestone payment is required", () => {
-      const { container } = render(
+    it("explains when no milestone payment is required", () => {
+      render(
         <ListingRequestMilestonePaymentAdminActions
           milestones={[
             createMilestone({
@@ -67,7 +67,23 @@ describe(
         />
       );
 
-      expect(container).toBeEmptyDOMElement();
+      expect(
+        screen.getByRole("heading", {
+          name: "No milestone payment to confirm",
+        })
+      ).toBeInTheDocument();
+
+      expect(
+        screen.getByText(
+          "Milestone 1: Initial design direction is waiting for creator submission."
+        )
+      ).toBeInTheDocument();
+
+      expect(
+        screen.queryByRole("button", {
+          name: "Confirm milestone payment",
+        })
+      ).not.toBeInTheDocument();
     });
 
     it("confirms the earliest payment-required milestone", () => {
@@ -138,6 +154,45 @@ describe(
       expect(
         screen.getByText(
           "This milestone is not awaiting payment confirmation."
+        )
+      ).toBeInTheDocument();
+    });
+
+    it("explains when milestone payment is waiting for buyer review", () => {
+      render(
+        <ListingRequestMilestonePaymentAdminActions
+          milestones={[
+            createMilestone({
+              status: "submitted",
+            }),
+          ]}
+          onConfirmPayment={onConfirmPayment}
+        />
+      );
+
+      expect(
+        screen.getByText(
+          "Milestone 1: Initial design direction is waiting for buyer review before payment is required."
+        )
+      ).toBeInTheDocument();
+    });
+
+    it("explains when all milestone payments have been confirmed", () => {
+      render(
+        <ListingRequestMilestonePaymentAdminActions
+          milestones={[
+            createMilestone({
+              status: "paid",
+              paid_at: "2026-06-18T14:00:00.000Z",
+            }),
+          ]}
+          onConfirmPayment={onConfirmPayment}
+        />
+      );
+
+      expect(
+        screen.getByText(
+          "All milestone payments have been confirmed."
         )
       ).toBeInTheDocument();
     });

@@ -1620,4 +1620,83 @@ describe("<BuyerRequestDetails />", () => {
         "Please adjust the title alignment.",
     });
   });
+
+  it("blocks final-delivery approval while milestone payments are unconfirmed", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        payment_structure: "milestone_payments",
+        starting_payment_status: "not_required",
+        listing_request_payment_schedule_items: [
+          {
+            id: "payment-1",
+            agreement_id: "agreement-1",
+            agreement_item_id: "agreement-item-1",
+            payment_timing: "due_at_milestone_approval",
+            status: "paid",
+            amount: 100,
+            currency: "cad",
+            due_at: null,
+            paid_at: "2026-06-18T12:00:00.000Z",
+            created_at: "2026-06-18T12:00:00.000Z",
+            updated_at: "2026-06-18T12:00:00.000Z",
+          },
+          {
+            id: "payment-2",
+            agreement_id: "agreement-1",
+            agreement_item_id: "agreement-item-2",
+            payment_timing: "due_at_milestone_approval",
+            status: "payment_required",
+            amount: 150,
+            currency: "cad",
+            due_at: "2026-06-18T13:00:00.000Z",
+            paid_at: null,
+            created_at: "2026-06-18T12:00:00.000Z",
+            updated_at: "2026-06-18T13:00:00.000Z",
+          },
+        ],
+        listing_request_timeline_holds: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue({
+      data: [
+        {
+          id: "final-delivery-1",
+          status: "submitted",
+          title: "Final package",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "All milestone payments must be confirmed before you can approve the final delivery."
+      )
+    ).toBeInTheDocument();
+  });
 });

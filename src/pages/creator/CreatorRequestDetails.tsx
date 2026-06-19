@@ -44,6 +44,7 @@ import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorReques
 import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
 import ListingRequestMilestoneSubmissionForm from '../../components/listingRequests/milestones/ListingRequestMilestoneSubmissionForm';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
+import { canSubmitListingRequestMilestone, getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
 
 const classes = {
   page: "space-y-6",
@@ -130,6 +131,34 @@ const priceText = (
       ? `From $${priceMin}`
       : `$${priceMin}–$${priceMax ?? priceMin}`;
 
+const getCreatorMilestoneWaitMessage = (
+  milestone: {
+    status: string;
+    sort_order: number;
+    title: string;
+  } | null
+): string | null => {
+  if (!milestone) {
+    return null;
+  }
+
+  const milestoneLabel = `Milestone ${milestone.sort_order + 1
+    }: ${milestone.title}`;
+
+  if (milestone.status === "submitted") {
+    return `${milestoneLabel} is waiting for buyer review. The next milestone will unlock after the buyer approves this one and payment is confirmed.`;
+  }
+
+  if (
+    milestone.status === "buyer_approved" ||
+    milestone.status === "payment_required"
+  ) {
+    return `${milestoneLabel} has been approved by the buyer and is waiting for admin payment confirmation. The next milestone will unlock after payment is confirmed.`;
+  }
+
+  return null;
+};
+
 const CreatorRequestDetails = () => {
   const { id } = useParams<{ id: string }>();
 
@@ -154,6 +183,7 @@ const CreatorRequestDetails = () => {
     useSendDraftListingRequestFinalDelivery();
   const submitMilestoneMutation =
     useSubmitListingRequestMilestone();
+
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -352,18 +382,18 @@ const CreatorRequestDetails = () => {
   const milestoneSubmissions =
     milestoneSubmissionsQuery.data ?? [];
 
-  const orderedMilestones = [...milestones].sort(
-    (firstMilestone, secondMilestone) =>
-      firstMilestone.sort_order -
-      secondMilestone.sort_order
-  );
-
   const activeMilestone =
-    orderedMilestones.find(
-      (milestone) =>
-        milestone.status !== "paid" &&
-        milestone.status !== "cancelled"
-    ) ?? null;
+    getActiveListingRequestMilestone(milestones);
+
+  const canSubmitActiveMilestone =
+    activeMilestone
+      ? canSubmitListingRequestMilestone(
+        activeMilestone.status
+      )
+      : false;
+
+  const activeMilestoneWaitMessage =
+    getCreatorMilestoneWaitMessage(activeMilestone);
 
   const milestonesAreLoading =
     milestonesQuery.isLoading ||
@@ -390,6 +420,7 @@ const CreatorRequestDetails = () => {
     !getHasAllMilestonePaymentsPaid(agreement) &&
     !finalDeliveriesQuery.isLoading &&
     !finalDeliveriesQuery.error;
+
 
   return (
     <div className={classes.page}>
@@ -741,7 +772,8 @@ const CreatorRequestDetails = () => {
 
             {!requestReadOnly &&
               request.status === "accepted" &&
-              startingPaymentResolved && (
+              startingPaymentResolved &&
+              canSubmitActiveMilestone && (
                 <ListingRequestMilestoneSubmissionForm
                   milestone={activeMilestone}
                   isPending={
@@ -755,6 +787,12 @@ const CreatorRequestDetails = () => {
                   }
                 />
               )}
+
+            {activeMilestoneWaitMessage && (
+              <div className={classes.infoCard}>
+                {activeMilestoneWaitMessage}
+              </div>
+            )}
           </>
         )}
 

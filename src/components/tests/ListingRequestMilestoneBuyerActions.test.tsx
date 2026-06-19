@@ -10,6 +10,7 @@ import {
   it,
   vi,
 } from "vitest";
+import userEvent from "@testing-library/user-event";
 
 import ListingRequestMilestoneBuyerActions from "../listingRequests/milestones/ListingRequestMilestoneBuyerActions";
 import type { ListingRequestMilestoneRow } from "../../hooks/creatorRequests/useListingRequestMilestones";
@@ -91,13 +92,7 @@ describe(
 
       expect(
         screen.getByText(
-          "No buyer response is needed."
-        )
-      ).toBeInTheDocument();
-
-      expect(
-        screen.getByText(
-          "Milestone 1 is currently payment required."
+          "Milestone 1 has been approved. Payment is now awaiting admin confirmation before the creator can continue."
         )
       ).toBeInTheDocument();
     });
@@ -126,45 +121,38 @@ describe(
       });
     });
 
-    it("requests revisions with trimmed notes", () => {
+    it("requests revisions with trimmed notes", async () => {
+      const user = userEvent.setup();
+
       render(
         <ListingRequestMilestoneBuyerActions
           milestone={createMilestone()}
-          onRespondMilestone={
-            onRespondMilestone
-          }
+          onRespondMilestone={onRespondMilestone}
         />
       );
 
-      fireEvent.click(
+      await user.click(
         screen.getByRole("button", {
           name: "Request revisions",
         })
       );
 
-      fireEvent.change(
+      await user.type(
         screen.getByLabelText("Revision notes"),
-        {
-          target: {
-            value:
-              " Please tighten the colour contrast. ",
-          },
-        }
+        "   Please revise the thumbnail layout.   "
       );
 
-      fireEvent.click(
+      await user.click(
         screen.getByRole("button", {
           name: "Send revision request",
         })
       );
 
-      expect(
-        onRespondMilestone
-      ).toHaveBeenCalledWith({
+      expect(onRespondMilestone).toHaveBeenCalledWith({
         milestoneId: "milestone-1",
         response: "revision_requested",
         revisionRequestReason:
-          "Please tighten the colour contrast.",
+          "Please revise the thumbnail layout.",
       });
     });
 
@@ -287,6 +275,46 @@ describe(
       expect(
         screen.getByText(
           "This milestone is not awaiting your response."
+        )
+      ).toBeInTheDocument();
+    });
+
+    it("explains when the buyer is waiting for creator milestone submission", () => {
+      render(
+        <ListingRequestMilestoneBuyerActions
+          milestone={createMilestone({
+            status: "pending",
+          })}
+          onRespondMilestone={onRespondMilestone}
+        />
+      );
+
+      expect(
+        screen.getByText(
+          "Milestone 1 is waiting for the creator to submit work for buyer review."
+        )
+      ).toBeInTheDocument();
+
+      expect(
+        screen.queryByRole("button", {
+          name: "Approve milestone",
+        })
+      ).not.toBeInTheDocument();
+    });
+
+    it("explains when the buyer is waiting for revised milestone work", () => {
+      render(
+        <ListingRequestMilestoneBuyerActions
+          milestone={createMilestone({
+            status: "revision_requested",
+          })}
+          onRespondMilestone={onRespondMilestone}
+        />
+      );
+
+      expect(
+        screen.getByText(
+          "Milestone 1 has revisions requested. The creator needs to submit an updated version before you can review it again."
         )
       ).toBeInTheDocument();
     });

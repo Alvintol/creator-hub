@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  canApproveListingRequestFinalDelivery,
   canBuyerRespondToListingRequestFinalDelivery,
   canCreateNextListingRequestFinalDelivery,
   canSubmitListingRequestFinalDelivery,
   getHasAllMilestonePaymentsPaid,
+  getListingRequestFinalDeliveryApprovalBlockedReason,
   getListingRequestFinalDeliveryStatusLabel,
   getListingRequestFinalDeliveryStatusSummary,
   getListingRequestFinalDeliveryStatusTone,
@@ -422,5 +424,118 @@ describe("listing request final deliveries", () => {
         []
       )
     ).toBe(true);
+  });
+
+  it("blocks final delivery approval while milestone payments are unconfirmed", () => {
+    const agreement = createAgreement({
+      starting_payment_status: "not_required",
+      payment_structure: "milestone_payments",
+      listing_request_payment_schedule_items: [
+        {
+          payment_timing: "due_at_milestone_approval",
+          status: "paid",
+          amount: 100,
+        },
+        {
+          payment_timing: "due_at_milestone_approval",
+          status: "payment_required",
+          amount: 150,
+        },
+      ],
+    });
+
+    expect(
+      canApproveListingRequestFinalDelivery(agreement)
+    ).toBe(false);
+
+    expect(
+      getListingRequestFinalDeliveryApprovalBlockedReason(
+        agreement
+      )
+    ).toBe(
+      "All milestone payments must be confirmed before you can approve the final delivery."
+    );
+  });
+
+  it("blocks final delivery approval while final balance payment is outstanding", () => {
+    const agreement = createAgreement({
+      listing_request_payment_schedule_items: [
+        {
+          payment_timing: "due_before_final_release",
+          status: "payment_required",
+          amount: 200,
+        },
+      ],
+    });
+
+    expect(
+      canApproveListingRequestFinalDelivery(agreement)
+    ).toBe(false);
+
+    expect(
+      getListingRequestFinalDeliveryApprovalBlockedReason(
+        agreement
+      )
+    ).toBe(
+      "The final balance must be confirmed as paid before you can approve this delivery."
+    );
+  });
+
+  it("blocks final delivery approval while final balance hold is active", () => {
+    const agreement = createAgreement({
+      listing_request_payment_schedule_items: [
+        {
+          payment_timing: "due_before_final_release",
+          status: "paid",
+          amount: 200,
+        },
+      ],
+      listing_request_timeline_holds: [
+        {
+          reason: "balance_payment_pending",
+          ended_at: null,
+        },
+      ],
+    });
+
+    expect(
+      canApproveListingRequestFinalDelivery(agreement)
+    ).toBe(false);
+
+    expect(
+      getListingRequestFinalDeliveryApprovalBlockedReason(
+        agreement
+      )
+    ).toBe(
+      "The final balance payment is still awaiting confirmation."
+    );
+  });
+
+  it("allows final delivery approval when payment blockers are resolved", () => {
+    const agreement = createAgreement({
+      listing_request_payment_schedule_items: [
+        {
+          payment_timing: "due_before_final_release",
+          status: "paid",
+          amount: 200,
+        },
+      ],
+      listing_request_timeline_holds: [
+        {
+          reason: "balance_payment_pending",
+          ended_at: "2026-06-18T12:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(
+      canApproveListingRequestFinalDelivery(agreement)
+    ).toBe(true);
+
+    expect(
+      getListingRequestFinalDeliveryApprovalBlockedReason(
+        agreement
+      )
+    ).toBeNull();
   });
 });

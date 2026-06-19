@@ -20,12 +20,20 @@ type ListingRequestFinalDeliveryPaymentItem = {
   amount?: number | null;
 };
 
+type ListingRequestFinalDeliveryTimelineHold = {
+  reason: string;
+  ended_at: string | null;
+};
+
 type ListingRequestFinalDeliveryAgreement = {
   status: string;
   starting_payment_status: string;
   payment_structure?: string | null;
   listing_request_payment_schedule_items?:
   | ListingRequestFinalDeliveryPaymentItem[]
+  | null;
+  listing_request_timeline_holds?:
+  | ListingRequestFinalDeliveryTimelineHold[]
   | null;
 };
 
@@ -195,3 +203,60 @@ export const hasListingRequestFinalDeliveryContent = (input: {
     input.summary?.trim() ||
     input.deliveryLinks?.some((link) => link.trim())
   );
+
+export const getListingRequestFinalDeliveryApprovalBlockedReason =
+  (
+    agreement: ListingRequestFinalDeliveryAgreement | null
+  ): string | null => {
+    if (!agreement) {
+      return null;
+    }
+
+    const hasUnconfirmedMilestonePayments =
+      agreement.payment_structure ===
+      "milestone_payments" &&
+      !getHasAllMilestonePaymentsPaid(agreement);
+
+    if (hasUnconfirmedMilestonePayments) {
+      return "All milestone payments must be confirmed before you can approve the final delivery.";
+    }
+
+    const hasOutstandingFinalBalance =
+      agreement
+        .listing_request_payment_schedule_items
+        ?.some(
+          (paymentItem) =>
+            paymentItem.payment_timing ===
+            "due_before_final_release" &&
+            (paymentItem.amount ?? 0) > 0 &&
+            (paymentItem.status === "pending" ||
+              paymentItem.status ===
+              "payment_required")
+        ) ?? false;
+
+    if (hasOutstandingFinalBalance) {
+      return "The final balance must be confirmed as paid before you can approve this delivery.";
+    }
+
+    const hasActiveFinalBalanceHold =
+      agreement.listing_request_timeline_holds?.some(
+        (timelineHold) =>
+          timelineHold.reason ===
+          "balance_payment_pending" &&
+          timelineHold.ended_at === null
+      ) ?? false;
+
+    if (hasActiveFinalBalanceHold) {
+      return "The final balance payment is still awaiting confirmation.";
+    }
+
+    return null;
+  };
+
+export const canApproveListingRequestFinalDelivery =
+  (
+    agreement: ListingRequestFinalDeliveryAgreement | null
+  ): boolean =>
+    getListingRequestFinalDeliveryApprovalBlockedReason(
+      agreement
+    ) === null;
