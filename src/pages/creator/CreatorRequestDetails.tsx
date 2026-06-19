@@ -36,6 +36,11 @@ import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/us
 import { useSendDraftListingRequestAgreement } from '../../hooks/creatorRequests/useSendDraftListingRequestAgreement';
 import { useSendDraftListingRequestChangeOrder } from '../../hooks/creatorRequests/useSendDraftListingRequestChangeOrder';
 import { useSendDraftListingRequestFinalDelivery } from '../../hooks/creatorRequests/useSendDraftListingRequestFinalDelivery';
+import { useSubmitListingRequestMilestone } from '../../hooks/creatorRequests/useSubmitListingRequestMilestone';
+import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorRequests/useListingRequestMilestoneSubmissions';
+import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
+import ListingRequestMilestoneSubmissionForm from '../../components/listingRequests/milestones/ListingRequestMilestoneSubmissionForm';
+import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
 
 const classes = {
   page: "space-y-6",
@@ -142,6 +147,8 @@ const CreatorRequestDetails = () => {
     useCreateListingRequestFinalDelivery();
   const sendDraftFinalDeliveryMutation =
     useSendDraftListingRequestFinalDelivery();
+  const submitMilestoneMutation =
+    useSubmitListingRequestMilestone();
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -178,6 +185,20 @@ const CreatorRequestDetails = () => {
       agreement?.status === "buyer_accepted"
         ? request?.id ?? null
         : null
+    );
+
+  const milestoneRequestId =
+    agreement?.status === "buyer_accepted" &&
+      agreement.payment_structure === "milestone_payments"
+      ? request?.id ?? null
+      : null;
+
+  const milestonesQuery =
+    useListingRequestMilestones(milestoneRequestId);
+
+  const milestoneSubmissionsQuery =
+    useListingRequestMilestoneSubmissions(
+      milestoneRequestId
     );
 
 
@@ -320,6 +341,32 @@ const CreatorRequestDetails = () => {
     request.status === "archived" ||
     request.status === "declined" ||
     request.status === "completed";
+
+  const milestones = milestonesQuery.data ?? [];
+
+  const milestoneSubmissions =
+    milestoneSubmissionsQuery.data ?? [];
+
+  const orderedMilestones = [...milestones].sort(
+    (firstMilestone, secondMilestone) =>
+      firstMilestone.sort_order -
+      secondMilestone.sort_order
+  );
+
+  const activeMilestone =
+    orderedMilestones.find(
+      (milestone) =>
+        milestone.status !== "paid" &&
+        milestone.status !== "cancelled"
+    ) ?? null;
+
+  const milestonesAreLoading =
+    milestonesQuery.isLoading ||
+    milestoneSubmissionsQuery.isLoading;
+
+  const milestoneError =
+    milestonesQuery.error ??
+    milestoneSubmissionsQuery.error;
 
   const requestReadOnlyMessage =
     request.status === "archived"
@@ -666,6 +713,36 @@ const CreatorRequestDetails = () => {
           )}
         </>
       )}
+
+      {agreement?.status === "buyer_accepted" &&
+        agreement.payment_structure === "milestone_payments" && (
+          <>
+            <ListingRequestMilestoneSummary
+              milestones={milestones}
+              submissions={milestoneSubmissions}
+              viewer="creator"
+              isLoading={milestonesAreLoading}
+              error={milestoneError}
+            />
+
+            {!requestReadOnly &&
+              request.status === "accepted" &&
+              startingPaymentResolved && (
+                <ListingRequestMilestoneSubmissionForm
+                  milestone={activeMilestone}
+                  isPending={
+                    submitMilestoneMutation.isPending
+                  }
+                  error={submitMilestoneMutation.error}
+                  onSubmitMilestone={(input) =>
+                    submitMilestoneMutation.mutateAsync(
+                      input
+                    )
+                  }
+                />
+              )}
+          </>
+        )}
 
       {agreement?.status === "buyer_accepted" && (
         <>
