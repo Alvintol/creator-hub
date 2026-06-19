@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   confirmFinalBalancePayment: vi.fn(),
   useListingRequestMilestones: vi.fn(),
   useListingRequestMilestoneSubmissions: vi.fn(),
+  confirmMilestonePayment: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminRequest", () => ({
@@ -423,6 +424,58 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../hooks/admin/useAdminConfirmListingRequestMilestonePayment",
+  () => ({
+    useAdminConfirmListingRequestMilestonePayment:
+      () => ({
+        mutateAsync:
+          mocks.confirmMilestonePayment,
+        isPending: false,
+        error: null,
+      }),
+  })
+);
+
+vi.mock(
+  "../../components/listingRequests/payments/ListingRequestMilestonePaymentAdminActions",
+  () => ({
+    default: ({
+      milestones,
+      onConfirmPayment,
+    }: {
+      milestones: Array<{
+        id: string;
+        status: string;
+        payment_schedule_item_id: string;
+      }>;
+      onConfirmPayment: (
+        paymentScheduleItemId: string
+      ) => void;
+    }) => {
+      const milestone =
+        milestones.find(
+          (item) =>
+            item.status ===
+            "payment_required"
+        ) ?? null;
+
+      return milestone ? (
+        <button
+          type="button"
+          onClick={() =>
+            onConfirmPayment(
+              milestone.payment_schedule_item_id
+            )
+          }
+        >
+          Mock confirm milestone payment
+        </button>
+      ) : null;
+    },
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -541,6 +594,10 @@ describe("<AdminRequestDetails />", () => {
       isLoading: false,
       error: null,
     });
+
+    mocks.confirmMilestonePayment.mockResolvedValue(
+      undefined
+    );
   });
 
   it("renders structured request details for admin review", () => {
@@ -1204,5 +1261,70 @@ describe("<AdminRequestDetails />", () => {
         "Mock milestone summary: admin / 2 / 1 / ready / no error"
       )
     ).toBeInTheDocument();
+  });
+
+  it("confirms a pending milestone payment from the admin request page", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        payment_structure: "milestone_payments",
+        starting_payment_status: "not_required",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestMilestones.mockReturnValue({
+      data: [
+        {
+          id: "milestone-1",
+          status: "payment_required",
+          title: "Initial design direction",
+          sort_order: 0,
+          payment_schedule_item_id:
+            "payment-1",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen
+      .getByRole("button", {
+        name: "Mock confirm milestone payment",
+      })
+      .click();
+
+    expect(
+      mocks.confirmMilestonePayment
+    ).toHaveBeenCalledWith({
+      paymentScheduleItemId: "payment-1",
+    });
   });
 });
