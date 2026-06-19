@@ -24,7 +24,10 @@ import ListingRequestFinalDeliverySummary from '../../components/listingRequests
 import ListingRequestProgressUpdateForm from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateForm';
 import ListingRequestProgressUpdateScheduleCard from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateScheduleCard';
 import ListingRequestProgressUpdateTimeline from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateTimeline';
-import { canCreateNextListingRequestFinalDelivery } from '../../domain/listings/listingRequestFinalDeliveries';
+import {
+  canCreateNextListingRequestFinalDelivery,
+  getHasAllMilestonePaymentsPaid,
+} from '../../domain/listings/listingRequestFinalDeliveries';
 import { useCreateListingRequestAgreement } from '../../hooks/creatorRequests/useCreateListingRequestAgreement';
 import { useCreateListingRequestChangeOrder } from '../../hooks/creatorRequests/useCreateListingRequestChangeOrder';
 import { useCreateListingRequestFinalDelivery } from '../../hooks/creatorRequests/useCreateListingRequestFinalDelivery';
@@ -85,7 +88,9 @@ const classes = {
   hint: "text-xs text-zinc-500",
   error: "text-xs font-semibold text-red-600",
   textarea:
-    "min-h-[140px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+    "min-h-[140px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
+  infoCard:
+    "rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900",
 } as const;
 
 // Prefers handle for buyer display, then display name, then user id
@@ -376,6 +381,15 @@ const CreatorRequestDetails = () => {
         : request.status === "completed"
           ? "Completed projects are read-only because the buyer approved the final delivery."
           : undefined;
+
+  const finalDeliveryBlockedByMilestones =
+    request.status === "accepted" &&
+    agreement?.status === "buyer_accepted" &&
+    agreement.payment_structure === "milestone_payments" &&
+    startingPaymentResolved &&
+    !getHasAllMilestonePaymentsPaid(agreement) &&
+    !finalDeliveriesQuery.isLoading &&
+    !finalDeliveriesQuery.error;
 
   return (
     <div className={classes.page}>
@@ -766,6 +780,14 @@ const CreatorRequestDetails = () => {
               })
             }
           />
+
+          {finalDeliveryBlockedByMilestones && (
+            <div className={classes.infoCard}>
+              Final delivery is locked until every milestone payment has been confirmed.
+              Submit each milestone for buyer review, wait for buyer approval, and then
+              wait for admin payment confirmation before creating the final delivery.
+            </div>
+          )}
 
           {canCreateFinalDelivery && (
             <ListingRequestFinalDeliveryBuilder

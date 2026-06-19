@@ -1822,6 +1822,12 @@ describe("<CreatorRequestDetails />", () => {
         name: "Mock final delivery builder",
       })
     ).not.toBeInTheDocument();
+
+    expect(
+      screen.getByText(
+        /Final delivery is locked until every milestone payment has been confirmed./
+      )
+    ).toBeInTheDocument();
   });
 
   it("shows the final-delivery builder after all milestone payments are paid", () => {
@@ -1876,6 +1882,12 @@ describe("<CreatorRequestDetails />", () => {
         name: "Mock final delivery builder",
       })
     ).toBeInTheDocument();
+
+    expect(
+      screen.queryByText(
+        /Final delivery is locked until every milestone payment has been confirmed./
+      )
+    ).not.toBeInTheDocument();
   });
 
   it("renders milestone history and submission form for milestone agreements", () => {
