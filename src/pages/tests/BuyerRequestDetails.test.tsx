@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   useListingRequestFinalDeliveries:
     vi.fn(),
   respondFinalDelivery: vi.fn(),
+  useListingRequestMilestones: vi.fn(),
+  useListingRequestMilestoneSubmissions: vi.fn(),
+  respondMilestone: vi.fn(),
 }));
 
 vi.mock(
@@ -403,6 +406,116 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../components/listingRequests/milestones/ListingRequestMilestoneSummary",
+  () => ({
+    default: ({
+      milestones,
+      submissions,
+      viewer,
+      isLoading,
+      error,
+    }: {
+      milestones: Array<{ id: string }>;
+      submissions: Array<{ id: string }>;
+      viewer: string;
+      isLoading?: boolean;
+      error?: unknown;
+    }) => (
+      <div>
+        Mock milestone summary: {viewer} / {milestones.length} /{" "}
+        {submissions.length} / {isLoading ? "loading" : "ready"} /{" "}
+        {error ? "error" : "no error"}
+      </div>
+    ),
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestMilestones",
+  () => ({
+    useListingRequestMilestones:
+      mocks.useListingRequestMilestones,
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestMilestoneSubmissions",
+  () => ({
+    useListingRequestMilestoneSubmissions:
+      mocks.useListingRequestMilestoneSubmissions,
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useRespondListingRequestMilestone",
+  () => ({
+    useRespondListingRequestMilestone: () => ({
+      mutateAsync: mocks.respondMilestone,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../components/listingRequests/milestones/ListingRequestMilestoneBuyerActions",
+  () => ({
+    default: ({
+      milestone,
+      onRespondMilestone,
+    }: {
+      milestone: {
+        id: string;
+        status: string;
+        title: string;
+        sort_order: number;
+      } | null;
+      onRespondMilestone: (
+        input:
+          | {
+            milestoneId: string;
+            response: "buyer_approved";
+          }
+          | {
+            milestoneId: string;
+            response: "revision_requested";
+            revisionRequestReason: string;
+          }
+      ) => unknown;
+    }) =>
+      milestone?.status === "submitted" ? (
+        <div>
+          <button
+            type="button"
+            onClick={() =>
+              onRespondMilestone({
+                milestoneId: milestone.id,
+                response: "buyer_approved",
+              })
+            }
+          >
+            Mock approve milestone: {milestone.title}
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              onRespondMilestone({
+                milestoneId: milestone.id,
+                response: "revision_requested",
+                revisionRequestReason:
+                  "Please adjust the colour contrast.",
+              })
+            }
+          >
+            Mock request milestone revisions: {milestone.title}
+          </button>
+        </div>
+      ) : null,
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -582,7 +695,22 @@ describe("<BuyerRequestDetails />", () => {
     );
 
     mocks.respondFinalDelivery.mockResolvedValue(undefined);
+
+    mocks.useListingRequestMilestones.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestMilestoneSubmissions.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.respondMilestone.mockResolvedValue(undefined);
   });
+
 
   it("renders structured buyer request details", () => {
     renderPage();
