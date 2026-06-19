@@ -294,9 +294,6 @@ const CreatorRequestDetails = () => {
   const finalDeliveries =
     finalDeliveriesQuery.data ?? [];
 
-  const latestFinalDelivery =
-    finalDeliveries[0] ?? null;
-
   const draftFinalDelivery =
     finalDeliveries.find(
       (finalDelivery) =>
@@ -313,7 +310,8 @@ const CreatorRequestDetails = () => {
     agreement?.status === "buyer_accepted" &&
     startingPaymentResolved &&
     canCreateNextListingRequestFinalDelivery(
-      latestFinalDelivery?.status
+      agreement,
+      finalDeliveries
     ) &&
     !finalDeliveriesQuery.isLoading &&
     !finalDeliveriesQuery.error;

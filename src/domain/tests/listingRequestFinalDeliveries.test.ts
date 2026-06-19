@@ -4,12 +4,54 @@ import {
   canBuyerRespondToListingRequestFinalDelivery,
   canCreateNextListingRequestFinalDelivery,
   canSubmitListingRequestFinalDelivery,
+  getHasAllMilestonePaymentsPaid,
   getListingRequestFinalDeliveryStatusLabel,
   getListingRequestFinalDeliveryStatusSummary,
   getListingRequestFinalDeliveryStatusTone,
   hasListingRequestFinalDeliveryContent,
   isListingRequestFinalDeliveryBuyerVisible,
 } from "../listings/listingRequestFinalDeliveries";
+
+type FinalDeliveryAgreement = NonNullable<
+  Parameters<typeof canCreateNextListingRequestFinalDelivery>[0]
+>;
+
+type FinalDeliveryRow =
+  Parameters<typeof canCreateNextListingRequestFinalDelivery>[1][number];
+
+const createAgreement = (
+  overrides: Partial<FinalDeliveryAgreement> = {}
+): FinalDeliveryAgreement =>
+  ({
+    status: "buyer_accepted",
+    starting_payment_status: "paid",
+    payment_structure: "deposit_balance",
+    listing_request_payment_schedule_items: [],
+    ...overrides,
+  }) as FinalDeliveryAgreement;
+
+const createFinalDelivery = (
+  overrides: Partial<FinalDeliveryRow> = {}
+): FinalDeliveryRow =>
+  ({
+    id: "final-delivery-1",
+    listing_request_id: "request-1",
+    agreement_id: "agreement-1",
+    creator_user_id: "creator-1",
+    buyer_user_id: "buyer-1",
+    status: "submitted",
+    title: "Final delivery",
+    summary: "Final delivery is ready.",
+    delivery_links: [],
+    revision_request_reason: null,
+    submitted_at: "2026-06-09T12:00:00.000Z",
+    buyer_approved_at: null,
+    superseded_at: null,
+    cancelled_at: null,
+    created_at: "2026-06-09T12:00:00.000Z",
+    updated_at: "2026-06-09T12:00:00.000Z",
+    ...overrides,
+  }) as FinalDeliveryRow;
 
 describe("listing request final deliveries", () => {
   it("maps delivery statuses to display labels", () => {
@@ -102,30 +144,127 @@ describe("listing request final deliveries", () => {
     ).toBe(false);
   });
 
+  it("requires an accepted agreement with resolved starting payment before creating a delivery", () => {
+    expect(
+      canCreateNextListingRequestFinalDelivery(null, [])
+    ).toBe(false);
+
+    expect(
+      canCreateNextListingRequestFinalDelivery(
+        createAgreement({
+          status: "sent",
+        }),
+        []
+      )
+    ).toBe(false);
+
+    expect(
+      canCreateNextListingRequestFinalDelivery(
+        createAgreement({
+          starting_payment_status: "payment_required",
+        }),
+        []
+      )
+    ).toBe(false);
+
+    expect(
+      canCreateNextListingRequestFinalDelivery(
+        createAgreement(),
+        []
+      )
+    ).toBe(true);
+  });
+
   it("allows a new delivery after revision or cancellation", () => {
-    expect(
-      canCreateNextListingRequestFinalDelivery(null)
-    ).toBe(true);
+    const agreement = createAgreement();
 
     expect(
       canCreateNextListingRequestFinalDelivery(
-        "revision_requested"
+        agreement,
+        [
+          createFinalDelivery({
+            status: "revision_requested",
+          }),
+        ]
       )
     ).toBe(true);
 
     expect(
-      canCreateNextListingRequestFinalDelivery("cancelled")
+      canCreateNextListingRequestFinalDelivery(
+        agreement,
+        [
+          createFinalDelivery({
+            status: "cancelled",
+          }),
+        ]
+      )
     ).toBe(true);
 
     expect(
-      canCreateNextListingRequestFinalDelivery("submitted")
+      canCreateNextListingRequestFinalDelivery(
+        agreement,
+        [
+          createFinalDelivery({
+            status: "submitted",
+          }),
+        ]
+      )
     ).toBe(false);
 
     expect(
       canCreateNextListingRequestFinalDelivery(
-        "buyer_approved"
+        agreement,
+        [
+          createFinalDelivery({
+            status: "buyer_approved",
+          }),
+        ]
       )
     ).toBe(false);
+  });
+
+  it("uses the latest final delivery when deciding whether another can be created", () => {
+    const agreement = createAgreement();
+
+    expect(
+      canCreateNextListingRequestFinalDelivery(
+        agreement,
+        [
+          createFinalDelivery({
+            id: "final-delivery-1",
+            status: "revision_requested",
+            created_at:
+              "2026-06-09T12:00:00.000Z",
+          }),
+          createFinalDelivery({
+            id: "final-delivery-2",
+            status: "submitted",
+            created_at:
+              "2026-06-10T12:00:00.000Z",
+          }),
+        ]
+      )
+    ).toBe(false);
+
+    expect(
+      canCreateNextListingRequestFinalDelivery(
+        agreement,
+        [
+          createFinalDelivery({
+            id: "final-delivery-1",
+            status: "submitted",
+            created_at:
+              "2026-06-09T12:00:00.000Z",
+          }),
+          createFinalDelivery({
+            id: "final-delivery-2",
+            status: "revision_requested",
+            created_at:
+              "2026-06-10T12:00:00.000Z",
+          }),
+        ]
+      )
+    ).toBe(true);
   });
 
   it("keeps unsent drafts hidden from buyers", () => {
@@ -169,6 +308,119 @@ describe("listing request final deliveries", () => {
           "https://example.com/final-delivery",
         ],
       })
+    ).toBe(true);
+  });
+
+  it("treats non-milestone agreements as milestone-payment ready", () => {
+    expect(
+      getHasAllMilestonePaymentsPaid(
+        createAgreement({
+          payment_structure: "deposit_balance",
+          listing_request_payment_schedule_items: [],
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("requires at least one paid milestone payment for milestone agreements", () => {
+    expect(
+      getHasAllMilestonePaymentsPaid(
+        createAgreement({
+          starting_payment_status: "not_required",
+          payment_structure: "milestone_payments",
+          listing_request_payment_schedule_items: [],
+        })
+      )
+    ).toBe(false);
+
+    expect(
+      getHasAllMilestonePaymentsPaid(
+        createAgreement({
+          starting_payment_status: "not_required",
+          payment_structure: "milestone_payments",
+          listing_request_payment_schedule_items: [
+            {
+              payment_timing:
+                "due_at_milestone_approval",
+              status: "pending",
+              amount: 100,
+            },
+          ],
+        })
+      )
+    ).toBe(false);
+
+    expect(
+      getHasAllMilestonePaymentsPaid(
+        createAgreement({
+          starting_payment_status: "not_required",
+          payment_structure: "milestone_payments",
+          listing_request_payment_schedule_items: [
+            {
+              payment_timing:
+                "due_at_milestone_approval",
+              status: "paid",
+              amount: 100,
+            },
+            {
+              payment_timing:
+                "due_at_milestone_approval",
+              status: "paid",
+              amount: 150,
+            },
+          ],
+        })
+      )
+    ).toBe(true);
+  });
+
+  it("blocks final delivery for milestone agreements until all milestone payments are paid", () => {
+    expect(
+      canCreateNextListingRequestFinalDelivery(
+        createAgreement({
+          starting_payment_status: "not_required",
+          payment_structure: "milestone_payments",
+          listing_request_payment_schedule_items: [
+            {
+              payment_timing:
+                "due_at_milestone_approval",
+              status: "paid",
+              amount: 100,
+            },
+            {
+              payment_timing:
+                "due_at_milestone_approval",
+              status: "payment_required",
+              amount: 150,
+            },
+          ],
+        }),
+        []
+      )
+    ).toBe(false);
+
+    expect(
+      canCreateNextListingRequestFinalDelivery(
+        createAgreement({
+          starting_payment_status: "not_required",
+          payment_structure: "milestone_payments",
+          listing_request_payment_schedule_items: [
+            {
+              payment_timing:
+                "due_at_milestone_approval",
+              status: "paid",
+              amount: 100,
+            },
+            {
+              payment_timing:
+                "due_at_milestone_approval",
+              status: "paid",
+              amount: 150,
+            },
+          ],
+        }),
+        []
+      )
     ).toBe(true);
   });
 });

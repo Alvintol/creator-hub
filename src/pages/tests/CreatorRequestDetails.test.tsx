@@ -1663,4 +1663,111 @@ describe("<CreatorRequestDetails />", () => {
     ).toBeInTheDocument();
   });
 
+  it("hides the final-delivery builder until milestone payments are paid", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "not_required",
+        payment_structure: "milestone_payments",
+        listing_request_payment_schedule_items: [
+          {
+            id: "payment-1",
+            payment_timing:
+              "due_at_milestone_approval",
+            status: "paid",
+            amount: 100,
+          },
+          {
+            id: "payment-2",
+            payment_timing:
+              "due_at_milestone_approval",
+            status: "payment_required",
+            amount: 150,
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Mock final delivery builder",
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the final-delivery builder after all milestone payments are paid", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        starting_payment_status: "not_required",
+        payment_structure: "milestone_payments",
+        listing_request_payment_schedule_items: [
+          {
+            id: "payment-1",
+            payment_timing:
+              "due_at_milestone_approval",
+            status: "paid",
+            amount: 100,
+          },
+          {
+            id: "payment-2",
+            payment_timing:
+              "due_at_milestone_approval",
+            status: "paid",
+            amount: 150,
+          },
+        ],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByRole("button", {
+        name: "Mock final delivery builder",
+      })
+    ).toBeInTheDocument();
+  });
 });
