@@ -44,6 +44,7 @@ import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorReques
 import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
 import ListingRequestMilestoneSubmissionForm from '../../components/listingRequests/milestones/ListingRequestMilestoneSubmissionForm';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
+import { canSubmitListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
 
 const classes = {
   page: "space-y-6",
@@ -386,13 +387,22 @@ const CreatorRequestDetails = () => {
       firstMilestone.sort_order -
       secondMilestone.sort_order
   );
-
   const activeMilestone =
     orderedMilestones.find(
       (milestone) =>
         milestone.status !== "paid" &&
         milestone.status !== "cancelled"
     ) ?? null;
+
+  const canSubmitActiveMilestone =
+    activeMilestone
+      ? canSubmitListingRequestMilestone(
+        activeMilestone.status
+      )
+      : false;
+
+  const activeMilestoneWaitMessage =
+    getCreatorMilestoneWaitMessage(activeMilestone);
 
   const milestonesAreLoading =
     milestonesQuery.isLoading ||
@@ -401,9 +411,6 @@ const CreatorRequestDetails = () => {
   const milestoneError =
     milestonesQuery.error ??
     milestoneSubmissionsQuery.error;
-
-  const activeMilestoneWaitMessage =
-    getCreatorMilestoneWaitMessage(activeMilestone);
 
   const requestReadOnlyMessage =
     request.status === "archived"
@@ -774,7 +781,8 @@ const CreatorRequestDetails = () => {
 
             {!requestReadOnly &&
               request.status === "accepted" &&
-              startingPaymentResolved && (
+              startingPaymentResolved &&
+              canSubmitActiveMilestone && (
                 <ListingRequestMilestoneSubmissionForm
                   milestone={activeMilestone}
                   isPending={
