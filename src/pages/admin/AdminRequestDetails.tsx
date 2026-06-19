@@ -20,6 +20,11 @@ import { useListingRequestAgreement } from '../../hooks/creatorRequests/useListi
 import { useListingRequestChangeOrders } from '../../hooks/creatorRequests/useListingRequestChangeOrders';
 import { useListingRequestFinalDeliveries } from '../../hooks/creatorRequests/useListingRequestFinalDeliveries';
 import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/useListingRequestProgressUpdates';
+import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorRequests/useListingRequestMilestoneSubmissions';
+import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
+import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
+import { useAdminConfirmListingRequestMilestonePayment } from '../../hooks/admin/useAdminConfirmListingRequestMilestonePayment';
+import ListingRequestMilestonePaymentAdminActions from '../../components/listingRequests/payments/ListingRequestMilestonePaymentAdminActions';
 
 const classes = {
   page: "space-y-6",
@@ -107,6 +112,8 @@ const AdminRequestDetails = () => {
     useAdminConfirmListingRequestChangeOrderPayment();
   const confirmFinalBalancePaymentMutation =
     useAdminConfirmListingRequestFinalBalancePayment();
+  const confirmMilestonePaymentMutation =
+    useAdminConfirmListingRequestMilestonePayment();
 
   const agreement = agreementQuery.data ?? null;
 
@@ -131,6 +138,33 @@ const AdminRequestDetails = () => {
 
   const finalDeliveries =
     finalDeliveriesQuery.data ?? [];
+
+  const milestoneRequestId =
+    agreement?.status === "buyer_accepted" &&
+      agreement.payment_structure === "milestone_payments"
+      ? request?.id ?? null
+      : null;
+
+  const milestonesQuery =
+    useListingRequestMilestones(milestoneRequestId);
+
+  const milestoneSubmissionsQuery =
+    useListingRequestMilestoneSubmissions(
+      milestoneRequestId
+    );
+
+  const milestones = milestonesQuery.data ?? [];
+
+  const milestoneSubmissions =
+    milestoneSubmissionsQuery.data ?? [];
+
+  const milestonesAreLoading =
+    milestonesQuery.isLoading ||
+    milestoneSubmissionsQuery.isLoading;
+
+  const milestoneError =
+    milestonesQuery.error ??
+    milestoneSubmissionsQuery.error;
 
 
   if (isLoading) {
@@ -353,10 +387,35 @@ const AdminRequestDetails = () => {
 
       {agreement?.status === "buyer_accepted" && (
         <>
+          {agreement.payment_structure === "milestone_payments" && (
+            <>
+              <ListingRequestMilestoneSummary
+                milestones={milestones}
+                submissions={milestoneSubmissions}
+                viewer="admin"
+                isLoading={milestonesAreLoading}
+                error={milestoneError}
+              />
+
+              <ListingRequestMilestonePaymentAdminActions
+                milestones={milestones}
+                isPending={
+                  confirmMilestonePaymentMutation.isPending
+                }
+                error={
+                  confirmMilestonePaymentMutation.error
+                }
+                onConfirmPayment={(paymentScheduleItemId) =>
+                  confirmMilestonePaymentMutation.mutateAsync({
+                    paymentScheduleItemId,
+                  })
+                }
+              />
+            </>
+          )}
+
           <ListingRequestChangeOrderSummary
-            changeOrders={
-              changeOrdersQuery.data ?? []
-            }
+            changeOrders={changeOrdersQuery.data ?? []}
             viewer="admin"
             isLoading={changeOrdersQuery.isLoading}
             error={changeOrdersQuery.error}

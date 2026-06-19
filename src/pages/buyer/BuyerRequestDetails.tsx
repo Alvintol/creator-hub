@@ -23,6 +23,11 @@ import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/us
 import { useRespondListingRequestAgreement } from '../../hooks/creatorRequests/useRespondListingRequestAgreement';
 import { useRespondListingRequestChangeOrder } from '../../hooks/creatorRequests/useRespondListingRequestChangeOrder';
 import { useRespondListingRequestFinalDelivery } from '../../hooks/creatorRequests/useRespondListingRequestFinalDelivery';
+import { useRespondListingRequestMilestone } from '../../hooks/creatorRequests/useRespondListingRequestMilestone';
+import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorRequests/useListingRequestMilestoneSubmissions';
+import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
+import ListingRequestMilestoneBuyerActions from '../../components/listingRequests/milestones/ListingRequestMilestoneBuyerActions';
+import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
 
 const classes = {
   page: "space-y-6",
@@ -115,6 +120,8 @@ const BuyerRequestDetails = () => {
     useRespondListingRequestChangeOrder();
   const respondFinalDeliveryMutation =
     useRespondListingRequestFinalDelivery();
+  const respondMilestoneMutation =
+    useRespondListingRequestMilestone();
 
   const agreement = agreementQuery.data ?? null;
 
@@ -122,6 +129,22 @@ const BuyerRequestDetails = () => {
   // RLS should block these too, but this keeps the UI safe if stale mocked data exists.
   const buyerVisibleAgreement =
     agreement?.status === "draft" ? null : agreement;
+
+  const milestoneRequestId =
+    buyerVisibleAgreement?.status === "buyer_accepted" &&
+      buyerVisibleAgreement.payment_structure ===
+      "milestone_payments"
+      ? request?.id ?? null
+      : null;
+
+  const milestonesQuery =
+    useListingRequestMilestones(milestoneRequestId);
+
+  const milestoneSubmissionsQuery =
+    useListingRequestMilestoneSubmissions(
+      milestoneRequestId
+    );
+
   const progressUpdatesQuery = useListingRequestProgressUpdates(
     buyerVisibleAgreement?.status === "buyer_accepted"
       ? request?.id ?? null
@@ -157,6 +180,32 @@ const BuyerRequestDetails = () => {
       (finalDelivery) =>
         finalDelivery.status === "submitted"
     ) ?? null;
+
+  const milestones = milestonesQuery.data ?? [];
+
+  const milestoneSubmissions =
+    milestoneSubmissionsQuery.data ?? [];
+
+  const orderedMilestones = [...milestones].sort(
+    (firstMilestone, secondMilestone) =>
+      firstMilestone.sort_order -
+      secondMilestone.sort_order
+  );
+
+  const activeMilestone =
+    orderedMilestones.find(
+      (milestone) =>
+        milestone.status !== "paid" &&
+        milestone.status !== "cancelled"
+    ) ?? null;
+
+  const milestonesAreLoading =
+    milestonesQuery.isLoading ||
+    milestoneSubmissionsQuery.isLoading;
+
+  const milestoneError =
+    milestonesQuery.error ??
+    milestoneSubmissionsQuery.error;
 
   const hasOutstandingFinalBalance =
     buyerVisibleAgreement
@@ -513,6 +562,37 @@ const BuyerRequestDetails = () => {
       {buyerVisibleAgreement?.status ===
         "buyer_accepted" && (
           <>
+            {buyerVisibleAgreement.payment_structure ===
+              "milestone_payments" && (
+                <>
+                  <ListingRequestMilestoneSummary
+                    milestones={milestones}
+                    submissions={milestoneSubmissions}
+                    viewer="buyer"
+                    isLoading={milestonesAreLoading}
+                    error={milestoneError}
+                  />
+
+                  {!requestReadOnly &&
+                    request.status === "accepted" && (
+                      <ListingRequestMilestoneBuyerActions
+                        milestone={activeMilestone}
+                        isPending={
+                          respondMilestoneMutation.isPending
+                        }
+                        error={
+                          respondMilestoneMutation.error
+                        }
+                        onRespondMilestone={(input) =>
+                          respondMilestoneMutation.mutateAsync(
+                            input
+                          )
+                        }
+                      />
+                    )}
+                </>
+              )}
+
             <ListingRequestChangeOrderSummary
               changeOrders={changeOrders}
               viewer="buyer"

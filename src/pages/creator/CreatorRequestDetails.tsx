@@ -24,7 +24,10 @@ import ListingRequestFinalDeliverySummary from '../../components/listingRequests
 import ListingRequestProgressUpdateForm from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateForm';
 import ListingRequestProgressUpdateScheduleCard from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateScheduleCard';
 import ListingRequestProgressUpdateTimeline from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateTimeline';
-import { canCreateNextListingRequestFinalDelivery } from '../../domain/listings/listingRequestFinalDeliveries';
+import {
+  canCreateNextListingRequestFinalDelivery,
+  getHasAllMilestonePaymentsPaid,
+} from '../../domain/listings/listingRequestFinalDeliveries';
 import { useCreateListingRequestAgreement } from '../../hooks/creatorRequests/useCreateListingRequestAgreement';
 import { useCreateListingRequestChangeOrder } from '../../hooks/creatorRequests/useCreateListingRequestChangeOrder';
 import { useCreateListingRequestFinalDelivery } from '../../hooks/creatorRequests/useCreateListingRequestFinalDelivery';
@@ -36,6 +39,11 @@ import { useListingRequestProgressUpdates } from '../../hooks/creatorRequests/us
 import { useSendDraftListingRequestAgreement } from '../../hooks/creatorRequests/useSendDraftListingRequestAgreement';
 import { useSendDraftListingRequestChangeOrder } from '../../hooks/creatorRequests/useSendDraftListingRequestChangeOrder';
 import { useSendDraftListingRequestFinalDelivery } from '../../hooks/creatorRequests/useSendDraftListingRequestFinalDelivery';
+import { useSubmitListingRequestMilestone } from '../../hooks/creatorRequests/useSubmitListingRequestMilestone';
+import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorRequests/useListingRequestMilestoneSubmissions';
+import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
+import ListingRequestMilestoneSubmissionForm from '../../components/listingRequests/milestones/ListingRequestMilestoneSubmissionForm';
+import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
 
 const classes = {
   page: "space-y-6",
@@ -80,7 +88,9 @@ const classes = {
   hint: "text-xs text-zinc-500",
   error: "text-xs font-semibold text-red-600",
   textarea:
-    "min-h-[140px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+    "min-h-[140px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
+  infoCard:
+    "rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900",
 } as const;
 
 // Prefers handle for buyer display, then display name, then user id
@@ -142,6 +152,8 @@ const CreatorRequestDetails = () => {
     useCreateListingRequestFinalDelivery();
   const sendDraftFinalDeliveryMutation =
     useSendDraftListingRequestFinalDelivery();
+  const submitMilestoneMutation =
+    useSubmitListingRequestMilestone();
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
@@ -178,6 +190,20 @@ const CreatorRequestDetails = () => {
       agreement?.status === "buyer_accepted"
         ? request?.id ?? null
         : null
+    );
+
+  const milestoneRequestId =
+    agreement?.status === "buyer_accepted" &&
+      agreement.payment_structure === "milestone_payments"
+      ? request?.id ?? null
+      : null;
+
+  const milestonesQuery =
+    useListingRequestMilestones(milestoneRequestId);
+
+  const milestoneSubmissionsQuery =
+    useListingRequestMilestoneSubmissions(
+      milestoneRequestId
     );
 
 
@@ -294,9 +320,6 @@ const CreatorRequestDetails = () => {
   const finalDeliveries =
     finalDeliveriesQuery.data ?? [];
 
-  const latestFinalDelivery =
-    finalDeliveries[0] ?? null;
-
   const draftFinalDelivery =
     finalDeliveries.find(
       (finalDelivery) =>
@@ -313,7 +336,8 @@ const CreatorRequestDetails = () => {
     agreement?.status === "buyer_accepted" &&
     startingPaymentResolved &&
     canCreateNextListingRequestFinalDelivery(
-      latestFinalDelivery?.status
+      agreement,
+      finalDeliveries
     ) &&
     !finalDeliveriesQuery.isLoading &&
     !finalDeliveriesQuery.error;
@@ -323,6 +347,32 @@ const CreatorRequestDetails = () => {
     request.status === "declined" ||
     request.status === "completed";
 
+  const milestones = milestonesQuery.data ?? [];
+
+  const milestoneSubmissions =
+    milestoneSubmissionsQuery.data ?? [];
+
+  const orderedMilestones = [...milestones].sort(
+    (firstMilestone, secondMilestone) =>
+      firstMilestone.sort_order -
+      secondMilestone.sort_order
+  );
+
+  const activeMilestone =
+    orderedMilestones.find(
+      (milestone) =>
+        milestone.status !== "paid" &&
+        milestone.status !== "cancelled"
+    ) ?? null;
+
+  const milestonesAreLoading =
+    milestonesQuery.isLoading ||
+    milestoneSubmissionsQuery.isLoading;
+
+  const milestoneError =
+    milestonesQuery.error ??
+    milestoneSubmissionsQuery.error;
+
   const requestReadOnlyMessage =
     request.status === "archived"
       ? "Archived requests are read-only."
@@ -331,6 +381,15 @@ const CreatorRequestDetails = () => {
         : request.status === "completed"
           ? "Completed projects are read-only because the buyer approved the final delivery."
           : undefined;
+
+  const finalDeliveryBlockedByMilestones =
+    request.status === "accepted" &&
+    agreement?.status === "buyer_accepted" &&
+    agreement.payment_structure === "milestone_payments" &&
+    startingPaymentResolved &&
+    !getHasAllMilestonePaymentsPaid(agreement) &&
+    !finalDeliveriesQuery.isLoading &&
+    !finalDeliveriesQuery.error;
 
   return (
     <div className={classes.page}>
@@ -669,6 +728,36 @@ const CreatorRequestDetails = () => {
         </>
       )}
 
+      {agreement?.status === "buyer_accepted" &&
+        agreement.payment_structure === "milestone_payments" && (
+          <>
+            <ListingRequestMilestoneSummary
+              milestones={milestones}
+              submissions={milestoneSubmissions}
+              viewer="creator"
+              isLoading={milestonesAreLoading}
+              error={milestoneError}
+            />
+
+            {!requestReadOnly &&
+              request.status === "accepted" &&
+              startingPaymentResolved && (
+                <ListingRequestMilestoneSubmissionForm
+                  milestone={activeMilestone}
+                  isPending={
+                    submitMilestoneMutation.isPending
+                  }
+                  error={submitMilestoneMutation.error}
+                  onSubmitMilestone={(input) =>
+                    submitMilestoneMutation.mutateAsync(
+                      input
+                    )
+                  }
+                />
+              )}
+          </>
+        )}
+
       {agreement?.status === "buyer_accepted" && (
         <>
           <ListingRequestFinalDeliverySummary
@@ -691,6 +780,14 @@ const CreatorRequestDetails = () => {
               })
             }
           />
+
+          {finalDeliveryBlockedByMilestones && (
+            <div className={classes.infoCard}>
+              Final delivery is locked until every milestone payment has been confirmed.
+              Submit each milestone for buyer review, wait for buyer approval, and then
+              wait for admin payment confirmation before creating the final delivery.
+            </div>
+          )}
 
           {canCreateFinalDelivery && (
             <ListingRequestFinalDeliveryBuilder

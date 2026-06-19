@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   confirmChangeOrderPayment: vi.fn(),
   useListingRequestFinalDeliveries: vi.fn(),
   confirmFinalBalancePayment: vi.fn(),
+  useListingRequestMilestones: vi.fn(),
+  useListingRequestMilestoneSubmissions: vi.fn(),
+  confirmMilestonePayment: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminRequest", () => ({
@@ -380,6 +383,99 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestMilestones",
+  () => ({
+    useListingRequestMilestones:
+      mocks.useListingRequestMilestones,
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestMilestoneSubmissions",
+  () => ({
+    useListingRequestMilestoneSubmissions:
+      mocks.useListingRequestMilestoneSubmissions,
+  })
+);
+
+vi.mock(
+  "../../components/listingRequests/milestones/ListingRequestMilestoneSummary",
+  () => ({
+    default: ({
+      milestones,
+      submissions,
+      viewer,
+      isLoading,
+      error,
+    }: {
+      milestones: Array<{ id: string }>;
+      submissions: Array<{ id: string }>;
+      viewer: string;
+      isLoading?: boolean;
+      error?: unknown;
+    }) => (
+      <div>
+        Mock milestone summary: {viewer} / {milestones.length} /{" "}
+        {submissions.length} / {isLoading ? "loading" : "ready"} /{" "}
+        {error ? "error" : "no error"}
+      </div>
+    ),
+  })
+);
+
+vi.mock(
+  "../../hooks/admin/useAdminConfirmListingRequestMilestonePayment",
+  () => ({
+    useAdminConfirmListingRequestMilestonePayment:
+      () => ({
+        mutateAsync:
+          mocks.confirmMilestonePayment,
+        isPending: false,
+        error: null,
+      }),
+  })
+);
+
+vi.mock(
+  "../../components/listingRequests/payments/ListingRequestMilestonePaymentAdminActions",
+  () => ({
+    default: ({
+      milestones,
+      onConfirmPayment,
+    }: {
+      milestones: Array<{
+        id: string;
+        status: string;
+        payment_schedule_item_id: string;
+      }>;
+      onConfirmPayment: (
+        paymentScheduleItemId: string
+      ) => void;
+    }) => {
+      const milestone =
+        milestones.find(
+          (item) =>
+            item.status ===
+            "payment_required"
+        ) ?? null;
+
+      return milestone ? (
+        <button
+          type="button"
+          onClick={() =>
+            onConfirmPayment(
+              milestone.payment_schedule_item_id
+            )
+          }
+        >
+          Mock confirm milestone payment
+        </button>
+      ) : null;
+    },
+  })
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -484,6 +580,22 @@ describe("<AdminRequestDetails />", () => {
     );
 
     mocks.confirmFinalBalancePayment.mockResolvedValue(
+      undefined
+    );
+
+    mocks.useListingRequestMilestones.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestMilestoneSubmissions.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.confirmMilestonePayment.mockResolvedValue(
       undefined
     );
   });
@@ -817,6 +929,18 @@ describe("<AdminRequestDetails />", () => {
     expect(
       screen.queryByText(/Mock progress schedule:/)
     ).not.toBeInTheDocument();
+
+    expect(
+      mocks.useListingRequestMilestones
+    ).toHaveBeenCalledWith(null);
+
+    expect(
+      mocks.useListingRequestMilestoneSubmissions
+    ).toHaveBeenCalledWith(null);
+
+    expect(
+      screen.queryByText(/Mock milestone summary:/)
+    ).not.toBeInTheDocument();
   });
 
   it("renders change orders for admin review", () => {
@@ -1055,6 +1179,152 @@ describe("<AdminRequestDetails />", () => {
       mocks.confirmFinalBalancePayment
     ).toHaveBeenCalledWith({
       paymentScheduleItemId: "payment-3",
+    });
+  });
+
+  it("renders milestone history for admin review", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        payment_structure: "milestone_payments",
+        starting_payment_status: "not_required",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestMilestones.mockReturnValue({
+      data: [
+        {
+          id: "milestone-1",
+          status: "submitted",
+          title: "Initial design direction",
+          sort_order: 0,
+        },
+        {
+          id: "milestone-2",
+          status: "pending",
+          title: "Completed project package",
+          sort_order: 1,
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestMilestoneSubmissions.mockReturnValue({
+      data: [
+        {
+          id: "submission-1",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestMilestones
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      mocks.useListingRequestMilestoneSubmissions
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock milestone summary: admin / 2 / 1 / ready / no error"
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("confirms a pending milestone payment from the admin request page", () => {
+    mocks.useAdminRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        status: "buyer_accepted",
+        payment_structure: "milestone_payments",
+        starting_payment_status: "not_required",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestMilestones.mockReturnValue({
+      data: [
+        {
+          id: "milestone-1",
+          status: "payment_required",
+          title: "Initial design direction",
+          sort_order: 0,
+          payment_schedule_item_id:
+            "payment-1",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    screen
+      .getByRole("button", {
+        name: "Mock confirm milestone payment",
+      })
+      .click();
+
+    expect(
+      mocks.confirmMilestonePayment
+    ).toHaveBeenCalledWith({
+      paymentScheduleItemId: "payment-1",
     });
   });
 });
