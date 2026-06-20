@@ -538,4 +538,18 @@ describe("listing request final deliveries", () => {
       )
     ).toBeNull();
   });
+
+  it("does not allow final delivery approval without a buyer-accepted agreement", () => {
+    expect(
+      canApproveListingRequestFinalDelivery(null)
+    ).toBe(false);
+
+    expect(
+      canApproveListingRequestFinalDelivery(
+        createAgreement({
+          status: "sent",
+        })
+      )
+    ).toBe(false);
+  });
 });
