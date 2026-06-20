@@ -28,7 +28,7 @@ import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorReques
 import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
 import ListingRequestMilestoneBuyerActions from '../../components/listingRequests/milestones/ListingRequestMilestoneBuyerActions';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
-import { canApproveListingRequestFinalDelivery, canApproveSubmittedListingRequestFinalDelivery, getHasAllMilestonePaymentsPaid, getListingRequestFinalDeliveryApprovalBlockedReason } from '../../domain/listings/listingRequestFinalDeliveries';
+import { canApproveListingRequestFinalDelivery, canApproveSubmittedListingRequestFinalDelivery, getHasAllMilestonePaymentsPaid, getListingRequestFinalDeliveryApprovalBlockedReason, getSubmittedListingRequestFinalDelivery } from '../../domain/listings/listingRequestFinalDeliveries';
 import { getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
 
 const classes = {
@@ -178,10 +178,9 @@ const BuyerRequestDetails = () => {
     finalDeliveriesQuery.data ?? [];
 
   const activeSubmittedFinalDelivery =
-    finalDeliveries.find(
-      (finalDelivery) =>
-        finalDelivery.status === "submitted"
-    ) ?? null;
+    getSubmittedListingRequestFinalDelivery(
+      finalDeliveries
+    );
 
   const milestones = milestonesQuery.data ?? [];
 

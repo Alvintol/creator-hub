@@ -26,7 +26,9 @@ import ListingRequestProgressUpdateScheduleCard from '../../components/listingRe
 import ListingRequestProgressUpdateTimeline from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateTimeline';
 import {
   canCreateNextListingRequestFinalDelivery,
+  getDraftListingRequestFinalDelivery,
   getHasAllMilestonePaymentsPaid,
+  getListingRequestFinalDeliveryCreationBlockedReason,
 } from '../../domain/listings/listingRequestFinalDeliveries';
 import { useCreateListingRequestAgreement } from '../../hooks/creatorRequests/useCreateListingRequestAgreement';
 import { useCreateListingRequestChangeOrder } from '../../hooks/creatorRequests/useCreateListingRequestChangeOrder';
@@ -351,10 +353,9 @@ const CreatorRequestDetails = () => {
     finalDeliveriesQuery.data ?? [];
 
   const draftFinalDelivery =
-    finalDeliveries.find(
-      (finalDelivery) =>
-        finalDelivery.status === "draft"
-    ) ?? null;
+    getDraftListingRequestFinalDelivery(
+      finalDeliveries
+    );
 
   const startingPaymentResolved =
     agreement?.starting_payment_status === "paid" ||
@@ -371,6 +372,18 @@ const CreatorRequestDetails = () => {
     ) &&
     !finalDeliveriesQuery.isLoading &&
     !finalDeliveriesQuery.error;
+
+  const finalDeliveryCreationBlockedReason =
+    request.status === "accepted" &&
+      agreement?.status === "buyer_accepted" &&
+      !canCreateFinalDelivery &&
+      !finalDeliveriesQuery.isLoading &&
+      !finalDeliveriesQuery.error
+      ? getListingRequestFinalDeliveryCreationBlockedReason(
+        agreement,
+        finalDeliveries
+      )
+      : null;
 
   const requestReadOnly =
     request.status === "archived" ||
@@ -411,15 +424,6 @@ const CreatorRequestDetails = () => {
         : request.status === "completed"
           ? "Completed projects are read-only because the buyer approved the final delivery."
           : undefined;
-
-  const finalDeliveryBlockedByMilestones =
-    request.status === "accepted" &&
-    agreement?.status === "buyer_accepted" &&
-    agreement.payment_structure === "milestone_payments" &&
-    startingPaymentResolved &&
-    !getHasAllMilestonePaymentsPaid(agreement) &&
-    !finalDeliveriesQuery.isLoading &&
-    !finalDeliveriesQuery.error;
 
 
   return (
@@ -819,11 +823,9 @@ const CreatorRequestDetails = () => {
             }
           />
 
-          {finalDeliveryBlockedByMilestones && (
+          {finalDeliveryCreationBlockedReason && (
             <div className={classes.infoCard}>
-              Final delivery is locked until every milestone payment has been confirmed.
-              Submit each milestone for buyer review, wait for buyer approval, and then
-              wait for admin payment confirmation before creating the final delivery.
+              {finalDeliveryCreationBlockedReason}
             </div>
           )}
 

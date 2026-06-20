@@ -1867,7 +1867,7 @@ describe("<CreatorRequestDetails />", () => {
 
     expect(
       screen.getByText(
-        /Final delivery is locked until every milestone payment has been confirmed./
+        "All milestone payments must be confirmed before final delivery can be created."
       )
     ).toBeInTheDocument();
   });
@@ -2249,6 +2249,67 @@ describe("<CreatorRequestDetails />", () => {
     expect(
       screen.queryByRole("button", {
         name: "Mock submit milestone: Initial design direction",
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it("explains when a previous final delivery is still active", () => {
+    mocks.useCreatorRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        buyer: {
+          user_id: "buyer-1",
+          handle: "buyeruser",
+          display_name: "Buyer User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        id: "agreement-1",
+        listing_request_id: "request-1",
+        status: "buyer_accepted",
+        payment_structure: "deposit_balance",
+        starting_payment_status: "paid",
+        listing_request_payment_schedule_items: [],
+        listing_request_timeline_holds: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue({
+      data: [
+        {
+          id: "final-delivery-1",
+          status: "submitted",
+          title: "Final package",
+          created_at: "2026-06-18T12:00:00.000Z",
+          updated_at: "2026-06-18T12:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.getByText(
+        "A new final delivery can only be created after the previous delivery is revised or cancelled."
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", {
+        name: "Mock final delivery builder",
       })
     ).not.toBeInTheDocument();
   });

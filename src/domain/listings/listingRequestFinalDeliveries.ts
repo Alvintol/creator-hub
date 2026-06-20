@@ -148,45 +148,105 @@ export const canBuyerRespondToListingRequestFinalDelivery = (
   status: ListingRequestFinalDeliveryStatus
 ): boolean => status === "submitted";
 
+
+export const getLatestListingRequestFinalDelivery = <
+  TFinalDelivery extends {
+    created_at: string;
+    id: string;
+  },
+>(
+  finalDeliveries: TFinalDelivery[]
+): TFinalDelivery | null =>
+  [...finalDeliveries].sort((firstDelivery, secondDelivery) => {
+    const dateDifference =
+      new Date(secondDelivery.created_at).getTime() -
+      new Date(firstDelivery.created_at).getTime();
+
+    if (dateDifference !== 0) {
+      return dateDifference;
+    }
+
+    return secondDelivery.id.localeCompare(firstDelivery.id);
+  })[0] ?? null;
+
+export const getDraftListingRequestFinalDelivery = <
+  TFinalDelivery extends {
+    status: ListingRequestFinalDeliveryStatus;
+    created_at: string;
+    id: string;
+  },
+>(
+  finalDeliveries: TFinalDelivery[]
+): TFinalDelivery | null =>
+  getLatestListingRequestFinalDelivery(
+    finalDeliveries.filter(
+      (finalDelivery) =>
+        finalDelivery.status === "draft"
+    )
+  );
+
+export const getSubmittedListingRequestFinalDelivery = <
+  TFinalDelivery extends {
+    status: ListingRequestFinalDeliveryStatus;
+    created_at: string;
+    id: string;
+  },
+>(
+  finalDeliveries: TFinalDelivery[]
+): TFinalDelivery | null =>
+  getLatestListingRequestFinalDelivery(
+    finalDeliveries.filter(
+      (finalDelivery) =>
+        finalDelivery.status === "submitted"
+    )
+  );
+
+export const getListingRequestFinalDeliveryCreationBlockedReason =
+  (
+    agreement: ListingRequestFinalDeliveryAgreement | null,
+    finalDeliveries: ListingRequestFinalDeliveryRow[]
+  ): string | null => {
+    if (!agreement) {
+      return "A buyer-accepted project agreement is required before final delivery can be created.";
+    }
+
+    if (agreement.status !== "buyer_accepted") {
+      return "A buyer-accepted project agreement is required before final delivery can be created.";
+    }
+
+    if (
+      agreement.starting_payment_status !== "paid" &&
+      agreement.starting_payment_status !== "not_required"
+    ) {
+      return "Starting payment must be resolved before final delivery can be created.";
+    }
+
+    if (!getHasAllMilestonePaymentsPaid(agreement)) {
+      return "All milestone payments must be confirmed before final delivery can be created.";
+    }
+
+    const latestFinalDelivery =
+      getLatestListingRequestFinalDelivery(finalDeliveries);
+
+    if (
+      latestFinalDelivery &&
+      latestFinalDelivery.status !== "revision_requested" &&
+      latestFinalDelivery.status !== "cancelled"
+    ) {
+      return "A new final delivery can only be created after the previous delivery is revised or cancelled.";
+    }
+
+    return null;
+  };
+
 export const canCreateNextListingRequestFinalDelivery = (
   agreement: ListingRequestFinalDeliveryAgreement | null,
   finalDeliveries: ListingRequestFinalDeliveryRow[]
-): boolean => {
-  if (!agreement) {
-    return false;
-  }
-
-  if (agreement.status !== "buyer_accepted") {
-    return false;
-  }
-
-  if (
-    agreement.starting_payment_status !== "paid" &&
-    agreement.starting_payment_status !== "not_required"
-  ) {
-    return false;
-  }
-
-  if (!getHasAllMilestonePaymentsPaid(agreement)) {
-    return false;
-  }
-
-  const latestFinalDelivery =
-    [...finalDeliveries].sort(
-      (firstDelivery, secondDelivery) =>
-        new Date(secondDelivery.created_at).getTime() -
-        new Date(firstDelivery.created_at).getTime()
-    )[0] ?? null;
-
-  if (!latestFinalDelivery) {
-    return true;
-  }
-
-  return (
-    latestFinalDelivery.status === "revision_requested" ||
-    latestFinalDelivery.status === "cancelled"
-  );
-};
+): boolean =>
+  getListingRequestFinalDeliveryCreationBlockedReason(
+    agreement,
+    finalDeliveries
+  ) === null;
 
 export const isListingRequestFinalDeliveryBuyerVisible = (input: {
   status: ListingRequestFinalDeliveryStatus;
