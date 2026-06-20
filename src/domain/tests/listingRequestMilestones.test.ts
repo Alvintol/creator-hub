@@ -15,6 +15,7 @@ import {
   getListingRequestMilestoneStatusSummary,
   getListingRequestMilestoneStatusTone,
   getOrderedListingRequestMilestones,
+  isListingRequestMilestoneTerminal,
   validateListingRequestMilestonePlan,
 } from "../listings/listingRequestMilestones";
 
@@ -352,6 +353,26 @@ describe("listing request milestones", () => {
           status: "payment_required",
         },
       ])
+    ).toBe(false);
+  });
+
+  it("identifies terminal milestone statuses", () => {
+    expect(
+      isListingRequestMilestoneTerminal("paid")
+    ).toBe(true);
+
+    expect(
+      isListingRequestMilestoneTerminal("cancelled")
+    ).toBe(true);
+
+    expect(
+      isListingRequestMilestoneTerminal("pending")
+    ).toBe(false);
+
+    expect(
+      isListingRequestMilestoneTerminal(
+        "payment_required"
+      )
     ).toBe(false);
   });
 });

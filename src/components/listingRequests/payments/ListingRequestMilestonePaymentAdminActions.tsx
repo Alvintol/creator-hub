@@ -1,3 +1,4 @@
+import { isListingRequestMilestoneTerminal } from '../../../domain/listings/listingRequestMilestones';
 import type { ListingRequestMilestoneRow } from "../../../hooks/creatorRequests/useListingRequestMilestones";
 
 type ListingRequestMilestonePaymentAdminActionsProps = {
@@ -118,10 +119,10 @@ const getAdminMilestonePaymentStatusMessage = (
   }
 
   const allMilestonesTerminal =
-    sortedMilestones.every(
-      (milestone) =>
-        milestone.status === "paid" ||
-        milestone.status === "cancelled"
+    sortedMilestones.every((milestone) =>
+      isListingRequestMilestoneTerminal(
+        milestone.status
+      )
     );
 
   if (allMilestonesTerminal) {
