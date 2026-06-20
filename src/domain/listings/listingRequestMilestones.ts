@@ -234,3 +234,15 @@ export const getActiveListingRequestMilestone = <
       milestone.status !== "paid" &&
       milestone.status !== "cancelled"
   ) ?? null;
+
+export const getListingRequestMilestonesAreComplete = (
+  milestones: Array<{
+    status: ListingRequestMilestoneStatus;
+  }>
+): boolean =>
+  milestones.length > 0 &&
+  milestones.every(
+    (milestone) =>
+      milestone.status === "paid" ||
+      milestone.status === "cancelled"
+  );

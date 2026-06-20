@@ -117,15 +117,15 @@ const getAdminMilestonePaymentStatusMessage = (
       } is waiting for creator submission.`;
   }
 
-  const allMilestonesPaid =
+  const allMilestonesTerminal =
     sortedMilestones.every(
       (milestone) =>
         milestone.status === "paid" ||
         milestone.status === "cancelled"
     );
 
-  if (allMilestonesPaid) {
-    return "All milestone payments have been confirmed.";
+  if (allMilestonesTerminal) {
+    return "All milestone payments have been confirmed or closed.";
   }
 
   return "No milestone payment is awaiting admin confirmation right now.";

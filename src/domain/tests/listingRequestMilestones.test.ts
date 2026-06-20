@@ -10,6 +10,7 @@ import {
   canSubmitListingRequestMilestone,
   getActiveListingRequestMilestone,
   getListingRequestMilestonePlanTotal,
+  getListingRequestMilestonesAreComplete,
   getListingRequestMilestoneStatusLabel,
   getListingRequestMilestoneStatusSummary,
   getListingRequestMilestoneStatusTone,
@@ -320,5 +321,37 @@ describe("listing request milestones", () => {
         },
       ])
     ).toBeNull();
+  });
+
+  it("does not treat an empty milestone list as complete", () => {
+    expect(
+      getListingRequestMilestonesAreComplete([])
+    ).toBe(false);
+  });
+
+  it("treats paid and cancelled milestones as complete", () => {
+    expect(
+      getListingRequestMilestonesAreComplete([
+        {
+          status: "paid",
+        },
+        {
+          status: "cancelled",
+        },
+      ])
+    ).toBe(true);
+  });
+
+  it("does not treat pending milestone work as complete", () => {
+    expect(
+      getListingRequestMilestonesAreComplete([
+        {
+          status: "paid",
+        },
+        {
+          status: "payment_required",
+        },
+      ])
+    ).toBe(false);
   });
 });
