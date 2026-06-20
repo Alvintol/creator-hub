@@ -19,31 +19,31 @@ export const listingRequestChangeOrderStatusOptions: Array<{
   value: ListingRequestChangeOrderStatus;
   label: string;
 }> = [
-  {
-    value: "draft",
-    label: "Draft",
-  },
-  {
-    value: "sent",
-    label: "Awaiting buyer review",
-  },
-  {
-    value: "buyer_accepted",
-    label: "Accepted by buyer",
-  },
-  {
-    value: "buyer_declined",
-    label: "Declined by buyer",
-  },
-  {
-    value: "cancelled",
-    label: "Cancelled",
-  },
-  {
-    value: "superseded",
-    label: "Superseded",
-  },
-];
+    {
+      value: "draft",
+      label: "Draft",
+    },
+    {
+      value: "sent",
+      label: "Awaiting buyer review",
+    },
+    {
+      value: "buyer_accepted",
+      label: "Accepted by buyer",
+    },
+    {
+      value: "buyer_declined",
+      label: "Declined by buyer",
+    },
+    {
+      value: "cancelled",
+      label: "Cancelled",
+    },
+    {
+      value: "superseded",
+      label: "Superseded",
+    },
+  ];
 
 export const getListingRequestChangeOrderStatusLabel = (
   status: ListingRequestChangeOrderStatus
@@ -79,8 +79,8 @@ export const getListingRequestChangeOrderStatusTone = (
   status: ListingRequestChangeOrderStatus
 ): ListingRequestChangeOrderTone =>
   status === "draft" ||
-  status === "cancelled" ||
-  status === "superseded"
+    status === "cancelled" ||
+    status === "superseded"
     ? "muted"
     : status === "sent"
       ? "review"
@@ -106,11 +106,11 @@ export const hasListingRequestChangeOrderImpact = (
 ): boolean =>
   Boolean(
     impact.changesScope ||
-      impact.changesPrice ||
-      impact.changesTimeline ||
-      impact.changesDeliverables ||
-      impact.changesPaymentSchedule ||
-      impact.changesMilestones
+    impact.changesPrice ||
+    impact.changesTimeline ||
+    impact.changesDeliverables ||
+    impact.changesPaymentSchedule ||
+    impact.changesMilestones
   );
 
 export const getListingRequestChangeOrderImpactLabels = (
@@ -144,3 +144,83 @@ export const getListingRequestChangeOrderImpactLabels = (
 
   return labels;
 };
+
+export const getLatestListingRequestChangeOrder = <
+  TChangeOrder extends {
+    created_at: string;
+    id: string;
+  },
+>(
+  changeOrders: TChangeOrder[]
+): TChangeOrder | null =>
+  [...changeOrders].sort((firstChangeOrder, secondChangeOrder) => {
+    const dateDifference =
+      new Date(secondChangeOrder.created_at).getTime() -
+      new Date(firstChangeOrder.created_at).getTime();
+
+    if (dateDifference !== 0) {
+      return dateDifference;
+    }
+
+    return secondChangeOrder.id.localeCompare(firstChangeOrder.id);
+  })[0] ?? null;
+
+export const getDraftListingRequestChangeOrder = <
+  TChangeOrder extends {
+    status: string;
+    created_at: string;
+    id: string;
+  },
+>(
+  changeOrders: TChangeOrder[]
+): TChangeOrder | null =>
+  getLatestListingRequestChangeOrder(
+    changeOrders.filter(
+      (changeOrder) => changeOrder.status === "draft"
+    )
+  );
+
+export const getSentListingRequestChangeOrder = <
+  TChangeOrder extends {
+    status: string;
+    created_at: string;
+    id: string;
+  },
+>(
+  changeOrders: TChangeOrder[]
+): TChangeOrder | null =>
+  getLatestListingRequestChangeOrder(
+    changeOrders.filter(
+      (changeOrder) => changeOrder.status === "sent"
+    )
+  );
+
+export const getHasPendingListingRequestChangeOrder = <
+  TChangeOrder extends {
+    status: string;
+  },
+>(
+  changeOrders: TChangeOrder[]
+): boolean =>
+  changeOrders.some(
+    (changeOrder) =>
+      changeOrder.status === "draft" ||
+      changeOrder.status === "sent"
+  );
+
+type ListingRequestChangeOrderCreatableAgreement = {
+  status: string;
+};
+
+export const canCreateListingRequestChangeOrder = <
+  TChangeOrder extends {
+    status: string;
+  },
+>(
+  requestStatus: string,
+  agreement: ListingRequestChangeOrderCreatableAgreement | null,
+  changeOrders: TChangeOrder[]
+): boolean =>
+  requestStatus === "accepted" &&
+  agreement?.status === "buyer_accepted" &&
+  !getHasPendingListingRequestChangeOrder(changeOrders);

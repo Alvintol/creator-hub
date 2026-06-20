@@ -45,6 +45,7 @@ import { useListingRequestMilestones } from '../../hooks/creatorRequests/useList
 import ListingRequestMilestoneSubmissionForm from '../../components/listingRequests/milestones/ListingRequestMilestoneSubmissionForm';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
 import { canSubmitListingRequestMilestone, getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
+import { canCreateListingRequestChangeOrder, getDraftListingRequestChangeOrder, getHasPendingListingRequestChangeOrder } from '../../domain/listings/listingRequestChangeOrders';
 
 const classes = {
   page: "space-y-6",
@@ -329,23 +330,17 @@ const CreatorRequestDetails = () => {
 
   const changeOrders = changeOrdersQuery.data ?? [];
 
-  const hasPendingChangeOrder = changeOrders.some(
-    (changeOrder) =>
-      changeOrder.status === "draft" ||
-      changeOrder.status === "sent"
-  );
-
   const canCreateChangeOrder =
-    request.status === "accepted" &&
-    agreement?.status === "buyer_accepted" &&
-    !hasPendingChangeOrder &&
+    canCreateListingRequestChangeOrder(
+      request.status,
+      agreement,
+      changeOrders
+    ) &&
     !changeOrdersQuery.isLoading &&
     !changeOrdersQuery.error;
 
   const draftChangeOrder =
-    changeOrders.find(
-      (changeOrder) => changeOrder.status === "draft"
-    ) ?? null;
+    getDraftListingRequestChangeOrder(changeOrders);
 
   const finalDeliveries =
     finalDeliveriesQuery.data ?? [];

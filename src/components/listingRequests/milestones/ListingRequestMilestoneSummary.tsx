@@ -75,8 +75,8 @@ const formatDate = (
 ): string =>
   value
     ? new Intl.DateTimeFormat("en-CA", {
-        dateStyle: "medium",
-      }).format(new Date(value))
+      dateStyle: "medium",
+    }).format(new Date(value))
     : "Not submitted";
 
 const formatMoney = (
@@ -124,7 +124,7 @@ const getLatestSubmissionByMilestoneId = (
     if (
       !current ||
       submission.version_number >
-        current.version_number
+      current.version_number
     ) {
       latestByMilestoneId.set(
         submission.milestone_id,
@@ -135,6 +135,49 @@ const getLatestSubmissionByMilestoneId = (
 
   return latestByMilestoneId;
 };
+
+type ListingRequestMilestoneSummaryViewer =
+  | "creator"
+  | "buyer"
+  | "admin";
+
+const getEmptyMilestoneMessage = (
+  viewer: ListingRequestMilestoneSummaryViewer
+): string => {
+  if (viewer === "creator") {
+    return "No milestones are available yet. They will appear here once the buyer accepts a milestone-based agreement.";
+  }
+
+  if (viewer === "buyer") {
+    return "No milestones are available yet. They will appear here once the agreement is ready for milestone work.";
+  }
+
+  return "No milestones are available for this request yet.";
+};
+
+const getCompletedMilestoneMessage = (
+  viewer: ListingRequestMilestoneSummaryViewer
+): string => {
+  if (viewer === "creator") {
+    return "All milestones have been paid. You can now prepare the final delivery when the project is ready.";
+  }
+
+  if (viewer === "buyer") {
+    return "All milestones have been paid. The creator can now prepare the final delivery.";
+  }
+
+  return "All milestones have been paid for this request.";
+};
+
+const getMilestonesAreComplete = (
+  milestones: Array<{ status: string }>
+): boolean =>
+  milestones.length > 0 &&
+  milestones.every(
+    (milestone) =>
+      milestone.status === "paid" ||
+      milestone.status === "cancelled"
+  );
 
 const ListingRequestMilestoneSummary = ({
   milestones,
@@ -332,28 +375,28 @@ const ListingRequestMilestoneSummary = ({
 
                         {latestSubmission.delivery_links.length >
                           0 && (
-                          <div className={classes.links}>
-                            {latestSubmission.delivery_links.map(
-                              (
-                                deliveryLink,
-                                index
-                              ) => (
-                                <a
-                                  className={
-                                    classes.link
-                                  }
-                                  href={deliveryLink}
-                                  key={`${latestSubmission.id}-${index}`}
-                                  rel="noreferrer"
-                                  target="_blank"
-                                >
-                                  Milestone delivery link{" "}
-                                  {index + 1}
-                                </a>
-                              )
-                            )}
-                          </div>
-                        )}
+                            <div className={classes.links}>
+                              {latestSubmission.delivery_links.map(
+                                (
+                                  deliveryLink,
+                                  index
+                                ) => (
+                                  <a
+                                    className={
+                                      classes.link
+                                    }
+                                    href={deliveryLink}
+                                    key={`${latestSubmission.id}-${index}`}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                  >
+                                    Milestone delivery link{" "}
+                                    {index + 1}
+                                  </a>
+                                )
+                              )}
+                            </div>
+                          )}
 
                         {latestSubmission.revision_request_reason && (
                           <div

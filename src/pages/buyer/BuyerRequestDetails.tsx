@@ -30,6 +30,7 @@ import ListingRequestMilestoneBuyerActions from '../../components/listingRequest
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
 import { canApproveListingRequestFinalDelivery, getHasAllMilestonePaymentsPaid, getListingRequestFinalDeliveryApprovalBlockedReason } from '../../domain/listings/listingRequestFinalDeliveries';
 import { getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
+import { getSentListingRequestChangeOrder } from '../../domain/listings/listingRequestChangeOrders';
 
 const classes = {
   page: "space-y-6",
@@ -162,9 +163,7 @@ const BuyerRequestDetails = () => {
   const changeOrders = changeOrdersQuery.data ?? [];
 
   const activeSentChangeOrder =
-    changeOrders.find(
-      (changeOrder) => changeOrder.status === "sent"
-    ) ?? null;
+    getSentListingRequestChangeOrder(changeOrders);
 
   const finalDeliveriesQuery =
     useListingRequestFinalDeliveries(
