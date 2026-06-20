@@ -1699,4 +1699,49 @@ describe("<BuyerRequestDetails />", () => {
       )
     ).toBeInTheDocument();
   });
+
+  it("does not allow final delivery approval without an active submitted delivery", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        listing_request_payment_schedule_items: [],
+        listing_request_timeline_holds: [],
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestFinalDeliveries.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      screen.queryByRole("button", {
+        name: /approve final delivery/i,
+      })
+    ).not.toBeInTheDocument();
+  });
 });

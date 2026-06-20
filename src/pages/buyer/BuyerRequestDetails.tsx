@@ -28,7 +28,7 @@ import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorReques
 import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
 import ListingRequestMilestoneBuyerActions from '../../components/listingRequests/milestones/ListingRequestMilestoneBuyerActions';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
-import { canApproveListingRequestFinalDelivery, getHasAllMilestonePaymentsPaid, getListingRequestFinalDeliveryApprovalBlockedReason } from '../../domain/listings/listingRequestFinalDeliveries';
+import { canApproveListingRequestFinalDelivery, canApproveSubmittedListingRequestFinalDelivery, getHasAllMilestonePaymentsPaid, getListingRequestFinalDeliveryApprovalBlockedReason } from '../../domain/listings/listingRequestFinalDeliveries';
 import { getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
 
 const classes = {
@@ -205,9 +205,12 @@ const BuyerRequestDetails = () => {
     );
 
   const canApproveFinalDelivery =
-    canApproveListingRequestFinalDelivery(
-      buyerVisibleAgreement
-    );
+    activeSubmittedFinalDelivery
+      ? canApproveSubmittedListingRequestFinalDelivery(
+        activeSubmittedFinalDelivery.status,
+        buyerVisibleAgreement
+      )
+      : false;
 
   const handleArchiveRequest = async () => {
     if (!request) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canApproveListingRequestFinalDelivery,
+  canApproveSubmittedListingRequestFinalDelivery,
   canBuyerRespondToListingRequestFinalDelivery,
   canCreateNextListingRequestFinalDelivery,
   canSubmitListingRequestFinalDelivery,
@@ -549,6 +550,62 @@ describe("listing request final deliveries", () => {
         createAgreement({
           status: "sent",
         })
+      )
+    ).toBe(false);
+  });
+
+  it("only allows submitted final deliveries to be approved when payment blockers are clear", () => {
+    const agreement = createAgreement({
+      status: "buyer_accepted",
+      listing_request_payment_schedule_items: [],
+      listing_request_timeline_holds: [],
+    });
+
+    expect(
+      canApproveSubmittedListingRequestFinalDelivery(
+        "submitted",
+        agreement
+      )
+    ).toBe(true);
+
+    expect(
+      canApproveSubmittedListingRequestFinalDelivery(
+        "draft",
+        agreement
+      )
+    ).toBe(false);
+
+    expect(
+      canApproveSubmittedListingRequestFinalDelivery(
+        "revision_requested",
+        agreement
+      )
+    ).toBe(false);
+
+    expect(
+      canApproveSubmittedListingRequestFinalDelivery(
+        "buyer_approved",
+        agreement
+      )
+    ).toBe(false);
+  });
+
+  it("blocks submitted final delivery approval when payment blockers remain", () => {
+    const agreement = createAgreement({
+      status: "buyer_accepted",
+      listing_request_payment_schedule_items: [
+        {
+          payment_timing: "due_before_final_release",
+          status: "payment_required",
+          amount: 200,
+        },
+      ],
+    });
+
+    expect(
+      canApproveSubmittedListingRequestFinalDelivery(
+        "submitted",
+        agreement
       )
     ).toBe(false);
   });

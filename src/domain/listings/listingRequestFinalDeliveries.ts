@@ -261,3 +261,11 @@ export const canApproveListingRequestFinalDelivery =
     getListingRequestFinalDeliveryApprovalBlockedReason(
       agreement
     ) === null;
+
+export const canApproveSubmittedListingRequestFinalDelivery =
+  (
+    status: ListingRequestFinalDeliveryStatus,
+    agreement: ListingRequestFinalDeliveryAgreement | null
+  ): boolean =>
+    canBuyerRespondToListingRequestFinalDelivery(status) &&
+    canApproveListingRequestFinalDelivery(agreement);
