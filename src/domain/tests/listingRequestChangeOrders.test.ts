@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canBuyerRespondToListingRequestChangeOrder,
+  canCreateListingRequestChangeOrder,
   canSendListingRequestChangeOrder,
   getDraftListingRequestChangeOrder,
   getHasPendingListingRequestChangeOrder,
@@ -284,4 +285,108 @@ describe("listing request change orders", () => {
       ])
     ).toBe(true);
   });
+<<<<<<< HEAD
+=======
+
+  it("allows change-order creation for accepted requests with buyer-accepted agreements and no pending change order", () => {
+    expect(
+      canCreateListingRequestChangeOrder(
+        "accepted",
+        {
+          status: "buyer_accepted",
+        },
+        [
+          {
+            id: "change-order-1",
+            status: "buyer_accepted",
+          },
+        ]
+      )
+    ).toBe(true);
+  });
+
+  it("blocks change-order creation when the request or agreement is not ready", () => {
+    expect(
+      canCreateListingRequestChangeOrder(
+        "submitted",
+        {
+          status: "buyer_accepted",
+        },
+        []
+      )
+    ).toBe(false);
+
+    expect(
+      canCreateListingRequestChangeOrder(
+        "accepted",
+        {
+          status: "sent",
+        },
+        []
+      )
+    ).toBe(false);
+
+    expect(
+      canCreateListingRequestChangeOrder(
+        "accepted",
+        null,
+        []
+      )
+    ).toBe(false);
+  });
+
+  it("blocks change-order creation while a draft or sent change order is pending", () => {
+    expect(
+      canCreateListingRequestChangeOrder(
+        "accepted",
+        {
+          status: "buyer_accepted",
+        },
+        [
+          {
+            id: "change-order-1",
+            status: "draft",
+          },
+        ]
+      )
+    ).toBe(false);
+
+    expect(
+      canCreateListingRequestChangeOrder(
+        "accepted",
+        {
+          status: "buyer_accepted",
+        },
+        [
+          {
+            id: "change-order-1",
+            status: "sent",
+          },
+        ]
+      )
+    ).toBe(false);
+  });
+
+  it("only allows buyers to respond to sent change orders", () => {
+    expect(
+      canBuyerRespondToListingRequestChangeOrder("sent")
+    ).toBe(true);
+
+    expect(
+      canBuyerRespondToListingRequestChangeOrder("draft")
+    ).toBe(false);
+
+    expect(
+      canBuyerRespondToListingRequestChangeOrder(
+        "buyer_accepted"
+      )
+    ).toBe(false);
+
+    expect(
+      canBuyerRespondToListingRequestChangeOrder(
+        "buyer_declined"
+      )
+    ).toBe(false);
+  });
+>>>>>>> 6176a4c2c2a899237b86fccc035b96799b29bbd7
 });

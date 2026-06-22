@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../providers/AuthProvider";
+import { requireCreatorPaymentAccountReadyForPublishing } from "./listingPaymentAccountGuards";
 
 export const usePublishListing = () => {
   const queryClient = useQueryClient();
@@ -11,6 +12,8 @@ export const usePublishListing = () => {
       if (!user?.id) {
         throw new Error("You must be signed in to publish a listing.");
       }
+
+      await requireCreatorPaymentAccountReadyForPublishing(user.id);
 
       const { data, error } = await supabase
         .from("listings")
@@ -33,13 +36,12 @@ export const usePublishListing = () => {
 
       if (!data?.id) {
         throw new Error(
-          "This listing could not be published. It may no longer be an editable draft or it may be locked by moderation."
+          "This listing could not be published. It may no longer be an editable draft or it may be locked by moderation.",
         );
       }
 
       return data.id as string;
     },
-
     onSuccess: async (listingId) => {
       await Promise.all([
         queryClient.invalidateQueries({

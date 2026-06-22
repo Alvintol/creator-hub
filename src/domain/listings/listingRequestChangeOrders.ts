@@ -207,3 +207,20 @@ export const getHasPendingListingRequestChangeOrder = <
       changeOrder.status === "draft" ||
       changeOrder.status === "sent"
   );
+
+type ListingRequestChangeOrderCreatableAgreement = {
+  status: string;
+};
+
+export const canCreateListingRequestChangeOrder = <
+  TChangeOrder extends {
+    status: string;
+  },
+>(
+  requestStatus: string,
+  agreement: ListingRequestChangeOrderCreatableAgreement | null,
+  changeOrders: TChangeOrder[]
+): boolean =>
+  requestStatus === "accepted" &&
+  agreement?.status === "buyer_accepted" &&
+  !getHasPendingListingRequestChangeOrder(changeOrders);

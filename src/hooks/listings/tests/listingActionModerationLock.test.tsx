@@ -9,12 +9,14 @@ import { useSetListingActiveState } from "../useSetListingActiveState";
 
 const mocks = vi.hoisted(() => ({
   from: vi.fn(),
+  rpc: vi.fn(),
   useAuth: vi.fn(),
 }));
 
 vi.mock("../../../lib/supabaseClient", () => ({
   supabase: {
     from: mocks.from,
+    rpc: mocks.rpc,
   },
 }));
 
@@ -78,9 +80,12 @@ describe("listing action moderation lock guards", () => {
     vi.clearAllMocks();
 
     mocks.useAuth.mockReturnValue({
-      user: {
-        id: "creator-1",
-      },
+      user: { id: "creator-1" },
+    });
+
+    mocks.rpc.mockResolvedValue({
+      data: true,
+      error: null,
     });
   });
 
@@ -218,6 +223,93 @@ describe("listing action moderation lock guards", () => {
 
     await expect(result.current.mutateAsync("listing-1")).rejects.toThrow(
       "This listing could not be moved to draft. It may be locked by moderation."
+    );
+  });
+
+  it("publish listing checks creator payment account readiness before publishing", async () => {
+    const chain = createSupabaseChain({ id: "listing-1" });
+
+    const { result } = renderHook(() => usePublishListing(), {
+      wrapper: createWrapper(),
+    });
+
+    await result.current.mutateAsync("listing-1");
+
+    expect(mocks.rpc).toHaveBeenCalledWith("has_ready_creator_payment_account", {
+      target_user_id: "creator-1",
+    });
+    expect(chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "published",
+        is_active: true,
+      }),
+    );
+  });
+
+  it("publish listing blocks when creator payment account is not ready", async () => {
+    mocks.rpc.mockResolvedValueOnce({
+      data: false,
+      error: null,
+    });
+
+    const chain = createSupabaseChain({ id: "listing-1" });
+
+    const { result } = renderHook(() => usePublishListing(), {
+      wrapper: createWrapper(),
+    });
+
+    await expect(result.current.mutateAsync("listing-1")).rejects.toThrow(
+      "Connect and complete Stripe payout onboarding before publishing paid listings.",
+    );
+
+    expect(chain.update).not.toHaveBeenCalled();
+  });
+
+  it("reactivating a listing checks creator payment account readiness", async () => {
+    const chain = createSupabaseChain({
+      id: "listing-1",
+      is_active: true,
+    });
+
+    const { result } = renderHook(() => useSetListingActiveState(), {
+      wrapper: createWrapper(),
+    });
+
+    await result.current.mutateAsync({
+      listingId: "listing-1",
+      isActive: true,
+    });
+
+    expect(mocks.rpc).toHaveBeenCalledWith("has_ready_creator_payment_account", {
+      target_user_id: "creator-1",
+    });
+    expect(chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        is_active: true,
+      }),
+    );
+  });
+
+  it("deactivating a listing does not require creator payment account readiness", async () => {
+    const chain = createSupabaseChain({
+      id: "listing-1",
+      is_active: false,
+    });
+
+    const { result } = renderHook(() => useSetListingActiveState(), {
+      wrapper: createWrapper(),
+    });
+
+    await result.current.mutateAsync({
+      listingId: "listing-1",
+      isActive: false,
+    });
+
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    expect(chain.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        is_active: false,
+      }),
     );
   });
 });

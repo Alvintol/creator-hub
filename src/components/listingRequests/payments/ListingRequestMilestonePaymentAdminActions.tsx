@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { isListingRequestMilestoneTerminal } from '../../../domain/listings/listingRequestMilestones';
+=======
+import { getOrderedListingRequestMilestones } from '../../../domain/listings/listingRequestMilestones';
+>>>>>>> 6176a4c2c2a899237b86fccc035b96799b29bbd7
 import type { ListingRequestMilestoneRow } from "../../../hooks/creatorRequests/useListingRequestMilestones";
 
 type ListingRequestMilestonePaymentAdminActionsProps = {
@@ -53,22 +57,14 @@ const getErrorMessage = (
   return "The milestone payment could not be confirmed.";
 };
 
-const getSortedMilestones = (
-  milestones: ListingRequestMilestoneRow[]
-) =>
-  [...milestones].sort(
-    (firstMilestone, secondMilestone) =>
-      firstMilestone.sort_order -
-      secondMilestone.sort_order
-  );
-
 const getPaymentRequiredMilestone = (
   milestones: ListingRequestMilestoneRow[]
 ) =>
-  getSortedMilestones(milestones).find(
+  getOrderedListingRequestMilestones(
+    milestones
+  ).find(
     (milestone) =>
-      milestone.status ===
-      "payment_required"
+      milestone.status === "payment_required"
   ) ?? null;
 
 const getAdminMilestonePaymentStatusMessage = (
@@ -79,7 +75,7 @@ const getAdminMilestonePaymentStatusMessage = (
   }
 
   const sortedMilestones =
-    getSortedMilestones(milestones);
+    getOrderedListingRequestMilestones(milestones);
 
   const submittedMilestone =
     sortedMilestones.find(

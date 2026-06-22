@@ -168,6 +168,49 @@ const getLatestSubmissionByMilestoneId = (
   return latestByMilestoneId;
 };
 
+type ListingRequestMilestoneSummaryViewer =
+  | "creator"
+  | "buyer"
+  | "admin";
+
+const getEmptyMilestoneMessage = (
+  viewer: ListingRequestMilestoneSummaryViewer
+): string => {
+  if (viewer === "creator") {
+    return "No milestones are available yet. They will appear here once the buyer accepts a milestone-based agreement.";
+  }
+
+  if (viewer === "buyer") {
+    return "No milestones are available yet. They will appear here once the agreement is ready for milestone work.";
+  }
+
+  return "No milestones are available for this request yet.";
+};
+
+const getCompletedMilestoneMessage = (
+  viewer: ListingRequestMilestoneSummaryViewer
+): string => {
+  if (viewer === "creator") {
+    return "All milestones have been paid. You can now prepare the final delivery when the project is ready.";
+  }
+
+  if (viewer === "buyer") {
+    return "All milestones have been paid. The creator can now prepare the final delivery.";
+  }
+
+  return "All milestones have been paid for this request.";
+};
+
+const getMilestonesAreComplete = (
+  milestones: Array<{ status: string }>
+): boolean =>
+  milestones.length > 0 &&
+  milestones.every(
+    (milestone) =>
+      milestone.status === "paid" ||
+      milestone.status === "cancelled"
+  );
+
 const ListingRequestMilestoneSummary = ({
   milestones,
   submissions,
@@ -253,7 +296,101 @@ const ListingRequestMilestoneSummary = ({
                             classes.itemHeading
                           }
                         >
+<<<<<<< HEAD
                           <h3
+=======
+                          Amount
+                        </div>
+
+                        <div
+                          className={
+                            classes.metaValue
+                          }
+                        >
+                          {formatMoney(
+                            milestone.amount,
+                            milestone.currency
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={classes.metaBlock}
+                      >
+                        <div
+                          className={
+                            classes.metaLabel
+                          }
+                        >
+                          Submitted
+                        </div>
+
+                        <div
+                          className={
+                            classes.metaValue
+                          }
+                        >
+                          {formatDate(
+                            milestone.latest_submitted_at
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={classes.metaBlock}
+                      >
+                        <div
+                          className={
+                            classes.metaLabel
+                          }
+                        >
+                          Viewer
+                        </div>
+
+                        <div
+                          className={
+                            classes.metaValue
+                          }
+                        >
+                          {viewer}
+                        </div>
+                      </div>
+                    </div>
+
+                    {latestSubmission ? (
+                      <>
+                        <p className={classes.body}>
+                          {latestSubmission.summary}
+                        </p>
+
+                        {latestSubmission.delivery_links.length >
+                          0 && (
+                            <div className={classes.links}>
+                              {latestSubmission.delivery_links.map(
+                                (
+                                  deliveryLink,
+                                  index
+                                ) => (
+                                  <a
+                                    className={
+                                      classes.link
+                                    }
+                                    href={deliveryLink}
+                                    key={`${latestSubmission.id}-${index}`}
+                                    rel="noreferrer"
+                                    target="_blank"
+                                  >
+                                    Milestone delivery link{" "}
+                                    {index + 1}
+                                  </a>
+                                )
+                              )}
+                            </div>
+                          )}
+
+                        {latestSubmission.revision_request_reason && (
+                          <div
+>>>>>>> 6176a4c2c2a899237b86fccc035b96799b29bbd7
                             className={
                               classes.itemTitle
                             }
