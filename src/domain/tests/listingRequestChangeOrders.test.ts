@@ -364,4 +364,26 @@ describe("listing request change orders", () => {
       )
     ).toBe(false);
   });
+
+  it("only allows buyers to respond to sent change orders", () => {
+    expect(
+      canBuyerRespondToListingRequestChangeOrder("sent")
+    ).toBe(true);
+
+    expect(
+      canBuyerRespondToListingRequestChangeOrder("draft")
+    ).toBe(false);
+
+    expect(
+      canBuyerRespondToListingRequestChangeOrder(
+        "buyer_accepted"
+      )
+    ).toBe(false);
+
+    expect(
+      canBuyerRespondToListingRequestChangeOrder(
+        "buyer_declined"
+      )
+    ).toBe(false);
+  });
 });

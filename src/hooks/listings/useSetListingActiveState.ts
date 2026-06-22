@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../providers/AuthProvider";
+import { requireCreatorPaymentAccountReadyForPublishing } from "./listingPaymentAccountGuards";
 
 type SetListingActiveStateInput = {
   listingId: string;
@@ -18,6 +19,10 @@ export const useSetListingActiveState = () => {
       }
 
       const { listingId, isActive } = input;
+
+      if (isActive) {
+        await requireCreatorPaymentAccountReadyForPublishing(user.id);
+      }
 
       const { data, error } = await supabase
         .from("listings")
@@ -38,13 +43,12 @@ export const useSetListingActiveState = () => {
 
       if (!data?.id) {
         throw new Error(
-          "This listing visibility could not be updated. It may be locked by moderation."
+          "This listing visibility could not be updated. It may be locked by moderation.",
         );
       }
 
       return data;
     },
-
     onSuccess: async (data, variables) => {
       await Promise.all([
         queryClient.invalidateQueries({
