@@ -2,6 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import crypto from "crypto";
+import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
 const app = express();
@@ -17,12 +18,22 @@ const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const OAUTH_STATE_SECRET = process.env.OAUTH_STATE_SECRET || "";
 
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_CONNECT_RETURN_URL =
+  process.env.STRIPE_CONNECT_RETURN_URL ||
+  `${APP_ORIGIN}/settings/payments?stripe=return`;
+const STRIPE_CONNECT_REFRESH_URL =
+  process.env.STRIPE_CONNECT_REFRESH_URL ||
+  `${APP_ORIGIN}/settings/payments?stripe=refresh`;
+
+const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
+
 const supabaseAdmin =
   SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
     ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     : null;
 
-// Allow local dev. If you use Vite proxy, CORS won’t matter much.
+// Allow local dev
 app.use(
   cors({
     origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -146,6 +157,163 @@ const requireSupabaseUserId = async (req) => {
 
   return data.user.id;
 };
+
+const requireStripe = () => {
+  if (!stripe) {
+    throw new Error("Stripe is not configured");
+  }
+
+  return stripe;
+};
+
+const normalizeCountryCode = (value) => {
+  const country = String(value || "")
+    .trim()
+    .toUpperCase();
+
+  if (!/^[A-Z]{2}$/.test(country)) {
+    throw new Error("A valid two-letter country code is required.");
+  }
+
+  return country;
+};
+
+const normalizeCurrencyCode = (value, fallback = "usd") => {
+  const currency = String(value || fallback)
+    .trim()
+    .toLowerCase();
+
+  if (!/^[a-z]{3}$/.test(currency)) {
+    throw new Error("A valid three-letter currency code is required.");
+  }
+
+  return currency;
+};
+
+const requireApprovedCreator = async (userId) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("seller_applications")
+    .select("id")
+    .eq("profile_user_id", userId)
+    .eq("status", "approved")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data?.id) {
+    throw new Error("Only approved creators can connect Stripe payouts.");
+  }
+};
+
+const getExistingCreatorPaymentAccount = async (userId) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("creator_payment_accounts")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("provider", "stripe")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+};
+
+const upsertCreatorPaymentAccount = async ({
+  userId,
+  stripeAccount,
+  fallbackCurrency,
+  onboardingStartedAt,
+}) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const now = new Date().toISOString();
+
+  const patch = {
+    user_id: userId,
+    provider: "stripe",
+    stripe_account_id: stripeAccount.id,
+    charges_enabled: Boolean(stripeAccount.charges_enabled),
+    payouts_enabled: Boolean(stripeAccount.payouts_enabled),
+    details_submitted: Boolean(stripeAccount.details_submitted),
+    country: normalizeCountryCode(stripeAccount.country),
+    default_currency: normalizeCurrencyCode(
+      stripeAccount.default_currency,
+      fallbackCurrency,
+    ),
+    onboarding_started_at: onboardingStartedAt,
+    onboarding_completed_at: stripeAccount.details_submitted ? now : null,
+    last_synced_at: now,
+    updated_at: now,
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from("creator_payment_accounts")
+    .upsert(patch, {
+      onConflict: "user_id,provider",
+    })
+    .select(
+      "id, user_id, provider, stripe_account_id, charges_enabled, payouts_enabled, details_submitted, country, default_currency, onboarding_started_at, onboarding_completed_at, last_synced_at",
+    )
+    .single();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+};
+
+const createStripeConnectAccount = async ({
+  stripeClient,
+  userId,
+  country,
+  defaultCurrency,
+}) =>
+  stripeClient.accounts.create({
+    type: "express",
+    country,
+    capabilities: {
+      card_payments: {
+        requested: true,
+      },
+      transfers: {
+        requested: true,
+      },
+    },
+    metadata: {
+      creatorhub_user_id: userId,
+    },
+    settings: {
+      payouts: {
+        schedule: {
+          interval: "manual",
+        },
+      },
+    },
+    default_currency: defaultCurrency,
+  });
+
+const getStripeConnectAccountLink = async ({ stripeClient, accountId }) =>
+  stripeClient.accountLinks.create({
+    account: accountId,
+    refresh_url: STRIPE_CONNECT_REFRESH_URL,
+    return_url: STRIPE_CONNECT_RETURN_URL,
+    type: "account_onboarding",
+  });
 
 const signState = (payload) => {
   if (!OAUTH_STATE_SECRET) throw new Error("OAUTH_STATE_SECRET missing");
@@ -469,6 +637,106 @@ app.get("/api/twitch/connect/callback", async (req, res) => {
     next.searchParams.set("twitch", "error");
     next.searchParams.set("msg", String(err?.message || err));
     return res.redirect(next.toString());
+  }
+});
+
+app.post("/api/stripe/connect/start", async (req, res) => {
+  try {
+    const stripeClient = requireStripe();
+    const userId = await requireSupabaseUserId(req);
+
+    await requireApprovedCreator(userId);
+
+    const country = normalizeCountryCode(req.body?.country);
+    const defaultCurrency = normalizeCurrencyCode(
+      req.body?.defaultCurrency,
+      "usd",
+    );
+
+    const existingAccount = await getExistingCreatorPaymentAccount(userId);
+
+    const stripeAccount = existingAccount?.stripe_account_id
+      ? await stripeClient.accounts.retrieve(existingAccount.stripe_account_id)
+      : await createStripeConnectAccount({
+        stripeClient,
+        userId,
+        country,
+        defaultCurrency,
+      });
+
+    const onboardingStartedAt =
+      existingAccount?.onboarding_started_at || new Date().toISOString();
+
+    const account = await upsertCreatorPaymentAccount({
+      userId,
+      stripeAccount,
+      fallbackCurrency: defaultCurrency,
+      onboardingStartedAt,
+    });
+
+    const accountLink = await getStripeConnectAccountLink({
+      stripeClient,
+      accountId: stripeAccount.id,
+    });
+
+    return res.json({
+      url: accountLink.url,
+      account: {
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+        detailsSubmitted: account.details_submitted,
+        country: account.country,
+        defaultCurrency: account.default_currency,
+      },
+    });
+  } catch (err) {
+    const message = String(err?.message || err);
+    const status = /session|authorization|approved creator/i.test(message)
+      ? 401
+      : 400;
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+app.post("/api/stripe/connect/sync", async (req, res) => {
+  try {
+    const stripeClient = requireStripe();
+    const userId = await requireSupabaseUserId(req);
+
+    const existingAccount = await getExistingCreatorPaymentAccount(userId);
+
+    if (!existingAccount?.stripe_account_id) {
+      return res.status(404).json({
+        error: "No Stripe payout account found for this creator.",
+      });
+    }
+
+    const stripeAccount = await stripeClient.accounts.retrieve(
+      existingAccount.stripe_account_id,
+    );
+
+    const account = await upsertCreatorPaymentAccount({
+      userId,
+      stripeAccount,
+      fallbackCurrency: existingAccount.default_currency,
+      onboardingStartedAt: existingAccount.onboarding_started_at,
+    });
+
+    return res.json({
+      account: {
+        chargesEnabled: account.charges_enabled,
+        payoutsEnabled: account.payouts_enabled,
+        detailsSubmitted: account.details_submitted,
+        country: account.country,
+        defaultCurrency: account.default_currency,
+      },
+    });
+  } catch (err) {
+    const message = String(err?.message || err);
+    const status = /session|authorization/i.test(message) ? 401 : 400;
+
+    return res.status(status).json({ error: message });
   }
 });
 
