@@ -285,8 +285,6 @@ describe("listing request change orders", () => {
       ])
     ).toBe(true);
   });
-<<<<<<< HEAD
-=======
 
   it("allows change-order creation for accepted requests with buyer-accepted agreements and no pending change order", () => {
     expect(
@@ -388,5 +386,4 @@ describe("listing request change orders", () => {
       )
     ).toBe(false);
   });
->>>>>>> 6176a4c2c2a899237b86fccc035b96799b29bbd7
 });

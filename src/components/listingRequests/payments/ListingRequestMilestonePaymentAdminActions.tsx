@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import { isListingRequestMilestoneTerminal } from '../../../domain/listings/listingRequestMilestones';
-=======
-import { getOrderedListingRequestMilestones } from '../../../domain/listings/listingRequestMilestones';
->>>>>>> 6176a4c2c2a899237b86fccc035b96799b29bbd7
+import { getOrderedListingRequestMilestones, isListingRequestMilestoneTerminal } from '../../../domain/listings/listingRequestMilestones';
 import type { ListingRequestMilestoneRow } from "../../../hooks/creatorRequests/useListingRequestMilestones";
 
 type ListingRequestMilestonePaymentAdminActionsProps = {
