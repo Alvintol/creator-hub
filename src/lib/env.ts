@@ -6,7 +6,8 @@ type ClientEnvKey =
   | "VITE_BETA_MODE"
   | "VITE_STRIPE_PAYMENTS_ENABLED"
   | "VITE_ADSENSE_ENABLED"
-  | "VITE_ADSENSE_CLIENT_ID";
+  | "VITE_ADSENSE_CLIENT_ID"
+  | "VITE_STRIPE_PUBLISHABLE_KEY";
 
 export type ClientEnvSource = Partial<
   Record<ClientEnvKey, string | boolean | undefined>
@@ -21,14 +22,16 @@ export type ClientEnv = {
   adsenseClientId: string;
   isTest: boolean;
   apiBase: string;
+  stripePublishableKey: string;
 };
 
 const TEST_SUPABASE_URL = "http://127.0.0.1:54321";
 const TEST_SUPABASE_ANON_KEY = "test-anon-key";
-
+const TEST_STRIPE_PUBLISHABLE_KEY = "pk_test_51TlZGtRzT1WqoVrZSQkeUPqsU3smy6JBe1xb7yQVSw2tp6SkDhC5EUyspBle7v5EuwmoUe2KQcDtpiRpWDHhOPM700uDxAN9cR";
 const REQUIRED_CLIENT_ENV_KEYS = [
   "VITE_SUPABASE_URL",
   "VITE_SUPABASE_ANON_KEY",
+  "VITE_STRIPE_PUBLISHABLE_KEY",
 ] as const;
 
 const getCurrentNodeEnv = (): string | undefined => {
@@ -99,6 +102,7 @@ export const resolveClientEnv = (
     stripePaymentsEnabled: getBooleanEnvValue(
       env.VITE_STRIPE_PAYMENTS_ENABLED,
     ),
+    stripePublishableKey: getOptionalString(env.VITE_STRIPE_PUBLISHABLE_KEY) ?? "",
     adsenseEnabled:
       getBooleanEnvValue(env.VITE_ADSENSE_ENABLED) &&
       adsenseClientId.length > 0,
