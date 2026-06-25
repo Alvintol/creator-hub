@@ -6,6 +6,7 @@ import { useMyProfile, type ProfileRow } from "../hooks/profile/useMyProfile";
 import { useProfilePlatformAccounts } from "../hooks/profile/useProfilePlatformAccounts";
 import { useSellerAccess } from "../hooks/creatorApplication/useSellerAccess";
 import { getProfileAvatarUrl } from "../domain/profileMedia";
+import CreatorPaymentSettingsCard from '../components/profile/CreatorPaymentSettingsCard';
 
 const classes = {
   page: "space-y-6",
@@ -111,6 +112,7 @@ const ProfileSettings = () => {
     sellerApplication,
     creatorStatusLabel,
     canStartApplication,
+    isCreatorApproved,
   } = useSellerAccess();
 
   const [handle, setHandle] = useState("");
@@ -677,6 +679,8 @@ const ProfileSettings = () => {
           )}
         </div>
       </div>
+
+      <CreatorPaymentSettingsCard isCreatorApproved={isCreatorApproved} />
 
       {(loading ||
         isLoading ||

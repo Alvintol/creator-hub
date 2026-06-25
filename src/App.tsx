@@ -47,6 +47,8 @@ import Terms from "./pages/legal/Terms";
 import MessageDetails from "./pages/messages/MessageDetails";
 import MessagesInbox from "./pages/messages/MessagesInbox";
 import MyReports from "./pages/reports/MyReports";
+import PaymentReturn from './pages/payments/PaymentReturn';
+import ListingRequestPaymentCheckout from './pages/payments/ListingRequestPaymentCheckout';
 
 const App = () => {
   return (
@@ -117,6 +119,20 @@ const App = () => {
             <Route
               path="/settings/reports"
               element={<MyReports />}
+            />
+
+            <Route
+              path="/payments/checkout/:paymentId"
+              element={
+                <ListingRequestPaymentCheckout />
+              }
+            />
+
+            <Route
+              path="/payments/return"
+              element={
+                <PaymentReturn />
+              }
             />
           </Route>
 
