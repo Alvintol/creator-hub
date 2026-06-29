@@ -1,16 +1,21 @@
-import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
+import {
+  EmbeddedCheckout,
+  EmbeddedCheckoutProvider,
+} from "@stripe/react-stripe-js";
 import type { Stripe } from "@stripe/stripe-js";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useCreateListingRequestPaymentCheckout } from "../../hooks/payments/useCreateListingRequestPaymentCheckout";
 import { getStripeForConnectedAccount } from "../../lib/stripeClient";
 
 const classes = {
-  shell: "mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8",
+  shell:
+    "mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-10 sm:px-6 lg:px-8",
   card: "card p-6",
   title: "text-2xl font-black tracking-tight text-zinc-950",
   text: "mt-2 text-sm leading-6 text-zinc-600",
-  error: "rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900",
+  error:
+    "rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900",
   checkoutWrap: "overflow-hidden rounded-2xl border border-zinc-200 bg-white p-2",
   actions: "flex flex-wrap items-center gap-3",
   btn:
@@ -25,53 +30,51 @@ const getErrorMessage = (error: unknown): string =>
 const ListingRequestPaymentCheckout = () => {
   const { paymentId = "" } = useParams<{ paymentId: string }>();
   const createCheckout = useCreateListingRequestPaymentCheckout();
+
+  const startedPaymentIdRef = useRef<string | null>(null);
+
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripePromise, setStripePromise] =
     useState<Promise<Stripe | null> | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
+  const startCheckout = useCallback(async () => {
+    if (!paymentId) {
+      setErrMsg("Payment id is missing.");
+      return;
+    }
+
+    if (startedPaymentIdRef.current === paymentId) {
+      return;
+    }
+
+    startedPaymentIdRef.current = paymentId;
+
+    setErrMsg(null);
+    setClientSecret(null);
+    setStripePromise(null);
+
+    try {
+      const response = await createCheckout.mutateAsync({ paymentId });
+
+      setClientSecret(response.checkout.clientSecret);
+      setStripePromise(
+        getStripeForConnectedAccount(
+          response.payment.stripe_connected_account_id,
+        ),
+      );
+    } catch (error) {
+      startedPaymentIdRef.current = null;
+      setErrMsg(getErrorMessage(error));
+    }
+  }, [createCheckout.mutateAsync, paymentId]);
+
   useEffect(() => {
-    let isMounted = true;
-
-    const startCheckout = async () => {
-      if (!paymentId) {
-        setErrMsg("Payment id is missing.");
-        return;
-      }
-
-      setErrMsg(null);
-      setClientSecret(null);
-      setStripePromise(null);
-
-      try {
-        const response = await createCheckout.mutateAsync({ paymentId });
-
-        if (!isMounted) {
-          return;
-        }
-
-        setClientSecret(response.checkout.clientSecret);
-        setStripePromise(
-          getStripeForConnectedAccount(
-            response.payment.stripe_connected_account_id,
-          ),
-        );
-      } catch (error) {
-        if (isMounted) {
-          setErrMsg(getErrorMessage(error));
-        }
-      }
-    };
-
     void startCheckout();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [createCheckout, paymentId]);
+  }, [startCheckout]);
 
   const checkoutOptions = useMemo(
-    () => (clientSecret ? { clientSecret } : null),
+    () => (clientSecret ? { clientSecret } : undefined),
     [clientSecret],
   );
 

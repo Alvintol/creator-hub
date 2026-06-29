@@ -7,7 +7,7 @@ const stripePromiseByConnectedAccount = new Map<
 >();
 
 export const getStripePublishableKeyMissingMessage = (): string =>
-  "Stripe publishable key is not configured.";
+  `Stripe ${clientEnv.stripeKeyMode} publishable key is not configured.`;
 
 export const getStripePublishableKey = (): string =>
   clientEnv.stripePublishableKey.trim();

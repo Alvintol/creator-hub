@@ -1,15 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import {
+  ConnectAccountOnboarding,
+  ConnectComponentsProvider,
+} from "@stripe/react-connect-js";
+import {
+  loadConnectAndInitialize,
+  type StripeConnectInstance,
+} from "@stripe/connect-js";
+import { useCallback, useMemo, useState } from "react";
+import {
+  createStripeConnectAccountSession,
+  type StripeConnectAccountSessionResponse,
+} from "../../hooks/payments/useStripeConnectAccountSession";
 import {
   getCreatorPaymentAccountIsReady,
   getCreatorPaymentAccountStatusLabel,
   useCreatorPaymentAccount,
 } from "../../hooks/payments/useCreatorPaymentAccount";
-import {
-  getStripeConnectErrorActionUrl,
-  useStartStripeConnectOnboarding,
-  useSyncStripeConnectAccount,
-} from "../../hooks/payments/useStripeConnectOnboarding";
+import { useSyncStripeConnectAccount } from "../../hooks/payments/useStripeConnectOnboarding";
+import { getStripePublishableKey } from "../../lib/stripeClient";
+import { useAuth } from "../../providers/AuthProvider";
 
 type CreatorPaymentSettingsCardProps = {
   isCreatorApproved: boolean;
@@ -17,31 +26,38 @@ type CreatorPaymentSettingsCardProps = {
 
 const classes = {
   card: "card p-6",
-  header: "flex flex-wrap items-start justify-between gap-4",
-  title: "text-base font-extrabold tracking-tight",
-  help: "mt-1 text-sm text-zinc-600",
-  grid: "mt-4 grid gap-4 md:grid-cols-2",
-  field: "space-y-2",
-  label: "text-sm font-extrabold text-zinc-800",
+  header: "flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between",
+  eyebrow: "text-xs font-black uppercase tracking-[0.22em] text-orange-600",
+  title: "text-xl font-black tracking-tight text-zinc-950",
+  text: "mt-2 text-sm leading-6 text-zinc-600",
+  status:
+    "inline-flex w-fit items-center rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-zinc-700",
+  ready:
+    "inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-emerald-700",
+  form: "mt-5 grid gap-4 sm:grid-cols-2",
+  field: "flex flex-col gap-2",
+  label: "text-sm font-bold text-zinc-900",
   input:
-    "w-full rounded-xl bg-white px-4 py-3 text-sm outline-none transition ring-1 ring-zinc-300/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/70 disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500",
-  statusGrid: "mt-4 grid gap-3 md:grid-cols-3",
-  statusCard: "rounded-2xl border border-zinc-200 bg-white p-4",
-  statusLabel: "text-xs font-bold uppercase tracking-[0.18em] text-zinc-500",
-  statusValue: "mt-1 text-sm font-extrabold text-zinc-900",
-  row: "mt-5 flex flex-wrap items-center gap-3",
-  btnPrimary:
-    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
-  btnOutline:
-    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
-  bannerInfo: "mt-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sky-900",
-  bannerOk:
-    "mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-900",
-  bannerErr:
-    "mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900",
-  bannerTitle: "text-sm font-extrabold",
-  bannerText: "mt-1 text-sm",
-  muted: "mt-2 text-xs text-zinc-500",
+    "rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm font-semibold text-zinc-900 shadow-sm outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100",
+  actions: "mt-5 flex flex-wrap items-center gap-3",
+  button:
+    "inline-flex items-center justify-center rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white shadow-[0_8px_20px_rgba(0,0,0,0.15)] transition hover:-translate-y-[1px] hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0",
+  secondaryButton:
+    "inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-black text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition hover:-translate-y-[1px] hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0",
+  warning:
+    "mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900",
+  error:
+    "mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm leading-6 text-rose-900",
+  success:
+    "mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900",
+  embeddedShell:
+    "mt-6 overflow-hidden rounded-2xl border border-zinc-200 bg-white p-4",
+  loadingShell:
+    "mt-6 rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 p-5",
+  loadingTitle: "text-sm font-black text-zinc-950",
+  loadingText: "mt-2 text-sm leading-6 text-zinc-600",
+  pulseRow: "mt-4 h-10 animate-pulse rounded-2xl bg-zinc-200",
+  pulseShort: "mt-3 h-4 w-2/3 animate-pulse rounded-full bg-zinc-200",
 } as const;
 
 const getErrorMessage = (error: unknown): string =>
@@ -49,238 +65,133 @@ const getErrorMessage = (error: unknown): string =>
     ? String((error as { message: unknown }).message)
     : "Something went wrong.";
 
-const isTwoLetterCountryCode = (value: string): boolean =>
-  /^[A-Z]{2}$/.test(value.trim().toUpperCase());
+const getDefaultCountry = (
+  accountCountry: string | null | undefined,
+): string => accountCountry || "CA";
 
-const isThreeLetterCurrencyCode = (value: string): boolean =>
-  /^[a-z]{3}$/.test(value.trim().toLowerCase());
-
-const formatBooleanStatus = (value?: boolean | null): string =>
-  value ? "Yes" : "No";
+const getDefaultCurrency = (
+  accountCurrency: string | null | undefined,
+): string => accountCurrency || "cad";
 
 const CreatorPaymentSettingsCard = ({
   isCreatorApproved,
 }: CreatorPaymentSettingsCardProps) => {
-  const navigate = useNavigate();
-  const { search } = useLocation();
-  const {
-    data: account = null,
-    isLoading,
-    error,
-  } = useCreatorPaymentAccount();
-  const startStripeConnect = useStartStripeConnectOnboarding();
-  const syncStripeConnect = useSyncStripeConnectAccount();
+  const { session } = useAuth();
+  const token = session?.access_token ?? null;
 
-  const [country, setCountry] = useState("CA");
-  const [defaultCurrency, setDefaultCurrency] = useState("cad");
-  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const paymentAccountQuery = useCreatorPaymentAccount();
+  const syncAccount = useSyncStripeConnectAccount();
+
+  const paymentAccount = paymentAccountQuery.data ?? null;
+  const isReady = getCreatorPaymentAccountIsReady(paymentAccount);
+
+  const [country, setCountry] = useState(() =>
+    getDefaultCountry(paymentAccount?.country),
+  );
+  const [defaultCurrency, setDefaultCurrency] = useState(() =>
+    getDefaultCurrency(paymentAccount?.default_currency),
+  );
+  const [connectInstance, setConnectInstance] =
+    useState<StripeConnectInstance | null>(null);
+  const [accountSession, setAccountSession] =
+    useState<StripeConnectAccountSessionResponse | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
-  const [infoMsg, setInfoMsg] = useState<string | null>(null);
-  const [actionUrl, setActionUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!account) {
-      return;
-    }
-
-    setCountry(account.country);
-    setDefaultCurrency(account.default_currency);
-  }, [account]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(search);
-    const stripeStatus = params.get("stripe");
-
-    if (stripeStatus !== "return" && stripeStatus !== "refresh") {
-      return;
-    }
-
-    const sync = async () => {
-      setOkMsg(null);
-      setErrMsg(null);
-      setInfoMsg("Refreshing your Stripe payout status…");
-
-      try {
-        await syncStripeConnect.mutateAsync();
-        setOkMsg("Stripe payout status refreshed.");
-        setInfoMsg(null);
-      } catch (error) {
-        setErrMsg(getErrorMessage(error));
-        setInfoMsg(null);
-      } finally {
-        navigate({ pathname: "/settings/profile", search: "" }, { replace: true });
-      }
-    };
-
-    void sync();
-  }, [navigate, search, syncStripeConnect]);
+  const [isStarting, setIsStarting] = useState(false);
 
   const statusLabel = useMemo(
-    () => getCreatorPaymentAccountStatusLabel(account),
-    [account],
+    () => getCreatorPaymentAccountStatusLabel(paymentAccount),
+    [paymentAccount],
   );
 
-  const isReady = useMemo(
-    () => getCreatorPaymentAccountIsReady(account),
-    [account],
-  );
+  const startEmbeddedOnboarding = useCallback(async () => {
+    if (!token) {
+      setErrMsg("You must be signed in to start Stripe setup.");
+      return;
+    }
 
-  const isBusy =
-    isLoading ||
-    startStripeConnect.isPending ||
-    syncStripeConnect.isPending;
-
-  const onStartStripeConnect = async () => {
-    setOkMsg(null);
+    setIsStarting(true);
     setErrMsg(null);
-    setInfoMsg(null);
-    setActionUrl(null);
-
-    const nextCountry = country.trim().toUpperCase();
-    const nextCurrency = defaultCurrency.trim().toLowerCase();
-
-    if (!isTwoLetterCountryCode(nextCountry)) {
-      setErrMsg("Enter a valid two-letter country code, such as CA or US.");
-      return;
-    }
-
-    if (!isThreeLetterCurrencyCode(nextCurrency)) {
-      setErrMsg("Enter a valid three-letter currency code, such as cad or usd.");
-      return;
-    }
+    setSuccessMsg(null);
+    setAccountSession(null);
+    setConnectInstance(null);
 
     try {
-      const response = await startStripeConnect.mutateAsync({
-        country: nextCountry,
-        defaultCurrency: nextCurrency,
+      const publishableKey = getStripePublishableKey();
+
+      const response = await createStripeConnectAccountSession({
+        token,
+        country,
+        defaultCurrency,
       });
 
-      window.location.assign(response.url);
+      setAccountSession(response);
+
+      const instance = loadConnectAndInitialize({
+        publishableKey,
+        fetchClientSecret: async () => response.accountSession.clientSecret,
+      });
+
+      setConnectInstance(instance);
     } catch (error) {
       setErrMsg(getErrorMessage(error));
-      setActionUrl(getStripeConnectErrorActionUrl(error));
+    } finally {
+      setIsStarting(false);
     }
-  };
+  }, [country, defaultCurrency, token]);
 
-  const onSyncStripeConnect = async () => {
-    setOkMsg(null);
+  const handleOnboardingExit = useCallback(async () => {
+    setSuccessMsg("Stripe setup was saved. Refreshing payout status…");
     setErrMsg(null);
-    setInfoMsg(null);
-    setActionUrl(null);
 
     try {
-      await syncStripeConnect.mutateAsync();
-      setOkMsg("Stripe payout status refreshed.");
+      await syncAccount.mutateAsync();
+      await paymentAccountQuery.refetch();
+      setSuccessMsg("Payout status refreshed.");
     } catch (error) {
       setErrMsg(getErrorMessage(error));
     }
-  };
+  }, [paymentAccountQuery, syncAccount]);
+
+  if (!isCreatorApproved) {
+    return (
+      <section className={classes.card}>
+        <p className={classes.eyebrow}>Creator payouts</p>
+        <h2 className={classes.title}>Stripe setup locked</h2>
+        <p className={classes.text}>
+          Creator payout setup becomes available after your creator application
+          is approved.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className={classes.card}>
       <div className={classes.header}>
         <div>
-          <h2 className={classes.title}>Creator payouts</h2>
-          <p className={classes.help}>
-            Connect Stripe so CreatorHub can collect buyer payments and release
-            approved creator earnings automatically.
+          <p className={classes.eyebrow}>Creator payouts</p>
+          <h2 className={classes.title}>Set up Stripe payouts</h2>
+          <p className={classes.text}>
+            Complete Stripe onboarding inside CreatorHub so buyers can pay you
+            securely for accepted project work.
           </p>
         </div>
-        <div className={classes.statusCard}>
-          <div className={classes.statusLabel}>Status</div>
-          <div className={classes.statusValue}>{statusLabel}</div>
-        </div>
+
+        <span className={isReady ? classes.ready : classes.status}>
+          {statusLabel}
+        </span>
       </div>
 
-      {!isCreatorApproved && (
-        <div className={classes.bannerInfo}>
-          <div className={classes.bannerTitle}>Creator approval required</div>
-          <p className={classes.bannerText}>
-            Stripe payout onboarding opens after your CreatorHub creator
-            application is approved.
-          </p>
-        </div>
-      )}
-
-      {isReady && (
-        <div className={classes.bannerOk}>
-          <div className={classes.bannerTitle}>Payouts ready</div>
-          <p className={classes.bannerText}>
-            Your Stripe account is ready. You can publish paid listings once the
-            listing passes the usual listing checks.
-          </p>
-        </div>
-      )}
-
-      {(errMsg || error) && (
-        <div className={classes.bannerErr}>
-          <div className={classes.bannerTitle}>Action needed</div>
-          <p className={classes.bannerText}>
-            {errMsg ?? getErrorMessage(error)}
-          </p>
-        </div>
-      )}
-
-      {actionUrl && (
-        <div className={classes.row}>
-          <a
-            className={classes.btnOutline}
-            href={actionUrl}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open Stripe Connect setup
-          </a>
-        </div>
-      )}
-
-      {okMsg && (
-        <div className={classes.bannerOk}>
-          <div className={classes.bannerTitle}>Success</div>
-          <p className={classes.bannerText}>{okMsg}</p>
-        </div>
-      )}
-
-      {infoMsg && (
-        <div className={classes.bannerInfo}>
-          <div className={classes.bannerTitle}>Checking Stripe</div>
-          <p className={classes.bannerText}>{infoMsg}</p>
-        </div>
-      )}
-
-      <div className={classes.statusGrid}>
-        <div className={classes.statusCard}>
-          <div className={classes.statusLabel}>Details submitted</div>
-          <div className={classes.statusValue}>
-            {formatBooleanStatus(account?.details_submitted)}
-          </div>
-        </div>
-        <div className={classes.statusCard}>
-          <div className={classes.statusLabel}>Charges enabled</div>
-          <div className={classes.statusValue}>
-            {formatBooleanStatus(account?.charges_enabled)}
-          </div>
-        </div>
-        <div className={classes.statusCard}>
-          <div className={classes.statusLabel}>Payouts enabled</div>
-          <div className={classes.statusValue}>
-            {formatBooleanStatus(account?.payouts_enabled)}
-          </div>
-        </div>
-      </div>
-
-      <div className={classes.grid}>
+      <div className={classes.form}>
         <label className={classes.field}>
-          <span className={classes.label}>Stripe country</span>
+          <span className={classes.label}>Country</span>
           <input
             className={classes.input}
-            value={country}
-            onChange={(event) =>
-              setCountry(event.currentTarget.value.toUpperCase())
-            }
             maxLength={2}
+            value={country}
+            onChange={(event) => setCountry(event.target.value.toUpperCase())}
             placeholder="CA"
-            disabled={!isCreatorApproved || Boolean(account)}
           />
         </label>
 
@@ -288,42 +199,84 @@ const CreatorPaymentSettingsCard = ({
           <span className={classes.label}>Default currency</span>
           <input
             className={classes.input}
+            maxLength={3}
             value={defaultCurrency}
             onChange={(event) =>
-              setDefaultCurrency(event.currentTarget.value.toLowerCase())
+              setDefaultCurrency(event.target.value.toLowerCase())
             }
-            maxLength={3}
             placeholder="cad"
-            disabled={!isCreatorApproved || Boolean(account)}
           />
         </label>
       </div>
 
-      <p className={classes.muted}>
-        Use the country and currency for the Stripe account that will receive
-        creator payouts. After an account is created, changes should happen
-        through Stripe or support.
-      </p>
-
-      <div className={classes.row}>
+      <div className={classes.actions}>
         <button
-          className={classes.btnPrimary}
+          className={classes.button}
           type="button"
-          onClick={onStartStripeConnect}
-          disabled={!isCreatorApproved || isBusy || isReady}
+          disabled={isStarting}
+          onClick={startEmbeddedOnboarding}
         >
-          {account ? "Continue Stripe onboarding" : "Connect Stripe"}
+          {isStarting
+            ? "Preparing Stripe setup…"
+            : connectInstance
+              ? "Restart embedded setup"
+              : "Start embedded setup"}
         </button>
 
         <button
-          className={classes.btnOutline}
+          className={classes.secondaryButton}
           type="button"
-          onClick={onSyncStripeConnect}
-          disabled={!isCreatorApproved || isBusy || !account}
+          disabled={syncAccount.isPending}
+          onClick={() => {
+            setSuccessMsg(null);
+            setErrMsg(null);
+            syncAccount
+              .mutateAsync()
+              .then(() => paymentAccountQuery.refetch())
+              .then(() => setSuccessMsg("Payout status refreshed."))
+              .catch((error) => setErrMsg(getErrorMessage(error)));
+          }}
         >
           Refresh payout status
         </button>
       </div>
+
+      {!isReady && (
+        <div className={classes.warning}>
+          Payout setup must be complete before this creator can publish active
+          listings or receive buyer payments.
+        </div>
+      )}
+
+      {accountSession && (
+        <div className={classes.success}>
+          Stripe account ready for embedded setup:{" "}
+          <strong>{accountSession.account.stripeAccountId}</strong>
+        </div>
+      )}
+
+      {successMsg && <div className={classes.success}>{successMsg}</div>}
+      {errMsg && <div className={classes.error}>{errMsg}</div>}
+
+      {isStarting && !connectInstance && (
+        <div className={classes.loadingShell}>
+          <p className={classes.loadingTitle}>Preparing Stripe setup…</p>
+          <p className={classes.loadingText}>
+            CreatorHub is opening the secure Stripe onboarding component. This can take
+            a moment the first time.
+          </p>
+          <div className={classes.pulseRow} />
+          <div className={classes.pulseShort} />
+        </div>
+      )}
+
+      {connectInstance && (
+        <div className={classes.embeddedShell}>
+          <ConnectComponentsProvider connectInstance={connectInstance}>
+            <ConnectAccountOnboarding onExit={handleOnboardingExit} />
+          </ConnectComponentsProvider>
+        </div>
+      )}
     </section>
   );
 };

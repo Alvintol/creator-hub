@@ -41,6 +41,15 @@ const STRIPE_CONNECT_SETUP_URL =
 const STRIPE_CHECKOUT_RETURN_PATH =
   process.env.STRIPE_CHECKOUT_RETURN_PATH || "/payments/return";
 
+const LOCAL_DEV_ORIGINS = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+const ALLOWED_ORIGINS = Array.from(
+  new Set([APP_ORIGIN, ...LOCAL_DEV_ORIGINS].filter(Boolean)),
+);
+
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
 const supabaseAdmin =
@@ -51,11 +60,21 @@ const supabaseAdmin =
 // Allow local dev
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
+    origin: (origin, callback) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin ${origin} is not allowed by CORS.`));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type"],
+    credentials: false,
+  }),
 );
+
+app.options("*", cors());
 
 app.post(
   "/api/stripe/webhook",
@@ -103,7 +122,10 @@ app.post(
 app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+  res.json({
+    ok: true,
+    service: "creator-hub-api",
+  });
 });
 
 let cachedToken = null;
@@ -516,6 +538,97 @@ const getStripePaymentMetadata = (payment) => ({
   related_entity_type: payment.related_entity_type || "",
   related_entity_id: payment.related_entity_id || "",
 });
+
+const getEmbeddedConnectAccountSessionComponents = () => ({
+  account_onboarding: {
+    enabled: true,
+    features: {
+      external_account_collection: true,
+    },
+  },
+});
+
+const getStripeAccountIdFromCreatorPaymentAccount = (account) =>
+  typeof account?.stripe_account_id === "string" &&
+    account.stripe_account_id.trim().length > 0
+    ? account.stripe_account_id.trim()
+    : null;
+
+const getStripeConnectAccountSummary = ({ account, existingAccount }) => ({
+  stripeAccountId: account.id,
+  chargesEnabled: Boolean(
+    "charges_enabled" in account
+      ? account.charges_enabled
+      : existingAccount?.charges_enabled,
+  ),
+  payoutsEnabled: Boolean(
+    "payouts_enabled" in account
+      ? account.payouts_enabled
+      : existingAccount?.payouts_enabled,
+  ),
+  detailsSubmitted: Boolean(
+    "details_submitted" in account
+      ? account.details_submitted
+      : existingAccount?.details_submitted,
+  ),
+  country: account.country || existingAccount?.country || null,
+  defaultCurrency:
+    account.default_currency || existingAccount?.default_currency || null,
+});
+
+const getOrCreateStripeAccountForEmbeddedConnect = async ({
+  stripeClient,
+  userId,
+  country,
+  defaultCurrency,
+}) => {
+  const existingAccount = await getExistingCreatorPaymentAccount(userId);
+  const existingStripeAccountId =
+    getStripeAccountIdFromCreatorPaymentAccount(existingAccount);
+
+  if (existingStripeAccountId) {
+    return {
+      account: {
+        id: existingStripeAccountId,
+        country: existingAccount.country,
+        default_currency: existingAccount.default_currency,
+        charges_enabled: existingAccount.charges_enabled,
+        payouts_enabled: existingAccount.payouts_enabled,
+        details_submitted: existingAccount.details_submitted,
+      },
+      existingAccount,
+      wasCreated: false,
+    };
+  }
+
+  const account = await stripeClient.accounts.create({
+    type: "express",
+    country,
+    default_currency: defaultCurrency,
+    capabilities: {
+      card_payments: {
+        requested: true,
+      },
+      transfers: {
+        requested: true,
+      },
+    },
+    metadata: {
+      creatorhub_user_id: userId,
+    },
+  });
+
+  await upsertCreatorPaymentAccount({
+    userId,
+    stripeAccount: account,
+  });
+
+  return {
+    account,
+    existingAccount: null,
+    wasCreated: true,
+  };
+};
 
 const signState = (payload) => {
   if (!OAUTH_STATE_SECRET) throw new Error("OAUTH_STATE_SECRET missing");
@@ -1145,6 +1258,74 @@ app.get("/api/stripe/checkout/session-status", async (req, res) => {
 
     return res.status(status).json({ error: message });
   }
+});
+
+app.post("/api/stripe/connect/account-session", async (req, res) => {
+  try {
+    const stripeClient = requireStripe();
+    const userId = await requireSupabaseUserId(req);
+
+    if (!stripeClient?.accounts?.create) {
+      return res.status(500).json({
+        error:
+          "Stripe accounts API is unavailable. Check the API Stripe package version and STRIPE_SECRET_KEY.",
+      });
+    }
+
+    if (!stripeClient?.accountSessions?.create) {
+      return res.status(500).json({
+        error:
+          "Stripe account sessions API is unavailable. Run `cd api && npm install stripe@latest`.",
+      });
+    }
+
+    await requireApprovedCreator(userId);
+
+    const country = normalizeCountryCode(req.body?.country || "CA");
+    const defaultCurrency = normalizeCurrencyCode(
+      req.body?.defaultCurrency || "cad",
+    );
+
+    const { account, existingAccount, wasCreated } =
+      await getOrCreateStripeAccountForEmbeddedConnect({
+        stripeClient,
+        userId,
+        country,
+        defaultCurrency,
+      });
+
+    const accountSession = await stripeClient.accountSessions.create({
+      account: account.id,
+      components: getEmbeddedConnectAccountSessionComponents(),
+    });
+
+    return res.json({
+      account: getStripeConnectAccountSummary({
+        account,
+        existingAccount,
+      }),
+      accountSession: {
+        clientSecret: accountSession.client_secret,
+        expiresAt: accountSession.expires_at,
+      },
+      meta: {
+        wasCreated,
+      },
+    });
+  } catch (err) {
+    const message = String(err?.message || err);
+    const status = /session|authorization/i.test(message) ? 401 : 400;
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+app.use((err, _req, res, _next) => {
+  console.error(err);
+
+  res.status(500).json({
+    error: err?.message || "Unexpected API error.",
+  });
 });
 
 app.listen(PORT, () => {
