@@ -1,9 +1,19 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+
 import express from "express";
 import cors from "cors";
 import crypto from "crypto";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({
+  path: path.join(__dirname, ".env"),
+});
 
 const app = express();
 
@@ -19,12 +29,26 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const OAUTH_STATE_SECRET = process.env.OAUTH_STATE_SECRET || "";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 const STRIPE_CONNECT_RETURN_URL =
   process.env.STRIPE_CONNECT_RETURN_URL ||
-  `${APP_ORIGIN}/settings/payments?stripe=return`;
+  `${APP_ORIGIN}/settings/profile?stripe=return`;
 const STRIPE_CONNECT_REFRESH_URL =
   process.env.STRIPE_CONNECT_REFRESH_URL ||
-  `${APP_ORIGIN}/settings/payments?stripe=refresh`;
+  `${APP_ORIGIN}/settings/profile?stripe=refresh`;
+const STRIPE_CONNECT_SETUP_URL =
+  process.env.STRIPE_CONNECT_SETUP_URL || "https://dashboard.stripe.com/connect";
+const STRIPE_CHECKOUT_RETURN_PATH =
+  process.env.STRIPE_CHECKOUT_RETURN_PATH || "/payments/return";
+
+const LOCAL_DEV_ORIGINS = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+];
+
+const ALLOWED_ORIGINS = Array.from(
+  new Set([APP_ORIGIN, ...LOCAL_DEV_ORIGINS].filter(Boolean)),
+);
 
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
 
@@ -36,16 +60,72 @@ const supabaseAdmin =
 // Allow local dev
 app.use(
   cors({
-    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
-    methods: ["GET", "POST"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
+    origin: (origin, callback) => {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error(`Origin ${origin} is not allowed by CORS.`));
+    },
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Authorization", "Content-Type"],
+    credentials: false,
+  }),
+);
+
+app.options("*", cors());
+
+app.post(
+  "/api/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    let event;
+    let webhookEventId = null;
+
+    try {
+      const stripeClient = requireStripe();
+      const webhookSecret = requireStripeWebhookSecret();
+      const signature = req.headers["stripe-signature"];
+
+      event = stripeClient.webhooks.constructEvent(
+        req.body,
+        signature,
+        webhookSecret,
+      );
+
+      const recordedEvent = await recordStripeWebhookEventStart(event);
+
+      if (recordedEvent.duplicate) {
+        return res.json({ received: true, duplicate: true });
+      }
+
+      webhookEventId = recordedEvent.id;
+
+      const processingStatus = await processStripeWebhookEvent(event);
+
+      await markStripeWebhookEventProcessed(webhookEventId, processingStatus);
+
+      return res.json({ received: true, status: processingStatus });
+    } catch (err) {
+      const message = String(err?.message || err);
+
+      await markStripeWebhookEventFailed(webhookEventId, message);
+
+      return res.status(400).json({
+        error: message,
+      });
+    }
+  },
 );
 
 app.use(express.json());
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true });
+  res.json({
+    ok: true,
+    service: "creator-hub-api",
+  });
 });
 
 let cachedToken = null;
@@ -314,6 +394,241 @@ const getStripeConnectAccountLink = async ({ stripeClient, accountId }) =>
     return_url: STRIPE_CONNECT_RETURN_URL,
     type: "account_onboarding",
   });
+
+const getStripeConnectSetupRequiredResponse = (message) => {
+  if (!/signed up for Connect|dashboard\.stripe\.com\/connect/i.test(message)) {
+    return null;
+  }
+
+  return {
+    status: 424,
+    body: {
+      code: "stripe_connect_platform_setup_required",
+      error:
+        "CreatorHub's Stripe platform account needs Connect setup before creator payout onboarding can start.",
+      actionUrl: STRIPE_CONNECT_SETUP_URL,
+    },
+  };
+};
+
+const CHECKOUT_OPENABLE_PAYMENT_STATUSES = new Set([
+  "requires_checkout",
+  "checkout_opened",
+  "failed",
+]);
+
+const getCheckoutReturnUrl = (paymentId) =>
+  `${APP_ORIGIN}${STRIPE_CHECKOUT_RETURN_PATH}?payment_id=${encodeURIComponent(
+    paymentId,
+  )}&session_id={CHECKOUT_SESSION_ID}`;
+
+const getListingRequestPaymentForCheckout = async (paymentId) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("listing_request_payments")
+    .select(
+      `
+      id,
+      listing_request_id,
+      related_entity_type,
+      related_entity_id,
+      payment_type,
+      status,
+      currency,
+      base_amount_cents,
+      creator_tip_cents,
+      buyer_service_fee_cents,
+      creator_platform_fee_cents,
+      platform_support_cents,
+      application_fee_cents,
+      total_checkout_cents,
+      buyer_service_fee_bps,
+      creator_platform_fee_bps,
+      buyer_service_fee_minimum_cents,
+      creator_platform_fee_minimum_cents,
+      payer_user_id,
+      creator_user_id,
+      stripe_connected_account_id,
+      stripe_checkout_session_id,
+      metadata,
+      created_at,
+      updated_at
+    `,
+    )
+    .eq("id", paymentId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data?.id) {
+    throw new Error("Payment record was not found.");
+  }
+
+  return data;
+};
+
+const getReadyCreatorPaymentAccount = async (creatorUserId) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("creator_payment_accounts")
+    .select(
+      "stripe_account_id, charges_enabled, payouts_enabled, details_submitted, default_currency",
+    )
+    .eq("user_id", creatorUserId)
+    .eq("provider", "stripe")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data?.stripe_account_id) {
+    throw new Error("Creator has not connected Stripe payouts.");
+  }
+
+  if (!data.details_submitted || !data.charges_enabled || !data.payouts_enabled) {
+    throw new Error("Creator Stripe account is not ready for payments.");
+  }
+
+  return data;
+};
+
+const assertCheckoutPaymentCanBeOpened = ({ payment, userId }) => {
+  if (payment.payer_user_id !== userId) {
+    throw new Error("Only the buyer for this payment can open checkout.");
+  }
+
+  if (!CHECKOUT_OPENABLE_PAYMENT_STATUSES.has(payment.status)) {
+    throw new Error("This payment is not available for checkout.");
+  }
+
+  if (payment.base_amount_cents <= 0 || payment.total_checkout_cents <= 0) {
+    throw new Error("This payment amount is invalid.");
+  }
+
+  if (payment.application_fee_cents >= payment.total_checkout_cents) {
+    throw new Error("This payment fee setup is invalid.");
+  }
+};
+
+const getPaymentCheckoutTitle = (payment) => {
+  const labelByType = {
+    one_time: "CreatorHub one-time payment",
+    starting_payment: "CreatorHub starting payment",
+    milestone_payment: "CreatorHub milestone payment",
+    change_order_payment: "CreatorHub change-order payment",
+    final_balance: "CreatorHub final balance",
+  };
+
+  return labelByType[payment.payment_type] || "CreatorHub project payment";
+};
+
+const getStripePaymentMetadata = (payment) => ({
+  creatorhub_payment_id: payment.id,
+  listing_request_id: payment.listing_request_id,
+  payment_type: payment.payment_type,
+  related_entity_type: payment.related_entity_type || "",
+  related_entity_id: payment.related_entity_id || "",
+});
+
+const getEmbeddedConnectAccountSessionComponents = () => ({
+  account_onboarding: {
+    enabled: true,
+    features: {
+      external_account_collection: true,
+    },
+  },
+});
+
+const getStripeAccountIdFromCreatorPaymentAccount = (account) =>
+  typeof account?.stripe_account_id === "string" &&
+    account.stripe_account_id.trim().length > 0
+    ? account.stripe_account_id.trim()
+    : null;
+
+const getStripeConnectAccountSummary = ({ account, existingAccount }) => ({
+  stripeAccountId: account.id,
+  chargesEnabled: Boolean(
+    "charges_enabled" in account
+      ? account.charges_enabled
+      : existingAccount?.charges_enabled,
+  ),
+  payoutsEnabled: Boolean(
+    "payouts_enabled" in account
+      ? account.payouts_enabled
+      : existingAccount?.payouts_enabled,
+  ),
+  detailsSubmitted: Boolean(
+    "details_submitted" in account
+      ? account.details_submitted
+      : existingAccount?.details_submitted,
+  ),
+  country: account.country || existingAccount?.country || null,
+  defaultCurrency:
+    account.default_currency || existingAccount?.default_currency || null,
+});
+
+const getOrCreateStripeAccountForEmbeddedConnect = async ({
+  stripeClient,
+  userId,
+  country,
+  defaultCurrency,
+}) => {
+  const existingAccount = await getExistingCreatorPaymentAccount(userId);
+  const existingStripeAccountId =
+    getStripeAccountIdFromCreatorPaymentAccount(existingAccount);
+
+  if (existingStripeAccountId) {
+    return {
+      account: {
+        id: existingStripeAccountId,
+        country: existingAccount.country,
+        default_currency: existingAccount.default_currency,
+        charges_enabled: existingAccount.charges_enabled,
+        payouts_enabled: existingAccount.payouts_enabled,
+        details_submitted: existingAccount.details_submitted,
+      },
+      existingAccount,
+      wasCreated: false,
+    };
+  }
+
+  const account = await stripeClient.accounts.create({
+    type: "express",
+    country,
+    default_currency: defaultCurrency,
+    capabilities: {
+      card_payments: {
+        requested: true,
+      },
+      transfers: {
+        requested: true,
+      },
+    },
+    metadata: {
+      creatorhub_user_id: userId,
+    },
+  });
+
+  await upsertCreatorPaymentAccount({
+    userId,
+    stripeAccount: account,
+  });
+
+  return {
+    account,
+    existingAccount: null,
+    wasCreated: true,
+  };
+};
 
 const signState = (payload) => {
   if (!OAUTH_STATE_SECRET) throw new Error("OAUTH_STATE_SECRET missing");
@@ -691,6 +1006,15 @@ app.post("/api/stripe/connect/start", async (req, res) => {
     });
   } catch (err) {
     const message = String(err?.message || err);
+    const connectSetupResponse =
+      getStripeConnectSetupRequiredResponse(message);
+
+    if (connectSetupResponse) {
+      return res
+        .status(connectSetupResponse.status)
+        .json(connectSetupResponse.body);
+    }
+
     const status = /session|authorization|approved creator/i.test(message)
       ? 401
       : 400;
@@ -738,6 +1062,270 @@ app.post("/api/stripe/connect/sync", async (req, res) => {
 
     return res.status(status).json({ error: message });
   }
+});
+
+app.post("/api/stripe/checkout/session", async (req, res) => {
+  try {
+    const stripeClient = requireStripe();
+    const userId = await requireSupabaseUserId(req);
+    const paymentId = String(req.body?.paymentId || "").trim();
+
+    if (!paymentId) {
+      return res.status(400).json({ error: "paymentId is required." });
+    }
+
+    const payment = await getListingRequestPaymentForCheckout(paymentId);
+
+    assertCheckoutPaymentCanBeOpened({ payment, userId });
+
+    const creatorPaymentAccount = await getReadyCreatorPaymentAccount(
+      payment.creator_user_id,
+    );
+
+    if (
+      payment.stripe_connected_account_id &&
+      payment.stripe_connected_account_id !==
+      creatorPaymentAccount.stripe_account_id
+    ) {
+      throw new Error("This payment is linked to a different Stripe account.");
+    }
+
+    const metadata = getStripePaymentMetadata(payment);
+
+    const session = await stripeClient.checkout.sessions.create(
+      {
+        mode: "payment",
+        ui_mode: "embedded_page",
+        client_reference_id: payment.id,
+        return_url: getCheckoutReturnUrl(payment.id),
+        line_items: [
+          {
+            price_data: {
+              currency: payment.currency,
+              unit_amount: payment.total_checkout_cents,
+              product_data: {
+                name: getPaymentCheckoutTitle(payment),
+                metadata,
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        payment_intent_data: {
+          application_fee_amount: payment.application_fee_cents,
+          metadata,
+        },
+        metadata,
+      },
+      {
+        stripeAccount: creatorPaymentAccount.stripe_account_id,
+      },
+    );
+
+    const { data, error } = await supabaseAdmin
+      .from("listing_request_payments")
+      .update({
+        status: "checkout_opened",
+        stripe_connected_account_id: creatorPaymentAccount.stripe_account_id,
+        stripe_checkout_session_id: session.id,
+        checkout_opened_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", payment.id)
+      .eq("payer_user_id", userId)
+      .select(
+        "id, status, stripe_connected_account_id, stripe_checkout_session_id",
+      )
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return res.json({
+      payment: data,
+      checkout: {
+        sessionId: session.id,
+        clientSecret: session.client_secret,
+      },
+    });
+  } catch (err) {
+    const message = String(err?.message || err);
+    const status = /session|authorization/i.test(message) ? 401 : 400;
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+app.get("/api/stripe/checkout/session-status", async (req, res) => {
+  try {
+    const stripeClient = requireStripe();
+    const userId = await requireSupabaseUserId(req);
+
+    const paymentId = String(
+      req.query.paymentId || req.query.payment_id || "",
+    ).trim();
+    const sessionId = String(
+      req.query.sessionId || req.query.session_id || "",
+    ).trim();
+
+    if (!paymentId) {
+      return res.status(400).json({ error: "paymentId is required." });
+    }
+
+    if (!sessionId) {
+      return res.status(400).json({ error: "sessionId is required." });
+    }
+
+    const { data: payment, error } = await supabaseAdmin
+      .from("listing_request_payments")
+      .select(
+        `
+        id,
+        status,
+        payment_type,
+        currency,
+        base_amount_cents,
+        creator_tip_cents,
+        buyer_service_fee_cents,
+        creator_platform_fee_cents,
+        platform_support_cents,
+        application_fee_cents,
+        total_checkout_cents,
+        payer_user_id,
+        creator_user_id,
+        stripe_connected_account_id,
+        stripe_checkout_session_id,
+        paid_at,
+        updated_at
+      `,
+      )
+      .eq("id", paymentId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!payment?.id) {
+      return res.status(404).json({ error: "Payment record was not found." });
+    }
+
+    if (
+      payment.payer_user_id !== userId &&
+      payment.creator_user_id !== userId
+    ) {
+      return res.status(403).json({
+        error: "You do not have access to this payment.",
+      });
+    }
+
+    if (!payment.stripe_connected_account_id) {
+      return res.status(400).json({
+        error: "Payment is missing a Stripe connected account.",
+      });
+    }
+
+    if (
+      payment.stripe_checkout_session_id &&
+      payment.stripe_checkout_session_id !== sessionId
+    ) {
+      return res.status(400).json({
+        error: "Checkout session does not match this payment.",
+      });
+    }
+
+    const session = await stripeClient.checkout.sessions.retrieve(
+      sessionId,
+      {},
+      {
+        stripeAccount: payment.stripe_connected_account_id,
+      },
+    );
+
+    return res.json({
+      payment,
+      checkout: {
+        sessionId: session.id,
+        status: session.status,
+        paymentStatus: session.payment_status,
+        customerEmail: session.customer_details?.email ?? null,
+      },
+    });
+  } catch (err) {
+    const message = String(err?.message || err);
+    const status = /session|authorization/i.test(message) ? 401 : 400;
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+app.post("/api/stripe/connect/account-session", async (req, res) => {
+  try {
+    const stripeClient = requireStripe();
+    const userId = await requireSupabaseUserId(req);
+
+    if (!stripeClient?.accounts?.create) {
+      return res.status(500).json({
+        error:
+          "Stripe accounts API is unavailable. Check the API Stripe package version and STRIPE_SECRET_KEY.",
+      });
+    }
+
+    if (!stripeClient?.accountSessions?.create) {
+      return res.status(500).json({
+        error:
+          "Stripe account sessions API is unavailable. Run `cd api && npm install stripe@latest`.",
+      });
+    }
+
+    await requireApprovedCreator(userId);
+
+    const country = normalizeCountryCode(req.body?.country || "CA");
+    const defaultCurrency = normalizeCurrencyCode(
+      req.body?.defaultCurrency || "cad",
+    );
+
+    const { account, existingAccount, wasCreated } =
+      await getOrCreateStripeAccountForEmbeddedConnect({
+        stripeClient,
+        userId,
+        country,
+        defaultCurrency,
+      });
+
+    const accountSession = await stripeClient.accountSessions.create({
+      account: account.id,
+      components: getEmbeddedConnectAccountSessionComponents(),
+    });
+
+    return res.json({
+      account: getStripeConnectAccountSummary({
+        account,
+        existingAccount,
+      }),
+      accountSession: {
+        clientSecret: accountSession.client_secret,
+        expiresAt: accountSession.expires_at,
+      },
+      meta: {
+        wasCreated,
+      },
+    });
+  } catch (err) {
+    const message = String(err?.message || err);
+    const status = /session|authorization/i.test(message) ? 401 : 400;
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+app.use((err, _req, res, _next) => {
+  console.error(err);
+
+  res.status(500).json({
+    error: err?.message || "Unexpected API error.",
+  });
 });
 
 app.listen(PORT, () => {
