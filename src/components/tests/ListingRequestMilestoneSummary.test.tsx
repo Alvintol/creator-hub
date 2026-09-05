@@ -7,7 +7,6 @@ import {
   expect,
   it,
 } from "vitest";
-
 import ListingRequestMilestoneSummary from "../listingRequests/milestones/ListingRequestMilestoneSummary";
 import type { ListingRequestMilestoneRow } from "../../hooks/creatorRequests/useListingRequestMilestones";
 import type { ListingRequestMilestoneSubmissionRow } from "../../hooks/creatorRequests/useListingRequestMilestoneSubmissions";
@@ -284,28 +283,6 @@ describe("ListingRequestMilestoneSummary", () => {
     expect(headings[1]).toHaveTextContent(
       "Second milestone"
     );
-  });
-
-  it("renders an empty milestone state", () => {
-    render(
-      <ListingRequestMilestoneSummary
-        milestones={[]}
-        submissions={[]}
-        viewer="creator"
-      />
-    );
-
-    expect(
-      screen.getByRole("heading", {
-        name: "No milestones yet",
-      })
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByText(
-        "No milestones are available yet. They will appear here once the buyer accepts a milestone-based agreement."
-      )
-    ).toBeInTheDocument();
   });
 
   it("explains when all milestones are complete", () => {

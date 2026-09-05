@@ -28,8 +28,79 @@ const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 const OAUTH_STATE_SECRET = process.env.OAUTH_STATE_SECRET || "";
 
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || "";
-const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
+const normalizeStripeKeyMode = (value) => {
+  const normalizedValue = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  if (
+    normalizedValue === "prod" ||
+    normalizedValue === "production" ||
+    normalizedValue === "live"
+  ) {
+    return "prod";
+  }
+
+  if (
+    normalizedValue === "dev" ||
+    normalizedValue === "development" ||
+    normalizedValue === "test"
+  ) {
+    return "dev";
+  }
+
+  return process.env.NODE_ENV === "production" ? "prod" : "dev";
+};
+
+const getStripeSecretKeyMode = (key) => {
+  if (key.startsWith("sk_live_")) {
+    return "prod";
+  }
+
+  if (key.startsWith("sk_test_")) {
+    return "dev";
+  }
+
+  return null;
+};
+
+const getStripeKeyConfig = () => {
+  const mode = normalizeStripeKeyMode(process.env.STRIPE_KEY_MODE);
+
+  const secretKey =
+    mode === "prod"
+      ? process.env.STRIPE_SECRET_KEY_PROD || ""
+      : process.env.STRIPE_SECRET_KEY_DEV || "";
+
+  const webhookSecret =
+    mode === "prod"
+      ? process.env.STRIPE_WEBHOOK_SECRET_PROD || ""
+      : process.env.STRIPE_WEBHOOK_SECRET_DEV || "";
+
+  const detectedSecretKeyMode = getStripeSecretKeyMode(secretKey);
+
+  if (
+    secretKey &&
+    detectedSecretKeyMode &&
+    detectedSecretKeyMode !== mode
+  ) {
+    throw new Error(
+      `Stripe secret key mode mismatch. STRIPE_KEY_MODE is "${mode}" but the selected key is "${detectedSecretKeyMode}".`,
+    );
+  }
+
+  return {
+    mode,
+    secretKey,
+    webhookSecret,
+  };
+};
+
+const STRIPE_KEY_CONFIG = getStripeKeyConfig();
+
+const STRIPE_KEY_MODE = STRIPE_KEY_CONFIG.mode;
+const STRIPE_SECRET_KEY = STRIPE_KEY_CONFIG.secretKey;
+const STRIPE_WEBHOOK_SECRET = STRIPE_KEY_CONFIG.webhookSecret;
 const STRIPE_CONNECT_RETURN_URL =
   process.env.STRIPE_CONNECT_RETURN_URL ||
   `${APP_ORIGIN}/settings/profile?stripe=return`;
@@ -94,10 +165,15 @@ app.post(
         webhookSecret,
       );
 
-      const recordedEvent = await recordStripeWebhookEventStart(event);
+      const recordedEvent =
+        await recordStripeWebhookEventStart(event);
 
-      if (recordedEvent.duplicate) {
-        return res.json({ received: true, duplicate: true });
+      if (!recordedEvent.shouldProcess) {
+        return res.json({
+          received: true,
+          duplicate: true,
+          status: "already_processed",
+        });
       }
 
       webhookEventId = recordedEvent.id;
@@ -125,6 +201,14 @@ app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
     service: "creator-hub-api",
+  });
+});
+
+app.get("/api/stripe/config", (_req, res) => {
+  res.json({
+    mode: STRIPE_KEY_MODE,
+    hasSecretKey: Boolean(STRIPE_SECRET_KEY),
+    hasWebhookSecret: Boolean(STRIPE_WEBHOOK_SECRET),
   });
 });
 
@@ -240,10 +324,549 @@ const requireSupabaseUserId = async (req) => {
 
 const requireStripe = () => {
   if (!stripe) {
-    throw new Error("Stripe is not configured");
+    throw new Error(
+      `Stripe ${STRIPE_KEY_MODE} secret key is not configured.`,
+    );
   }
 
   return stripe;
+};
+
+const requireStripeWebhookSecret = () => {
+  if (!STRIPE_WEBHOOK_SECRET) {
+    throw new Error(
+      `Stripe ${STRIPE_KEY_MODE} webhook secret is not configured.`,
+    );
+  }
+
+  return STRIPE_WEBHOOK_SECRET;
+};
+
+// Returns the connected Stripe account that emitted a Connect event.
+const getStripeEventAccountId = (event) =>
+  typeof event?.account === "string" && event.account.trim()
+    ? event.account.trim()
+    : null;
+
+// Use Stripe's event timestamp for payment lifecycle timestamps.
+const getStripeEventTimestamp = (event) =>
+  new Date(
+    (event?.created || Math.floor(Date.now() / 1000)) * 1000,
+  ).toISOString();
+
+// Payment ids are stored in Stripe metadata.
+// Checkout Sessions also use client_reference_id as a fallback.
+const getPaymentIdFromStripeObject = (stripeObject) =>
+  String(
+    stripeObject?.metadata?.creatorhub_payment_id ||
+    stripeObject?.client_reference_id ||
+    "",
+  ).trim();
+
+const getPaymentIntentIdFromCheckoutSession = (session) => {
+  if (typeof session?.payment_intent === "string") {
+    return session.payment_intent;
+  }
+
+  return session?.payment_intent?.id || null;
+};
+
+const getNextStripeEventIds = (payment, eventId) =>
+  Array.from(
+    new Set([
+      ...(payment?.stripe_event_ids || []),
+      eventId,
+    ]),
+  );
+
+// Record every webhook before applying any business logic.
+// Failed events remain retryable if Stripe sends them again.
+const recordStripeWebhookEventStart = async (event) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("stripe_webhook_events")
+    .insert({
+      stripe_event_id: event.id,
+      stripe_account_id: getStripeEventAccountId(event),
+      event_type: event.type,
+      processing_status: "processing",
+      payload: event,
+    })
+    .select("id, processing_status")
+    .single();
+
+  if (!error) {
+    return {
+      duplicate: false,
+      shouldProcess: true,
+      id: data.id,
+    };
+  }
+
+  // 23505 = unique violation.
+  // This means Stripe retried an event we already recorded.
+  if (error.code !== "23505") {
+    throw new Error(error.message);
+  }
+
+  const {
+    data: existingEvent,
+    error: existingEventError,
+  } = await supabaseAdmin
+    .from("stripe_webhook_events")
+    .select("id, processing_status")
+    .eq("stripe_event_id", event.id)
+    .maybeSingle();
+
+  if (existingEventError) {
+    throw new Error(existingEventError.message);
+  }
+
+  if (!existingEvent?.id) {
+    throw new Error(
+      "Existing Stripe webhook event could not be found.",
+    );
+  }
+
+  // Successfully handled events should remain idempotent.
+  if (
+    existingEvent.processing_status === "processed" ||
+    existingEvent.processing_status === "ignored"
+  ) {
+    return {
+      duplicate: true,
+      shouldProcess: false,
+      id: existingEvent.id,
+    };
+  }
+
+  // A previous attempt failed or stopped part-way through.
+  // Allow Stripe's retry to run the workflow again.
+  const { error: retryUpdateError } = await supabaseAdmin
+    .from("stripe_webhook_events")
+    .update({
+      processing_status: "processing",
+      error_message: null,
+      processed_at: null,
+    })
+    .eq("id", existingEvent.id);
+
+  if (retryUpdateError) {
+    throw new Error(retryUpdateError.message);
+  }
+
+  return {
+    duplicate: true,
+    shouldProcess: true,
+    id: existingEvent.id,
+  };
+};
+
+const markStripeWebhookEventProcessed = async (
+  eventId,
+  processingStatus = "processed",
+) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const { error } = await supabaseAdmin
+    .from("stripe_webhook_events")
+    .update({
+      processing_status: processingStatus,
+      error_message: null,
+      processed_at: new Date().toISOString(),
+    })
+    .eq("id", eventId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+// Do not let an error while recording the failure hide the
+// original webhook processing error.
+const markStripeWebhookEventFailed = async (
+  eventId,
+  errorMessage,
+) => {
+  if (!supabaseAdmin || !eventId) {
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("stripe_webhook_events")
+    .update({
+      processing_status: "failed",
+      error_message: errorMessage,
+      processed_at: new Date().toISOString(),
+    })
+    .eq("id", eventId);
+
+  if (error) {
+    console.error(
+      "[stripe] failed to record webhook error:",
+      error.message,
+    );
+  }
+};
+
+// Load the internal payment row used by webhook processing.
+const getPaymentWithStripeEventIds = async (paymentId) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("listing_request_payments")
+    .select(
+      `
+      id,
+      payment_type,
+      status,
+      stripe_event_ids,
+      stripe_connected_account_id,
+      stripe_checkout_session_id,
+      stripe_payment_intent_id,
+      paid_at
+    `,
+    )
+    .eq("id", paymentId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data?.id) {
+    throw new Error("Payment record was not found.");
+  }
+
+  return data;
+};
+
+// Apply project-workflow side effects only after Stripe has
+// confirmed that the ledger payment is paid.
+const applyPaidListingRequestPaymentWorkflow = async ({
+  paymentId,
+  paymentType,
+}) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  if (paymentType === "starting_payment") {
+    const { error } = await supabaseAdmin.rpc(
+      "apply_paid_listing_request_starting_payment",
+      {
+        p_listing_request_payment_id: paymentId,
+      },
+    );
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return;
+  }
+
+  // These will be connected in the next payment workflow patches:
+  // milestone_payment
+  // change_order_payment
+  // final_balance
+  // one_time
+};
+
+const markListingRequestPaymentProcessingFromCheckoutSession =
+  async ({ session, event }) => {
+    const paymentId = getPaymentIdFromStripeObject(session);
+
+    if (!paymentId) {
+      throw new Error(
+        "Stripe checkout session is missing CreatorHub payment metadata.",
+      );
+    }
+
+    const payment =
+      await getPaymentWithStripeEventIds(paymentId);
+
+    // Never downgrade an already-paid payment.
+    if (payment.status === "paid") {
+      return;
+    }
+
+    const { error } = await supabaseAdmin
+      .from("listing_request_payments")
+      .update({
+        status: "processing",
+
+        stripe_connected_account_id:
+          payment.stripe_connected_account_id ||
+          getStripeEventAccountId(event),
+
+        stripe_checkout_session_id:
+          payment.stripe_checkout_session_id ||
+          session.id,
+
+        stripe_payment_intent_id:
+          payment.stripe_payment_intent_id ||
+          getPaymentIntentIdFromCheckoutSession(session),
+
+        stripe_event_ids: getNextStripeEventIds(
+          payment,
+          event.id,
+        ),
+
+        processing_at: getStripeEventTimestamp(event),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", payment.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  };
+
+const markListingRequestPaymentPaidFromCheckoutSession =
+  async ({ session, event }) => {
+    const paymentId = getPaymentIdFromStripeObject(session);
+
+    if (!paymentId) {
+      throw new Error(
+        "Stripe checkout session is missing CreatorHub payment metadata.",
+      );
+    }
+
+    const payment =
+      await getPaymentWithStripeEventIds(paymentId);
+
+    const connectedAccountId =
+      getStripeEventAccountId(event);
+
+    const paymentIntentId =
+      getPaymentIntentIdFromCheckoutSession(session);
+
+    if (
+      payment.stripe_checkout_session_id &&
+      payment.stripe_checkout_session_id !== session.id
+    ) {
+      throw new Error(
+        "Stripe checkout session does not match this payment.",
+      );
+    }
+
+    if (
+      payment.stripe_connected_account_id &&
+      connectedAccountId &&
+      payment.stripe_connected_account_id !==
+      connectedAccountId
+    ) {
+      throw new Error(
+        "Stripe connected account does not match this payment.",
+      );
+    }
+
+    // The payment may already have been saved as paid while a
+    // downstream workflow RPC failed. Retry that workflow here.
+    if (payment.status === "paid") {
+      await applyPaidListingRequestPaymentWorkflow({
+        paymentId: payment.id,
+        paymentType: payment.payment_type,
+      });
+
+      return;
+    }
+
+    const { error } = await supabaseAdmin
+      .from("listing_request_payments")
+      .update({
+        status: "paid",
+
+        stripe_connected_account_id:
+          payment.stripe_connected_account_id ||
+          connectedAccountId,
+
+        stripe_checkout_session_id: session.id,
+
+        stripe_payment_intent_id:
+          payment.stripe_payment_intent_id ||
+          paymentIntentId,
+
+        stripe_event_ids: getNextStripeEventIds(
+          payment,
+          event.id,
+        ),
+
+        paid_at:
+          payment.paid_at ||
+          getStripeEventTimestamp(event),
+
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", payment.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    await applyPaidListingRequestPaymentWorkflow({
+      paymentId: payment.id,
+      paymentType: payment.payment_type,
+    });
+  };
+
+const markListingRequestPaymentCancelledFromCheckoutSession =
+  async ({ session, event }) => {
+    const paymentId = getPaymentIdFromStripeObject(session);
+
+    if (!paymentId) {
+      throw new Error(
+        "Stripe checkout session is missing CreatorHub payment metadata.",
+      );
+    }
+
+    const payment =
+      await getPaymentWithStripeEventIds(paymentId);
+
+    if (payment.status === "paid") {
+      return;
+    }
+
+    const { error } = await supabaseAdmin
+      .from("listing_request_payments")
+      .update({
+        status: "cancelled",
+
+        stripe_connected_account_id:
+          payment.stripe_connected_account_id ||
+          getStripeEventAccountId(event),
+
+        stripe_checkout_session_id:
+          payment.stripe_checkout_session_id ||
+          session.id,
+
+        stripe_payment_intent_id:
+          payment.stripe_payment_intent_id ||
+          getPaymentIntentIdFromCheckoutSession(session),
+
+        stripe_event_ids: getNextStripeEventIds(
+          payment,
+          event.id,
+        ),
+
+        cancelled_at: getStripeEventTimestamp(event),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", payment.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  };
+
+const markListingRequestPaymentFailedFromPaymentIntent =
+  async ({ paymentIntent, event }) => {
+    const paymentId =
+      getPaymentIdFromStripeObject(paymentIntent);
+
+    // Stripe may send PaymentIntent events unrelated to
+    // CreatorHub's payment ledger.
+    if (!paymentId) {
+      return;
+    }
+
+    const payment =
+      await getPaymentWithStripeEventIds(paymentId);
+
+    if (payment.status === "paid") {
+      return;
+    }
+
+    const { error } = await supabaseAdmin
+      .from("listing_request_payments")
+      .update({
+        status: "failed",
+
+        stripe_connected_account_id:
+          payment.stripe_connected_account_id ||
+          getStripeEventAccountId(event),
+
+        stripe_payment_intent_id:
+          payment.stripe_payment_intent_id ||
+          paymentIntent.id,
+
+        stripe_event_ids: getNextStripeEventIds(
+          payment,
+          event.id,
+        ),
+
+        failed_at: getStripeEventTimestamp(event),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", payment.id);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  };
+
+const processStripeWebhookEvent = async (event) => {
+  const stripeObject = event.data.object;
+
+  if (event.type === "checkout.session.completed") {
+    if (stripeObject.payment_status === "paid") {
+      await markListingRequestPaymentPaidFromCheckoutSession({
+        session: stripeObject,
+        event,
+      });
+    } else {
+      await markListingRequestPaymentProcessingFromCheckoutSession(
+        {
+          session: stripeObject,
+          event,
+        },
+      );
+    }
+
+    return "processed";
+  }
+
+  if (
+    event.type ===
+    "checkout.session.async_payment_succeeded"
+  ) {
+    await markListingRequestPaymentPaidFromCheckoutSession({
+      session: stripeObject,
+      event,
+    });
+
+    return "processed";
+  }
+
+  if (event.type === "checkout.session.expired") {
+    await markListingRequestPaymentCancelledFromCheckoutSession(
+      {
+        session: stripeObject,
+        event,
+      },
+    );
+
+    return "processed";
+  }
+
+  if (event.type === "payment_intent.payment_failed") {
+    await markListingRequestPaymentFailedFromPaymentIntent({
+      paymentIntent: stripeObject,
+      event,
+    });
+
+    return "processed";
+  }
+
+  return "ignored";
 };
 
 const normalizeCountryCode = (value) => {
@@ -1330,4 +1953,7 @@ app.use((err, _req, res, _next) => {
 
 app.listen(PORT, () => {
   console.log(`[api] listening on http://localhost:${PORT}`);
+  console.log(
+    `[stripe] mode=${STRIPE_KEY_MODE} secret=${STRIPE_SECRET_KEY ? "configured" : "missing"} webhook=${STRIPE_WEBHOOK_SECRET ? "configured" : "missing"}`,
+  );
 });
