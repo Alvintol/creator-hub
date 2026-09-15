@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   useListingRequestMilestones: vi.fn(),
   useListingRequestMilestoneSubmissions: vi.fn(),
   respondMilestone: vi.fn(),
+  useListingRequestPayments: vi.fn(),
 }));
 
 vi.mock(
@@ -28,6 +29,14 @@ vi.mock(
     useBuyerRequest:
       mocks.useBuyerRequest,
   })
+);
+
+vi.mock(
+  "../../hooks/payments/useListingRequestPayments",
+  () => ({
+    useListingRequestPayments:
+      mocks.useListingRequestPayments,
+  }),
 );
 
 vi.mock(
@@ -516,6 +525,32 @@ vi.mock(
   })
 );
 
+vi.mock(
+  "../../components/listingRequests/payments/ListingRequestPaymentsCard",
+  () => ({
+    default: ({
+      payments,
+      isLoading,
+      error,
+      readOnly,
+    }: {
+      payments: Array<{ id: string }>;
+      isLoading?: boolean;
+      error?: unknown;
+      readOnly?: boolean;
+    }) => (
+      <div>
+        Mock payments card: {payments.length} /{" "}
+        {isLoading ? "loading" : "ready"} /{" "}
+        {error !== null && error !== undefined
+          ? "error"
+          : "no error"}{" "}
+        / {readOnly ? "read-only" : "writable"}
+      </div>
+    ),
+  }),
+);
+
 const request = {
   id: "request-1",
   listing_id: "listing-1",
@@ -709,6 +744,12 @@ describe("<BuyerRequestDetails />", () => {
     });
 
     mocks.respondMilestone.mockResolvedValue(undefined);
+
+    mocks.useListingRequestPayments.mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+    });
   });
 
 
@@ -1742,6 +1783,81 @@ describe("<BuyerRequestDetails />", () => {
       screen.queryByRole("button", {
         name: /approve final delivery/i,
       })
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders payments after the buyer accepts the agreement", () => {
+    mocks.useBuyerRequest.mockReturnValue({
+      data: {
+        request: {
+          ...request,
+          status: "accepted",
+        },
+        creator: {
+          user_id: "creator-1",
+          handle: "creatoruser",
+          display_name: "Creator User",
+          avatar_url: null,
+        },
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "buyer_accepted",
+        starting_payment_status: "paid",
+        buyer_accepted_at:
+          "2026-06-06T12:00:00.000Z",
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestPayments.mockReturnValue({
+      data: [
+        {
+          id: "stripe-payment-1",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestPayments,
+    ).toHaveBeenCalledWith("request-1");
+
+    expect(
+      screen.getByText(
+        "Mock payments card: 1 / ready / no error / writable",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("does not load payments before the buyer accepts the agreement", () => {
+    mocks.useListingRequestAgreement.mockReturnValue({
+      data: {
+        ...agreement,
+        status: "sent",
+        buyer_accepted_at: null,
+      },
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(
+      mocks.useListingRequestPayments,
+    ).toHaveBeenCalledWith(null);
+
+    expect(
+      screen.queryByText(/Mock payments card:/),
     ).not.toBeInTheDocument();
   });
 });

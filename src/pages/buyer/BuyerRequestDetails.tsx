@@ -31,6 +31,8 @@ import ListingRequestMilestoneSummary from '../../components/listingRequests/mil
 import { canApproveListingRequestFinalDelivery, canApproveSubmittedListingRequestFinalDelivery, getHasAllMilestonePaymentsPaid, getListingRequestFinalDeliveryApprovalBlockedReason, getSubmittedListingRequestFinalDelivery } from '../../domain/listings/listingRequestFinalDeliveries';
 import { getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
 import { getSentListingRequestChangeOrder } from '../../domain/listings/listingRequestChangeOrders';
+import { useListingRequestPayments } from '../../hooks/payments/useListingRequestPayments';
+import ListingRequestPaymentsCard from '../../components/listingRequests/payments/ListingRequestPaymentsCard';
 
 const classes = {
   page: "space-y-6",
@@ -152,6 +154,12 @@ const BuyerRequestDetails = () => {
     buyerVisibleAgreement?.status === "buyer_accepted"
       ? request?.id ?? null
       : null
+  );
+
+  const paymentsQuery = useListingRequestPayments(
+    buyerVisibleAgreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null,
   );
 
   const changeOrdersQuery = useListingRequestChangeOrders(
@@ -529,6 +537,13 @@ const BuyerRequestDetails = () => {
       {buyerVisibleAgreement?.status ===
         "buyer_accepted" && (
           <>
+            <ListingRequestPaymentsCard
+              payments={paymentsQuery.data ?? []}
+              isLoading={paymentsQuery.isLoading}
+              error={paymentsQuery.error}
+              readOnly={requestReadOnly}
+            />
+
             {buyerVisibleAgreement.payment_structure ===
               "milestone_payments" && (
                 <>
