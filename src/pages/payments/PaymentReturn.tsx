@@ -95,8 +95,8 @@ const PaymentReturn = () => {
       )}
 
       <div className={classes.actions}>
-        <Link className={classes.btn} to="/buyer/requests">
-          Back to buyer requests
+        <Link className={classes.btn} to="/requests">
+          Back to requests
         </Link>
         <Link className={classes.btn} to="/messages">
           Open inbox

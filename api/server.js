@@ -527,6 +527,8 @@ const getPaymentWithStripeEventIds = async (paymentId) => {
       id,
       payment_type,
       status,
+      currency,
+      total_checkout_cents,
       stripe_event_ids,
       stripe_connected_account_id,
       stripe_checkout_session_id,
@@ -558,26 +560,28 @@ const applyPaidListingRequestPaymentWorkflow = async ({
     throw new Error("Supabase admin not configured");
   }
 
-  if (paymentType === "starting_payment") {
-    const { error } = await supabaseAdmin.rpc(
-      "apply_paid_listing_request_starting_payment",
-      {
-        p_listing_request_payment_id: paymentId,
-      },
-    );
+  const workflowRpcByPaymentType = {
+    starting_payment: "apply_paid_listing_request_starting_payment",
+    milestone_payment: "apply_paid_listing_request_milestone_payment",
+    change_order_payment:
+      "apply_paid_listing_request_change_order_payment",
+    final_balance: "apply_paid_listing_request_final_balance_payment",
+  };
 
-    if (error) {
-      throw new Error(error.message);
-    }
+  const rpcName = workflowRpcByPaymentType[paymentType];
 
+  if (!rpcName) {
+    // one_time payments have no downstream project workflow to apply yet.
     return;
   }
 
-  // These will be connected in the next payment workflow patches:
-  // milestone_payment
-  // change_order_payment
-  // final_balance
-  // one_time
+  const { error } = await supabaseAdmin.rpc(rpcName, {
+    p_listing_request_payment_id: paymentId,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
 };
 
 const markListingRequestPaymentProcessingFromCheckoutSession =
@@ -666,6 +670,27 @@ const markListingRequestPaymentPaidFromCheckoutSession =
     ) {
       throw new Error(
         "Stripe connected account does not match this payment.",
+      );
+    }
+
+    if (
+      typeof session.amount_total === "number" &&
+      typeof payment.total_checkout_cents === "number" &&
+      session.amount_total !== payment.total_checkout_cents
+    ) {
+      throw new Error(
+        "Stripe checkout session amount does not match this payment.",
+      );
+    }
+
+    if (
+      session.currency &&
+      payment.currency &&
+      String(session.currency).toLowerCase() !==
+      String(payment.currency).toLowerCase()
+    ) {
+      throw new Error(
+        "Stripe checkout session currency does not match this payment.",
       );
     }
 
@@ -1038,6 +1063,7 @@ const CHECKOUT_OPENABLE_PAYMENT_STATUSES = new Set([
   "requires_checkout",
   "checkout_opened",
   "failed",
+  "cancelled",
 ]);
 
 const getCheckoutReturnUrl = (paymentId) =>
@@ -1161,6 +1187,45 @@ const getStripePaymentMetadata = (payment) => ({
   related_entity_type: payment.related_entity_type || "",
   related_entity_id: payment.related_entity_id || "",
 });
+
+// Stripe checkout sessions are single-use and cannot be recreated, so
+// reopening checkout for the same payment (a page refresh, a second
+// browser tab, the buyer navigating back) should reuse the still-open
+// session instead of minting a new one for every request.
+const getReusableCheckoutSession = async ({
+  stripeClient,
+  payment,
+  stripeAccountId,
+}) => {
+  if (!payment.stripe_checkout_session_id) {
+    return null;
+  }
+
+  let existingSession;
+
+  try {
+    existingSession = await stripeClient.checkout.sessions.retrieve(
+      payment.stripe_checkout_session_id,
+      { stripeAccount: stripeAccountId },
+    );
+  } catch (error) {
+    // The session may be gone, expired past retrieval, or tied to a
+    // stale connected account. Fall through and create a fresh one.
+    return null;
+  }
+
+  if (existingSession.status === "complete") {
+    throw new Error(
+      "This payment has already been completed with Stripe. Refresh the page to see its latest status.",
+    );
+  }
+
+  if (existingSession.status !== "open") {
+    return null;
+  }
+
+  return existingSession;
+};
 
 const getEmbeddedConnectAccountSessionComponents = () => ({
   account_onboarding: {
@@ -1715,6 +1780,27 @@ app.post("/api/stripe/checkout/session", async (req, res) => {
 
     const metadata = getStripePaymentMetadata(payment);
 
+    const reusableSession = await getReusableCheckoutSession({
+      stripeClient,
+      payment,
+      stripeAccountId: creatorPaymentAccount.stripe_account_id,
+    });
+
+    if (reusableSession) {
+      return res.json({
+        payment: {
+          id: payment.id,
+          status: payment.status,
+          stripe_connected_account_id: creatorPaymentAccount.stripe_account_id,
+          stripe_checkout_session_id: reusableSession.id,
+        },
+        checkout: {
+          sessionId: reusableSession.id,
+          clientSecret: reusableSession.client_secret,
+        },
+      });
+    }
+
     const session = await stripeClient.checkout.sessions.create(
       {
         mode: "payment",
@@ -1742,6 +1828,7 @@ app.post("/api/stripe/checkout/session", async (req, res) => {
       },
       {
         stripeAccount: creatorPaymentAccount.stripe_account_id,
+        idempotencyKey: `checkout_session_${payment.id}_${payment.updated_at}`,
       },
     );
 
