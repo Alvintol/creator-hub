@@ -2,14 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import {
   canApproveListingRequestFinalDelivery,
+  canApproveSubmittedListingRequestFinalDelivery,
   canBuyerRespondToListingRequestFinalDelivery,
   canCreateNextListingRequestFinalDelivery,
   canSubmitListingRequestFinalDelivery,
+  getDraftListingRequestFinalDelivery,
   getHasAllMilestonePaymentsPaid,
+  getLatestListingRequestFinalDelivery,
   getListingRequestFinalDeliveryApprovalBlockedReason,
+  getListingRequestFinalDeliveryCreationBlockedReason,
   getListingRequestFinalDeliveryStatusLabel,
   getListingRequestFinalDeliveryStatusSummary,
   getListingRequestFinalDeliveryStatusTone,
+  getSubmittedListingRequestFinalDelivery,
   hasListingRequestFinalDeliveryContent,
   isListingRequestFinalDeliveryBuyerVisible,
 } from "../listings/listingRequestFinalDeliveries";
@@ -536,6 +541,260 @@ describe("listing request final deliveries", () => {
       getListingRequestFinalDeliveryApprovalBlockedReason(
         agreement
       )
+    ).toBeNull();
+  });
+
+  it("does not allow final delivery approval without a buyer-accepted agreement", () => {
+    expect(
+      canApproveListingRequestFinalDelivery(null)
+    ).toBe(false);
+
+    expect(
+      canApproveListingRequestFinalDelivery(
+        createAgreement({
+          status: "sent",
+        })
+      )
+    ).toBe(false);
+  });
+
+  it("only allows submitted final deliveries to be approved when payment blockers are clear", () => {
+    const agreement = createAgreement({
+      status: "buyer_accepted",
+      listing_request_payment_schedule_items: [],
+      listing_request_timeline_holds: [],
+    });
+
+    expect(
+      canApproveSubmittedListingRequestFinalDelivery(
+        "submitted",
+        agreement
+      )
+    ).toBe(true);
+
+    expect(
+      canApproveSubmittedListingRequestFinalDelivery(
+        "draft",
+        agreement
+      )
+    ).toBe(false);
+
+    expect(
+      canApproveSubmittedListingRequestFinalDelivery(
+        "revision_requested",
+        agreement
+      )
+    ).toBe(false);
+
+    expect(
+      canApproveSubmittedListingRequestFinalDelivery(
+        "buyer_approved",
+        agreement
+      )
+    ).toBe(false);
+  });
+
+  it("blocks submitted final delivery approval when payment blockers remain", () => {
+    const agreement = createAgreement({
+      status: "buyer_accepted",
+      listing_request_payment_schedule_items: [
+        {
+          payment_timing: "due_before_final_release",
+          status: "payment_required",
+          amount: 200,
+        },
+      ],
+    });
+
+    expect(
+      canApproveSubmittedListingRequestFinalDelivery(
+        "submitted",
+        agreement
+      )
+    ).toBe(false);
+  });
+
+  it("returns a creation blocked reason when the agreement is not ready", () => {
+    expect(
+      getListingRequestFinalDeliveryCreationBlockedReason(
+        null,
+        []
+      )
+    ).toBe(
+      "A buyer-accepted project agreement is required before final delivery can be created."
+    );
+
+    expect(
+      getListingRequestFinalDeliveryCreationBlockedReason(
+        createAgreement({
+          status: "sent",
+        }),
+        []
+      )
+    ).toBe(
+      "A buyer-accepted project agreement is required before final delivery can be created."
+    );
+
+    expect(
+      getListingRequestFinalDeliveryCreationBlockedReason(
+        createAgreement({
+          starting_payment_status: "payment_required",
+        }),
+        []
+      )
+    ).toBe(
+      "Starting payment must be resolved before final delivery can be created."
+    );
+  });
+
+  it("returns a creation blocked reason when milestone payments are incomplete", () => {
+    expect(
+      getListingRequestFinalDeliveryCreationBlockedReason(
+        createAgreement({
+          starting_payment_status: "not_required",
+          payment_structure: "milestone_payments",
+          listing_request_payment_schedule_items: [
+            {
+              payment_timing: "due_at_milestone_approval",
+              status: "payment_required",
+              amount: 150,
+            },
+          ],
+        }),
+        []
+      )
+    ).toBe(
+      "All milestone payments must be confirmed before final delivery can be created."
+    );
+  });
+
+  it("returns a creation blocked reason when a final delivery is already active", () => {
+    expect(
+      getListingRequestFinalDeliveryCreationBlockedReason(
+        createAgreement(),
+        [
+          createFinalDelivery({
+            status: "submitted",
+          }),
+        ]
+      )
+    ).toBe(
+      "A new final delivery can only be created after the previous delivery is revised or cancelled."
+    );
+  });
+
+  it("returns null when there is no latest final delivery", () => {
+    expect(
+      getLatestListingRequestFinalDelivery([])
+    ).toBeNull();
+  });
+
+  it("returns the latest final delivery by created date", () => {
+    const olderDelivery = createFinalDelivery({
+      id: "final-delivery-1",
+      status: "revision_requested",
+      created_at: "2026-06-09T12:00:00.000Z",
+    });
+
+    const newerDelivery = createFinalDelivery({
+      id: "final-delivery-2",
+      status: "submitted",
+      created_at: "2026-06-10T12:00:00.000Z",
+    });
+
+    expect(
+      getLatestListingRequestFinalDelivery([
+        olderDelivery,
+        newerDelivery,
+      ])
+    ).toEqual(newerDelivery);
+  });
+
+  it("uses the id as a stable latest final delivery tie-breaker", () => {
+    const firstDelivery = createFinalDelivery({
+      id: "final-delivery-1",
+      created_at: "2026-06-10T12:00:00.000Z",
+    });
+
+    const secondDelivery = createFinalDelivery({
+      id: "final-delivery-2",
+      created_at: "2026-06-10T12:00:00.000Z",
+    });
+
+    expect(
+      getLatestListingRequestFinalDelivery([
+        firstDelivery,
+        secondDelivery,
+      ])
+    ).toEqual(secondDelivery);
+  });
+
+  it("returns the latest draft final delivery", () => {
+    const olderDraft = createFinalDelivery({
+      id: "final-delivery-1",
+      status: "draft",
+      created_at: "2026-06-09T12:00:00.000Z",
+    });
+
+    const submittedDelivery = createFinalDelivery({
+      id: "final-delivery-2",
+      status: "submitted",
+      created_at: "2026-06-10T12:00:00.000Z",
+    });
+
+    const newerDraft = createFinalDelivery({
+      id: "final-delivery-3",
+      status: "draft",
+      created_at: "2026-06-11T12:00:00.000Z",
+    });
+
+    expect(
+      getDraftListingRequestFinalDelivery([
+        olderDraft,
+        submittedDelivery,
+        newerDraft,
+      ])
+    ).toEqual(newerDraft);
+  });
+
+  it("returns the latest submitted final delivery", () => {
+    const olderSubmittedDelivery = createFinalDelivery({
+      id: "final-delivery-1",
+      status: "submitted",
+      created_at: "2026-06-09T12:00:00.000Z",
+    });
+
+    const draftDelivery = createFinalDelivery({
+      id: "final-delivery-2",
+      status: "draft",
+      created_at: "2026-06-10T12:00:00.000Z",
+    });
+
+    const newerSubmittedDelivery = createFinalDelivery({
+      id: "final-delivery-3",
+      status: "submitted",
+      created_at: "2026-06-11T12:00:00.000Z",
+    });
+
+    expect(
+      getSubmittedListingRequestFinalDelivery([
+        olderSubmittedDelivery,
+        draftDelivery,
+        newerSubmittedDelivery,
+      ])
+    ).toEqual(newerSubmittedDelivery);
+  });
+
+  it("returns null when there is no submitted final delivery", () => {
+    expect(
+      getSubmittedListingRequestFinalDelivery([
+        createFinalDelivery({
+          status: "draft",
+        }),
+        createFinalDelivery({
+          status: "revision_requested",
+        }),
+      ])
     ).toBeNull();
   });
 });

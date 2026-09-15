@@ -27,3 +27,6 @@ dist-ssr
 .env.*
 *.local
 !.env.example
+
+# Local Claude Code / Cowork output, not part of the shipped app
+Claude outputs/

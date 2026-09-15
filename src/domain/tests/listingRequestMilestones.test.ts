@@ -10,10 +10,12 @@ import {
   canSubmitListingRequestMilestone,
   getActiveListingRequestMilestone,
   getListingRequestMilestonePlanTotal,
+  getListingRequestMilestonesAreComplete,
   getListingRequestMilestoneStatusLabel,
   getListingRequestMilestoneStatusSummary,
   getListingRequestMilestoneStatusTone,
   getOrderedListingRequestMilestones,
+  isListingRequestMilestoneTerminal,
   validateListingRequestMilestonePlan,
 } from "../listings/listingRequestMilestones";
 
@@ -320,5 +322,57 @@ describe("listing request milestones", () => {
         },
       ])
     ).toBeNull();
+  });
+
+  it("does not treat an empty milestone list as complete", () => {
+    expect(
+      getListingRequestMilestonesAreComplete([])
+    ).toBe(false);
+  });
+
+  it("treats paid and cancelled milestones as complete", () => {
+    expect(
+      getListingRequestMilestonesAreComplete([
+        {
+          status: "paid",
+        },
+        {
+          status: "cancelled",
+        },
+      ])
+    ).toBe(true);
+  });
+
+  it("does not treat pending milestone work as complete", () => {
+    expect(
+      getListingRequestMilestonesAreComplete([
+        {
+          status: "paid",
+        },
+        {
+          status: "payment_required",
+        },
+      ])
+    ).toBe(false);
+  });
+
+  it("identifies terminal milestone statuses", () => {
+    expect(
+      isListingRequestMilestoneTerminal("paid")
+    ).toBe(true);
+
+    expect(
+      isListingRequestMilestoneTerminal("cancelled")
+    ).toBe(true);
+
+    expect(
+      isListingRequestMilestoneTerminal("pending")
+    ).toBe(false);
+
+    expect(
+      isListingRequestMilestoneTerminal(
+        "payment_required"
+      )
+    ).toBe(false);
   });
 });

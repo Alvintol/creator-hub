@@ -1,4 +1,4 @@
-import { getOrderedListingRequestMilestones } from '../../../domain/listings/listingRequestMilestones';
+import { getOrderedListingRequestMilestones, isListingRequestMilestoneTerminal } from '../../../domain/listings/listingRequestMilestones';
 import type { ListingRequestMilestoneRow } from "../../../hooks/creatorRequests/useListingRequestMilestones";
 
 type ListingRequestMilestonePaymentAdminActionsProps = {
@@ -110,15 +110,15 @@ const getAdminMilestonePaymentStatusMessage = (
       } is waiting for creator submission.`;
   }
 
-  const allMilestonesPaid =
-    sortedMilestones.every(
-      (milestone) =>
-        milestone.status === "paid" ||
-        milestone.status === "cancelled"
+  const allMilestonesTerminal =
+    sortedMilestones.every((milestone) =>
+      isListingRequestMilestoneTerminal(
+        milestone.status
+      )
     );
 
-  if (allMilestonesPaid) {
-    return "All milestone payments have been confirmed.";
+  if (allMilestonesTerminal) {
+    return "All milestone payments have been confirmed or closed.";
   }
 
   return "No milestone payment is awaiting admin confirmation right now.";

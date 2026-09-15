@@ -7,7 +7,6 @@ import {
   expect,
   it,
 } from "vitest";
-
 import ListingRequestMilestoneSummary from "../listingRequests/milestones/ListingRequestMilestoneSummary";
 import type { ListingRequestMilestoneRow } from "../../hooks/creatorRequests/useListingRequestMilestones";
 import type { ListingRequestMilestoneSubmissionRow } from "../../hooks/creatorRequests/useListingRequestMilestoneSubmissions";
@@ -93,8 +92,14 @@ describe("ListingRequestMilestoneSummary", () => {
     );
 
     expect(
+      screen.getByRole("heading", {
+        name: "No milestones yet",
+      })
+    ).toBeInTheDocument();
+
+    expect(
       screen.getByText(
-        "No project milestones have been created for this agreement."
+        "No milestones are available yet. They will appear here once the buyer accepts a milestone-based agreement."
       )
     ).toBeInTheDocument();
   });
@@ -278,5 +283,95 @@ describe("ListingRequestMilestoneSummary", () => {
     expect(headings[1]).toHaveTextContent(
       "Second milestone"
     );
+  });
+
+  it("explains when all milestones are complete", () => {
+    render(
+      <ListingRequestMilestoneSummary
+        milestones={[
+          createMilestone({
+            id: "milestone-1",
+            status: "paid",
+            title: "Initial design direction",
+            sort_order: 0,
+          }),
+          createMilestone({
+            id: "milestone-2",
+            status: "paid",
+            title: "Completed project package",
+            sort_order: 1,
+          }),
+        ]}
+        submissions={[]}
+        viewer="buyer"
+      />
+    );
+
+    expect(
+      screen.getByText(
+        "All milestones are complete or closed. The creator can now prepare the final delivery."
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Initial design direction")
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Completed project package")
+    ).toBeInTheDocument();
+  });
+
+  it("uses admin completed milestone copy", () => {
+    render(
+      <ListingRequestMilestoneSummary
+        milestones={[
+          createMilestone({
+            status: "paid",
+          }),
+        ]}
+        submissions={[]}
+        viewer="admin"
+      />
+    );
+
+    expect(
+      screen.getByText(
+        "All milestones are complete or closed for this request."
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("treats cancelled milestones as terminal in the completed state", () => {
+    render(
+      <ListingRequestMilestoneSummary
+        milestones={[
+          createMilestone({
+            id: "milestone-1",
+            status: "paid",
+            title: "Initial design direction",
+            sort_order: 0,
+          }),
+          createMilestone({
+            id: "milestone-2",
+            status: "cancelled",
+            title: "Optional polish pass",
+            sort_order: 1,
+          }),
+        ]}
+        submissions={[]}
+        viewer="admin"
+      />
+    );
+
+    expect(
+      screen.getByText(
+        "All milestones are complete or closed for this request."
+      )
+    ).toBeInTheDocument();
+
+    expect(
+      screen.getByText("Optional polish pass")
+    ).toBeInTheDocument();
   });
 });

@@ -111,6 +111,11 @@ export const getListingRequestMilestonePlanTotal = (
     )
   );
 
+export const isListingRequestMilestoneTerminal = (
+  status: ListingRequestMilestoneStatus
+): boolean =>
+  status === "paid" || status === "cancelled";
+
 export const validateListingRequestMilestonePlan = (
   input: {
     estimatedWorkDays: number;
@@ -231,6 +236,19 @@ export const getActiveListingRequestMilestone = <
 ): TMilestone | null =>
   getOrderedListingRequestMilestones(milestones).find(
     (milestone) =>
-      milestone.status !== "paid" &&
-      milestone.status !== "cancelled"
+      !isListingRequestMilestoneTerminal(
+        milestone.status
+      )
   ) ?? null;
+
+export const getListingRequestMilestonesAreComplete = (
+  milestones: Array<{
+    status: ListingRequestMilestoneStatus;
+  }>
+): boolean =>
+  milestones.length > 0 &&
+  milestones.every((milestone) =>
+    isListingRequestMilestoneTerminal(
+      milestone.status
+    )
+  );

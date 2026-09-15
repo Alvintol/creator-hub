@@ -192,9 +192,42 @@ describe(
 
       expect(
         screen.getByText(
-          "All milestone payments have been confirmed."
+          "All milestone payments have been confirmed or closed."
         )
       ).toBeInTheDocument();
+    });
+
+    it("explains when milestone payments are closed because milestones are terminal", () => {
+      render(
+        <ListingRequestMilestonePaymentAdminActions
+          milestones={[
+            createMilestone({
+              status: "paid",
+              paid_at: "2026-06-18T14:00:00.000Z",
+            }),
+            createMilestone({
+              id: "milestone-2",
+              status: "cancelled",
+              title: "Optional polish pass",
+              sort_order: 1,
+              payment_schedule_item_id: "payment-2",
+            }),
+          ]}
+          onConfirmPayment={onConfirmPayment}
+        />
+      );
+
+      expect(
+        screen.getByText(
+          "All milestone payments have been confirmed or closed."
+        )
+      ).toBeInTheDocument();
+
+      expect(
+        screen.queryByRole("button", {
+          name: "Confirm milestone payment",
+        })
+      ).not.toBeInTheDocument();
     });
   }
 );

@@ -28,9 +28,11 @@ import { useListingRequestMilestoneSubmissions } from '../../hooks/creatorReques
 import { useListingRequestMilestones } from '../../hooks/creatorRequests/useListingRequestMilestones';
 import ListingRequestMilestoneBuyerActions from '../../components/listingRequests/milestones/ListingRequestMilestoneBuyerActions';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
-import { canApproveListingRequestFinalDelivery, getHasAllMilestonePaymentsPaid, getListingRequestFinalDeliveryApprovalBlockedReason } from '../../domain/listings/listingRequestFinalDeliveries';
+import { canApproveListingRequestFinalDelivery, canApproveSubmittedListingRequestFinalDelivery, getHasAllMilestonePaymentsPaid, getListingRequestFinalDeliveryApprovalBlockedReason, getSubmittedListingRequestFinalDelivery } from '../../domain/listings/listingRequestFinalDeliveries';
 import { getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
 import { getSentListingRequestChangeOrder } from '../../domain/listings/listingRequestChangeOrders';
+import { useListingRequestPayments } from '../../hooks/payments/useListingRequestPayments';
+import ListingRequestPaymentsCard from '../../components/listingRequests/payments/ListingRequestPaymentsCard';
 
 const classes = {
   page: "space-y-6",
@@ -154,6 +156,12 @@ const BuyerRequestDetails = () => {
       : null
   );
 
+  const paymentsQuery = useListingRequestPayments(
+    buyerVisibleAgreement?.status === "buyer_accepted"
+      ? request?.id ?? null
+      : null,
+  );
+
   const changeOrdersQuery = useListingRequestChangeOrders(
     buyerVisibleAgreement?.status === "buyer_accepted"
       ? request?.id ?? null
@@ -177,10 +185,9 @@ const BuyerRequestDetails = () => {
     finalDeliveriesQuery.data ?? [];
 
   const activeSubmittedFinalDelivery =
-    finalDeliveries.find(
-      (finalDelivery) =>
-        finalDelivery.status === "submitted"
-    ) ?? null;
+    getSubmittedListingRequestFinalDelivery(
+      finalDeliveries
+    );
 
   const milestones = milestonesQuery.data ?? [];
 
@@ -204,9 +211,12 @@ const BuyerRequestDetails = () => {
     );
 
   const canApproveFinalDelivery =
-    canApproveListingRequestFinalDelivery(
-      buyerVisibleAgreement
-    );
+    activeSubmittedFinalDelivery
+      ? canApproveSubmittedListingRequestFinalDelivery(
+        activeSubmittedFinalDelivery.status,
+        buyerVisibleAgreement
+      )
+      : false;
 
   const handleArchiveRequest = async () => {
     if (!request) {
@@ -527,6 +537,13 @@ const BuyerRequestDetails = () => {
       {buyerVisibleAgreement?.status ===
         "buyer_accepted" && (
           <>
+            <ListingRequestPaymentsCard
+              payments={paymentsQuery.data ?? []}
+              isLoading={paymentsQuery.isLoading}
+              error={paymentsQuery.error}
+              readOnly={requestReadOnly}
+            />
+
             {buyerVisibleAgreement.payment_structure ===
               "milestone_payments" && (
                 <>
