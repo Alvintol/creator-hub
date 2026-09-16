@@ -26,11 +26,11 @@ const brand = {
 const classes = {
   header: "topbar",
 
-  topRow: "mx-auto flex max-w-6xl items-center gap-3 px-4 py-2",
+  topRow: "container mx-auto flex items-center gap-4 px-4 py-3 sm:px-6",
   brandLink: "shrink-0 text-lg font-black tracking-tight",
-  brandWrap: "inline-flex items-center gap-2",
+  brandWrap: "inline-flex items-center gap-2.5",
   brandImg: "h-8 w-8 shrink-0",
-  brandText: "text-lg font-black tracking-tight",
+  brandText: "font-display text-lg font-extrabold tracking-tight",
   brandAccent: "text-[rgb(var(--brand))]",
 
   form: "flex w-full items-center gap-2",
@@ -53,8 +53,8 @@ const classes = {
 
   subbar: "subbar",
   subbarRow:
-    "mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2",
-  statement: "text-xs font-semibold text-zinc-800",
+    "container mx-auto flex items-center justify-between gap-3 px-4 py-2 sm:px-6",
+  statement: "text-xs font-medium text-zinc-500",
   aboutLink: "linkPill",
 
   categoryWrap: "categoryBar",
