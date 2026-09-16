@@ -657,8 +657,6 @@ const BuyerRequestDetails = () => {
 
       <RequestConversationThread
         requestId={request.id}
-        buyerUserId={request.buyer_user_id}
-        creatorUserId={request.creator_user_id}
         buyerLabel="You"
         creatorLabel={creatorText(
           creator,
