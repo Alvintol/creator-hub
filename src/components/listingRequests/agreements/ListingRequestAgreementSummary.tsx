@@ -18,25 +18,25 @@ const classes = {
   card: "card p-6",
   section: "space-y-4",
   header: "space-y-1",
-  title: "text-base font-extrabold tracking-tight",
+  title: "font-display text-base font-extrabold tracking-tight",
   h3: "text-sm font-extrabold text-zinc-900",
   text: "text-sm text-zinc-600",
   muted: "text-xs text-zinc-500",
   grid: "grid gap-4 sm:grid-cols-2",
   metaBlock: "space-y-1",
-  metaLabel: "text-xs font-bold uppercase tracking-wide text-zinc-500",
-  metaValue: "text-sm text-zinc-900",
+  metaLabel: "metaLabel",
+  metaValue: "metaValue",
   badge:
     "inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700",
   list: "space-y-2",
   item:
-    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700",
+    "notice noticeNeutral",
   itemTitle: "font-bold text-zinc-900",
   itemText: "mt-1 text-sm text-zinc-600",
   payment:
     "rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700",
   warning:
-    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900",
+    "notice noticeWarning",
 } as const;
 
 const formatMoney = (amount: number | null, currency: string): string => {

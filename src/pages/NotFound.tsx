@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 const classes = {
   wrap: "space-y-4",
-  h1: "text-2xl font-extrabold tracking-tight",
+  h1: "pageTitle",
   p: "text-sm text-zinc-600",
   btn: "btnPrimary",
 } as const;

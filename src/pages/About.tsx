@@ -4,13 +4,13 @@ const classes = {
   page: "space-y-8",
 
   hero: "card p-6",
-  h1: "text-3xl font-extrabold tracking-tight",
+  h1: "pageTitle",
   lead: "mt-2 text-sm text-zinc-600",
   heroActions: "mt-5 flex flex-wrap gap-3",
 
   grid: "grid gap-4 lg:grid-cols-2",
   section: "card p-6 space-y-3",
-  h2: "text-xl font-extrabold tracking-tight",
+  h2: "font-display text-xl font-extrabold tracking-tight",
   p: "text-sm text-zinc-700 leading-6",
 
   list: "space-y-2 text-sm text-zinc-700",

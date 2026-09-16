@@ -3,6 +3,7 @@ import CreatorCard, { type CreatorCardModel } from "../../components/creators/Cr
 import { normalizeTwitchLogin } from "../../domain/twitch";
 import { usePublicCreators, type PublicCreatorItem } from "../../hooks/usePublicCreators";
 import { useTwitchStreams } from "../../hooks/useTwitchStreams";
+import { StaggerGroup } from "../../lib/motion";
 import {
   useHubState,
   useHubActions,
@@ -14,7 +15,7 @@ const classes = {
   container: "space-y-5",
 
   headerWrap: "space-y-1",
-  h1: "text-2xl font-extrabold tracking-tight",
+  h1: "pageTitle",
   subtitle: "text-sm text-zinc-600",
 
   filtersGrid: "grid gap-3 md:grid-cols-3",
@@ -217,11 +218,11 @@ const CreatorsPage = () => {
         <div className={classes.emptyText}>No creators found.</div>
       )}
 
-      <div className={classes.cardsGrid}>
+      <StaggerGroup className={classes.cardsGrid} itemCount={filtered.length}>
         {filtered.map((creator) => (
           <CreatorCard key={creator.id} creator={creator} />
         ))}
-      </div>
+      </StaggerGroup>
     </div>
   );
 };

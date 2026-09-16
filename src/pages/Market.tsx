@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import ListingCard from "../components/listings/ListingCard";
+import { StaggerGroup } from "../lib/motion";
 import { normalizeTwitchLogin } from "../domain/twitch";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
 import { useMarketListings, type MarketListingItem } from "../hooks/listings/useMarketListings";
@@ -17,7 +18,7 @@ const classes = {
   page: "space-y-5",
 
   headerWrap: "space-y-1",
-  h1: "text-2xl font-extrabold tracking-tight",
+  h1: "pageTitle",
   subtitle: "text-sm text-zinc-600",
 
   filtersGrid: "grid gap-3 md:grid-cols-3",
@@ -218,7 +219,11 @@ const Market = () => {
         <div className={classes.emptyText}>No listings found.</div>
       )}
 
-      <div className={classes.grid}>
+      <StaggerGroup
+        className={classes.grid}
+        itemCount={filtered.length}
+        resetKey={search}
+      >
         {filtered.map((item) => {
           const { listing, creator, platformAccounts } = item;
 
@@ -252,7 +257,7 @@ const Market = () => {
             />
           );
         })}
-      </div>
+      </StaggerGroup>
     </div>
   );
 };

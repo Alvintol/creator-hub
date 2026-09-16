@@ -12,19 +12,19 @@ type ListingRequestMilestonePaymentAdminActionsProps = {
 
 const classes = {
   card:
-    "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm",
+    "card p-5",
   eyebrow:
     "text-xs font-semibold uppercase tracking-[0.2em] text-blue-600",
   title:
-    "mt-2 text-lg font-semibold text-slate-950",
+    "mt-2 font-display text-lg font-bold tracking-tight text-zinc-900",
   description:
-    "mt-2 text-sm leading-6 text-slate-600",
+    "mt-2 text-sm leading-6 text-zinc-600",
   actions:
     "mt-5 flex flex-wrap gap-3",
   button:
-    "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300",
+    "btnPrimary",
   error:
-    "mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700",
+    "notice noticeError mt-3",
 };
 
 const getErrorMessage = (

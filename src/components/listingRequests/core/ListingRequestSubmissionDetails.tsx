@@ -11,7 +11,7 @@ type ListingRequestSubmissionDetailsProps = {
 const classes = {
   section: "space-y-4",
   header: "space-y-1",
-  sectionTitle: "text-base font-extrabold tracking-tight",
+  sectionTitle: "sectionHeading",
   text: "text-sm text-zinc-600",
   titleBox:
     "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-bold text-zinc-900",
@@ -19,8 +19,8 @@ const classes = {
     "whitespace-pre-wrap rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700",
   metaGrid: "grid gap-4 sm:grid-cols-2",
   metaBlock: "space-y-1",
-  metaLabel: "text-xs font-bold uppercase tracking-wide text-zinc-500",
-  metaValue: "text-sm text-zinc-900",
+  metaLabel: "metaLabel",
+  metaValue: "metaValue",
   list: "space-y-2",
   link:
     "block rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-semibold text-zinc-700 hover:border-zinc-300 hover:bg-zinc-100",

@@ -1,3 +1,4 @@
+import { FadeIn } from "../../lib/motion";
 import { Link, useParams } from "react-router-dom";
 import { normalizeTwitchLogin } from "../../domain/twitch";
 import { useTwitchStreams } from "../../hooks/useTwitchStreams";
@@ -14,11 +15,11 @@ import { useActiveListingRequestForListing } from '../../hooks/listings/useActiv
 
 const classes = {
   notFoundWrap: "space-y-4",
-  h1: "text-2xl font-extrabold tracking-tight",
+  h1: "pageTitle",
   backBtn: "btnOutline",
 
   page: "space-y-6",
-  backLink: "text-sm font-semibold text-zinc-600 hover:text-zinc-900",
+  backLink: "backLink",
   loadingText: "text-sm text-zinc-600",
 
   grid: "grid gap-6 lg:grid-cols-2",
@@ -52,25 +53,25 @@ const classes = {
 
   metaText: "text-sm text-zinc-500",
   reportCard: "card p-5",
-  reportTitle: "text-base font-extrabold tracking-tight",
+  reportTitle: "font-display text-base font-extrabold tracking-tight",
   reportText: "mt-1 text-sm text-zinc-600",
   reportForm: "mt-4 space-y-3",
-  label: "text-sm font-bold text-zinc-900",
+  label: "formLabel",
   select:
-    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
+    "formControl",
   textarea:
-    "min-h-[110px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-60",
-  hint: "text-xs text-zinc-500",
+    "formControl min-h-[110px]",
+  hint: "formHint",
   successCard:
-    "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
+    "notice noticeSuccess",
   errorCard:
-    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+    "notice noticeError",
   btnPrimary:
-    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnPrimary",
   btnOutline:
-    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnOutline",
   btnDanger:
-    "inline-flex items-center justify-center rounded-full border border-red-600 bg-red-600 px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(220,38,38,0.24)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(220,38,38,0.32)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnDanger",
   field: "space-y-2",
   row: "flex flex-wrap items-center gap-3",
 } as const;
@@ -362,7 +363,7 @@ const ListingPage = () => {
                     Report listing
                   </button>
                 ) : (
-                  <>
+                  <FadeIn className="space-y-3">
                     <div className={classes.field}>
                       <label className={classes.label} htmlFor="listingReportReason">
                         Reason
@@ -429,7 +430,7 @@ const ListingPage = () => {
                         Cancel
                       </button>
                     </div>
-                  </>
+                  </FadeIn>
                 )}
               </div>
             )}

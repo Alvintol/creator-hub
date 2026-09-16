@@ -6,7 +6,7 @@ const classes = {
   favWrap: "absolute right-3 top-3",
 
   titleRow: "flex items-start gap-2",
-  h3: "text-base font-extrabold tracking-tight",
+  h3: "font-display text-base font-extrabold tracking-tight",
 
   badgeBase: "rounded-full border bg-white px-2 py-0.5 text-xs font-semibold",
   badgeVerified: "border-zinc-200",

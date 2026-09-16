@@ -4,6 +4,7 @@ import { CATEGORIES, type CategoryKey } from "../domain/catalog";
 import { normalizeTwitchLogin, type TwitchStream } from "../domain/twitch";
 import { usePublicCreators, type PublicCreatorItem } from "../hooks/usePublicCreators";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
+import { StaggerGroup } from "../lib/motion";
 
 type PlatformFilter = "all" | "twitch" | "youtube";
 
@@ -11,7 +12,7 @@ const classes = {
   page: "space-y-5",
 
   headerWrap: "space-y-1",
-  h1: "text-2xl font-extrabold tracking-tight",
+  h1: "pageTitle",
   subtitle: "text-sm text-zinc-600",
 
   filtersGrid: "grid gap-3 md:grid-cols-3",
@@ -24,7 +25,7 @@ const classes = {
   errorText: "mt-1 text-sm text-zinc-700",
 
   emptyCard: "card p-6",
-  emptyTitle: "text-base font-extrabold tracking-tight",
+  emptyTitle: "font-display text-base font-extrabold tracking-tight",
   emptyText: "mt-2 text-sm text-zinc-600",
   emptyActions: "mt-4 flex flex-wrap gap-3",
   btnOutline: "btnOutline",
@@ -36,7 +37,7 @@ const classes = {
 
   thumb: "mb-3 h-40 w-full rounded-2xl object-cover",
   topRow: "flex flex-wrap items-center gap-2",
-  name: "text-base font-extrabold tracking-tight",
+  name: "font-display text-base font-extrabold tracking-tight",
   badgeLive: "badge badgeLive",
 
   title: "mt-2 text-sm text-zinc-600",
@@ -204,7 +205,7 @@ const Live = () => {
           </div>
         </div>
       ) : (
-        <div className={classes.grid}>
+        <StaggerGroup className={classes.grid} itemCount={liveNow.length}>
           {liveNow.map(({ item, stream }) => {
             const thumb =
               stream.thumbnailUrl
@@ -272,7 +273,7 @@ const Live = () => {
               </div>
             );
           })}
-        </div>
+        </StaggerGroup>
       )}
     </div>
   );

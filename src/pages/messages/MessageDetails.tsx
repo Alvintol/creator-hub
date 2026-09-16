@@ -18,93 +18,119 @@ import { useMyModerationReports } from '../../hooks/moderation/useMyModerationRe
 import { useSubmitModerationReport } from '../../hooks/moderation/useSubmitModerationReport';
 import { useApproveBuyerImageUpload, useRequestBuyerImageUpload, useRevokeBuyerImageUpload } from '../../hooks/conversations/useConversationImagePermissions';
 import { useCloseConversation } from '../../hooks/conversations/useCloseConversation';
+import { Collapse, FadeIn, useStaggerIn } from "../../lib/motion";
+
+const fieldControl =
+  "w-full rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-[rgb(var(--brand)/0.45)] focus:ring-4 focus:ring-[rgb(var(--brand)/0.12)] disabled:cursor-not-allowed disabled:opacity-60";
+
+const ghostButton =
+  "inline-flex items-center justify-center rounded-full border border-zinc-200 bg-white px-3.5 py-1.5 text-xs font-semibold transition hover:border-zinc-300 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 const classes = {
-  page: "space-y-6",
-  backLink: "text-sm font-semibold text-zinc-600 hover:text-zinc-900",
+  card: "card overflow-hidden",
+  loadingCard: "card p-6",
+  header:
+    "flex flex-wrap items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 sm:px-6",
+  headerText: "space-y-0.5",
+  title: "font-display text-lg font-bold tracking-tight text-zinc-900",
+  sub: "pageSub",
+  headerActions: "flex flex-wrap items-center gap-2",
+  body: "space-y-4 p-5 sm:p-6",
 
-  card: "card p-6 space-y-4",
-  header: "space-y-1",
-  h1: "text-2xl font-extrabold tracking-tight",
-  title: "text-base font-extrabold tracking-tight",
-  sub: "text-sm text-zinc-600",
+  notice: "rounded-xl border px-4 py-3 text-sm",
+  statusBox: "border-zinc-200 bg-zinc-50 text-zinc-700",
+  warningBox: "border-amber-200 bg-amber-50 text-amber-800",
+  errorBox: "border-red-200 bg-red-50 text-red-700",
+  successBox: "border-emerald-200 bg-emerald-50 text-emerald-800",
 
-  statusBox:
-    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700",
-  warningBox:
-    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800",
-  errorBox:
-    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+  closedStatusTitle: "font-display text-sm font-bold text-zinc-900",
+  closedStatusList: "mt-2 grid gap-1 text-sm text-zinc-600",
+  closedStatusLabel: "font-semibold text-zinc-800",
 
-  thread: "space-y-3",
-  loadingText: "text-sm text-zinc-600",
+  thread:
+    "max-h-[34rem] min-h-[12rem] space-y-5 overflow-y-auto rounded-2xl bg-zinc-50/80 p-4 ring-1 ring-inset ring-zinc-100 sm:p-5",
+  loadingText: "text-sm text-zinc-500",
   empty:
-    "rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-5 text-sm text-zinc-600",
+    "flex min-h-[12rem] items-center justify-center rounded-2xl bg-zinc-50/80 px-4 text-center text-sm text-zinc-500 ring-1 ring-inset ring-zinc-100",
+  adminNote:
+    "rounded-xl border border-dashed border-zinc-300 px-4 py-3 text-center text-sm text-zinc-500",
 
-  messageRow: "flex",
-  messageRowOwn: "justify-end",
-  messageRowOther: "justify-start",
-  messageRowSystem: "justify-center",
+  messageRow: "group flex flex-col",
+  messageRowOwn: "items-end",
+  messageRowOther: "items-start",
+  messageRowSystem: "items-center",
+
+  messageMeta: "mb-1 flex flex-wrap items-center gap-1.5 px-1 text-xs text-zinc-500",
+  messageName: "font-semibold text-zinc-800",
+  messageRole:
+    "rounded-full bg-zinc-200/70 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider text-zinc-600",
 
   messageBubble:
-    "max-w-[min(100%,42rem)] rounded-2xl border px-4 py-3 shadow-sm",
-  messageBubbleOwn: "border-orange-200 bg-orange-50",
-  messageBubbleOther: "border-zinc-200 bg-white",
-  messageBubbleSystem:
-    "border-zinc-200 bg-zinc-50 text-center shadow-none",
+    "max-w-[min(100%,36rem)] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-6",
+  messageBubbleOwn:
+    "rounded-br-md bg-gradient-to-b from-zinc-800 to-zinc-900 text-white shadow-[0_6px_16px_-8px_rgb(17_17_20/0.45)]",
+  messageBubbleOther:
+    "rounded-bl-md border border-zinc-200 bg-white text-zinc-800 shadow-sm",
+  systemMessage:
+    "max-w-[min(100%,32rem)] rounded-full border border-zinc-200 bg-white px-3.5 py-1 text-center text-xs text-zinc-600",
+  systemMeta: "mb-1 text-[11px] text-zinc-400",
 
-  messageMeta:
-    "mb-1 flex flex-wrap items-center gap-2 text-xs font-semibold text-zinc-500",
-  messageRole: "uppercase tracking-wide",
-  messageBody: "whitespace-pre-wrap text-sm leading-6 text-zinc-800",
-  readReceipt: "mt-1 text-right text-xs font-semibold text-zinc-500",
+  readReceipt: "mt-1 px-1 text-[11px] font-medium text-zinc-400",
+  messageActions: "mt-1 px-1",
+  messageActionsHidden:
+    "mt-1 px-1 sm:opacity-0 sm:transition sm:group-hover:opacity-100 sm:focus-within:opacity-100",
+  reportLink:
+    "text-[11px] font-medium text-zinc-400 underline-offset-2 transition hover:text-red-600 hover:underline disabled:cursor-not-allowed disabled:no-underline disabled:hover:text-zinc-400",
 
-  form: "space-y-3 border-t border-zinc-200 pt-4",
-  textarea:
-    "min-h-[120px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-60",
-  formFooter: "flex flex-wrap items-center justify-between gap-3",
-  hint: "text-xs text-zinc-500",
-
-  btnPrimary:
-    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
-  field: "space-y-2",
-  label: "text-sm font-bold text-zinc-900",
-  select:
-    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
-
-  row: "flex flex-wrap items-center gap-3",
-  btnOutline:
-    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
-  btnDanger:
-    "inline-flex items-center justify-center rounded-full border border-red-300 bg-white px-5 py-3 text-sm font-bold text-red-700 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-red-400 hover:bg-red-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
-
-  messageActions: "mt-2 flex flex-wrap items-center gap-2",
-  tinyDangerButton:
-    "inline-flex items-center justify-center rounded-full border border-red-200 bg-white px-3 py-1 text-xs font-bold text-red-700 transition hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60",
-
-  reportBox:
-    "rounded-2xl border border-red-200 bg-red-50/70 px-4 py-4 text-sm text-red-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
-  reportTitle: "font-extrabold text-red-900",
   reportStatusBox:
-    "rounded-2xl border border-rose-300 bg-rose-100/70 my-2 px-4 py-3 text-sm text-zinc-800 shadow-[0_6px_18px_rgba(0,0,0,0.06)]",
-  reportStatusTitle: "font-extrabold text-zinc-900",
-  reportStatusText: "mt-1 text-sm font-semibold text-zinc-700",
-  successBox:
-    "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
-  chatUtilityBar:
-    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700",
-  chatUtilityHeader:
-    "flex flex-wrap items-center justify-between gap-3",
-  chatUtilityTitle: "text-sm font-extrabold text-zinc-900",
-  chatUtilityText: "mt-1 text-sm text-zinc-600",
-  chatUtilityActions: "flex flex-wrap items-center gap-2",
-  chatUtilityButton:
-    "inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-bold text-zinc-800 transition hover:border-zinc-400 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-60",
-  closedStatusBox:
-    "rounded-2xl border-2 border-zinc-300 bg-zinc-300/70 px-5 py-4 text-sm text-zinc-800 shadow-[0_100px_30px_rgba(0,0,0,0.08)]",
-  closedStatusTitle: "text-sm font-extrabold tracking-tight text-zinc-900",
-  closedStatusList: "mt-3 space-y-2 text-sm text-zinc-700",
-  closedStatusLabel: "font-semibold text-zinc-900",
+    "rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs text-rose-900",
+  messageReportStatusBox:
+    "mt-2 max-w-[min(100%,36rem)] rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-900",
+  reportStatusTitle: "font-semibold",
+  reportStatusText: "mt-0.5 text-rose-800/90",
+
+  panel: "space-y-4 rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4 sm:p-5",
+  dangerPanel: "space-y-4 rounded-2xl border border-red-200 bg-red-50/40 p-4 sm:p-5",
+  panelTitle: "font-display text-sm font-bold text-zinc-900",
+  field: "space-y-1.5",
+  label: "block text-sm font-semibold text-zinc-800",
+  hint: "formHint",
+  select: fieldControl,
+  textarea: `${fieldControl} min-h-[100px]`,
+  row: "flex flex-wrap items-center gap-2",
+
+  composer:
+    "rounded-2xl border border-zinc-200 bg-white shadow-sm transition focus-within:border-[rgb(var(--brand)/0.45)] focus-within:shadow-[0_0_0_4px_rgb(var(--brand)/0.12)]",
+  composerTextarea:
+    "block min-h-[96px] w-full resize-y rounded-t-2xl border-0 bg-transparent px-4 py-3 text-sm text-zinc-900 outline-none placeholder:text-zinc-400 disabled:cursor-not-allowed disabled:opacity-60",
+  composerFooter:
+    "flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 px-3 py-2.5",
+  composerTools: "flex min-w-0 flex-wrap items-center gap-2",
+  composerSend: "flex items-center gap-3",
+  counter: "text-xs tabular-nums text-zinc-400",
+  imageStatus:
+    "inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600",
+  imageStatusLabel: "font-semibold text-zinc-800",
+  imageNote: "px-1 text-xs text-zinc-500",
+
+  btnPrimary: "btnPrimary",
+  btnSend: "btnPrimary px-4 py-2",
+  btnOutline: "btnOutline",
+  btnDanger:
+    "btnDanger",
+  headerButton: `${ghostButton} text-zinc-700`,
+  headerDangerButton: `${ghostButton} text-red-600 hover:border-red-200 hover:bg-red-50`,
+  chatUtilityButton: `${ghostButton} py-1 text-zinc-700`,
+} as const;
+
+const notice = (tone: string) => `${classes.notice} ${tone}`;
+
+const pageClasses = {
+  page: "space-y-5",
+  backLink:
+    "inline-flex items-center gap-1.5 text-sm font-medium text-zinc-500 transition hover:text-zinc-900",
+  h1: "font-display text-2xl font-bold tracking-tight text-zinc-900",
+  participants: "text-sm text-zinc-500",
 } as const;
 
 const dateText = (value: string) => {
@@ -149,6 +175,9 @@ const MessageDetails = () => {
 
   const [reportReasonDetails, setReportReasonDetails] = useState("");
   const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [reportPanelType, setReportPanelType] =
+    useState<"conversation" | "message">("conversation");
+  const threadRef = useRef<HTMLDivElement>(null);
 
   const requestBuyerImageUploadMutation = useRequestBuyerImageUpload();
   const approveBuyerImageUploadMutation = useApproveBuyerImageUpload();
@@ -174,9 +203,7 @@ const MessageDetails = () => {
   const reportConversationMutation = useSubmitModerationReport();
   const closeConversationMutation = useCloseConversation();
 
-  const { data: myReports = [] } = useMyModerationReports(
-    conversation?.id ?? null
-  );
+  const { data: myReports = [] } = useMyModerationReports();
 
   const { data: participants = [] } = useConversationParticipants(
     conversation?.id ?? null
@@ -320,7 +347,11 @@ const MessageDetails = () => {
     !closeConversationMutation.isPending;
 
   const conversationReport =
-    myReports.find((report) => report.target_type === "conversation") ?? null;
+    myReports.find(
+      (report) =>
+        report.target_type === "conversation" &&
+        report.conversation_id === conversation?.id
+    ) ?? null;
 
   const getMessageReport = (messageId: string) =>
     myReports.find(
@@ -353,6 +384,7 @@ const MessageDetails = () => {
     if (hasReportedConversation) return;
 
     setReportSubmitted(false);
+    setReportPanelType("conversation");
     setReportTarget({
       type: "conversation",
       messageId: null,
@@ -365,6 +397,7 @@ const MessageDetails = () => {
     if (hasReportedMessage(messageId)) return;
 
     setReportSubmitted(false);
+    setReportPanelType("message");
     setReportTarget({
       type: "message",
       messageId,
@@ -517,9 +550,14 @@ const MessageDetails = () => {
     }
   };
 
+  useStaggerIn(threadRef, messages.length, {
+    resetKey: conversation?.id ?? null,
+    scrollToEnd: true,
+  });
+
   if (isConversationLoading) {
     return (
-      <div className={classes.card}>
+      <div className={classes.loadingCard}>
         <div className={classes.loadingText}>Loading conversation…</div>
       </div>
     );
@@ -527,164 +565,391 @@ const MessageDetails = () => {
 
   if (conversationError || !conversation) {
     return (
-      <div className={classes.card}>
-        <h1 className={classes.h1}>Conversation</h1>
-        <div className={classes.errorBox}>
+      <div className={`${classes.loadingCard} space-y-3`}>
+        <h1 className={pageClasses.h1}>Conversation</h1>
+        <div className={notice(classes.errorBox)}>
           Conversation could not be loaded right now.
         </div>
       </div>
     );
   }
 
+  const renderReportStatus = (
+    report: NonNullable<typeof conversationReport>,
+    title: string,
+    className: string
+  ) => (
+    <div className={className}>
+      <div className={classes.reportStatusTitle}>{title}</div>
+
+      <div className={classes.reportStatusText}>
+        Status: {getModerationReportStatusLabel(report.status)}
+      </div>
+
+      <div className={classes.reportStatusText}>
+        {report.reporter_status_message ||
+          getModerationReportStatusSummary(report.status)}
+      </div>
+
+      {report.reporter_status_updated_at && (
+        <div className={classes.reportStatusText}>
+          Last update: {dateText(report.reporter_status_updated_at)}
+        </div>
+      )}
+    </div>
+  );
 
   return (
-    <div className={classes.page}>
-      <Link to="/messages" className={classes.backLink}>
+    <div className={pageClasses.page}>
+      <Link to="/messages" className={pageClasses.backLink}>
         ← Back to messages
       </Link>
 
       <div className={classes.card}>
         <div className={classes.header}>
-          <h1 className={classes.h1}>
-            {listing?.title ?? conversation.subject ?? "Conversation"}
-          </h1>
+          <div className={classes.headerText}>
+            <h1 className={pageClasses.h1}>
+              {listing?.title ?? conversation.subject ?? "Conversation"}
+            </h1>
 
-          <p className={classes.sub}>
-            Topic:{" "}
-            {getConversationInitiationReasonLabel(
-              conversation.initiation_reason_code
-            )}
-          </p>
-
-          <p className={classes.sub}>
-            Client: {profileText(buyer, conversation.buyer_user_id)} · Creator:{" "}
-            {profileText(creator, conversation.creator_user_id)}
-          </p>
-        </div>
-
-        {conversation.status === "closed" && (
-          <div className={classes.closedStatusBox}>
-            <div className={classes.closedStatusTitle}>Conversation ended</div>
-
-            <div className={classes.closedStatusList}>
-              <div>
-                <span className={classes.closedStatusLabel}>Status:</span> This
-                conversation has been ended and is now read-only for both parties.
-              </div>
-
-              <div>
-                <span className={classes.closedStatusLabel}>Reason:</span>{" "}
-                {getConversationCloseReasonLabel(conversation.closed_reason_code)}
-              </div>
-
-              <div>
-                <span className={classes.closedStatusLabel}>Additional details:</span>{" "}
-                {conversation.closed_reason_details || "No additional details provided."}
-              </div>
-
-              {conversation.closed_at && (
-                <div>
-                  <span className={classes.closedStatusLabel}>Ended on:</span>{" "}
-                  {dateText(conversation.closed_at)}
-                </div>
+            <p className={classes.sub}>
+              Topic:{" "}
+              {getConversationInitiationReasonLabel(
+                conversation.initiation_reason_code
               )}
-            </div>
+            </p>
+
+            <p className={pageClasses.participants}>
+              Client: {profileText(buyer, conversation.buyer_user_id)} · Creator:{" "}
+              {profileText(creator, conversation.creator_user_id)}
+            </p>
           </div>
-        )}
 
-        {conversation.status === "admin_locked" && (
-          <div className={classes.warningBox}>
-            This conversation has been locked by an admin and is read-only.
-          </div>
-        )}
+          <div className={classes.headerActions}>
+            <button
+              className={classes.headerButton}
+              type="button"
+              onClick={openConversationReport}
+              disabled={hasReportedConversation || reportConversationMutation.isPending}
+            >
+              {getReportedConversationButtonText()}
+            </button>
 
-        {conversationReport && (
-          <div className={classes.reportStatusBox}>
-            <div className={classes.reportStatusTitle}>
-              Conversation report status
-            </div>
-
-            <div className={classes.reportStatusText}>
-              Status: {getModerationReportStatusLabel(conversationReport.status)}
-            </div>
-
-            <div className={classes.reportStatusText}>
-              {conversationReport.reporter_status_message ||
-                getModerationReportStatusSummary(conversationReport.status)}
-            </div>
-
-            {conversationReport.reporter_status_updated_at && (
-              <div className={classes.reportStatusText}>
-                Last update: {dateText(conversationReport.reporter_status_updated_at)}
-              </div>
+            {canCloseConversation && (
+              <button
+                className={classes.headerDangerButton}
+                type="button"
+                onClick={() => setShowCloseForm((current) => !current)}
+              >
+                {showCloseForm ? "Cancel ending conversation" : "End conversation"}
+              </button>
             )}
           </div>
-        )}
-
-        <div className={classes.row}>
-          <button
-            className={classes.btnOutline}
-            type="button"
-            onClick={openConversationReport}
-            disabled={hasReportedConversation || reportConversationMutation.isPending}
-          >
-            {getReportedConversationButtonText()}
-          </button>
         </div>
 
-        {areMessagesLoading ? (
-          <div className={classes.loadingText}>Loading messages…</div>
-        ) : messagesError ? (
-          <div className={classes.errorBox}>
-            Messages could not be loaded right now.
-          </div>
-        ) : messages.length > 0 ? (
-          <div className={classes.thread}>
-            {messages.map((message) => {
-              const isSystemMessage = message.message_type === "system";
-              const isOwnMessage = message.sender_user_id === currentUserId;
-              const messageReport = getMessageReport(message.id);
+        <div className={classes.body}>
+          {conversation.status === "closed" && (
+            <div className={notice(classes.statusBox)}>
+              <div className={classes.closedStatusTitle}>Conversation ended</div>
 
-              const rowClassName = `${classes.messageRow} ${isSystemMessage
-                ? classes.messageRowSystem
-                : isOwnMessage
-                  ? classes.messageRowOwn
-                  : classes.messageRowOther
-                }`;
+              <div className={classes.closedStatusList}>
+                <div>
+                  <span className={classes.closedStatusLabel}>Status:</span> This
+                  conversation has been ended and is now read-only for both parties.
+                </div>
 
-              const bubbleClassName = `${classes.messageBubble} ${isSystemMessage
-                ? classes.messageBubbleSystem
-                : isOwnMessage
-                  ? classes.messageBubbleOwn
-                  : classes.messageBubbleOther
-                }`;
+                <div>
+                  <span className={classes.closedStatusLabel}>Reason:</span>{" "}
+                  {getConversationCloseReasonLabel(conversation.closed_reason_code)}
+                </div>
 
-              return (
-                <div key={message.id} className={rowClassName}>
-                  <div className={bubbleClassName}>
-                    <div className={classes.messageMeta}>
+                <div>
+                  <span className={classes.closedStatusLabel}>Additional details:</span>{" "}
+                  {conversation.closed_reason_details || "No additional details provided."}
+                </div>
+
+                {conversation.closed_at && (
+                  <div>
+                    <span className={classes.closedStatusLabel}>Ended on:</span>{" "}
+                    {dateText(conversation.closed_at)}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {conversation.status === "admin_locked" && (
+            <div className={notice(classes.warningBox)}>
+              This conversation has been locked by an admin and is read-only.
+            </div>
+          )}
+
+          <Collapse open={canCloseConversation && showCloseForm}>
+            <div className={classes.dangerPanel}>
+              <div className={classes.panelTitle}>End conversation</div>
+
+              <div className={notice(classes.warningBox)}>
+                Ending this conversation will make the thread read-only for both
+                parties. The message history and reason will remain visible.
+              </div>
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="closeReason">
+                  Reason for ending conversation
+                </label>
+
+                <select
+                  id="closeReason"
+                  className={classes.select}
+                  value={closeReasonCode}
+                  onChange={(event) =>
+                    setCloseReasonCode(
+                      event.target.value as ConversationCloseReasonCode | ""
+                    )
+                  }
+                >
+                  <option value="">Choose a reason</option>
+
+                  {conversationCloseReasonOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="closeDetails">
+                  Additional details{isOtherCloseReason ? " *" : ""}
+                </label>
+
+                <textarea
+                  id="closeDetails"
+                  className={classes.textarea}
+                  value={closeReasonDetails}
+                  onChange={(event) => setCloseReasonDetails(event.target.value)}
+                  placeholder={
+                    isOtherCloseReason
+                      ? "Required. Explain why this conversation is being ended."
+                      : "Optional. Add context for both parties and admins."
+                  }
+                  maxLength={1000}
+                />
+
+                <div className={classes.hint}>
+                  {closeReasonDetailsTrimmed.length}/1000 characters.
+                  {isOtherCloseReason
+                    ? " Mandatory. Please explain why this conversation is being ended."
+                    : " Optional, but helpful for both parties and admins."}
+                </div>
+
+                {closeReasonDetailsError && (
+                  <div className={notice(classes.errorBox)}>{closeReasonDetailsError}</div>
+                )}
+              </div>
+
+              <div className={classes.row}>
+                <button
+                  className={classes.btnDanger}
+                  type="button"
+                  onClick={() => void handleCloseConversation()}
+                  disabled={!canConfirmCloseConversation}
+                >
+                  {closeConversationMutation.isPending
+                    ? "Ending conversation…"
+                    : "Confirm end conversation"}
+                </button>
+              </div>
+            </div>
+          </Collapse>
+
+          {closeConversationMutation.error && (
+            <FadeIn className={notice(classes.errorBox)}>
+              Conversation could not be ended right now.
+            </FadeIn>
+          )}
+
+          <Collapse open={Boolean(reportTarget)}>
+            <div className={classes.dangerPanel}>
+              <div className={classes.panelTitle}>
+                {reportPanelType === "message"
+                  ? "Report message"
+                  : "Report conversation"}
+              </div>
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="reportReason">
+                  Reason
+                </label>
+
+                <select
+                  id="reportReason"
+                  className={classes.select}
+                  value={reportReasonCode}
+                  onChange={(event) =>
+                    setReportReasonCode(
+                      event.target.value as ModerationReportReasonCode | ""
+                    )
+                  }
+                >
+                  <option value="">Choose a reason</option>
+
+                  {conversationModerationReportReasonOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="reportDetails">
+                  Additional details{isOtherReportReason ? " *" : ""}
+                </label>
+
+                <textarea
+                  id="reportDetails"
+                  className={classes.textarea}
+                  value={reportReasonDetails}
+                  onChange={(event) => setReportReasonDetails(event.target.value)}
+                  placeholder={
+                    isOtherReportReason
+                      ? "Required. Explain why this should be reviewed."
+                      : "Optional. Add context for the admin reviewing this report."
+                  }
+                  maxLength={1000}
+                />
+
+                <div className={classes.hint}>
+                  {reportReasonDetailsTrimmed.length}/1000 characters.
+                  {isOtherReportReason
+                    ? " Please provide a reason for the report."
+                    : " Optional unless you choose Other."}
+                </div>
+
+                {reportReasonDetailsError && (
+                  <div className={notice(classes.errorBox)}>{reportReasonDetailsError}</div>
+                )}
+              </div>
+
+              <div className={classes.row}>
+                <button
+                  className={classes.btnDanger}
+                  type="button"
+                  onClick={() => void handleSubmitReport()}
+                  disabled={!canSubmitReport}
+                >
+                  {reportConversationMutation.isPending
+                    ? "Submitting report…"
+                    : "Submit report"}
+                </button>
+
+                <button
+                  className={classes.btnOutline}
+                  type="button"
+                  onClick={closeReportForm}
+                  disabled={reportConversationMutation.isPending}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </Collapse>
+
+          {reportSubmitted && (
+            <FadeIn className={notice(classes.successBox)}>
+              Report submitted. An admin can review it.
+            </FadeIn>
+          )}
+
+          {reportConversationMutation.error && (
+            <FadeIn className={notice(classes.errorBox)}>
+              Report could not be submitted right now.
+            </FadeIn>
+          )}
+
+          {conversationReport &&
+            renderReportStatus(
+              conversationReport,
+              "Conversation report status",
+              classes.reportStatusBox
+            )}
+
+          {areMessagesLoading ? (
+            <div className={classes.empty}>
+              <span className={classes.loadingText}>Loading messages…</span>
+            </div>
+          ) : messagesError ? (
+            <div className={notice(classes.errorBox)}>
+              Messages could not be loaded right now.
+            </div>
+          ) : messages.length > 0 ? (
+            <div ref={threadRef} className={classes.thread}>
+              {messages.map((message) => {
+                const isSystemMessage = message.message_type === "system";
+                const isOwnMessage = message.sender_user_id === currentUserId;
+                const messageReport = getMessageReport(message.id);
+
+                if (isSystemMessage) {
+                  return (
+                    <div
+                      key={message.id}
+                      className={`${classes.messageRow} ${classes.messageRowSystem}`}
+                    >
+                      <div className={classes.systemMeta}>
+                        CreatorHub · {dateText(message.created_at)}
+                      </div>
+                      <div className={classes.systemMessage}>{message.body}</div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={message.id}
+                    className={`${classes.messageRow} ${isOwnMessage ? classes.messageRowOwn : classes.messageRowOther}`}
+                  >
+                    <div
+                      className={`${classes.messageMeta} ${isOwnMessage ? "justify-end" : ""}`}
+                    >
+                      <span className={classes.messageName}>
+                        {senderLabelText(message.sender_user_id)}
+                      </span>
+
                       <span className={classes.messageRole}>
-                        {isSystemMessage
-                          ? "System"
-                          : senderRoleText(message.sender_user_id)}
+                        {senderRoleText(message.sender_user_id)}
                       </span>
 
-                      <span>
-                        {isSystemMessage
-                          ? "CreatorHub"
-                          : senderLabelText(message.sender_user_id)}
-                      </span>
-
-                      <span>·</span>
+                      <span aria-hidden="true">·</span>
 
                       <span>{dateText(message.created_at)}</span>
                     </div>
 
-                    <div className={classes.messageBody}>{message.body}</div>
-                    {!isSystemMessage && !isOwnMessage && (
-                      <div className={classes.messageActions}>
+                    <div
+                      className={`${classes.messageBubble} ${isOwnMessage ? classes.messageBubbleOwn : classes.messageBubbleOther}`}
+                    >
+                      {message.body}
+                    </div>
+
+                    {message.id === latestReadOwnMessageId &&
+                      otherParticipantLabel &&
+                      otherParticipantLastReadAt && (
+                        <div className={classes.readReceipt}>
+                          Read by {otherParticipantLabel} ·{" "}
+                          {dateText(otherParticipantLastReadAt)}
+                        </div>
+                      )}
+
+                    {!isOwnMessage && (
+                      <div
+                        className={
+                          messageReport
+                            ? classes.messageActions
+                            : classes.messageActionsHidden
+                        }
+                      >
                         <button
-                          className={classes.tinyDangerButton}
+                          className={classes.reportLink}
                           type="button"
                           onClick={() => openMessageReport(message.id)}
                           disabled={
@@ -697,344 +962,87 @@ const MessageDetails = () => {
                       </div>
                     )}
 
-                    {messageReport && (
-                      <div className={classes.reportStatusBox}>
-                        <div className={classes.reportStatusTitle}>Message report status</div>
+                    {messageReport &&
+                      renderReportStatus(
+                        messageReport,
+                        "Message report status",
+                        classes.messageReportStatusBox
+                      )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className={classes.empty}>No messages yet.</div>
+          )}
 
-                        <div className={classes.reportStatusText}>
-                          Status: {getModerationReportStatusLabel(messageReport.status)}
-                        </div>
+          {sendMessageMutation.error && (
+            <FadeIn className={notice(classes.errorBox)}>
+              Message could not be sent. Please try again.
+            </FadeIn>
+          )}
 
-                        <div className={classes.reportStatusText}>
-                          {messageReport.reporter_status_message ||
-                            getModerationReportStatusSummary(messageReport.status)}
-                        </div>
+          {!readOnly && (
+            <>
+              {(requestBuyerImageUploadMutation.error ||
+                approveBuyerImageUploadMutation.error ||
+                revokeBuyerImageUploadMutation.error) && (
+                  <FadeIn className={notice(classes.errorBox)}>
+                    Image sharing permissions could not be updated right now.
+                  </FadeIn>
+                )}
 
-                        {messageReport.reporter_status_updated_at && (
-                          <div className={classes.reportStatusText}>
-                            Last update: {dateText(messageReport.reporter_status_updated_at)}
-                          </div>
-                        )}
-                      </div>
+              <Collapse open={showImageRequestForm && canRequestImageUpload}>
+                <div className={classes.panel}>
+                  <div className={classes.field}>
+                    <label className={classes.label} htmlFor="imageRequestNote">
+                      Why do you need to send images?
+                    </label>
+
+                    <textarea
+                      id="imageRequestNote"
+                      className={classes.textarea}
+                      value={imageRequestNote}
+                      onChange={(event) => setImageRequestNote(event.target.value)}
+                      placeholder="Optional. Explain what kind of reference images you want to send."
+                      maxLength={1000}
+                    />
+
+                    <div className={classes.hint}>
+                      {imageRequestNoteTrimmed.length}/1000 characters.
+                    </div>
+
+                    {imageRequestNoteError && (
+                      <div className={notice(classes.errorBox)}>{imageRequestNoteError}</div>
                     )}
-
-                    {message.id === latestReadOwnMessageId &&
-                      otherParticipantLabel &&
-                      otherParticipantLastReadAt && (
-                        <div className={classes.readReceipt}>
-                          Read by {otherParticipantLabel} ·{" "}
-                          {dateText(otherParticipantLastReadAt)}
-                        </div>
-                      )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className={classes.empty}>No messages yet.</div>
-        )}
-
-        {sendMessageMutation.error && (
-          <div className={classes.errorBox}>
-            Message could not be sent. Please try again.
-          </div>
-        )}
-
-        {reportSubmitted && (
-          <div className={classes.successBox}>
-            Report submitted. An admin can review it.
-          </div>
-        )}
-
-        {reportConversationMutation.error && (
-          <div className={classes.errorBox}>
-            Report could not be submitted right now.
-          </div>
-        )}
-
-        {closeConversationMutation.error && (
-          <div className={classes.errorBox}>
-            Conversation could not be ended right now.
-          </div>
-        )}
-
-        {reportTarget && (
-          <div className={classes.reportBox}>
-            <div className={classes.reportTitle}>
-              {reportTarget.type === "message"
-                ? "Report message"
-                : "Report conversation"}
-            </div>
-
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="reportReason">
-                Reason
-              </label>
-
-              <select
-                id="reportReason"
-                className={classes.select}
-                value={reportReasonCode}
-                onChange={(event) =>
-                  setReportReasonCode(
-                    event.target.value as ModerationReportReasonCode | ""
-                  )
-                }
-              >
-                <option value="">Choose a reason</option>
-
-                {conversationModerationReportReasonOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="reportDetails">
-                Additional details{isOtherReportReason ? " *" : ""}
-              </label>
-
-              <textarea
-                id="reportDetails"
-                className={classes.textarea}
-                value={reportReasonDetails}
-                onChange={(event) => setReportReasonDetails(event.target.value)}
-                placeholder={
-                  isOtherReportReason
-                    ? "Required. Explain why this should be reviewed."
-                    : "Optional. Add context for the admin reviewing this report."
-                }
-                maxLength={1000}
-              />
-
-              <div className={classes.hint}>
-                {reportReasonDetailsTrimmed.length}/1000 characters.
-                {isOtherReportReason
-                  ? " Please provide a reason for the report."
-                  : " Optional unless you choose Other."}
-              </div>
-
-              {reportReasonDetailsError && (
-                <div className={classes.errorBox}>{reportReasonDetailsError}</div>
-              )}
-            </div>
-
-            <div className={classes.row}>
-              <button
-                className={classes.btnDanger}
-                type="button"
-                onClick={() => void handleSubmitReport()}
-                disabled={!canSubmitReport}
-              >
-                {reportConversationMutation.isPending
-                  ? "Submitting report…"
-                  : "Submit report"}
-              </button>
-
-              <button
-                className={classes.btnOutline}
-                type="button"
-                onClick={closeReportForm}
-                disabled={reportConversationMutation.isPending}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {canCloseConversation && (
-          <div className={classes.form}>
-
-            {showCloseForm && (
-              <>
-                <div className={classes.warningBox}>
-                  Ending this conversation will make the thread read-only for both
-                  parties. The message history and reason will remain visible.
-                </div>
-
-                <div className={classes.field}>
-                  <label className={classes.label} htmlFor="closeReason">
-                    Reason for ending conversation
-                  </label>
-
-                  <select
-                    id="closeReason"
-                    className={classes.select}
-                    value={closeReasonCode}
-                    onChange={(event) =>
-                      setCloseReasonCode(
-                        event.target.value as ConversationCloseReasonCode | ""
-                      )
-                    }
-                  >
-                    <option value="">Choose a reason</option>
-
-                    {conversationCloseReasonOptions.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className={classes.field}>
-                  <label className={classes.label} htmlFor="closeDetails">
-                    Additional details{isOtherCloseReason ? " *" : ""}
-                  </label>
-
-                  <textarea
-                    id="closeDetails"
-                    className={classes.textarea}
-                    value={closeReasonDetails}
-                    onChange={(event) => setCloseReasonDetails(event.target.value)}
-                    placeholder={
-                      isOtherCloseReason
-                        ? "Required. Explain why this conversation is being ended."
-                        : "Optional. Add context for both parties and admins."
-                    }
-                    maxLength={1000}
-                  />
-
-                  <div className={classes.hint}>
-                    {closeReasonDetailsTrimmed.length}/1000 characters.
-                    {isOtherCloseReason
-                      ? " Mandatory. Please explain why this conversation is being ended."
-                      : " Optional, but helpful for both parties and admins."}
                   </div>
 
-                  {closeReasonDetailsError && (
-                    <div className={classes.errorBox}>{closeReasonDetailsError}</div>
-                  )}
-                </div>
-
-                <div className={classes.row}>
-                  <button
-                    className={classes.btnDanger}
-                    type="button"
-                    onClick={() => void handleCloseConversation()}
-                    disabled={!canConfirmCloseConversation}
-                  >
-                    {closeConversationMutation.isPending
-                      ? "Ending conversation…"
-                      : "Confirm end conversation"}
-                  </button>
-                </div>
-              </>
-            )}
-
-            {!readOnly && (
-              <div className={classes.form}>
-                <div className={classes.chatUtilityBar}>
-                  <div className={classes.chatUtilityHeader}>
-                    <div>
-                      <div className={classes.chatUtilityTitle}>Image sharing</div>
-
-                      <div className={classes.chatUtilityText}>
-                        {getBuyerImageUploadStatusLabel(conversation.buyer_image_upload_status)}
-                      </div>
-
-                      {conversation.buyer_image_upload_status === "requested" &&
-                        conversation.buyer_image_upload_request_note && (
-                          <div className={classes.chatUtilityText}>
-                            Client note: {conversation.buyer_image_upload_request_note}
-                          </div>
-                        )}
-                    </div>
-
-                    <div className={classes.chatUtilityActions}>
-                      {canRequestImageUpload && (
-                        <button
-                          className={classes.chatUtilityButton}
-                          type="button"
-                          onClick={() => setShowImageRequestForm((current) => !current)}
-                          disabled={isImageActionPending}
-                        >
-                          {showImageRequestForm ? "Cancel image request" : "Request images"}
-                        </button>
-                      )}
-
-                      {canApproveImageUpload && (
-                        <button
-                          className={classes.chatUtilityButton}
-                          type="button"
-                          onClick={() => void handleApproveImageUpload()}
-                          disabled={isImageActionPending}
-                        >
-                          {approveBuyerImageUploadMutation.isPending
-                            ? "Allowing…"
-                            : approveImageUploadButtonText}
-                        </button>
-                      )}
-
-                      {canRevokeImageUpload && (
-                        <button
-                          className={classes.chatUtilityButton}
-                          type="button"
-                          onClick={() => void handleRevokeImageUpload()}
-                          disabled={isImageActionPending}
-                        >
-                          {revokeBuyerImageUploadMutation.isPending
-                            ? "Disabling…"
-                            : "Disable images"}
-                        </button>
-                      )}
-                    </div>
+                  <div className={classes.row}>
+                    <button
+                      className={classes.btnPrimary}
+                      type="button"
+                      onClick={() => void handleRequestImageUpload()}
+                      disabled={Boolean(imageRequestNoteError) || isImageActionPending}
+                    >
+                      {requestBuyerImageUploadMutation.isPending
+                        ? "Sending request…"
+                        : "Send image request"}
+                    </button>
                   </div>
-
-                  {(requestBuyerImageUploadMutation.error ||
-                    approveBuyerImageUploadMutation.error ||
-                    revokeBuyerImageUploadMutation.error) && (
-                      <div className={classes.errorBox}>
-                        Image sharing permissions could not be updated right now.
-                      </div>
-                    )}
-
-                  {showImageRequestForm && canRequestImageUpload && (
-                    <div className={classes.form}>
-                      <div className={classes.field}>
-                        <label className={classes.label} htmlFor="imageRequestNote">
-                          Why do you need to send images?
-                        </label>
-
-                        <textarea
-                          id="imageRequestNote"
-                          className={classes.textarea}
-                          value={imageRequestNote}
-                          onChange={(event) => setImageRequestNote(event.target.value)}
-                          placeholder="Optional. Explain what kind of reference images you want to send."
-                          maxLength={1000}
-                        />
-
-                        <div className={classes.hint}>
-                          {imageRequestNoteTrimmed.length}/1000 characters.
-                        </div>
-
-                        {imageRequestNoteError && (
-                          <div className={classes.errorBox}>{imageRequestNoteError}</div>
-                        )}
-                      </div>
-
-                      <div className={classes.row}>
-                        <button
-                          className={classes.btnPrimary}
-                          type="button"
-                          onClick={() => void handleRequestImageUpload()}
-                          disabled={Boolean(imageRequestNoteError) || isImageActionPending}
-                        >
-                          {requestBuyerImageUploadMutation.isPending
-                            ? "Sending request…"
-                            : "Send image request"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
+              </Collapse>
+
+              {conversation.buyer_image_upload_status === "requested" &&
+                conversation.buyer_image_upload_request_note && (
+                  <div className={classes.imageNote}>
+                    Client note: {conversation.buyer_image_upload_request_note}
+                  </div>
+                )}
+
+              <div className={classes.composer}>
                 <textarea
-                  className={classes.textarea}
+                  aria-label="Message"
+                  className={classes.composerTextarea}
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   placeholder="Write a message…"
@@ -1042,38 +1050,80 @@ const MessageDetails = () => {
                   disabled={sendMessageMutation.isPending}
                 />
 
-                <div className={classes.formFooter}>
-                  <div className={classes.hint}>
-                    {trimmedBody.length}/2000 characters
+                <div className={classes.composerFooter}>
+                  <div className={classes.composerTools}>
+                    <span className={classes.imageStatus}>
+                      <span className={classes.imageStatusLabel}>Image sharing</span>
+                      {getBuyerImageUploadStatusLabel(conversation.buyer_image_upload_status)}
+                    </span>
+
+                    {canRequestImageUpload && (
+                      <button
+                        className={classes.chatUtilityButton}
+                        type="button"
+                        onClick={() => setShowImageRequestForm((current) => !current)}
+                        disabled={isImageActionPending}
+                      >
+                        {showImageRequestForm ? "Cancel image request" : "Request images"}
+                      </button>
+                    )}
+
+                    {canApproveImageUpload && (
+                      <button
+                        className={classes.chatUtilityButton}
+                        type="button"
+                        onClick={() => void handleApproveImageUpload()}
+                        disabled={isImageActionPending}
+                      >
+                        {approveBuyerImageUploadMutation.isPending
+                          ? "Allowing…"
+                          : approveImageUploadButtonText}
+                      </button>
+                    )}
+
+                    {canRevokeImageUpload && (
+                      <button
+                        className={classes.chatUtilityButton}
+                        type="button"
+                        onClick={() => void handleRevokeImageUpload()}
+                        disabled={isImageActionPending}
+                      >
+                        {revokeBuyerImageUploadMutation.isPending
+                          ? "Disabling…"
+                          : "Disable images"}
+                      </button>
+                    )}
                   </div>
 
-                  <button
-                    className={classes.btnPrimary}
-                    type="button"
-                    onClick={() => void handleSubmitMessage()}
-                    disabled={!canSubmit}
-                  >
-                    {sendMessageMutation.isPending ? "Sending…" : "Send message"}
-                  </button>
+                  <div className={classes.composerSend}>
+                    <span className={classes.counter}>
+                      {trimmedBody.length}/2000 characters
+                    </span>
+
+                    <button
+                      className={classes.btnSend}
+                      type="button"
+                      onClick={() => void handleSubmitMessage()}
+                      disabled={!canSubmit}
+                    >
+                      {sendMessageMutation.isPending ? "Sending…" : "Send message"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            )}
-
-
-            <div className={classes.row}>
-              <button
-                className={classes.btnDanger}
-                type="button"
-                onClick={() => setShowCloseForm((current) => !current)}
-              >
-                {showCloseForm ? "Cancel ending conversation" : "End conversation"}
-              </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-export default MessageDetails;
+// Remount per conversation so drafts and open forms never carry over to a different chat.
+const MessageDetailsPage = () => {
+  const { id } = useParams<{ id: string }>();
+
+  return <MessageDetails key={id} />;
+};
+
+export default MessageDetailsPage;

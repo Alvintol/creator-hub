@@ -1,3 +1,4 @@
+import { Collapse } from "../../../lib/motion";
 import { useState } from "react";
 
 import type { ListingRequestMilestoneRow } from "../../../hooks/creatorRequests/useListingRequestMilestones";
@@ -14,29 +15,29 @@ type ListingRequestMilestoneBuyerActionsProps = {
 
 const classes = {
   card:
-    "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm",
+    "card p-5",
   eyebrow:
     "text-xs font-semibold uppercase tracking-[0.2em] text-blue-600",
   title:
-    "mt-2 text-lg font-semibold text-slate-950",
+    "mt-2 font-display text-lg font-bold tracking-tight text-zinc-900",
   description:
-    "mt-2 text-sm leading-6 text-slate-600",
+    "mt-2 text-sm leading-6 text-zinc-600",
   actions:
     "mt-5 flex flex-wrap gap-3",
   primaryButton:
-    "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300",
+    "btnPrimary",
   secondaryButton:
-    "rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400",
+    "btnOutline",
   form:
     "mt-5 space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4",
   label:
-    "text-sm font-semibold text-slate-800",
+    "formLabel",
   textarea:
-    "min-h-28 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100",
+    "formControl min-h-28",
   help:
-    "text-xs leading-5 text-slate-500",
+    "formHint",
   error:
-    "mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700",
+    "notice noticeError mt-3",
 };
 
 const getErrorMessage = (error: unknown): string | null => {
@@ -269,7 +270,7 @@ const ListingRequestMilestoneBuyerActions = ({
         </button>
       </div>
 
-      {showRevisionForm && (
+      <Collapse open={showRevisionForm}>
         <div className={classes.form}>
           <label className={classes.label}>
             Revision notes
@@ -312,7 +313,7 @@ const ListingRequestMilestoneBuyerActions = ({
             </button>
           </div>
         </div>
-      )}
+      </Collapse>
     </section>
   );
 };

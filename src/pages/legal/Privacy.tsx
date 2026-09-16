@@ -3,14 +3,14 @@ import { privacySections, privacyVersion } from "../../domain/legal/privacyPolic
 const classes = {
   page: "space-y-6",
   header: "space-y-1",
-  h1: "text-2xl font-extrabold tracking-tight",
-  sub: "text-sm text-zinc-600",
+  h1: "pageTitle",
+  sub: "pageSub",
 
   card: "card p-6",
   meta: "text-xs text-zinc-500",
   sectionList: "space-y-5",
   section: "rounded-2xl border border-zinc-200 bg-white p-5",
-  sectionTitle: "text-base font-extrabold tracking-tight",
+  sectionTitle: "sectionHeading",
   sectionBody: "mt-3 space-y-3 text-sm text-zinc-700",
 } as const;
 

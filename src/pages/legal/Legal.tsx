@@ -3,11 +3,11 @@ import { Link } from "react-router-dom";
 const classes = {
   page: "space-y-6",
   header: "space-y-1",
-  h1: "text-2xl font-extrabold tracking-tight",
-  sub: "text-sm text-zinc-600",
+  h1: "pageTitle",
+  sub: "pageSub",
 
   card: "card p-6",
-  sectionTitle: "text-base font-extrabold tracking-tight",
+  sectionTitle: "sectionHeading",
   sectionText: "mt-1 text-sm text-zinc-600",
 
   linkList: "mt-4 grid gap-3 md:grid-cols-2",

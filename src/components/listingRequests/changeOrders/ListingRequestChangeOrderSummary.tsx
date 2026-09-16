@@ -25,14 +25,14 @@ const classes = {
   card: "card p-6",
   section: "space-y-4",
   header: "space-y-1",
-  title: "text-base font-extrabold tracking-tight",
+  title: "font-display text-base font-extrabold tracking-tight",
   text: "text-sm text-zinc-600",
   loading:
-    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm text-zinc-600",
+    "notice noticeNeutral",
   empty:
-    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm text-zinc-600",
+    "notice noticeNeutral",
   error:
-    "rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700",
+    "notice noticeError",
   list: "space-y-4",
   item:
     "rounded-2xl border border-zinc-200 bg-white px-4 py-4",
@@ -59,10 +59,10 @@ const classes = {
   metaGrid: "mt-4 grid gap-4 sm:grid-cols-2",
   metaBlock: "space-y-1",
   metaLabel:
-    "text-xs font-bold uppercase tracking-wide text-zinc-500",
+    "metaLabel",
   metaValue: "text-sm font-semibold text-zinc-900",
   response:
-    "mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800",
+    "notice noticeError mt-4",
 } as const;
 
 const getErrorMessage = (error: unknown): string =>

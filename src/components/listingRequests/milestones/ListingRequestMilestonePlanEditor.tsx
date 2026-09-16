@@ -28,9 +28,9 @@ const classes = {
   title: "text-sm font-extrabold text-zinc-900",
   text: "text-sm text-zinc-600",
   notice:
-    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900",
+    "notice noticeWarning",
   eligibleNotice:
-    "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900",
+    "notice noticeSuccess",
   list: "space-y-4",
   item:
     "space-y-4 rounded-2xl border border-zinc-200 bg-white p-4",
@@ -41,11 +41,11 @@ const classes = {
   grid: "grid gap-4 sm:grid-cols-2",
   field: "space-y-2",
   fullField: "space-y-2 sm:col-span-2",
-  label: "text-sm font-bold text-zinc-900",
+  label: "formLabel",
   input:
-    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-[rgb(var(--brand))] focus:ring-2 focus:ring-[rgba(244,92,44,0.18)] disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500",
+    "formControl",
   textarea:
-    "min-h-24 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-[rgb(var(--brand))] focus:ring-2 focus:ring-[rgba(244,92,44,0.18)] disabled:cursor-not-allowed disabled:bg-zinc-100 disabled:text-zinc-500",
+    "formControl min-h-24",
   summaryGrid: "grid gap-3 sm:grid-cols-3",
   summaryItem:
     "rounded-2xl border border-zinc-200 bg-white px-4 py-3",
@@ -61,9 +61,9 @@ const classes = {
     "space-y-1 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
   errorItem: "list-disc ml-5",
   btnOutline:
-    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-4 py-2 text-xs font-bold text-zinc-900 transition hover:border-zinc-500 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50",
+    "btnOutline btnSm",
   btnDanger:
-    "inline-flex items-center justify-center rounded-full border border-red-300 bg-white px-4 py-2 text-xs font-bold text-red-700 transition hover:border-red-400 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50",
+    "btnDangerOutline btnSm",
   btnAdd:
     "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-white px-5 py-3 text-sm font-bold text-[rgb(var(--brand))] transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-50",
 } as const;

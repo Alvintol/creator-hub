@@ -13,12 +13,12 @@ import { useAdminApplicantPlatformAccounts } from "../../hooks/admin/useAdminApp
 const classes = {
   page: "space-y-6",
   header: "space-y-1",
-  h1: "text-2xl font-extrabold tracking-tight",
-  sub: "text-sm text-zinc-600",
+  h1: "pageTitle",
+  sub: "pageSub",
 
   grid: "grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]",
   card: "card p-6",
-  title: "text-base font-extrabold tracking-tight",
+  title: "font-display text-base font-extrabold tracking-tight",
   help: "mt-1 text-sm text-zinc-600",
 
   queueList: "mt-4 space-y-3",
@@ -36,17 +36,17 @@ const classes = {
   pill: "chip",
 
   field: "space-y-2",
-  label: "text-sm font-extrabold text-zinc-800",
+  label: "formLabel",
   textarea:
     "w-full rounded-xl bg-white px-4 py-3 text-sm outline-none transition ring-1 ring-zinc-300/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/70",
   fieldHelp: "text-xs text-zinc-500",
 
   btnPrimary:
-    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnPrimary",
   btnOutline:
-    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnOutline",
   btnDanger:
-    "inline-flex items-center justify-center rounded-full border border-rose-300 bg-white px-5 py-3 text-sm font-bold text-rose-700 transition-all duration-200 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60",
+    "btnDangerOutline",
 
   sampleList: "space-y-3",
   sampleCard: "rounded-2xl border border-zinc-200 bg-white p-4",

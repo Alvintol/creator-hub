@@ -9,21 +9,21 @@ import {
 const classes = {
   page: "space-y-6",
   header: "space-y-1",
-  h1: "text-2xl font-extrabold tracking-tight",
-  sub: "text-sm text-zinc-600",
+  h1: "pageTitle",
+  sub: "pageSub",
 
   card: "card p-6",
   section: "space-y-4",
-  sectionTitle: "text-base font-extrabold tracking-tight",
+  sectionTitle: "sectionHeading",
   text: "text-sm text-zinc-600",
 
   filtersGrid: "grid gap-4 md:grid-cols-2 xl:grid-cols-4",
   field: "space-y-2",
-  label: "text-sm font-bold text-zinc-900",
+  label: "formLabel",
   input:
-    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
+    "formControl",
   select:
-    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
+    "formControl",
 
   row: "flex flex-wrap items-center gap-3",
   countText: "text-sm text-zinc-600",
@@ -33,13 +33,13 @@ const classes = {
   listingCard: "card p-5",
   listingTop: "flex flex-wrap items-start justify-between gap-3",
   listingTitleWrap: "space-y-1",
-  listingTitle: "text-lg font-extrabold tracking-tight",
+  listingTitle: "font-display text-lg font-extrabold tracking-tight",
   listingText: "text-sm text-zinc-600",
 
   metaGrid: "grid gap-3 sm:grid-cols-2",
   metaBlock: "space-y-1",
-  metaLabel: "text-xs font-bold uppercase tracking-wide text-zinc-500",
-  metaValue: "text-sm text-zinc-900",
+  metaLabel: "metaLabel",
+  metaValue: "metaValue",
 
   pills: "flex flex-wrap gap-2",
   pill: "chip",
@@ -51,15 +51,15 @@ const classes = {
     "rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700",
 
   btnPrimary:
-    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnPrimary",
   btnOutline:
-    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnOutline",
 
   loadingText: "text-sm text-zinc-600",
   errorCard:
-    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+    "notice noticeError",
 
-  backLink: "text-sm font-semibold text-zinc-600 hover:text-zinc-900",
+  backLink: "backLink",
 } as const;
 
 const initialFilters: AdminListingsFilters = {

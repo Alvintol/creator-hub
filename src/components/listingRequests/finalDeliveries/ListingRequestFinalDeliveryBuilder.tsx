@@ -38,15 +38,15 @@ const classes = {
   card: "card p-6",
   section: "space-y-5",
   header: "space-y-1",
-  title: "text-base font-extrabold tracking-tight",
+  title: "font-display text-base font-extrabold tracking-tight",
   text: "text-sm text-zinc-600",
   field: "space-y-2",
-  label: "text-sm font-bold text-zinc-900",
-  help: "text-xs text-zinc-500",
+  label: "formLabel",
+  help: "formHint",
   input:
-    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-[rgb(var(--brand))] focus:ring-2 focus:ring-[rgba(244,92,44,0.18)]",
+    "formControl",
   textarea:
-    "min-h-32 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-[rgb(var(--brand))] focus:ring-2 focus:ring-[rgba(244,92,44,0.18)]",
+    "formControl min-h-32",
   linksTextarea:
     "min-h-28 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-[rgb(var(--brand))] focus:ring-2 focus:ring-[rgba(244,92,44,0.18)]",
   submitRow:
@@ -54,13 +54,13 @@ const classes = {
   checkbox: "mt-1 h-4 w-4 rounded border-zinc-300",
   checkboxLabel: "text-sm font-semibold text-zinc-800",
   notice:
-    "rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900",
+    "notice noticeWarning",
   actions: "flex flex-wrap items-center gap-3",
   btnPrimary:
-    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
-  errorText: "text-xs font-semibold text-red-600",
+    "btnPrimary",
+  errorText: "formError",
   errorBox:
-    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+    "notice noticeError",
 } as const;
 
 const defaultFormState: BuilderFormState = {
