@@ -1,60 +1,59 @@
+import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { useMessagesInbox } from "../../hooks/conversations/useMessagesInbox";
 import { useMyModerationReports } from '../../hooks/moderation/useMyModerationReports';
 import { getConversationDisplayContext, getConversationDisplayTitle } from '../../domain/conversations/conversationDisplay';
+import { useStaggerIn } from "../../lib/motion";
+
+const pill = "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold";
 
 const classes = {
   page: "space-y-6",
-  header: "space-y-1",
-  h1: "text-2xl font-extrabold tracking-tight",
-  sub: "text-sm text-zinc-600",
+  header: "flex flex-wrap items-end justify-between gap-4",
+  headerText: "space-y-1",
+  h1: "font-display text-3xl font-bold tracking-tight text-zinc-900",
+  sub: "text-sm text-zinc-500",
 
-  grid: "grid gap-4 lg:grid-cols-2",
-  card: "card p-5",
-  titleRow: "flex flex-wrap items-start justify-between gap-3",
-  title: "text-lg font-extrabold tracking-tight",
-  text: "text-sm text-zinc-600",
+  summaryBox: "text-sm text-zinc-500",
+  summaryStrong: "font-semibold text-zinc-900",
 
-  metaGrid: "grid gap-3 sm:grid-cols-2",
-  metaBlock: "space-y-1",
-  metaLabel: "text-xs font-bold uppercase tracking-wide text-zinc-500",
-  metaValue: "text-sm text-zinc-900",
-
-  unreadPill:
-    "inline-flex rounded-full border border-orange-200 bg-orange-50 px-3 py-1 text-xs font-bold text-orange-800",
-  statusPill:
-    "inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700",
-
-  activityBox:
-    "rounded-2xl border border-zinc-200 bg-zinc-50 my-2 px-4 py-3 text-sm text-zinc-700",
-  activityTitle: "text-xs font-bold uppercase tracking-wide text-zinc-500",
-  activityText: "mt-1 text-sm text-zinc-800",
-
-  row: "flex flex-wrap items-center gap-3",
-  btnPrimary:
-    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
-
-  loadingText: "text-sm text-zinc-600",
-  errorCard:
-    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
-  summaryBox:
-    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-700",
-  summaryStrong: "font-extrabold text-zinc-900",
   moderationNav:
-    "rounded-2xl border border-zinc-200 bg-white px-4 py-3 shadow-sm",
-  moderationNavInner:
-    "flex flex-wrap items-center justify-between gap-3",
-  moderationNavTextWrap: "space-y-1",
-  moderationNavTitle: "text-sm font-extrabold text-zinc-900",
-  moderationNavText: "text-sm text-zinc-600",
-  btnOutline:
-    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
-  reportCountPill:
-    "inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800",
-  reportCountPillEmpty:
-    "inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700",
-  reportUpdatePill:
-    "inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800",
+    "card flex flex-wrap items-center justify-between gap-4 px-5 py-4",
+  moderationNavTextWrap: "space-y-0.5",
+  moderationNavTitle: "font-display text-sm font-bold text-zinc-900",
+  moderationNavText: "text-sm text-zinc-500",
+  row: "flex flex-wrap items-center gap-2",
+  reportCountPill: `${pill} bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200`,
+  reportCountPillEmpty: `${pill} bg-zinc-100 text-zinc-600`,
+  reportUpdatePill: `${pill} bg-blue-600 text-white`,
+  btnOutline: "btnOutline px-4 py-2",
+
+  list: "space-y-3",
+  item:
+    "card group flex flex-col gap-4 p-5 sm:flex-row sm:items-center",
+  itemUnread: "ring-1 ring-[rgb(var(--brand)/0.25)]",
+  avatar:
+    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-zinc-800 to-zinc-950 font-display text-sm font-bold uppercase text-white",
+  itemMain: "min-w-0 flex-1 space-y-1.5",
+  titleRow: "flex flex-wrap items-center gap-2",
+  title: "truncate font-display text-base font-bold tracking-tight text-zinc-900",
+  unreadPill: `${pill} bg-[rgb(var(--brand))] text-white`,
+  metaLine: "flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-500",
+  metaDot: "text-zinc-300",
+  text: "text-sm text-zinc-500",
+  preview:
+    "line-clamp-2 rounded-xl bg-zinc-50 px-3 py-2 text-sm text-zinc-700 ring-1 ring-inset ring-zinc-100",
+  previewFrom: "font-semibold text-zinc-900",
+  itemSide:
+    "flex shrink-0 flex-row items-center justify-between gap-3 sm:flex-col sm:items-end",
+  statusPill: `${pill} bg-zinc-100 text-zinc-700`,
+  updated: "text-xs text-zinc-400",
+  btnPrimary: "btnPrimary px-4 py-2",
+
+  loadingText: "text-sm text-zinc-500",
+  errorCard:
+    "rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+  emptyCard: "card px-6 py-12 text-center",
 } as const;
 
 const dateTimeText = (value: string | null) => {
@@ -149,60 +148,66 @@ const MessagesInbox = () => {
       ? "1 new report update"
       : `${unreadReportUpdateCount} new report updates`;
 
+
+  const listRef = useRef<HTMLDivElement>(null);
+  useStaggerIn(listRef, items.length);
+
+  const hasItems = !isLoading && !error && items.length > 0;
+
   return (
     <div className={classes.page}>
       <div className={classes.header}>
-        <h1 className={classes.h1}>Messages</h1>
+        <div className={classes.headerText}>
+          <h1 className={classes.h1}>Messages</h1>
 
-        <p className={classes.sub}>
-          Messages, listing inquiries, creator inquiries, and request conversations.
-        </p>
+          <p className={classes.sub}>
+            Messages, listing inquiries, creator inquiries, and request conversations.
+          </p>
+        </div>
+
+        {!isLoading && !error && (
+          <div className={classes.summaryBox}>
+            <span className={classes.summaryStrong}>
+              {totalUnreadCount}
+            </span>{" "}
+            unread {totalUnreadCount === 1 ? "message" : "messages"} across{" "}
+            <span className={classes.summaryStrong}>{items.length}</span>{" "}
+            {items.length === 1 ? "conversation" : "conversations"}.
+          </div>
+        )}
       </div>
 
       <div className={classes.moderationNav}>
-        <div className={classes.moderationNavInner}>
-          <div className={classes.moderationNavTextWrap}>
-            <div className={classes.moderationNavTitle}>Moderation reports</div>
+        <div className={classes.moderationNavTextWrap}>
+          <div className={classes.moderationNavTitle}>Moderation reports</div>
 
-            <p className={classes.moderationNavText}>
-              Track reports you have submitted and check review updates from admins.
-            </p>
-          </div>
+          <p className={classes.moderationNavText}>
+            Track reports you have submitted and check review updates from admins.
+          </p>
+        </div>
 
+        <div className={classes.row}>
           {unreadReportUpdateCount > 0 && (
             <span className={classes.reportUpdatePill}>
               {unreadReportUpdateText}
             </span>
           )}
 
-          <div className={classes.row}>
-            <span
-              className={
-                activeReportCount > 0
-                  ? classes.reportCountPill
-                  : classes.reportCountPillEmpty
-              }
-            >
-              {isLoadingMyReports ? "Checking reports…" : activeReportText}
-            </span>
+          <span
+            className={
+              activeReportCount > 0
+                ? classes.reportCountPill
+                : classes.reportCountPillEmpty
+            }
+          >
+            {isLoadingMyReports ? "Checking reports…" : activeReportText}
+          </span>
 
-            <Link className={classes.btnOutline} to="/settings/reports">
-              My reports
-            </Link>
-          </div>
+          <Link className={classes.btnOutline} to="/settings/reports">
+            My reports
+          </Link>
         </div>
       </div>
-
-      {!isLoading && !error && (
-        <div className={classes.summaryBox}>
-          <span className={classes.summaryStrong}>
-            {totalUnreadCount}
-          </span>{" "}
-          unread {totalUnreadCount === 1 ? "message" : "messages"} across{" "}
-          <span className={classes.summaryStrong}>{items.length}</span>{" "}
-          {items.length === 1 ? "conversation" : "conversations"}.
-        </div>
-      )}
 
       {error && (
         <div className={classes.errorCard}>
@@ -213,82 +218,85 @@ const MessagesInbox = () => {
       {isLoading && <div className={classes.loadingText}>Loading messages…</div>}
 
       {!isLoading && !error && items.length === 0 && (
-        <div className={classes.card}>
+        <div className={classes.emptyCard}>
           <p className={classes.text}>You do not have any inquiry messages yet.</p>
         </div>
       )}
 
-      {!isLoading && !error && items.length > 0 && (
-        <div className={classes.grid}>
-          {items.map((item) => (
-            <div key={item.conversation.id} className={classes.card}>
-              <div className={classes.titleRow}>
-                <h2 className={classes.title}>{getConversationDisplayTitle(item)}</h2>
+      {hasItems && (
+        <div ref={listRef} className={classes.list}>
+          {items.map((item) => {
+            const otherParticipantText = profileText(
+              item.otherParticipant,
+              item.otherParticipantUserId
+            );
+            const displayContext = getConversationDisplayContext(item);
 
-                {item.hasUnread && (
-                  <span className={classes.unreadPill}>
-                    {item.unreadCount} new {item.unreadCount === 1 ? "message" : "messages"}
-                  </span>
-                )}
-              </div>
-
-              <p className={classes.text}>
-                With: {profileText(item.otherParticipant, item.otherParticipantUserId)}
-              </p>
-
-              <div className={classes.metaGrid}>
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Type</div>
-                  <div className={classes.metaValue}>
-                    {conversationTypeText(item.conversation.conversation_type)}
-                  </div>
+            return (
+              <div
+                key={item.conversation.id}
+                className={`${classes.item} ${item.hasUnread ? classes.itemUnread : ""}`}
+              >
+                <div className={classes.avatar} aria-hidden="true">
+                  {otherParticipantText.replace(/^@/, "").charAt(0) || "?"}
                 </div>
 
-                {getConversationDisplayContext(item) && (
-                  <p className={classes.text}>{getConversationDisplayContext(item)}</p>
-                )}
+                <div className={classes.itemMain}>
+                  <div className={classes.titleRow}>
+                    <h2 className={classes.title}>{getConversationDisplayTitle(item)}</h2>
 
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Status</div>
-                  <div className={classes.statusPill}>
-                    {conversationStatusText(item.conversation.status)}
+                    {item.hasUnread && (
+                      <span className={classes.unreadPill}>
+                        {item.unreadCount} new {item.unreadCount === 1 ? "message" : "messages"}
+                      </span>
+                    )}
                   </div>
-                </div>
 
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Updated</div>
-                  <div className={classes.metaValue}>
-                    {dateTimeText(item.conversation.updated_at)}
+                  <div className={classes.metaLine}>
+                    <span>With: {otherParticipantText}</span>
+                    <span className={classes.metaDot} aria-hidden="true">•</span>
+                    <span>{conversationTypeText(item.conversation.conversation_type)}</span>
                   </div>
-                </div>
-              </div>
 
-              <div className={classes.activityBox}>
-                <div className={classes.activityText}>
-                  From:{" "}
-                  {latestSenderText(
-                    item.conversation.last_message_sender_user_id,
-                    item.conversation.buyer_user_id,
-                    item.conversation.creator_user_id
+                  {displayContext && (
+                    <p className={classes.text}>{displayContext}</p>
                   )}
+
+                  <div className={classes.preview}>
+                    <span className={classes.previewFrom}>
+                      {latestSenderText(
+                        item.conversation.last_message_sender_user_id,
+                        item.conversation.buyer_user_id,
+                        item.conversation.creator_user_id
+                      )}
+                      :
+                    </span>{" "}
+                    {item.hasUnread ? "Unread: " : ""}
+                    {item.conversation.last_message_preview || "No messages yet."}
+                  </div>
                 </div>
 
-                <div className={classes.activityText}>
-                  {item.hasUnread ? "Unread: " : ""}
-                  {item.conversation.last_message_preview || "No messages yet."}
+                <div className={classes.itemSide}>
+                  <div className={classes.row}>
+                    <span className={classes.statusPill}>
+                      {conversationStatusText(item.conversation.status)}
+                    </span>
+
+                    <span className={classes.updated}>
+                      {dateTimeText(item.conversation.updated_at)}
+                    </span>
+                  </div>
+
+                  <Link
+                    className={classes.btnPrimary}
+                    to={getConversationHref(item)}
+                  >
+                    Open conversation
+                  </Link>
                 </div>
               </div>
-
-              <div className={classes.row}>
-                <Link
-                  className={classes.btnPrimary}
-                  to={getConversationHref(item)}
-                >
-                  Open conversation
-                </Link>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

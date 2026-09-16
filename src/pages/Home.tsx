@@ -5,6 +5,7 @@ import { normalizeTwitchLogin, type TwitchStream } from "../domain/twitch";
 import { useMarketListings, type MarketListingItem } from "../hooks/listings/useMarketListings";
 import { usePublicCreators, type PublicCreatorItem } from "../hooks/usePublicCreators";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
+import { StaggerGroup } from "../lib/motion";
 
 const classes = {
   page: "space-y-10",
@@ -239,11 +240,11 @@ const FeaturedSection = ({ featuredListings, isLoading }: FeaturedSectionProps) 
     ) : featuredListings.length === 0 ? (
       <p className={classes.emptyText}>No listings available yet.</p>
     ) : (
-      <div className={classes.grid}>
+      <StaggerGroup className={classes.grid} itemCount={featuredListings.length}>
         {featuredListings.map((item) => (
           <FeaturedListingCard key={item.listing.id} item={item} />
         ))}
-      </div>
+      </StaggerGroup>
     )}
   </section>
 );
@@ -317,7 +318,7 @@ const LiveNowSection = ({ liveNow, isFetching, errorMsg }: LiveNowSectionProps) 
         {isFetching ? "Checking live status…" : "No one is live right now."}
       </p>
     ) : (
-      <div className={classes.grid}>
+      <StaggerGroup className={classes.grid} itemCount={Math.min(liveNow.length, 6)}>
         {liveNow.slice(0, 6).map(({ creator, verified, stream }) => (
           <LiveCreatorCard
             key={creator.user_id}
@@ -326,7 +327,7 @@ const LiveNowSection = ({ liveNow, isFetching, errorMsg }: LiveNowSectionProps) 
             stream={stream}
           />
         ))}
-      </div>
+      </StaggerGroup>
     )}
   </section>
 );

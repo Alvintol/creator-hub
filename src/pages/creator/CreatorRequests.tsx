@@ -15,6 +15,7 @@ import {
   getListingRequestDisplayTitle,
 } from "../../domain/listings/listings";
 import { useMyCreatorRequests } from "../../hooks/creatorRequests/useMyCreatorRequests";
+import { StaggerGroup } from "../../lib/motion";
 
 type CreatorRequestsProps = {
   view?: ListingRequestListView;
@@ -253,7 +254,7 @@ const CreatorRequests = ({
         !error &&
         items.length > 0 && (
           <>
-            <div className={classes.grid}>
+            <StaggerGroup className={classes.grid} itemCount={items.length} resetKey={String(page)}>
               {items.map((item) => (
                 <div
                   className={classes.card}
@@ -477,7 +478,7 @@ const CreatorRequests = ({
                   </div>
                 </div>
               ))}
-            </div>
+            </StaggerGroup>
 
             <div className={classes.row}>
               <button

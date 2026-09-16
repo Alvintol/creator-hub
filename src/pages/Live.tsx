@@ -4,6 +4,7 @@ import { CATEGORIES, type CategoryKey } from "../domain/catalog";
 import { normalizeTwitchLogin, type TwitchStream } from "../domain/twitch";
 import { usePublicCreators, type PublicCreatorItem } from "../hooks/usePublicCreators";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
+import { StaggerGroup } from "../lib/motion";
 
 type PlatformFilter = "all" | "twitch" | "youtube";
 
@@ -204,7 +205,7 @@ const Live = () => {
           </div>
         </div>
       ) : (
-        <div className={classes.grid}>
+        <StaggerGroup className={classes.grid} itemCount={liveNow.length}>
           {liveNow.map(({ item, stream }) => {
             const thumb =
               stream.thumbnailUrl
@@ -272,7 +273,7 @@ const Live = () => {
               </div>
             );
           })}
-        </div>
+        </StaggerGroup>
       )}
     </div>
   );

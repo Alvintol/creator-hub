@@ -15,6 +15,7 @@ import {
   getListingRequestDisplayTitle,
 } from "../../domain/listings/listings";
 import { useMyBuyerRequests } from "../../hooks/creatorRequests/useMyBuyerRequests";
+import { StaggerGroup } from "../../lib/motion";
 
 type BuyerRequestsProps = {
   view?: ListingRequestListView;
@@ -253,7 +254,7 @@ const BuyerRequests = ({
         !error &&
         items.length > 0 && (
           <>
-            <div className={classes.grid}>
+            <StaggerGroup className={classes.grid} itemCount={items.length} resetKey={String(page)}>
               {items.map((item) => (
                 <div
                   className={classes.card}
@@ -478,7 +479,7 @@ const BuyerRequests = ({
                   </div>
                 </div>
               ))}
-            </div>
+            </StaggerGroup>
 
             <div className={classes.row}>
               <button
