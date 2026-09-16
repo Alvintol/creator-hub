@@ -1208,7 +1208,7 @@ const getReusableCheckoutSession = async ({
       payment.stripe_checkout_session_id,
       { stripeAccount: stripeAccountId },
     );
-  } catch (error) {
+  } catch {
     // The session may be gone, expired past retrieval, or tied to a
     // stale connected account. Fall through and create a fresh one.
     return null;

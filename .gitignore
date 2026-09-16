@@ -30,3 +30,4 @@ dist-ssr
 
 # Local Claude Code / Cowork output, not part of the shipped app
 Claude outputs/
+claude/
