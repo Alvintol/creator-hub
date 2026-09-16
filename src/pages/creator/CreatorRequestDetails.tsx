@@ -69,6 +69,9 @@ const classes = {
   metaLabel: "metaLabel",
   metaValue: "metaValue",
 
+  snapshotHeader: "flex items-start justify-between gap-4",
+  snapshotBody: "space-y-4 pt-4",
+
   list: "space-y-2",
   listItem:
     "notice noticeNeutral",
@@ -191,6 +194,7 @@ const CreatorRequestDetails = () => {
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
+  const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
   const [declineReasonError, setDeclineReasonError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -625,97 +629,110 @@ const CreatorRequestDetails = () => {
           )}
 
         <div className={classes.card}>
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Frozen listing snapshot</h2>
-            <p className={classes.text}>
-              This captures the listing state the buyer reached out about.
-            </p>
+          <div className={classes.snapshotHeader}>
+            <div className={classes.section}>
+              <h2 className={classes.sectionTitle}>Frozen listing snapshot</h2>
+              <p className={classes.text}>
+                This captures the listing state the buyer reached out about.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className={classes.btnOutline}
+              aria-expanded={isSnapshotOpen}
+              onClick={() => setIsSnapshotOpen((current) => !current)}
+            >
+              {isSnapshotOpen ? "Hide listing snapshot" : "Show listing snapshot"}
+            </button>
           </div>
 
-          <div className={classes.metaGrid}>
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Title</div>
-              <div className={classes.metaValue}>{snapshot.title}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Price</div>
-              <div className={classes.metaValue}>
-                {priceText(
-                  snapshot.price_type,
-                  snapshot.price_min,
-                  snapshot.price_max
-                )}
+          <Collapse open={isSnapshotOpen} className={classes.snapshotBody}>
+            <div className={classes.metaGrid}>
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Title</div>
+                <div className={classes.metaValue}>{snapshot.title}</div>
               </div>
-            </div>
 
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Purchase flow</div>
-              <div className={classes.metaValue}>{snapshot.fulfilment_mode}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Offering type</div>
-              <div className={classes.metaValue}>{snapshot.offering_type}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Category</div>
-              <div className={classes.metaValue}>{snapshot.category}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Listing last updated</div>
-              <div className={classes.metaValue}>
-                {dateText(snapshot.updated_at)}
-              </div>
-            </div>
-
-            {request.status === "completed" &&
-              request.completed_at && (
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>
-                    Completed
-                  </div>
-
-                  <div className={classes.metaValue}>
-                    {dateText(request.completed_at)}
-                  </div>
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Price</div>
+                <div className={classes.metaValue}>
+                  {priceText(
+                    snapshot.price_type,
+                    snapshot.price_min,
+                    snapshot.price_max
+                  )}
                 </div>
+              </div>
+
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Purchase flow</div>
+                <div className={classes.metaValue}>{snapshot.fulfilment_mode}</div>
+              </div>
+
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Offering type</div>
+                <div className={classes.metaValue}>{snapshot.offering_type}</div>
+              </div>
+
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Category</div>
+                <div className={classes.metaValue}>{snapshot.category}</div>
+              </div>
+
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Listing last updated</div>
+                <div className={classes.metaValue}>
+                  {dateText(snapshot.updated_at)}
+                </div>
+              </div>
+
+              {request.status === "completed" &&
+                request.completed_at && (
+                  <div className={classes.metaBlock}>
+                    <div className={classes.metaLabel}>
+                      Completed
+                    </div>
+
+                    <div className={classes.metaValue}>
+                      {dateText(request.completed_at)}
+                    </div>
+                  </div>
+                )}
+            </div>
+
+            <div className={classes.section}>
+              <h2 className={classes.sectionTitle}>Deliverables</h2>
+
+              {snapshot.deliverables.length > 0 ? (
+                <div className={classes.list}>
+                  {snapshot.deliverables.map((deliverable) => (
+                    <div key={deliverable} className={classes.listItem}>
+                      {deliverable}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={classes.text}>No deliverables were listed.</p>
               )}
-          </div>
+            </div>
 
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Deliverables</h2>
+            <div className={classes.section}>
+              <h2 className={classes.sectionTitle}>Tags</h2>
 
-            {snapshot.deliverables.length > 0 ? (
-              <div className={classes.list}>
-                {snapshot.deliverables.map((deliverable) => (
-                  <div key={deliverable} className={classes.listItem}>
-                    {deliverable}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className={classes.text}>No deliverables were listed.</p>
-            )}
-          </div>
-
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Tags</h2>
-
-            {snapshot.tags.length > 0 ? (
-              <div className={classes.list}>
-                {snapshot.tags.map((tag) => (
-                  <div key={tag} className={classes.listItem}>
-                    {tag}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className={classes.text}>No tags were listed.</p>
-            )}
-          </div>
+              {snapshot.tags.length > 0 ? (
+                <div className={classes.list}>
+                  {snapshot.tags.map((tag) => (
+                    <div key={tag} className={classes.listItem}>
+                      {tag}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className={classes.text}>No tags were listed.</p>
+              )}
+            </div>
+          </Collapse>
         </div>
       </div>
 

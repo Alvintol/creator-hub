@@ -214,6 +214,7 @@ const AdminRequestDetails = () => {
             requestedTimeline={request.requested_timeline}
             budgetAmount={request.budget_amount}
             referenceLinks={request.reference_links}
+            defaultOpen
           />
 
           <ListingRequestStatusCard

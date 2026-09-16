@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { Collapse } from "../../../lib/motion";
+
 type ListingRequestSubmissionDetailsProps = {
   heading: string;
   requestTitle?: string | null;
@@ -6,13 +9,17 @@ type ListingRequestSubmissionDetailsProps = {
   requestedTimeline?: string | null;
   budgetAmount?: number | string | null;
   referenceLinks?: string[] | null;
+  defaultOpen?: boolean;
 };
 
 const classes = {
   section: "space-y-4",
-  header: "space-y-1",
+  header: "flex items-start justify-between gap-4",
+  headingGroup: "space-y-1",
   sectionTitle: "sectionHeading",
   text: "text-sm text-zinc-600",
+  toggle: "btnOutline shrink-0",
+  body: "space-y-4 pt-4",
   titleBox:
     "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm font-bold text-zinc-900",
   detailsBox:
@@ -57,7 +64,10 @@ const ListingRequestSubmissionDetails = ({
   requestedTimeline,
   budgetAmount,
   referenceLinks,
+  defaultOpen = false,
 }: ListingRequestSubmissionDetailsProps) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
   const titleText = cleanText(requestTitle);
   const detailsText = cleanText(requestDetails) || cleanText(fallbackMessage);
   const timelineText = cleanText(requestedTimeline);
@@ -66,63 +76,76 @@ const ListingRequestSubmissionDetails = ({
   return (
     <div className={classes.section}>
       <div className={classes.header}>
-        <h2 className={classes.sectionTitle}>{heading}</h2>
-        <p className={classes.text}>
-          Structured request details submitted by the buyer.
-        </p>
-      </div>
-
-      <div className={classes.metaBlock}>
-        <div className={classes.metaLabel}>Request Title / Summary</div>
-        <div className={classes.titleBox}>
-          {titleText || "No request summary provided."}
+        <div className={classes.headingGroup}>
+          <h2 className={classes.sectionTitle}>{heading}</h2>
+          <p className={classes.text}>
+            Structured request details submitted by the buyer.
+          </p>
         </div>
+
+        <button
+          type="button"
+          className={classes.toggle}
+          aria-expanded={isOpen}
+          onClick={() => setIsOpen((current) => !current)}
+        >
+          {isOpen ? "Hide request details" : "Show request details"}
+        </button>
       </div>
 
-      <div className={classes.metaBlock}>
-        <div className={classes.metaLabel}>Details</div>
-        <div className={classes.detailsBox}>
-          {detailsText || "No request details provided."}
-        </div>
-      </div>
-
-      <div className={classes.metaGrid}>
+      <Collapse open={isOpen} className={classes.body}>
         <div className={classes.metaBlock}>
-          <div className={classes.metaLabel}>Requested Timeline</div>
-          <div className={classes.metaValue}>
-            {timelineText || "Not provided"}
+          <div className={classes.metaLabel}>Request Title / Summary</div>
+          <div className={classes.titleBox}>
+            {titleText || "No request summary provided."}
           </div>
         </div>
 
         <div className={classes.metaBlock}>
-          <div className={classes.metaLabel}>Budget</div>
-          <div className={classes.metaValue}>
-            {formatBudgetAmount(budgetAmount)}
+          <div className={classes.metaLabel}>Details</div>
+          <div className={classes.detailsBox}>
+            {detailsText || "No request details provided."}
           </div>
         </div>
-      </div>
 
-      <div className={classes.metaBlock}>
-        <div className={classes.metaLabel}>Reference Links</div>
-
-        {links.length > 0 ? (
-          <div className={classes.list}>
-            {links.map((link) => (
-              <a
-                key={link}
-                className={classes.link}
-                href={link}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {link}
-              </a>
-            ))}
+        <div className={classes.metaGrid}>
+          <div className={classes.metaBlock}>
+            <div className={classes.metaLabel}>Requested Timeline</div>
+            <div className={classes.metaValue}>
+              {timelineText || "Not provided"}
+            </div>
           </div>
-        ) : (
-          <div className={classes.metaValue}>No Reference Links Provided.</div>
-        )}
-      </div>
+
+          <div className={classes.metaBlock}>
+            <div className={classes.metaLabel}>Budget</div>
+            <div className={classes.metaValue}>
+              {formatBudgetAmount(budgetAmount)}
+            </div>
+          </div>
+        </div>
+
+        <div className={classes.metaBlock}>
+          <div className={classes.metaLabel}>Reference Links</div>
+
+          {links.length > 0 ? (
+            <div className={classes.list}>
+              {links.map((link) => (
+                <a
+                  key={link}
+                  className={classes.link}
+                  href={link}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {link}
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className={classes.metaValue}>No Reference Links Provided.</div>
+          )}
+        </div>
+      </Collapse>
     </div>
   );
 };

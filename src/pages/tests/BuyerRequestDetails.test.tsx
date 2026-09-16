@@ -756,6 +756,12 @@ describe("<BuyerRequestDetails />", () => {
   it("renders structured buyer request details", () => {
     renderPage();
 
+    // Request summary and the frozen listing snapshot are collapsed by
+    // default so a request with a lot of history doesn't bury payment and
+    // messaging actions — expand both before asserting on their content.
+    fireEvent.click(screen.getByRole("button", { name: "Show request details" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show listing snapshot" }));
+
     expect(screen.getByText("Custom cozy emote pack")).toBeInTheDocument();
     expect(
       screen.getByText("I need three cozy emotes for my Twitch channel launch.")
