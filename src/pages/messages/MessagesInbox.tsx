@@ -12,7 +12,7 @@ const classes = {
   header: "flex flex-wrap items-end justify-between gap-4",
   headerText: "space-y-1",
   h1: "font-display text-3xl font-bold tracking-tight text-zinc-900",
-  sub: "text-sm text-zinc-500",
+  sub: "pageSub",
 
   summaryBox: "text-sm text-zinc-500",
   summaryStrong: "font-semibold text-zinc-900",
@@ -52,7 +52,7 @@ const classes = {
 
   loadingText: "text-sm text-zinc-500",
   errorCard:
-    "rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+    "notice noticeError",
   emptyCard: "card px-6 py-12 text-center",
 } as const;
 

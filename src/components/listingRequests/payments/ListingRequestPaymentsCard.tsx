@@ -20,7 +20,7 @@ const classes = {
   card: "card p-6",
   section: "space-y-4",
   header: "space-y-1",
-  title: "text-base font-extrabold tracking-tight",
+  title: "font-display text-base font-extrabold tracking-tight",
   text: "text-sm text-zinc-600",
   list: "space-y-4",
   item:
@@ -35,18 +35,18 @@ const classes = {
   metaGrid: "mt-4 grid gap-3 sm:grid-cols-3",
   metaBlock: "space-y-1",
   metaLabel:
-    "text-xs font-bold uppercase tracking-wide text-zinc-500",
+    "metaLabel",
   metaValue: "text-sm font-semibold text-zinc-900",
   feeText: "mt-3 text-xs leading-5 text-zinc-500",
   actions: "mt-4 flex flex-wrap items-center gap-3",
   payButton:
-    "inline-flex items-center justify-center rounded-full bg-zinc-950 px-5 py-3 text-sm font-bold text-white shadow-[0_6px_18px_rgba(0,0,0,0.14)] transition-all duration-200 hover:-translate-y-[1px] hover:bg-zinc-800 hover:shadow-[0_9px_24px_rgba(0,0,0,0.18)]",
+    "btnPrimary",
   loading:
-    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm text-zinc-600",
+    "notice noticeNeutral",
   empty:
-    "rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-4 text-sm text-zinc-600",
+    "notice noticeNeutral",
   error:
-    "rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700",
+    "notice noticeError",
 } as const;
 
 const formatMoney = (

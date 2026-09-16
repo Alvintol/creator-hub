@@ -145,6 +145,151 @@
     @apply cursor-not-allowed opacity-60;
   }
 
+  .btnDanger {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200;
+    color: rgb(255 255 255);
+    background: linear-gradient(180deg, rgb(220 38 38), rgb(185 28 28));
+    border: 1px solid rgb(185 28 28);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.18),
+      0 6px 16px -8px rgb(220 38 38 / 0.5);
+  }
+
+  .btnDanger:hover {
+    transform: translateY(-1px);
+  }
+
+  .btnDangerOutline {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200;
+    color: rgb(185 28 28);
+    background: rgb(var(--surface));
+    border: 1px solid rgb(220 38 38 / 0.3);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .btnDangerOutline:hover {
+    background: rgb(254 242 242);
+    border-color: rgb(220 38 38 / 0.45);
+  }
+
+  .btnDanger:focus-visible,
+  .btnDangerOutline:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px rgb(220 38 38 / 0.16);
+  }
+
+  .btnDanger:disabled,
+  .btnDangerOutline:disabled {
+    @apply cursor-not-allowed opacity-60;
+    transform: none;
+  }
+
+  .btnSm {
+    @apply px-3.5 py-1.5 text-xs;
+  }
+
+  /* Page typography */
+  .pageTitle {
+    @apply font-display text-2xl font-bold tracking-tight sm:text-3xl;
+    color: rgb(var(--ink));
+  }
+
+  .pageSub {
+    @apply text-sm;
+    color: rgb(var(--muted));
+  }
+
+  .sectionHeading {
+    @apply font-display text-base font-bold tracking-tight;
+    color: rgb(var(--ink));
+  }
+
+  .backLink {
+    @apply inline-flex items-center gap-1.5 text-sm font-medium transition;
+    color: rgb(var(--muted));
+  }
+
+  .backLink:hover {
+    color: rgb(var(--ink));
+  }
+
+  .metaLabel {
+    @apply text-[11px] font-semibold uppercase tracking-[0.08em];
+    color: rgb(var(--muted));
+  }
+
+  .metaValue {
+    @apply text-sm;
+    color: rgb(var(--ink));
+  }
+
+  /* Forms */
+  .formLabel {
+    @apply block text-sm font-semibold;
+    color: rgb(var(--ink) / 0.9);
+  }
+
+  .formControl {
+    @apply w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition duration-200;
+    color: rgb(var(--ink));
+    background: rgb(var(--surface));
+    border: 1px solid var(--hairline-strong);
+  }
+
+  .formControl::placeholder {
+    color: rgb(var(--muted) / 0.75);
+  }
+
+  .formControl:hover {
+    border-color: rgb(var(--ink) / 0.24);
+  }
+
+  .formControl:focus,
+  .formControl:focus-visible {
+    border-color: rgb(var(--brand) / 0.45);
+    box-shadow: var(--ring);
+  }
+
+  .formControl:disabled {
+    @apply cursor-not-allowed;
+    color: rgb(var(--muted));
+    background: rgb(var(--ink) / 0.03);
+  }
+
+  .formHint {
+    @apply text-xs;
+    color: rgb(var(--muted));
+  }
+
+  .formError {
+    @apply text-xs font-medium text-red-600;
+  }
+
+  /* Notices */
+  .notice {
+    @apply rounded-xl border px-4 py-3 text-sm leading-6;
+  }
+
+  .noticeError {
+    @apply border-red-200 bg-red-50 text-red-800;
+  }
+
+  .noticeWarning {
+    @apply border-amber-200 bg-amber-50 text-amber-900;
+  }
+
+  .noticeSuccess {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-800;
+  }
+
+  .noticeInfo {
+    @apply border-blue-200 bg-blue-50 text-blue-900;
+  }
+
+  .noticeNeutral {
+    @apply border-zinc-200 bg-zinc-50 text-zinc-700;
+  }
+
   /* Inputs */
   .searchInput {
     @apply w-full rounded-full px-4 py-2.5 text-sm outline-none transition duration-200;

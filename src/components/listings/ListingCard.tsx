@@ -9,7 +9,7 @@ const classes = {
 
   body: "p-4",
   titleRow: "flex flex-wrap items-center gap-2",
-  h3: "text-base font-extrabold tracking-tight",
+  h3: "font-display text-base font-extrabold tracking-tight",
 
   badge:
     "rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-xs font-semibold",

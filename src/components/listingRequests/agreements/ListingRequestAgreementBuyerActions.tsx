@@ -18,7 +18,7 @@ const classes = {
   card: "card p-6",
   section: "space-y-4",
   header: "space-y-1",
-  title: "text-base font-extrabold tracking-tight",
+  title: "font-display text-base font-extrabold tracking-tight",
   text: "text-sm text-zinc-600",
   checklist: "space-y-3",
   checkboxRow:
@@ -27,11 +27,11 @@ const classes = {
   checkboxLabel: "text-sm font-semibold text-zinc-800",
   row: "flex flex-wrap items-center gap-3",
   errorBox:
-    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+    "notice noticeError",
   btnPrimary:
-    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnPrimary",
   btnOutline:
-    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnOutline",
 } as const;
 
 const getErrorMessage = (error: unknown): string =>

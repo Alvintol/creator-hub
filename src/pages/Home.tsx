@@ -12,7 +12,7 @@ const classes = {
 
   section: "space-y-3",
   headerRow: "flex items-baseline justify-between gap-4",
-  h2: "text-xl font-extrabold tracking-tight",
+  h2: "font-display text-xl font-extrabold tracking-tight",
   linkSubtle: "text-sm font-semibold text-zinc-600 hover:text-zinc-900",
 
   cardLg: "card flex flex-col items-center rounded-3xl p-6",
@@ -29,7 +29,7 @@ const classes = {
   badgeLive: "border-rose-200 bg-rose-50 text-rose-700",
 
   heroMax: "max-w-3xl",
-  heroH1: "text-3xl font-extrabold tracking-tight",
+  heroH1: "font-display text-3xl font-extrabold tracking-tight",
   heroP: "mt-2 text-zinc-600",
   heroActions: "mt-5 flex flex-wrap gap-3",
   heroChips: "mt-6 flex flex-wrap items-center gap-2",
@@ -43,7 +43,7 @@ const classes = {
   featuredBody: "p-4",
   featuredTop: "flex items-start justify-between gap-3",
   featuredTitleWrap: "min-w-0",
-  featuredTitle: "truncate text-base font-extrabold tracking-tight",
+  featuredTitle: "font-display truncate text-base font-extrabold tracking-tight",
   featuredMeta: "mt-1 text-sm text-zinc-600",
   featuredPrice: "shrink-0 text-sm font-extrabold",
   featuredShort: "mt-2 line-clamp-2 text-sm text-zinc-600",
@@ -52,7 +52,7 @@ const classes = {
 
   liveCardImg: "mb-3 h-40 w-full rounded-2xl object-cover",
   liveRow: "flex flex-wrap items-center gap-2",
-  liveTitle: "text-base font-extrabold tracking-tight",
+  liveTitle: "font-display text-base font-extrabold tracking-tight",
   liveDesc: "mt-2 text-sm text-zinc-600",
   liveMeta: "mt-2 text-xs text-zinc-500",
 

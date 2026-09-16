@@ -18,7 +18,7 @@ const classes = {
   page: "space-y-5",
 
   headerWrap: "space-y-1",
-  h1: "text-2xl font-extrabold tracking-tight",
+  h1: "pageTitle",
   subtitle: "text-sm text-zinc-600",
 
   filtersGrid: "grid gap-3 md:grid-cols-3",

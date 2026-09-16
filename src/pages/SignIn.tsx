@@ -7,7 +7,7 @@ const classes = {
   page: "space-y-6",
   card: "card mx-auto max-w-xl rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_12px_30px_rgba(0,0,0,0.06)]",
 
-  h1: "text-2xl font-extrabold tracking-tight",
+  h1: "pageTitle",
   p: "mt-2 text-sm text-zinc-600",
   signedInEmail: "font-semibold",
 
@@ -42,17 +42,17 @@ const classes = {
 
   form: "space-y-3",
   field: "space-y-2",
-  label: "text-sm font-extrabold text-zinc-800",
+  label: "formLabel",
   input: "searchInput",
 
   row: "flex flex-wrap items-center gap-3",
   rowTop: "mt-5 flex flex-wrap items-center gap-3",
 
   btn:
-    "inline-flex items-center justify-center rounded-full border border-zinc-400 bg-[rgb(var(--brand))] px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(244,92,44,0.28)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(244,92,44,0.34)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnPrimary",
 
   btnAlt:
-    "inline-flex items-center justify-center rounded-full border border-zinc-600 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition-all duration-200 hover:-translate-y-[1px] hover:border-zinc-500 hover:bg-zinc-50 hover:shadow-[0_6px_18px_rgba(0,0,0,0.11)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnOutline",
 
   msgOk: "text-sm font-semibold text-emerald-700",
   msgErr: "text-sm font-semibold text-rose-700",

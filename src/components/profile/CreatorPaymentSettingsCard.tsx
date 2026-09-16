@@ -36,14 +36,14 @@ const classes = {
     "inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-emerald-700",
   form: "mt-5 grid gap-4 sm:grid-cols-2",
   field: "flex flex-col gap-2",
-  label: "text-sm font-bold text-zinc-900",
+  label: "formLabel",
   input:
     "rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm font-semibold text-zinc-900 shadow-sm outline-none transition focus:border-orange-500 focus:ring-4 focus:ring-orange-100",
   actions: "mt-5 flex flex-wrap items-center gap-3",
   button:
-    "inline-flex items-center justify-center rounded-full bg-zinc-950 px-5 py-3 text-sm font-black text-white shadow-[0_8px_20px_rgba(0,0,0,0.15)] transition hover:-translate-y-[1px] hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0",
+    "btnPrimary",
   secondaryButton:
-    "inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-black text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition hover:-translate-y-[1px] hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0",
+    "btnOutline",
   warning:
     "mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900",
   error:

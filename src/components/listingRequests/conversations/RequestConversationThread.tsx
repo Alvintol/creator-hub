@@ -48,7 +48,7 @@ const classes = {
     "flex flex-wrap items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 sm:px-6",
   headerText: "space-y-0.5",
   title: "font-display text-lg font-bold tracking-tight text-zinc-900",
-  sub: "text-sm text-zinc-500",
+  sub: "pageSub",
   headerActions: "flex flex-wrap items-center gap-2",
   body: "space-y-4 p-5 sm:p-6",
 
@@ -109,7 +109,7 @@ const classes = {
   panelTitle: "font-display text-sm font-bold text-zinc-900",
   field: "space-y-1.5",
   label: "block text-sm font-semibold text-zinc-800",
-  hint: "text-xs text-zinc-500",
+  hint: "formHint",
   select: fieldControl,
   textarea: `${fieldControl} min-h-[100px]`,
   row: "flex flex-wrap items-center gap-2",
@@ -132,7 +132,7 @@ const classes = {
   btnSend: "btnPrimary px-4 py-2",
   btnOutline: "btnOutline",
   btnDanger:
-    "inline-flex items-center justify-center rounded-full bg-red-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60",
+    "btnDanger",
   headerButton: `${ghostButton} text-zinc-700`,
   headerDangerButton: `${ghostButton} text-red-600 hover:border-red-200 hover:bg-red-50`,
   chatUtilityButton: `${ghostButton} py-1 text-zinc-700`,

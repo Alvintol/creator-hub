@@ -1,3 +1,4 @@
+import { Collapse } from "../../lib/motion";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { normalizeTwitchLogin } from "../../domain/twitch";
 import { usePublicCreatorProfile } from "../../hooks/profile/usePublicCreatorProfile";
@@ -12,11 +13,11 @@ import { ModerationReportReasonCode, moderationReportReasonOptions } from '../..
 const classes = {
   container: "space-y-8",
 
-  backLink: "text-sm font-semibold text-zinc-600 hover:text-zinc-900",
+  backLink: "backLink",
 
   notFoundWrap: "space-y-4",
-  h1: "text-2xl font-extrabold tracking-tight",
-  h2: "text-xl font-extrabold tracking-tight",
+  h1: "pageTitle",
+  h2: "font-display text-xl font-extrabold tracking-tight",
 
   card: "card p-6",
 
@@ -37,7 +38,7 @@ const classes = {
   listingCard: "card overflow-hidden",
   listingImg: "h-40 w-full object-cover bg-zinc-100",
   listingBody: "p-4",
-  listingTitle: "text-base font-extrabold tracking-tight",
+  listingTitle: "font-display text-base font-extrabold tracking-tight",
   listingDesc: "mt-1 text-sm text-zinc-600",
   listingMeta: "mt-3 flex items-center justify-between text-sm",
   listingMetaLeft: "font-extrabold",
@@ -75,26 +76,26 @@ const classes = {
   inquiryText: "mt-1 text-sm text-zinc-600",
   form: "mt-4 space-y-3",
   field: "space-y-2",
-  label: "text-sm font-bold text-zinc-900",
+  label: "formLabel",
   select:
-    "w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
+    "formControl",
   textarea:
-    "min-h-[120px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200 disabled:cursor-not-allowed disabled:opacity-60",
-  hint: "text-xs text-zinc-500",
+    "formControl min-h-[120px]",
+  hint: "formHint",
   errorBox:
-    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+    "notice noticeError",
 
   reportCard: "card p-5",
-  reportTitle: "text-base font-extrabold tracking-tight",
+  reportTitle: "font-display text-base font-extrabold tracking-tight",
   reportText: "mt-1 text-sm text-zinc-600",
   reportForm: "mt-4 space-y-3",
   row: "flex flex-wrap items-center gap-3",
   successCard:
-    "rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800",
+    "notice noticeSuccess",
   errorCard:
-    "rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700",
+    "notice noticeError",
   btnDanger:
-    "inline-flex items-center justify-center rounded-full border border-red-600 bg-red-600 px-5 py-3 text-sm font-bold text-white shadow-[0_4px_14px_rgba(220,38,38,0.24)] transition-all duration-200 hover:-translate-y-[1px] hover:brightness-105 hover:shadow-[0_8px_22px_rgba(220,38,38,0.32)] disabled:cursor-not-allowed disabled:opacity-60",
+    "btnDanger",
 } as const;
 
 type CreatorLinkButtonProps = {
@@ -357,7 +358,7 @@ const CreatorProfile = () => {
                 {showInquiryForm ? "Cancel message" : "Message creator"}
               </button>
 
-              {showInquiryForm && (
+              <Collapse open={showInquiryForm}>
                 <div className={classes.form}>
                   <div className={classes.field}>
                     <label className={classes.label} htmlFor="creatorInquiryTopic">
@@ -425,7 +426,7 @@ const CreatorProfile = () => {
                       : "Start conversation"}
                   </button>
                 </div>
-              )}
+              </Collapse>
             </>
           )}
         </div>

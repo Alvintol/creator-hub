@@ -11,7 +11,7 @@ const classes = {
   error: "rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-900",
   actions: "flex flex-wrap items-center gap-3",
   btn:
-    "inline-flex items-center justify-center rounded-full border border-zinc-300 bg-white px-5 py-3 text-sm font-bold text-zinc-900 shadow-[0_3px_10px_rgba(0,0,0,0.07)] transition hover:-translate-y-[1px] hover:bg-zinc-50",
+    "btnOutline",
 } as const;
 
 const getPaymentMessage = ({
