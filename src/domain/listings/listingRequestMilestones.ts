@@ -92,14 +92,6 @@ export const canSubmitListingRequestMilestone = (
   status === "pending" ||
   status === "revision_requested";
 
-export const canBuyerRespondToListingRequestMilestone = (
-  status: ListingRequestMilestoneStatus
-): boolean => status === "submitted";
-
-export const canConfirmListingRequestMilestonePayment = (
-  status: ListingRequestMilestoneStatus
-): boolean => status === "payment_required";
-
 export const getListingRequestMilestonePlanTotal = (
   milestones: ListingRequestMilestonePlanItem[]
 ): number =>

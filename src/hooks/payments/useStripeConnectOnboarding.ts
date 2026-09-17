@@ -60,42 +60,6 @@ export class StripeConnectApiError extends Error {
   }
 }
 
-export const getStripeConnectErrorActionUrl = (
-  error: unknown,
-): string | null =>
-  error instanceof StripeConnectApiError ? error.actionUrl ?? null : null;
-
-export const useStartStripeConnectOnboarding = () => {
-  const { session, user } = useAuth();
-
-  return useMutation({
-    mutationFn: async (
-      input: StartStripeConnectInput,
-    ): Promise<StartStripeConnectResponse> => {
-      const token = session?.access_token;
-
-      if (!token) {
-        throw new Error("You must be signed in to connect Stripe payouts.");
-      }
-
-      const response = await fetch(`${getApiBase()}/api/stripe/connect/start`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          country: input.country.trim().toUpperCase(),
-          defaultCurrency: input.defaultCurrency.trim().toLowerCase(),
-        }),
-      });
-
-      return getJsonResponse<StartStripeConnectResponse>(response);
-    },
-    mutationKey: ["startStripeConnectOnboarding", user?.id ?? null],
-  });
-};
-
 export const useSyncStripeConnectAccount = () => {
   const queryClient = useQueryClient();
   const { session, user } = useAuth();

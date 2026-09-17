@@ -1,11 +1,31 @@
 import { Link, useParams } from "react-router-dom";
 import { useAdminRequest } from "../../hooks/admin/useAdminRequest";
-import { getListingRequestStatusLabel } from "../../domain/listings/listingRequests";
+import {
+  getListingRequestStatusLabel,
+  getListingRequestStatusTone,
+} from "../../domain/listings/listingRequests";
+import { getRequestNextStep, getRequestStages } from "../../domain/listings/requestWorkspace";
+import ListingSnapshotDetails from "../../components/listingRequests/workspace/ListingSnapshotDetails";
+import RequestNextStepCard from "../../components/listingRequests/workspace/RequestNextStepCard";
+import RequestStatusNotice from "../../components/listingRequests/workspace/RequestStatusNotice";
+import RequestWorkspace from "../../components/listingRequests/workspace/RequestWorkspace";
+import RequestWorkspaceHeader from "../../components/listingRequests/workspace/RequestWorkspaceHeader";
+import WorkspaceSectionList from "../../components/listingRequests/workspace/WorkspaceSectionList";
+import {
+  getSectionFlags,
+  summarizeAgreement,
+  summarizeChangeOrders,
+  summarizeDeliveries,
+  summarizeMilestones,
+  summarizeProgress,
+  summarizeSchedule,
+  workspaceDate,
+  type WorkspaceSectionSpec,
+} from "../../components/listingRequests/workspace/sectionSummaries";
 import ListingRequestAgreementSummary from '../../components/listingRequests/agreements/ListingRequestAgreementSummary';
 import ListingRequestAgreementWorkReadinessCard from '../../components/listingRequests/agreements/ListingRequestAgreementWorkReadinessCard';
 import ListingRequestChangeOrderSummary from '../../components/listingRequests/changeOrders/ListingRequestChangeOrderSummary';
 import RequestConversationThread from '../../components/listingRequests/conversations/RequestConversationThread';
-import ListingRequestStatusCard from '../../components/listingRequests/core/ListingRequestStatusCard';
 import ListingRequestSubmissionDetails from '../../components/listingRequests/core/ListingRequestSubmissionDetails';
 import ListingRequestFinalDeliverySummary from '../../components/listingRequests/finalDeliveries/ListingRequestFinalDeliverySummary';
 import ListingRequestAgreementAdminPaymentActions from '../../components/listingRequests/payments/ListingRequestAgreementAdminPaymentActions';
@@ -29,35 +49,11 @@ import ListingRequestMilestonePaymentAdminActions from '../../components/listing
 const classes = {
   page: "space-y-6",
   backLink: "backLink",
-
-  header: "space-y-1",
   h1: "pageTitle",
   sub: "pageSub",
-
-  grid: "grid gap-6 lg:grid-cols-[0.9fr_1.1fr]",
   card: "card p-6",
-  section: "space-y-4",
-  sectionTitle: "sectionHeading",
-  text: "text-sm text-zinc-600",
-
-  metaGrid: "grid gap-4 sm:grid-cols-2",
-  metaBlock: "space-y-1",
-  metaLabel: "metaLabel",
-  metaValue: "metaValue",
-
-  list: "space-y-2",
-  listItem:
-    "notice noticeNeutral",
-
-  row: "flex flex-wrap items-center gap-3",
-  btnOutline:
-    "btnOutline",
-  btnPrimary:
-    "btnPrimary",
-
+  btnOutline: "btnOutline btnSm",
   loadingText: "text-sm text-zinc-600",
-  errorCard:
-    "notice noticeError",
 } as const;
 
 const profileText = (
@@ -69,31 +65,6 @@ const profileText = (
   fallbackUserId: string
 ) =>
   profile?.handle ? `@${profile.handle}` : profile?.display_name ?? fallbackUserId;
-
-const dateText = (value: string) => {
-  const date = new Date(value);
-
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-};
-
-const priceText = (
-  priceType: "fixed" | "starting_at" | "range",
-  priceMin: number,
-  priceMax: number | null
-) =>
-  priceType === "fixed"
-    ? `$${priceMin}`
-    : priceType === "starting_at"
-      ? `From $${priceMin}`
-      : `$${priceMin}–$${priceMax ?? priceMin}`;
 
 const AdminRequestDetails = () => {
   const { id } = useParams<{ id: string }>();
@@ -189,43 +160,52 @@ const AdminRequestDetails = () => {
   }
 
   const snapshot = request.listing_snapshot;
+  const buyerLabel = profileText(buyer, request.buyer_user_id);
+  const creatorLabel = profileText(creator, request.creator_user_id);
+  const changeOrders = changeOrdersQuery.data ?? [];
+  const progressUpdates = progressUpdatesQuery.data ?? [];
+  const agreementAccepted = agreement?.status === "buyer_accepted";
+  const requestReadOnly = request.status === "archived" || request.status === "declined";
 
-  return (
-    <div className={classes.page}>
-      <Link to="/admin/requests" className={classes.backLink}>
-        ← Back to admin requests
-      </Link>
+  const workspaceInput = {
+    requestStatus: request.status,
+    agreement,
+    milestones,
+    changeOrders,
+    finalDeliveries,
+  };
 
-      <div className={classes.header}>
-        <h1 className={classes.h1}>Admin request review</h1>
+  const nextStep = getRequestNextStep(workspaceInput);
+  const workspaceLoading =
+    agreementQuery.isLoading ||
+    milestonesAreLoading ||
+    changeOrdersQuery.isLoading ||
+    finalDeliveriesQuery.isLoading;
+  const flags = getSectionFlags(nextStep, "admin", {
+    readOnly: requestReadOnly,
+    isLoading: workspaceLoading,
+  });
 
-        <p className={classes.sub}>
-          Read-only request review for dispute support.
-        </p>
-      </div>
+  // Payment confirmation is the admin's own job, so due payments flag the section for admin.
+  const paymentDue =
+    agreement?.starting_payment_status === "payment_required" ||
+    (agreement?.listing_request_payment_schedule_items ?? []).some(
+      (item) => item.status === "payment_required"
+    );
 
-      <div className={classes.grid}>
-        <div className={classes.card}>
-          <ListingRequestSubmissionDetails
-            heading="Request summary"
-            requestTitle={request.request_title}
-            requestDetails={request.request_details}
-            fallbackMessage={request.message}
-            requestedTimeline={request.requested_timeline}
-            budgetAmount={request.budget_amount}
-            referenceLinks={request.reference_links}
-            defaultOpen
-          />
-
-          <ListingRequestStatusCard
-            status={request.status}
-            reason={request.creator_status_reason}
-            archiveContext={request}
-          />
-
-          <ListingRequestAgreementSummary
+  const sections: WorkspaceSectionSpec[] = [
+    {
+      id: "payments",
+      title: "Payments",
+      summary: summarizeSchedule(agreement),
+      ...flags("payments"),
+      attention: paymentDue && !requestReadOnly,
+      visible: Boolean(agreement),
+      content: (
+        <>
+          <ListingRequestAgreementWorkReadinessCard
+            requestStatus={request.status}
             agreement={agreement}
-            isLoading={agreementQuery.isLoading}
           />
 
           <ListingRequestAgreementAdminPaymentActions
@@ -237,236 +217,223 @@ const AdminRequestDetails = () => {
             }
           />
 
+          {agreementAccepted && agreement?.payment_structure === "milestone_payments" && (
+            <ListingRequestMilestonePaymentAdminActions
+              milestones={milestones}
+              isPending={confirmMilestonePaymentMutation.isPending}
+              error={confirmMilestonePaymentMutation.error}
+              onConfirmPayment={(paymentScheduleItemId) =>
+                confirmMilestonePaymentMutation.mutateAsync({ paymentScheduleItemId })
+              }
+            />
+          )}
+
           <ListingRequestChangeOrderPaymentAdminActions
             agreement={agreement}
             isPending={confirmChangeOrderPaymentMutation.isPending}
             error={confirmChangeOrderPaymentMutation.error}
             onConfirmPayment={(paymentScheduleItemId) =>
-              confirmChangeOrderPaymentMutation.mutateAsync({
-                paymentScheduleItemId,
-              })
+              confirmChangeOrderPaymentMutation.mutateAsync({ paymentScheduleItemId })
             }
           />
 
           <ListingRequestFinalBalancePaymentAdminActions
             agreement={agreement}
-            isPending={
-              confirmFinalBalancePaymentMutation.isPending
-            }
+            isPending={confirmFinalBalancePaymentMutation.isPending}
             error={confirmFinalBalancePaymentMutation.error}
             onConfirmPayment={(paymentScheduleItemId) =>
-              confirmFinalBalancePaymentMutation.mutateAsync({
-                paymentScheduleItemId,
-              })
+              confirmFinalBalancePaymentMutation.mutateAsync({ paymentScheduleItemId })
             }
           />
-
-          <ListingRequestAgreementWorkReadinessCard
-            requestStatus={request.status}
-            agreement={agreement}
-          />
-
-          <div className={classes.metaGrid}>
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Buyer</div>
-              <div className={classes.metaValue}>
-                {profileText(buyer, request.buyer_user_id)}
-              </div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Creator</div>
-              <div className={classes.metaValue}>
-                {profileText(creator, request.creator_user_id)}
-              </div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Status</div>
-              <div className={classes.metaValue}>
-                {getListingRequestStatusLabel(request.status, request)}
-              </div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Submitted</div>
-              <div className={classes.metaValue}>
-                {dateText(request.created_at)}
-              </div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Last updated</div>
-              <div className={classes.metaValue}>
-                {dateText(request.updated_at)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className={classes.card}>
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Frozen listing snapshot</h2>
-            <p className={classes.text}>
-              This is the listing state captured when the buyer submitted the request.
-            </p>
-          </div>
-
-          <div className={classes.metaGrid}>
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Title</div>
-              <div className={classes.metaValue}>{snapshot.title}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Price</div>
-              <div className={classes.metaValue}>
-                {priceText(
-                  snapshot.price_type,
-                  snapshot.price_min,
-                  snapshot.price_max
-                )}
-              </div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Purchase flow</div>
-              <div className={classes.metaValue}>{snapshot.fulfilment_mode}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Offering type</div>
-              <div className={classes.metaValue}>{snapshot.offering_type}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Category</div>
-              <div className={classes.metaValue}>{snapshot.category}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Listing last updated</div>
-              <div className={classes.metaValue}>
-                {dateText(snapshot.updated_at)}
-              </div>
-            </div>
-          </div>
-
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Deliverables</h2>
-
-            {snapshot.deliverables.length > 0 ? (
-              <div className={classes.list}>
-                {snapshot.deliverables.map((deliverable) => (
-                  <div key={deliverable} className={classes.listItem}>
-                    {deliverable}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className={classes.text}>No deliverables were listed.</p>
-            )}
-          </div>
-
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Tags</h2>
-
-            {snapshot.tags.length > 0 ? (
-              <div className={classes.list}>
-                {snapshot.tags.map((tag) => (
-                  <div key={tag} className={classes.listItem}>
-                    {tag}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className={classes.text}>No tags were listed.</p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {agreement?.status === "buyer_accepted" && (
+        </>
+      ),
+    },
+    {
+      id: "request",
+      title: "Buyer request",
+      summary: "Brief, timeline, budget and references",
+      ...flags("request"),
+      defaultOpen: true,
+      content: (
+        <ListingRequestSubmissionDetails
+          requestTitle={request.request_title}
+          requestDetails={request.request_details}
+          fallbackMessage={request.message}
+          requestedTimeline={request.requested_timeline}
+          budgetAmount={request.budget_amount}
+          referenceLinks={request.reference_links}
+        />
+      ),
+    },
+    {
+      id: "agreement",
+      title: "Project agreement",
+      summary: summarizeAgreement(agreement, "Not created yet"),
+      ...flags("agreement"),
+      content: (
+        <ListingRequestAgreementSummary
+          agreement={agreement}
+          isLoading={agreementQuery.isLoading}
+        />
+      ),
+    },
+    {
+      id: "milestones",
+      title: "Milestones",
+      summary: summarizeMilestones(milestones),
+      ...flags("milestones"),
+      visible: agreementAccepted && agreement?.payment_structure === "milestone_payments",
+      content: (
+        <ListingRequestMilestoneSummary
+          milestones={milestones}
+          submissions={milestoneSubmissions}
+          viewer="admin"
+          isLoading={milestonesAreLoading}
+          error={milestoneError}
+        />
+      ),
+    },
+    {
+      id: "delivery",
+      title: "Final delivery",
+      summary: summarizeDeliveries(finalDeliveries),
+      ...flags("delivery"),
+      visible: agreementAccepted,
+      content: (
+        <ListingRequestFinalDeliverySummary
+          finalDeliveries={finalDeliveries}
+          viewer="admin"
+          isLoading={finalDeliveriesQuery.isLoading}
+          error={finalDeliveriesQuery.error}
+        />
+      ),
+    },
+    {
+      id: "changeOrders",
+      title: "Change orders",
+      summary: summarizeChangeOrders(changeOrders),
+      ...flags("changeOrders"),
+      visible: agreementAccepted,
+      content: (
+        <ListingRequestChangeOrderSummary
+          changeOrders={changeOrders}
+          viewer="admin"
+          isLoading={changeOrdersQuery.isLoading}
+          error={changeOrdersQuery.error}
+        />
+      ),
+    },
+    {
+      id: "progress",
+      title: "Progress updates",
+      summary: summarizeProgress(progressUpdates),
+      ...flags("progress"),
+      visible: agreementAccepted,
+      content: (
         <>
-          {agreement.payment_structure === "milestone_payments" && (
-            <>
-              <ListingRequestMilestoneSummary
-                milestones={milestones}
-                submissions={milestoneSubmissions}
-                viewer="admin"
-                isLoading={milestonesAreLoading}
-                error={milestoneError}
-              />
-
-              <ListingRequestMilestonePaymentAdminActions
-                milestones={milestones}
-                isPending={
-                  confirmMilestonePaymentMutation.isPending
-                }
-                error={
-                  confirmMilestonePaymentMutation.error
-                }
-                onConfirmPayment={(paymentScheduleItemId) =>
-                  confirmMilestonePaymentMutation.mutateAsync({
-                    paymentScheduleItemId,
-                  })
-                }
-              />
-            </>
-          )}
-
-          <ListingRequestChangeOrderSummary
-            changeOrders={changeOrdersQuery.data ?? []}
-            viewer="admin"
-            isLoading={changeOrdersQuery.isLoading}
-            error={changeOrdersQuery.error}
-          />
-
-          <ListingRequestFinalDeliverySummary
-            finalDeliveries={finalDeliveries}
-            viewer="admin"
-            isLoading={finalDeliveriesQuery.isLoading}
-            error={finalDeliveriesQuery.error}
-          />
-
-          <ListingRequestProgressUpdateScheduleCard
-            agreement={agreement}
-            updates={progressUpdatesQuery.data ?? []}
-          />
+          <ListingRequestProgressUpdateScheduleCard agreement={agreement} updates={progressUpdates} />
 
           <ListingRequestProgressUpdateTimeline
-            updates={progressUpdatesQuery.data ?? []}
+            updates={progressUpdates}
             isLoading={progressUpdatesQuery.isLoading}
             error={progressUpdatesQuery.error}
           />
         </>
-      )}
+      ),
+    },
+    {
+      id: "snapshot",
+      title: "Listing snapshot",
+      summary: "Captured when the buyer submitted",
+      ...flags("snapshot"),
+      content: <ListingSnapshotDetails snapshot={snapshot} />,
+    },
+  ];
 
-      <RequestConversationThread
-        requestId={request.id}
-        buyerLabel={profileText(buyer, request.buyer_user_id)}
-        creatorLabel={profileText(creator, request.creator_user_id)}
-        viewer="admin"
-        requestReadOnly={
-          request.status === "archived" || request.status === "declined"
-        }
-        requestReadOnlyMessage={
-          request.status === "archived"
-            ? "Archived requests are read-only."
-            : "Declined requests are read-only because the conversation has been ended."
-        }
-      />
+  const meta = [
+    <span key="parties">
+      <span className="font-semibold text-zinc-900">{buyerLabel}</span> →{" "}
+      <span className="font-semibold text-zinc-900">{creatorLabel}</span>
+    </span>,
+    <span key="submitted">Submitted {workspaceDate(request.created_at)}</span>,
+    request.status === "completed" && request.completed_at ? (
+      <span key="completed">Completed {workspaceDate(request.completed_at)}</span>
+    ) : (
+      <span key="updated">Updated {workspaceDate(request.updated_at)}</span>
+    ),
+  ];
 
-      <div className={classes.row}>
-        <Link className={classes.btnPrimary} to={`/admin/listing-revisions/${request.listing_id}`}>
-          View listing revisions
-        </Link>
-
-        <Link className={classes.btnOutline} to="/admin/requests">
-          Back to admin requests
-        </Link>
-      </div>
-    </div>
+  return (
+    <RequestWorkspace
+      header={
+        <RequestWorkspaceHeader
+          backTo="/admin/requests"
+          backLabel="Back to admin requests"
+          eyebrow="Admin request review"
+          title={snapshot.title}
+          meta={meta}
+          statusLabel={getListingRequestStatusLabel(request.status, request)}
+          statusTone={getListingRequestStatusTone(request.status)}
+          stages={getRequestStages(workspaceInput)}
+          actions={
+            <Link
+              className={classes.btnOutline}
+              to={`/admin/listing-revisions/${request.listing_id}`}
+            >
+              View listing revisions
+            </Link>
+          }
+          notice={
+            (request.status === "declined" || request.status === "archived") && (
+              <RequestStatusNotice
+                status={request.status}
+                reason={request.creator_status_reason}
+                archiveContext={request}
+              />
+            )
+          }
+        />
+      }
+      nextStep={
+        <RequestNextStepCard
+          step={nextStep}
+          viewer="admin"
+          isLoading={workspaceLoading}
+          buyerLabel={buyerLabel}
+          creatorLabel={creatorLabel}
+        />
+      }
+      conversation={
+        <RequestConversationThread
+          requestId={request.id}
+          buyerLabel={buyerLabel}
+          creatorLabel={creatorLabel}
+          viewer="admin"
+          requestReadOnly={requestReadOnly}
+          requestReadOnlyMessage={
+            request.status === "archived"
+              ? "Archived requests are read-only."
+              : "Declined requests are read-only because the conversation has been ended."
+          }
+        />
+      }
+      sections={
+        <WorkspaceSectionList
+          requestStatus={request.status}
+          sections={sections}
+          order={[
+            "payments",
+            "request",
+            "agreement",
+            "milestones",
+            "delivery",
+            "changeOrders",
+            "progress",
+            "snapshot",
+          ]}
+        />
+      }
+    />
   );
 };
 

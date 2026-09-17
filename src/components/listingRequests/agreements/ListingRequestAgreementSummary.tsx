@@ -1,366 +1,284 @@
-import { useState } from "react";
+import type { ReactNode } from "react";
 import {
   getListingRequestAgreementStatusLabel,
   getListingRequestAgreementStatusSummary,
-  getListingRequestPaymentStructureLabel,
-  getListingRequestPaymentStructureSummary,
-  getListingRequestPaymentTimingLabel,
-  getListingRequestPaymentTimingSummary,
   getListingRequestBuyerHoldReasonLabel,
+  getListingRequestPaymentStructureLabel,
+  getListingRequestPaymentTimingLabel,
 } from "../../../domain/listings/listingRequestAgreements";
 import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
-import { Collapse } from "../../../lib/motion";
 
 type ListingRequestAgreementSummaryProps = {
   agreement: ListingRequestAgreementRow | null;
   isLoading?: boolean;
-  collapsible?: boolean;
-  // May flip after the agreement loads; it applies until the viewer toggles manually.
-  defaultOpen?: boolean;
 };
 
 const classes = {
-  card: "card p-6",
-  section: "space-y-4",
-  header: "space-y-1",
-  headerRow: "flex items-start justify-between gap-4",
-  headerText: "min-w-0 flex-1 space-y-4",
-  toggle: "btnOutline shrink-0",
-  body: "space-y-5",
-  collapsibleBody: "space-y-5 pt-5",
-  title: "font-display text-base font-extrabold tracking-tight",
-  h3: "text-sm font-extrabold text-zinc-900",
-  text: "text-sm text-zinc-600",
-  muted: "text-xs text-zinc-500",
-  grid: "grid gap-4 sm:grid-cols-2",
-  metaBlock: "space-y-1",
-  metaLabel: "metaLabel",
-  metaValue: "metaValue",
+  statusRow: "flex flex-wrap items-center gap-2 text-xs text-zinc-500",
   badge:
-    "inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-700",
-  list: "space-y-2",
-  item:
-    "notice noticeNeutral",
-  itemTitle: "font-bold text-zinc-900",
-  itemText: "mt-1 text-sm text-zinc-600",
-  payment:
-    "rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-700",
-  warning:
-    "notice noticeWarning",
+    "inline-flex rounded-full border border-zinc-200 bg-zinc-100 px-2 py-0.5 text-[11px] font-semibold text-zinc-700",
+  text: "text-sm text-zinc-600",
+  body: "space-y-5",
+
+  group: "space-y-2",
+  groupTitle: "text-[11px] font-semibold uppercase tracking-[0.1em] text-zinc-500",
+  rows: "divide-y divide-[var(--hairline)] rounded-xl border border-[var(--hairline)]",
+  row: "flex items-start justify-between gap-3 px-3 py-2 text-sm",
+  rowLabel: "text-zinc-600",
+  rowValue: "text-right font-semibold text-zinc-900",
+  rowMain: "min-w-0",
+  rowTitle: "font-medium text-zinc-900",
+  rowSub: "mt-0.5 text-xs text-zinc-500",
+  rowAside: "shrink-0 text-right text-xs font-semibold tabular-nums text-zinc-700",
+  note: "mt-0.5 text-xs font-normal text-zinc-500",
+  bullets: "list-disc space-y-1 pl-5 text-sm text-zinc-700 marker:text-zinc-400",
+  chips: "flex flex-wrap gap-1.5",
+  chip: "rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700",
+  confirmedOn: "text-xs font-medium text-zinc-500",
+  warning: "notice noticeWarning",
 } as const;
 
-const formatMoney = (amount: number | null, currency: string): string => {
-  if (amount === null) {
-    return "Not set";
-  }
-
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount);
-};
+const formatMoney = (amount: number | null, currency: string): string =>
+  amount === null
+    ? "Not set"
+    : new Intl.NumberFormat("en-CA", {
+      style: "currency",
+      currency: currency.toUpperCase(),
+    }).format(amount);
 
 const formatDate = (value?: string | null): string =>
   value
-    ? new Intl.DateTimeFormat("en-CA", {
-      dateStyle: "medium",
-    }).format(new Date(value))
+    ? new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" }).format(new Date(value))
     : "Not set";
 
 const sortedBySortOrder = <T extends { sort_order: number }>(items: T[]): T[] =>
   [...items].sort((a, b) => a.sort_order - b.sort_order);
 
-const sortedAcknowledgements = (
+const scheduleStatusLabel = (status: string): string =>
+  status === "payment_required"
+    ? "Due now"
+    : status === "paid"
+      ? "Paid"
+      : status === "waived"
+        ? "Waived"
+        : status === "cancelled"
+          ? "Cancelled"
+          : "Upcoming";
+
+// Acknowledgements are usually all given in one sitting, so group them under a single date.
+const groupAcknowledgementsByDay = (
   acknowledgements: ListingRequestAgreementRow["listing_request_agreement_acknowledgements"]
-) =>
-  [...acknowledgements].sort((a, b) =>
-    a.created_at.localeCompare(b.created_at)
-  );
+) => {
+  const groups = new Map<string, typeof acknowledgements>();
 
-const ListingRequestAgreementSummary = ({
-  agreement,
-  isLoading = false,
-  collapsible = false,
-  defaultOpen = false,
-}: ListingRequestAgreementSummaryProps) => {
-  const [openOverride, setOpenOverride] = useState<boolean | null>(null);
-  const isOpen = collapsible ? openOverride ?? defaultOpen : true;
+  [...acknowledgements]
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .forEach((acknowledgement) => {
+      const day = formatDate(acknowledgement.created_at);
+      groups.set(day, [...(groups.get(day) ?? []), acknowledgement]);
+    });
 
-  if (isLoading) {
-    return (
-      <div className={classes.card}>
-        <p className={classes.text}>Loading project agreement…</p>
-      </div>
-    );
-  }
+  return [...groups.entries()];
+};
 
-  if (!agreement) {
-    return (
-      <div className={classes.card}>
-        <div className={classes.header}>
-          <h2 className={classes.title}>Project agreement</h2>
-          <p className={classes.text}>
-            No project agreement has been created for this request yet.
-          </p>
-        </div>
-      </div>
-    );
-  }
+const Group = ({ title, children }: { title: string; children: ReactNode }) => (
+  <section className={classes.group}>
+    <h3 className={classes.groupTitle}>{title}</h3>
+    {children}
+  </section>
+);
 
+const TermRow = ({ label, children }: { label: string; children: ReactNode }) => (
+  <div className={classes.row}>
+    <dt className={classes.rowLabel}>{label}</dt>
+    <dd className={classes.rowValue}>{children}</dd>
+  </div>
+);
+
+const AgreementDetails = ({ agreement }: { agreement: ListingRequestAgreementRow }) => {
   const completedHoldDays = agreement.listing_request_timeline_holds
     .filter((hold) => hold.ended_at)
     .reduce((total, hold) => total + hold.rounded_extension_days, 0);
 
-  const details = (
+  const hasActiveHold = agreement.listing_request_timeline_holds.some((hold) => !hold.ended_at);
+  const adjustedDiffers =
+    agreement.adjusted_estimated_completion_at &&
+    agreement.adjusted_estimated_completion_at !== agreement.estimated_completion_at;
+  const checklist = sortedBySortOrder(agreement.listing_request_agreement_items);
+  const schedule = sortedBySortOrder(agreement.listing_request_payment_schedule_items);
+  const policies = [
+    agreement.additional_cost_policy,
+    agreement.revision_policy,
+    agreement.update_schedule_summary,
+  ].filter((policy): policy is string => Boolean(policy));
+
+  return (
     <>
-      <div className={classes.grid}>
-        <div className={classes.metaBlock}>
-          <div className={classes.metaLabel}>Payment structure</div>
-          <div className={classes.metaValue}>
-            {getListingRequestPaymentStructureLabel(
-              agreement.payment_structure
-            )}
-          </div>
-          <p className={classes.muted}>
-            {getListingRequestPaymentStructureSummary(
-              agreement.payment_structure
-            )}
-          </p>
-        </div>
-
-        <div className={classes.metaBlock}>
-          <div className={classes.metaLabel}>Total</div>
-          <div className={classes.metaValue}>
-            {formatMoney(agreement.total_amount, agreement.currency)}
-          </div>
-        </div>
-
-        <div className={classes.metaBlock}>
-          <div className={classes.metaLabel}>Deposit</div>
-          <div className={classes.metaValue}>
-            {formatMoney(agreement.deposit_amount, agreement.currency)}
-          </div>
-        </div>
-
-        <div className={classes.metaBlock}>
-          <div className={classes.metaLabel}>Included revisions</div>
-          <div className={classes.metaValue}>
-            {agreement.included_revision_count}
-          </div>
-        </div>
-
-        <div className={classes.metaBlock}>
-          <div className={classes.metaLabel}>Estimated completion</div>
-          <div className={classes.metaValue}>
-            {formatDate(agreement.estimated_completion_at)}
-          </div>
-        </div>
-
-        <div className={classes.metaBlock}>
-          <div className={classes.metaLabel}>Adjusted completion</div>
-          <div className={classes.metaValue}>
-            {formatDate(agreement.adjusted_estimated_completion_at)}
-          </div>
-          {completedHoldDays > 0 && (
-            <p className={classes.muted}>
-              Includes +{completedHoldDays} day
-              {completedHoldDays === 1 ? "" : "s"} from buyer-side holds.
-            </p>
+      <Group title="Terms">
+        <dl className={classes.rows}>
+          <TermRow label="Payment structure">
+            {getListingRequestPaymentStructureLabel(agreement.payment_structure)}
+          </TermRow>
+          <TermRow label="Total">{formatMoney(agreement.total_amount, agreement.currency)}</TermRow>
+          {agreement.deposit_amount !== null && (
+            <TermRow label="Deposit">
+              {formatMoney(agreement.deposit_amount, agreement.currency)}
+            </TermRow>
           )}
-        </div>
-      </div>
+          <TermRow label="Included revisions">{agreement.included_revision_count}</TermRow>
+          <TermRow label={adjustedDiffers ? "Adjusted completion" : "Estimated completion"}>
+            {formatDate(agreement.adjusted_estimated_completion_at || agreement.estimated_completion_at)}
+            {completedHoldDays > 0 && (
+              <p className={classes.note}>
+                Includes +{completedHoldDays} day{completedHoldDays === 1 ? "" : "s"} from buyer-side holds.
+              </p>
+            )}
+          </TermRow>
+        </dl>
+      </Group>
 
-      <div className={classes.section}>
-        <h3 className={classes.h3}>Scope summary</h3>
+      <Group title="Scope">
         <p className={classes.text}>{agreement.scope_summary}</p>
-      </div>
-
-      <div className={classes.section}>
-        <h3 className={classes.h3}>Included deliverables</h3>
 
         {agreement.included_deliverables.length > 0 ? (
-          <div className={classes.list}>
+          <div className={classes.chips}>
             {agreement.included_deliverables.map((deliverable) => (
-              <div key={deliverable} className={classes.item}>
+              <span key={deliverable} className={classes.chip}>
                 {deliverable}
-              </div>
+              </span>
             ))}
           </div>
         ) : (
           <p className={classes.text}>No deliverables listed.</p>
         )}
-      </div>
+      </Group>
 
-      <div className={classes.section}>
-        <h3 className={classes.h3}>Scope checklist</h3>
-
-        {agreement.listing_request_agreement_items.length > 0 ? (
-          <div className={classes.list}>
-            {sortedBySortOrder(agreement.listing_request_agreement_items).map(
-              (item) => (
-                <div key={item.id} className={classes.item}>
-                  <div className={classes.itemTitle}>{item.title}</div>
-
-                  {item.description && (
-                    <p className={classes.itemText}>{item.description}</p>
-                  )}
-
-                  <p className={classes.itemText}>
-                    {getListingRequestPaymentTimingLabel(item.payment_timing)}
-                    {item.price_amount !== null
-                      ? ` · ${formatMoney(item.price_amount, agreement.currency)}`
-                      : ""}
-                    {item.timeline_impact_days
-                      ? ` · +${item.timeline_impact_days} day${item.timeline_impact_days === 1 ? "" : "s"
-                      }`
-                      : ""}
-                  </p>
+      {checklist.length > 0 && (
+        <Group title="Scope checklist">
+          <ul className={classes.rows}>
+            {checklist.map((item) => (
+              <li key={item.id} className={classes.row}>
+                <div className={classes.rowMain}>
+                  <div className={classes.rowTitle}>{item.title}</div>
+                  {item.description && <div className={classes.rowSub}>{item.description}</div>}
                 </div>
-              )
-            )}
-          </div>
-        ) : (
-          <p className={classes.text}>No checklist items listed.</p>
-        )}
-      </div>
-
-      <div className={classes.section}>
-        <h3 className={classes.h3}>Payment schedule</h3>
-
-        {agreement.listing_request_payment_schedule_items.length > 0 ? (
-          <div className={classes.list}>
-            {sortedBySortOrder(
-              agreement.listing_request_payment_schedule_items
-            ).map((paymentItem) => (
-              <div key={paymentItem.id} className={classes.payment}>
-                <div className={classes.itemTitle}>{paymentItem.title}</div>
-
-                {paymentItem.description && (
-                  <p className={classes.itemText}>{paymentItem.description}</p>
-                )}
-
-                <p className={classes.itemText}>
-                  {formatMoney(paymentItem.amount, paymentItem.currency)} ·{" "}
-                  {getListingRequestPaymentTimingLabel(
-                    paymentItem.payment_timing
-                  )}
-                </p>
-
-                <p className={classes.muted}>
-                  {getListingRequestPaymentTimingSummary(
-                    paymentItem.payment_timing
-                  )}
-                </p>
-              </div>
+                <div className={classes.rowAside}>
+                  {[
+                    getListingRequestPaymentTimingLabel(item.payment_timing),
+                    item.price_amount ? formatMoney(item.price_amount, agreement.currency) : null,
+                    item.timeline_impact_days
+                      ? `+${item.timeline_impact_days} day${item.timeline_impact_days === 1 ? "" : "s"}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </div>
+              </li>
             ))}
-          </div>
+          </ul>
+        </Group>
+      )}
+
+      <Group title="Payment schedule">
+        {schedule.length > 0 ? (
+          <ul className={classes.rows}>
+            {schedule.map((paymentItem) => (
+              <li key={paymentItem.id} className={classes.row}>
+                <div className={classes.rowMain}>
+                  <div className={classes.rowTitle}>{paymentItem.title}</div>
+                  <div className={classes.rowSub}>
+                    {getListingRequestPaymentTimingLabel(paymentItem.payment_timing)}
+                  </div>
+                </div>
+                <div className={classes.rowAside}>
+                  {`${formatMoney(paymentItem.amount, paymentItem.currency)} · ${scheduleStatusLabel(paymentItem.status)}`}
+                </div>
+              </li>
+            ))}
+          </ul>
         ) : (
           <p className={classes.text}>No payment schedule items listed.</p>
         )}
-      </div>
+      </Group>
 
-      <div className={classes.section}>
-        <h3 className={classes.h3}>Policies</h3>
-        <p className={classes.text}>{agreement.additional_cost_policy}</p>
-
-        {agreement.revision_policy && (
-          <p className={classes.text}>{agreement.revision_policy}</p>
-        )}
-
-        {agreement.update_schedule_summary && (
-          <p className={classes.text}>{agreement.update_schedule_summary}</p>
-        )}
-      </div>
-
-      {agreement.listing_request_agreement_acknowledgements.length > 0 && (
-        <div className={classes.section}>
-          <h3 className={classes.h3}>Buyer confirmations</h3>
-
-          <div className={classes.list}>
-            {sortedAcknowledgements(
-              agreement.listing_request_agreement_acknowledgements
-            ).map((acknowledgement) => (
-              <div key={acknowledgement.id} className={classes.item}>
-                <div className={classes.itemTitle}>
-                  {acknowledgement.acknowledgement_label}
-                </div>
-
-                <p className={classes.itemText}>
-                  Confirmed on {formatDate(acknowledgement.created_at)}
-                </p>
-              </div>
+      {policies.length > 0 && (
+        <Group title="Policies">
+          <ul className={classes.bullets}>
+            {policies.map((policy) => (
+              <li key={policy}>{policy}</li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </Group>
       )}
 
-      {agreement.listing_request_timeline_holds.some((hold) => !hold.ended_at) && (
+      {agreement.listing_request_agreement_acknowledgements.length > 0 && (
+        <Group title="Buyer confirmations">
+          {groupAcknowledgementsByDay(agreement.listing_request_agreement_acknowledgements).map(
+            ([day, acknowledgements]) => (
+              <div key={day} className="space-y-1.5">
+                <p className={classes.confirmedOn}>Confirmed on {day}</p>
+                <ul className={classes.bullets}>
+                  {acknowledgements.map((acknowledgement) => (
+                    <li key={acknowledgement.id}>{acknowledgement.acknowledgement_label}</li>
+                  ))}
+                </ul>
+              </div>
+            )
+          )}
+        </Group>
+      )}
+
+      {hasActiveHold && (
         <div className={classes.warning}>
-          This project is currently waiting on buyer action. The estimated
-          completion date may be adjusted after the hold is resolved.
+          This project is currently waiting on buyer action. The estimated completion date may be
+          adjusted after the hold is resolved.
         </div>
       )}
 
       {agreement.listing_request_timeline_holds.length > 0 && (
-        <div className={classes.section}>
-          <h3 className={classes.h3}>Timeline holds</h3>
-
-          <div className={classes.list}>
+        <Group title="Timeline holds">
+          <ul className={classes.rows}>
             {agreement.listing_request_timeline_holds.map((hold) => (
-              <div key={hold.id} className={classes.item}>
-                <div className={classes.itemTitle}>
+              <li key={hold.id} className={classes.row}>
+                <div className={classes.rowTitle}>
                   {getListingRequestBuyerHoldReasonLabel(hold.reason)}
                 </div>
-                <p className={classes.itemText}>
+                <div className={classes.rowAside}>
                   {hold.ended_at
-                    ? `Resolved with +${hold.rounded_extension_days} day${hold.rounded_extension_days === 1 ? "" : "s"
-                    } added.`
+                    ? `Resolved with +${hold.rounded_extension_days} day${hold.rounded_extension_days === 1 ? "" : "s"} added.`
                     : "Currently active."}
-                </p>
-              </div>
+                </div>
+              </li>
             ))}
-          </div>
-        </div>
+          </ul>
+        </Group>
       )}
     </>
   );
+};
+
+// Rendered inside a workspace section, which supplies the title and collapse.
+const ListingRequestAgreementSummary = ({
+  agreement,
+  isLoading = false,
+}: ListingRequestAgreementSummaryProps) => {
+  if (isLoading) {
+    return <p className={classes.text}>Loading project agreement…</p>;
+  }
+
+  if (!agreement) {
+    return <p className={classes.text}>No project agreement has been created for this request yet.</p>;
+  }
 
   return (
-    <div className={classes.card}>
-      <div className={classes.headerRow}>
-        <div className={classes.headerText}>
-          <div className={classes.header}>
-            <h2 className={classes.title}>Project agreement</h2>
-            <p className={classes.text}>
-              Version {agreement.version_number} ·{" "}
-              {getListingRequestAgreementStatusSummary(agreement.status)}
-            </p>
-          </div>
-
-          <span className={classes.badge}>
-            {getListingRequestAgreementStatusLabel(agreement.status)}
-          </span>
-        </div>
-
-        {collapsible && (
-          <button
-            type="button"
-            className={classes.toggle}
-            aria-expanded={isOpen}
-            onClick={() => setOpenOverride(!isOpen)}
-          >
-            {isOpen ? "Hide agreement details" : "Show agreement details"}
-          </button>
-        )}
+    <div className={classes.body}>
+      <div className={classes.statusRow}>
+        <span className={classes.badge}>{getListingRequestAgreementStatusLabel(agreement.status)}</span>
+        <span>
+          Version {agreement.version_number} · {getListingRequestAgreementStatusSummary(agreement.status)}
+        </span>
       </div>
-
-      {collapsible ? (
-        <Collapse open={isOpen} className={classes.collapsibleBody}>
-          {details}
-        </Collapse>
-      ) : (
-        <div className={`${classes.body} pt-5`}>{details}</div>
-      )}
+      <AgreementDetails agreement={agreement} />
     </div>
   );
 };

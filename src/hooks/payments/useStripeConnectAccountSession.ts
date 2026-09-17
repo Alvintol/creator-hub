@@ -104,33 +104,3 @@ export const createStripeConnectAccountSession = async ({
 
   return parseStripeConnectAccountSessionResponse(response);
 };
-
-export const useCreateStripeConnectAccountSession = () => {
-  const queryClient = useQueryClient();
-  const { session, user } = useAuth();
-
-  return useMutation({
-    mutationKey: ["createStripeConnectAccountSession", user?.id ?? null],
-    mutationFn: async ({
-      country,
-      defaultCurrency,
-    }: StripeConnectAccountSessionInput) => {
-      const token = session?.access_token;
-
-      if (!token) {
-        throw new Error("You must be signed in to start Stripe setup.");
-      }
-
-      return createStripeConnectAccountSession({
-        token,
-        country,
-        defaultCurrency,
-      });
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["creatorPaymentAccount"],
-      });
-    },
-  });
-};

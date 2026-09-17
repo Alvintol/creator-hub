@@ -12,11 +12,7 @@ type ListingRequestProgressUpdateTimelineProps = {
 };
 
 const classes = {
-  card: "card p-6",
   section: "space-y-4",
-  header: "space-y-1",
-  title: "font-display text-base font-extrabold tracking-tight",
-  text: "text-sm text-zinc-600",
   list: "space-y-4",
   item:
     "rounded-2xl border border-zinc-200 bg-white px-4 py-4",
@@ -77,15 +73,8 @@ const ListingRequestProgressUpdateTimeline = ({
   const sortedUpdates = sortUpdatesNewestFirst(updates);
 
   return (
-    <div className={classes.card}>
+    <div>
       <div className={classes.section}>
-        <div className={classes.header}>
-          <h2 className={classes.title}>Project progress</h2>
-
-          <p className={classes.text}>
-            Creator updates recorded throughout the active project.
-          </p>
-        </div>
 
         {isLoading && (
           <div className={classes.loading}>

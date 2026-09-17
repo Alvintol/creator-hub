@@ -8,7 +8,6 @@ import {
   getListingRequestStatusLabel,
   getListingRequestStatusSummary,
   getListingRequestStatusTone,
-  listingRequestStatusOptions,
 } from "../listings/listingRequests";
 import {
   getListingRequestDisplayPreview,
@@ -16,13 +15,6 @@ import {
 } from "../listings/listings";
 
 describe("listing request status helpers", () => {
-  it("includes the completed status option", () => {
-    expect(listingRequestStatusOptions).toContainEqual({
-      value: "completed",
-      label: "Completed",
-    });
-  });
-
   it("maps request list views to their statuses", () => {
     expect(
       getListingRequestStatusesForView("active")

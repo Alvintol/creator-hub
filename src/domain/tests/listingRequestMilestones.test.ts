@@ -5,8 +5,6 @@ import {
 } from "vitest";
 
 import {
-  canBuyerRespondToListingRequestMilestone,
-  canConfirmListingRequestMilestonePayment,
   canSubmitListingRequestMilestone,
   getActiveListingRequestMilestone,
   getListingRequestMilestonePlanTotal,
@@ -110,30 +108,6 @@ describe("listing request milestones", () => {
 
     expect(
       canSubmitListingRequestMilestone("submitted")
-    ).toBe(false);
-
-    expect(
-      canBuyerRespondToListingRequestMilestone(
-        "submitted"
-      )
-    ).toBe(true);
-
-    expect(
-      canBuyerRespondToListingRequestMilestone(
-        "pending"
-      )
-    ).toBe(false);
-
-    expect(
-      canConfirmListingRequestMilestonePayment(
-        "payment_required"
-      )
-    ).toBe(true);
-
-    expect(
-      canConfirmListingRequestMilestonePayment(
-        "buyer_approved"
-      )
     ).toBe(false);
   });
 

@@ -17,11 +17,7 @@ type ListingRequestPaymentsCardProps = {
 };
 
 const classes = {
-  card: "card p-6",
   section: "space-y-4",
-  header: "space-y-1",
-  title: "font-display text-base font-extrabold tracking-tight",
-  text: "text-sm text-zinc-600",
   list: "space-y-4",
   item:
     "rounded-2xl border border-zinc-200 bg-white px-4 py-4 shadow-sm",
@@ -71,7 +67,7 @@ const ListingRequestPaymentsCard = ({
 }: ListingRequestPaymentsCardProps) => {
   if (isLoading) {
     return (
-      <section className={classes.card}>
+      <section>
         <div className={classes.loading}>Loading payments…</div>
       </section>
     );
@@ -79,7 +75,7 @@ const ListingRequestPaymentsCard = ({
 
   if (error) {
     return (
-      <section className={classes.card}>
+      <section>
         <div className={classes.error}>
           {getErrorMessage(error)}
         </div>
@@ -92,15 +88,8 @@ const ListingRequestPaymentsCard = ({
   }
 
   return (
-    <section className={classes.card}>
+    <section>
       <div className={classes.section}>
-        <div className={classes.header}>
-          <h2 className={classes.title}>Payments</h2>
-          <p className={classes.text}>
-            Complete project payments securely through Stripe inside
-            CreatorHub.
-          </p>
-        </div>
 
         <div className={classes.list}>
           {payments.map((payment) => {
