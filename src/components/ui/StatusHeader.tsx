@@ -1,10 +1,15 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import type { RequestStage } from "../../../domain/listings/requestWorkspace";
+
+export type StatusHeaderStage = {
+  key: string;
+  label: string;
+  state: "done" | "current" | "upcoming";
+};
 
 type StatusTone = "review" | "success" | "danger" | "muted";
 
-type RequestWorkspaceHeaderProps = {
+type StatusHeaderProps = {
   backTo: string;
   backLabel: string;
   eyebrow: string;
@@ -12,7 +17,7 @@ type RequestWorkspaceHeaderProps = {
   meta: ReactNode[];
   statusLabel: string;
   statusTone: StatusTone;
-  stages: RequestStage[];
+  stages: StatusHeaderStage[];
   actions?: ReactNode;
   notice?: ReactNode;
 };
@@ -53,14 +58,14 @@ const classes = {
   compactFill: "h-full rounded-full bg-gradient-to-r from-[rgb(var(--accent))] to-[rgb(var(--brand))]",
 } as const;
 
-const stageClass = (state: RequestStage["state"]) =>
+const stageClass = (state: StatusHeaderStage["state"]) =>
   state === "done"
     ? classes.stageDone
     : state === "current"
       ? classes.stageCurrent
       : classes.stageUpcoming;
 
-const RequestWorkspaceHeader = ({
+const StatusHeader = ({
   backTo,
   backLabel,
   eyebrow,
@@ -71,7 +76,7 @@ const RequestWorkspaceHeader = ({
   stages,
   actions,
   notice,
-}: RequestWorkspaceHeaderProps) => {
+}: StatusHeaderProps) => {
   const currentIndex = stages.findIndex((stage) => stage.state === "current");
   const doneCount = stages.filter((stage) => stage.state === "done").length;
   const position = currentIndex >= 0 ? currentIndex + 1 : doneCount;
@@ -137,4 +142,4 @@ const RequestWorkspaceHeader = ({
   );
 };
 
-export default RequestWorkspaceHeader;
+export default StatusHeader;

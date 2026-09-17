@@ -24,7 +24,7 @@ import ActionMenu from "../../components/ui/ActionMenu";
 import RequestNextStepCard from "../../components/listingRequests/workspace/RequestNextStepCard";
 import RequestStatusNotice from "../../components/listingRequests/workspace/RequestStatusNotice";
 import RequestWorkspace from "../../components/listingRequests/workspace/RequestWorkspace";
-import RequestWorkspaceHeader from "../../components/listingRequests/workspace/RequestWorkspaceHeader";
+import StatusHeader from "../../components/ui/StatusHeader";
 import WorkspaceSectionList from "../../components/listingRequests/workspace/WorkspaceSectionList";
 import {
   getSectionFlags,
@@ -564,7 +564,7 @@ const BuyerRequestDetails = () => {
   return (
     <RequestWorkspace
       header={
-        <RequestWorkspaceHeader
+        <StatusHeader
           backTo={backTo}
           backLabel="Back to my requests"
           eyebrow="My request"
