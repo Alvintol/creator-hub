@@ -288,6 +288,11 @@
     box-shadow: var(--ring);
   }
 
+  /* Fields flagged by validation keep a red edge until fixed. */
+  .formControl[aria-invalid="true"] {
+    border-color: rgb(220 38 38 / 0.6);
+  }
+
   .formControl:disabled {
     @apply cursor-not-allowed;
     color: rgb(var(--muted));
