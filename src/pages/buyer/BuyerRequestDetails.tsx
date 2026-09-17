@@ -20,7 +20,7 @@ import ListingRequestFinalDeliverySummary from '../../components/listingRequests
 import ListingRequestProgressUpdateScheduleCard from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateScheduleCard';
 import ListingRequestProgressUpdateTimeline from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateTimeline';
 import ListingSnapshotDetails from "../../components/listingRequests/workspace/ListingSnapshotDetails";
-import RequestManageMenu from "../../components/listingRequests/workspace/RequestManageMenu";
+import ActionMenu from "../../components/ui/ActionMenu";
 import RequestNextStepCard from "../../components/listingRequests/workspace/RequestNextStepCard";
 import RequestStatusNotice from "../../components/listingRequests/workspace/RequestStatusNotice";
 import RequestWorkspace from "../../components/listingRequests/workspace/RequestWorkspace";
@@ -507,7 +507,7 @@ const BuyerRequestDetails = () => {
 
   const manageMenu =
     request.status === "submitted" ? (
-      <RequestManageMenu>
+      <ActionMenu>
         <p className={classes.text}>
           Archive this request if you no longer want the creator to review it. You can
           submit a new request for this listing after archiving.
@@ -558,7 +558,7 @@ const BuyerRequestDetails = () => {
             Archive request
           </button>
         )}
-      </RequestManageMenu>
+      </ActionMenu>
     ) : undefined;
 
   return (

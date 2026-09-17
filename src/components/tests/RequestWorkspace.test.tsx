@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { RequestNextStep } from "../../domain/listings/requestWorkspace";
 import ExpandingFormPanel from "../listingRequests/workspace/ExpandingFormPanel";
-import RequestManageMenu from "../listingRequests/workspace/RequestManageMenu";
+import ActionMenu from "../ui/ActionMenu";
 import RequestNextStepCard from "../listingRequests/workspace/RequestNextStepCard";
 import RequestWorkspace from "../listingRequests/workspace/RequestWorkspace";
 import WorkspaceSectionList from "../listingRequests/workspace/WorkspaceSectionList";
@@ -182,12 +182,12 @@ describe("ExpandingFormPanel", () => {
   });
 });
 
-describe("RequestManageMenu", () => {
+describe("ActionMenu", () => {
   it("opens on click and closes on Escape", () => {
     render(
-      <RequestManageMenu>
+      <ActionMenu>
         <button type="button">Archive request</button>
-      </RequestManageMenu>
+      </ActionMenu>
     );
 
     expect(screen.queryByRole("button", { name: "Archive request" })).not.toBeInTheDocument();

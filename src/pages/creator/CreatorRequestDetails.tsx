@@ -12,7 +12,7 @@ import {
 import { getRequestNextStep, getRequestStages } from "../../domain/listings/requestWorkspace";
 import ExpandingFormPanel from "../../components/listingRequests/workspace/ExpandingFormPanel";
 import ListingSnapshotDetails from "../../components/listingRequests/workspace/ListingSnapshotDetails";
-import RequestManageMenu from "../../components/listingRequests/workspace/RequestManageMenu";
+import ActionMenu from "../../components/ui/ActionMenu";
 import RequestNextStepCard from "../../components/listingRequests/workspace/RequestNextStepCard";
 import RequestStatusNotice from "../../components/listingRequests/workspace/RequestStatusNotice";
 import RequestWorkspace from "../../components/listingRequests/workspace/RequestWorkspace";
@@ -788,7 +788,7 @@ const CreatorRequestDetails = () => {
   ];
 
   const manageMenu = canArchiveListingRequest(request.status) ? (
-    <RequestManageMenu>
+    <ActionMenu>
       <p className={classes.text}>
         Archive this request to remove it from your active queue without declining it.
       </p>
@@ -801,7 +801,7 @@ const CreatorRequestDetails = () => {
       >
         {updateStatusMutation.isPending ? "Updating…" : "Archive request"}
       </button>
-    </RequestManageMenu>
+    </ActionMenu>
   ) : undefined;
 
   return (
