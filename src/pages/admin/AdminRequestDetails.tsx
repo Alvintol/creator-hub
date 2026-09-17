@@ -443,8 +443,6 @@ const AdminRequestDetails = () => {
 
       <RequestConversationThread
         requestId={request.id}
-        buyerUserId={request.buyer_user_id}
-        creatorUserId={request.creator_user_id}
         buyerLabel={profileText(buyer, request.buyer_user_id)}
         creatorLabel={profileText(creator, request.creator_user_id)}
         viewer="admin"
