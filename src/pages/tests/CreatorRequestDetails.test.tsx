@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -813,6 +813,11 @@ describe("<CreatorRequestDetails />", () => {
 
   it("renders structured buyer request details for the creator", () => {
     renderPage();
+
+    // Buyer request details are collapsed by default so a request with a
+    // lot of history doesn't bury payment and messaging actions — expand
+    // before asserting on its content.
+    fireEvent.click(screen.getByRole("button", { name: "Show request details" }));
 
     expect(screen.getByText("Custom cozy emote pack")).toBeInTheDocument();
     expect(
@@ -1806,6 +1811,9 @@ describe("<CreatorRequestDetails />", () => {
       "href",
       "/creator/requests/completed"
     );
+
+    // The completed date lives inside the collapsed listing snapshot.
+    fireEvent.click(screen.getByRole("button", { name: "Show listing snapshot" }));
 
     expect(
       screen.getByText(/Jun 9, 2026/)

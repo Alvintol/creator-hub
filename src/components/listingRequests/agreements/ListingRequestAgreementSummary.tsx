@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   getListingRequestAgreementStatusLabel,
   getListingRequestAgreementStatusSummary,
@@ -8,16 +9,25 @@ import {
   getListingRequestBuyerHoldReasonLabel,
 } from "../../../domain/listings/listingRequestAgreements";
 import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
+import { Collapse } from "../../../lib/motion";
 
 type ListingRequestAgreementSummaryProps = {
   agreement: ListingRequestAgreementRow | null;
   isLoading?: boolean;
+  collapsible?: boolean;
+  // May flip after the agreement loads; it applies until the viewer toggles manually.
+  defaultOpen?: boolean;
 };
 
 const classes = {
   card: "card p-6",
   section: "space-y-4",
   header: "space-y-1",
+  headerRow: "flex items-start justify-between gap-4",
+  headerText: "min-w-0 flex-1 space-y-4",
+  toggle: "btnOutline shrink-0",
+  body: "space-y-5",
+  collapsibleBody: "space-y-5 pt-5",
   title: "font-display text-base font-extrabold tracking-tight",
   h3: "text-sm font-extrabold text-zinc-900",
   text: "text-sm text-zinc-600",
@@ -70,7 +80,12 @@ const sortedAcknowledgements = (
 const ListingRequestAgreementSummary = ({
   agreement,
   isLoading = false,
+  collapsible = false,
+  defaultOpen = false,
 }: ListingRequestAgreementSummaryProps) => {
+  const [openOverride, setOpenOverride] = useState<boolean | null>(null);
+  const isOpen = collapsible ? openOverride ?? defaultOpen : true;
+
   if (isLoading) {
     return (
       <div className={classes.card}>
@@ -96,22 +111,8 @@ const ListingRequestAgreementSummary = ({
     .filter((hold) => hold.ended_at)
     .reduce((total, hold) => total + hold.rounded_extension_days, 0);
 
-  return (
-    <div className={classes.card}>
-      <div className={classes.section}>
-        <div className={classes.header}>
-          <h2 className={classes.title}>Project agreement</h2>
-          <p className={classes.text}>
-            Version {agreement.version_number} ·{" "}
-            {getListingRequestAgreementStatusSummary(agreement.status)}
-          </p>
-        </div>
-
-        <span className={classes.badge}>
-          {getListingRequestAgreementStatusLabel(agreement.status)}
-        </span>
-      </div>
-
+  const details = (
+    <>
       <div className={classes.grid}>
         <div className={classes.metaBlock}>
           <div className={classes.metaLabel}>Payment structure</div>
@@ -320,6 +321,45 @@ const ListingRequestAgreementSummary = ({
             ))}
           </div>
         </div>
+      )}
+    </>
+  );
+
+  return (
+    <div className={classes.card}>
+      <div className={classes.headerRow}>
+        <div className={classes.headerText}>
+          <div className={classes.header}>
+            <h2 className={classes.title}>Project agreement</h2>
+            <p className={classes.text}>
+              Version {agreement.version_number} ·{" "}
+              {getListingRequestAgreementStatusSummary(agreement.status)}
+            </p>
+          </div>
+
+          <span className={classes.badge}>
+            {getListingRequestAgreementStatusLabel(agreement.status)}
+          </span>
+        </div>
+
+        {collapsible && (
+          <button
+            type="button"
+            className={classes.toggle}
+            aria-expanded={isOpen}
+            onClick={() => setOpenOverride(!isOpen)}
+          >
+            {isOpen ? "Hide agreement details" : "Show agreement details"}
+          </button>
+        )}
+      </div>
+
+      {collapsible ? (
+        <Collapse open={isOpen} className={classes.collapsibleBody}>
+          {details}
+        </Collapse>
+      ) : (
+        <div className={`${classes.body} pt-5`}>{details}</div>
       )}
     </div>
   );

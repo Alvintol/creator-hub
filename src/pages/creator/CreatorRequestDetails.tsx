@@ -48,6 +48,7 @@ import { useListingRequestMilestones } from '../../hooks/creatorRequests/useList
 import ListingRequestMilestoneSubmissionForm from '../../components/listingRequests/milestones/ListingRequestMilestoneSubmissionForm';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
 import { canSubmitListingRequestMilestone, getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
+import { canSendListingRequestAgreement } from "../../domain/listings/listingRequestAgreements";
 import { canCreateListingRequestChangeOrder, getDraftListingRequestChangeOrder, getHasPendingListingRequestChangeOrder } from '../../domain/listings/listingRequestChangeOrders';
 
 const classes = {
@@ -59,6 +60,7 @@ const classes = {
   sub: "pageSub",
 
   grid: "grid gap-6 lg:grid-cols-[0.9fr_1.1fr]",
+  column: "min-w-0 space-y-6",
   card: "card p-6",
   section: "space-y-4",
   sectionTitle: "sectionHeading",
@@ -68,6 +70,9 @@ const classes = {
   metaBlock: "space-y-1",
   metaLabel: "metaLabel",
   metaValue: "metaValue",
+
+  snapshotHeader: "flex items-start justify-between gap-4",
+  snapshotBody: "space-y-4 pt-4",
 
   list: "space-y-2",
   listItem:
@@ -191,6 +196,7 @@ const CreatorRequestDetails = () => {
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
+  const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
   const [declineReasonError, setDeclineReasonError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -444,277 +450,296 @@ const CreatorRequestDetails = () => {
       )}
 
       <div className={classes.grid}>
-        <div className={classes.card}>
-          <ListingRequestSubmissionDetails
-            heading="Buyer request"
-            requestTitle={request.request_title}
-            requestDetails={request.request_details}
-            fallbackMessage={request.message}
-            requestedTimeline={request.requested_timeline}
-            budgetAmount={request.budget_amount}
-            referenceLinks={request.reference_links}
-          />
+        <div className={classes.column}>
+          <div className={classes.card}>
+            <ListingRequestSubmissionDetails
+              heading="Buyer request"
+              requestTitle={request.request_title}
+              requestDetails={request.request_details}
+              fallbackMessage={request.message}
+              requestedTimeline={request.requested_timeline}
+              budgetAmount={request.budget_amount}
+              referenceLinks={request.reference_links}
+            />
 
-          <ListingRequestStatusCard
-            status={request.status}
-            reason={request.creator_status_reason}
-            archiveContext={request}
-          />
+            <ListingRequestStatusCard
+              status={request.status}
+              reason={request.creator_status_reason}
+              archiveContext={request}
+            />
+
+            <ListingRequestAgreementCreatorActions
+              agreement={agreement}
+              isPending={sendDraftAgreementMutation.isPending}
+              error={sendDraftAgreementMutation.error}
+              onSendAgreement={(agreementId) =>
+                sendDraftAgreementMutation.mutateAsync({ agreementId })
+              }
+            />
+
+            <ListingRequestAgreementWorkReadinessCard
+              requestStatus={request.status}
+              agreement={agreement}
+            />
+
+            <div className={classes.metaGrid}>
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Buyer</div>
+                <div className={classes.metaValue}>
+                  {buyerText(buyer, request.buyer_user_id)}
+                </div>
+              </div>
+
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Status</div>
+                <div className={classes.metaValue}>
+                  {getListingRequestStatusLabel(request.status, request)}
+                </div>
+              </div>
+
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Submitted</div>
+                <div className={classes.metaValue}>
+                  {dateText(request.created_at)}
+                </div>
+              </div>
+
+              <div className={classes.metaBlock}>
+                <div className={classes.metaLabel}>Last updated</div>
+                <div className={classes.metaValue}>
+                  {dateText(request.updated_at)}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={classes.card}>
+            <div className={classes.section}>
+              <h2 className={classes.sectionTitle}>Request actions</h2>
+
+              <p className={classes.text}>
+                Update the request status so the buyer can clearly track your response.
+              </p>
+            </div>
+
+            {updateStatusMutation.error && (
+              <div className={classes.submitError}>
+                The request status could not be updated right now.
+              </div>
+            )}
+
+            <div className={classes.row}>
+              {canAcceptListingRequest(request.status) && (
+                <button
+                  className={classes.btnPrimary}
+                  type="button"
+                  onClick={() => void handleAcceptRequest()}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  {updateStatusMutation.isPending ? "Updating…" : "Accept request"}
+                </button>
+              )}
+
+              {canDeclineListingRequest(request.status) && (
+                <button
+                  className={classes.btnDanger}
+                  type="button"
+                  onClick={() => {
+                    setShowDeclineForm((current) => !current);
+                    setDeclineReasonError(null);
+                  }}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  {showDeclineForm ? "Cancel decline" : "Decline request"}
+                </button>
+              )}
+
+              {canArchiveListingRequest(request.status) && (
+                <button
+                  className={classes.btnOutline}
+                  type="button"
+                  onClick={() => void handleArchiveRequest()}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  {updateStatusMutation.isPending ? "Updating…" : "Archive request"}
+                </button>
+              )}
+            </div>
+
+            <Collapse open={showDeclineForm && canDeclineListingRequest(request.status)}>
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="declineReason">
+                  Decline reason
+                </label>
+
+                <textarea
+                  id="declineReason"
+                  className={classes.textarea}
+                  value={declineReason}
+                  onChange={(event) => {
+                    setDeclineReason(event.target.value);
+                    setDeclineReasonError(null);
+                  }}
+                  placeholder="Explain why this request is being declined for audit and client clarity."
+                  maxLength={1000}
+                />
+
+                <div className={classes.hint}>
+                  {trimmedDeclineReason.length}/1000 characters. Minimum 10 characters required.
+                </div>
+
+                {declineReasonError && (
+                  <div className={classes.error}>{declineReasonError}</div>
+                )}
+
+                <div className={classes.row}>
+                  <button
+                    className={classes.btnDanger}
+                    type="button"
+                    onClick={() => void handleDeclineRequest()}
+                    disabled={!canConfirmDecline}
+                  >
+                    {updateStatusMutation.isPending
+                      ? "Declining request…"
+                      : "Confirm decline request"}
+                  </button>
+                </div>
+              </div>
+            </Collapse>
+          </div>
+
+          {request.status === "accepted" &&
+            !agreement &&
+            !agreementQuery.isLoading &&
+            !agreementQuery.error && (
+              <ListingRequestAgreementBuilder
+                request={request}
+                isPending={createAgreementMutation.isPending}
+                error={createAgreementMutation.error}
+                onCreateAgreement={(input) => createAgreementMutation.mutateAsync(input)}
+              />
+            )}
+        </div>
+
+        <div className={classes.column}>
+          {agreementQuery.error && (
+            <div className={classes.errorCard}>
+              Project agreement could not be loaded right now.
+            </div>
+          )}
 
           <ListingRequestAgreementSummary
             agreement={agreementQuery.data ?? null}
             isLoading={agreementQuery.isLoading}
+            collapsible
+            defaultOpen={agreement ? canSendListingRequestAgreement(agreement.status) : false}
           />
 
-          <ListingRequestAgreementCreatorActions
-            agreement={agreement}
-            isPending={sendDraftAgreementMutation.isPending}
-            error={sendDraftAgreementMutation.error}
-            onSendAgreement={(agreementId) =>
-              sendDraftAgreementMutation.mutateAsync({ agreementId })
-            }
-          />
-
-          <ListingRequestAgreementWorkReadinessCard
-            requestStatus={request.status}
-            agreement={agreement}
-          />
-
-          <div className={classes.metaGrid}>
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Buyer</div>
-              <div className={classes.metaValue}>
-                {buyerText(buyer, request.buyer_user_id)}
+          <div className={classes.card}>
+            <div className={classes.snapshotHeader}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Frozen listing snapshot</h2>
+                <p className={classes.text}>
+                  This captures the listing state the buyer reached out about.
+                </p>
               </div>
-            </div>
 
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Status</div>
-              <div className={classes.metaValue}>
-                {getListingRequestStatusLabel(request.status, request)}
-              </div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Submitted</div>
-              <div className={classes.metaValue}>
-                {dateText(request.created_at)}
-              </div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Last updated</div>
-              <div className={classes.metaValue}>
-                {dateText(request.updated_at)}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className={classes.card}>
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Request actions</h2>
-
-            <p className={classes.text}>
-              Update the request status so the buyer can clearly track your response.
-            </p>
-          </div>
-
-          {updateStatusMutation.error && (
-            <div className={classes.submitError}>
-              The request status could not be updated right now.
-            </div>
-          )}
-
-          <div className={classes.row}>
-            {canAcceptListingRequest(request.status) && (
               <button
-                className={classes.btnPrimary}
                 type="button"
-                onClick={() => void handleAcceptRequest()}
-                disabled={updateStatusMutation.isPending}
-              >
-                {updateStatusMutation.isPending ? "Updating…" : "Accept request"}
-              </button>
-            )}
-
-            {canDeclineListingRequest(request.status) && (
-              <button
-                className={classes.btnDanger}
-                type="button"
-                onClick={() => {
-                  setShowDeclineForm((current) => !current);
-                  setDeclineReasonError(null);
-                }}
-                disabled={updateStatusMutation.isPending}
-              >
-                {showDeclineForm ? "Cancel decline" : "Decline request"}
-              </button>
-            )}
-
-            {canArchiveListingRequest(request.status) && (
-              <button
                 className={classes.btnOutline}
-                type="button"
-                onClick={() => void handleArchiveRequest()}
-                disabled={updateStatusMutation.isPending}
+                aria-expanded={isSnapshotOpen}
+                onClick={() => setIsSnapshotOpen((current) => !current)}
               >
-                {updateStatusMutation.isPending ? "Updating…" : "Archive request"}
+                {isSnapshotOpen ? "Hide listing snapshot" : "Show listing snapshot"}
               </button>
-            )}
-          </div>
-
-          <Collapse open={showDeclineForm && canDeclineListingRequest(request.status)}>
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="declineReason">
-                Decline reason
-              </label>
-
-              <textarea
-                id="declineReason"
-                className={classes.textarea}
-                value={declineReason}
-                onChange={(event) => {
-                  setDeclineReason(event.target.value);
-                  setDeclineReasonError(null);
-                }}
-                placeholder="Explain why this request is being declined for audit and client clarity."
-                maxLength={1000}
-              />
-
-              <div className={classes.hint}>
-                {trimmedDeclineReason.length}/1000 characters. Minimum 10 characters required.
-              </div>
-
-              {declineReasonError && (
-                <div className={classes.error}>{declineReasonError}</div>
-              )}
-
-              <div className={classes.row}>
-                <button
-                  className={classes.btnDanger}
-                  type="button"
-                  onClick={() => void handleDeclineRequest()}
-                  disabled={!canConfirmDecline}
-                >
-                  {updateStatusMutation.isPending
-                    ? "Declining request…"
-                    : "Confirm decline request"}
-                </button>
-              </div>
-            </div>
-          </Collapse>
-        </div>
-
-        {agreementQuery.error && (
-          <div className={classes.errorCard}>
-            Project agreement could not be loaded right now.
-          </div>
-        )}
-
-        {request.status === "accepted" &&
-          !agreement &&
-          !agreementQuery.isLoading &&
-          !agreementQuery.error && (
-            <ListingRequestAgreementBuilder
-              request={request}
-              isPending={createAgreementMutation.isPending}
-              error={createAgreementMutation.error}
-              onCreateAgreement={(input) => createAgreementMutation.mutateAsync(input)}
-            />
-          )}
-
-        <div className={classes.card}>
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Frozen listing snapshot</h2>
-            <p className={classes.text}>
-              This captures the listing state the buyer reached out about.
-            </p>
-          </div>
-
-          <div className={classes.metaGrid}>
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Title</div>
-              <div className={classes.metaValue}>{snapshot.title}</div>
             </div>
 
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Price</div>
-              <div className={classes.metaValue}>
-                {priceText(
-                  snapshot.price_type,
-                  snapshot.price_min,
-                  snapshot.price_max
-                )}
-              </div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Purchase flow</div>
-              <div className={classes.metaValue}>{snapshot.fulfilment_mode}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Offering type</div>
-              <div className={classes.metaValue}>{snapshot.offering_type}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Category</div>
-              <div className={classes.metaValue}>{snapshot.category}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Listing last updated</div>
-              <div className={classes.metaValue}>
-                {dateText(snapshot.updated_at)}
-              </div>
-            </div>
-
-            {request.status === "completed" &&
-              request.completed_at && (
+            <Collapse open={isSnapshotOpen} className={classes.snapshotBody}>
+              <div className={classes.metaGrid}>
                 <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>
-                    Completed
-                  </div>
+                  <div className={classes.metaLabel}>Title</div>
+                  <div className={classes.metaValue}>{snapshot.title}</div>
+                </div>
 
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Price</div>
                   <div className={classes.metaValue}>
-                    {dateText(request.completed_at)}
+                    {priceText(
+                      snapshot.price_type,
+                      snapshot.price_min,
+                      snapshot.price_max
+                    )}
                   </div>
                 </div>
-              )}
-          </div>
 
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Deliverables</h2>
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Purchase flow</div>
+                  <div className={classes.metaValue}>{snapshot.fulfilment_mode}</div>
+                </div>
 
-            {snapshot.deliverables.length > 0 ? (
-              <div className={classes.list}>
-                {snapshot.deliverables.map((deliverable) => (
-                  <div key={deliverable} className={classes.listItem}>
-                    {deliverable}
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Offering type</div>
+                  <div className={classes.metaValue}>{snapshot.offering_type}</div>
+                </div>
+
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Category</div>
+                  <div className={classes.metaValue}>{snapshot.category}</div>
+                </div>
+
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Listing last updated</div>
+                  <div className={classes.metaValue}>
+                    {dateText(snapshot.updated_at)}
                   </div>
-                ))}
+                </div>
+
+                {request.status === "completed" &&
+                  request.completed_at && (
+                    <div className={classes.metaBlock}>
+                      <div className={classes.metaLabel}>
+                        Completed
+                      </div>
+
+                      <div className={classes.metaValue}>
+                        {dateText(request.completed_at)}
+                      </div>
+                    </div>
+                  )}
               </div>
-            ) : (
-              <p className={classes.text}>No deliverables were listed.</p>
-            )}
-          </div>
 
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Tags</h2>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Deliverables</h2>
 
-            {snapshot.tags.length > 0 ? (
-              <div className={classes.list}>
-                {snapshot.tags.map((tag) => (
-                  <div key={tag} className={classes.listItem}>
-                    {tag}
+                {snapshot.deliverables.length > 0 ? (
+                  <div className={classes.list}>
+                    {snapshot.deliverables.map((deliverable) => (
+                      <div key={deliverable} className={classes.listItem}>
+                        {deliverable}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <p className={classes.text}>No deliverables were listed.</p>
+                )}
               </div>
-            ) : (
-              <p className={classes.text}>No tags were listed.</p>
-            )}
+
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Tags</h2>
+
+                {snapshot.tags.length > 0 ? (
+                  <div className={classes.list}>
+                    {snapshot.tags.map((tag) => (
+                      <div key={tag} className={classes.listItem}>
+                        {tag}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={classes.text}>No tags were listed.</p>
+                )}
+              </div>
+            </Collapse>
           </div>
         </div>
       </div>
