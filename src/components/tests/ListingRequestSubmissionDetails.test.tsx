@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import ListingRequestSubmissionDetails from "../listingRequests/core/ListingRequestSubmissionDetails";
@@ -7,18 +7,15 @@ describe("<ListingRequestSubmissionDetails />", () => {
   it("renders structured request details", () => {
     render(
       <ListingRequestSubmissionDetails
-        heading="Buyer request"
         requestTitle="Custom cozy emote pack"
         requestDetails="I need three cozy emotes for my Twitch channel launch."
         fallbackMessage="Legacy fallback message."
         requestedTimeline="Flexible, ideally before June 10."
         budgetAmount={75}
         referenceLinks={["https://example.com/reference"]}
-        defaultOpen
       />
     );
 
-    expect(screen.getByText("Buyer request")).toBeInTheDocument();
     expect(screen.getByText("Custom cozy emote pack")).toBeInTheDocument();
     expect(
       screen.getByText("I need three cozy emotes for my Twitch channel launch.")
@@ -36,14 +33,12 @@ describe("<ListingRequestSubmissionDetails />", () => {
   it("falls back to the legacy message when structured details are missing", () => {
     render(
       <ListingRequestSubmissionDetails
-        heading="Request summary"
         requestTitle={null}
         requestDetails={null}
         fallbackMessage="Legacy request message."
         requestedTimeline={null}
         budgetAmount={null}
         referenceLinks={[]}
-        defaultOpen
       />
     );
 
@@ -51,36 +46,5 @@ describe("<ListingRequestSubmissionDetails />", () => {
     expect(screen.getByText("Legacy request message.")).toBeInTheDocument();
     expect(screen.getAllByText("Not provided")).toHaveLength(2);
     expect(screen.getByText("No Reference Links Provided.")).toBeInTheDocument();
-  });
-
-  it("starts collapsed and toggles the details open and closed", () => {
-    render(
-      <ListingRequestSubmissionDetails
-        heading="Request summary"
-        requestTitle="Custom cozy emote pack"
-        requestDetails={null}
-        fallbackMessage={null}
-        requestedTimeline={null}
-        budgetAmount={null}
-        referenceLinks={[]}
-      />
-    );
-
-    expect(screen.getByText("Request summary")).toBeInTheDocument();
-    expect(screen.queryByText("Custom cozy emote pack")).not.toBeInTheDocument();
-
-    const toggle = screen.getByRole("button", { name: "Show request details" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-
-    fireEvent.click(toggle);
-
-    expect(screen.getByText("Custom cozy emote pack")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Hide request details" })
-    ).toHaveAttribute("aria-expanded", "true");
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide request details" }));
-
-    expect(screen.queryByText("Custom cozy emote pack")).not.toBeInTheDocument();
   });
 });

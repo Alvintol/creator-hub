@@ -19,16 +19,19 @@ type ListingRequestAgreementWorkReadinessCardProps = {
 };
 
 const classes = {
-  card: "rounded-2xl border px-4 py-4",
-  readyCard: "border-emerald-200 bg-emerald-50 text-emerald-950",
+  card: "rounded-xl border px-3 py-3",
+  readyCard: "border-[var(--hairline)] bg-[rgb(var(--surface))] text-zinc-900",
   blockedCard: "border-amber-200 bg-amber-50 text-amber-950",
   mutedCard: "border-zinc-200 bg-zinc-50 text-zinc-800",
-  title: "text-sm font-extrabold",
-  text: "mt-1 text-sm",
-  metaGrid: "mt-4 grid gap-3 sm:grid-cols-2",
-  metaBlock: "space-y-1",
-  metaLabel: "text-xs font-bold uppercase tracking-wide opacity-70",
-  metaValue: "text-sm font-semibold",
+  title: "flex items-center gap-2 text-sm font-semibold",
+  dot: "h-2 w-2 shrink-0 rounded-full",
+  dotReady: "bg-emerald-500",
+  dotBlocked: "bg-amber-500",
+  text: "mt-1 text-xs opacity-80",
+  metaGrid: "mt-3 grid grid-cols-3 gap-2 border-t border-current/10 pt-2",
+  metaBlock: "min-w-0 space-y-0.5",
+  metaLabel: "text-[10px] font-semibold uppercase tracking-wide opacity-70",
+  metaValue: "truncate text-xs font-semibold",
 } as const;
 
 const formatMoney = (amount: number | null, currency: string): string => {
@@ -85,6 +88,10 @@ const ListingRequestAgreementWorkReadinessCard = ({
   return (
     <div className={cardClass}>
       <div className={classes.title}>
+        <span
+          className={`${classes.dot} ${canStartWork ? classes.dotReady : classes.dotBlocked}`}
+          aria-hidden="true"
+        />
         {canStartWork
           ? "Work may begin"
           : "Payment required before work starts"}

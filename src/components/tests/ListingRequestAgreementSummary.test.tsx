@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import ListingRequestAgreementSummary from "../listingRequests/agreements/ListingRequestAgreementSummary";
@@ -103,7 +103,6 @@ describe("<ListingRequestAgreementSummary />", () => {
   it("renders an empty state when no agreement exists", () => {
     render(<ListingRequestAgreementSummary agreement={null} />);
 
-    expect(screen.getByText("Project agreement")).toBeInTheDocument();
     expect(
       screen.getByText("No project agreement has been created for this request yet.")
     ).toBeInTheDocument();
@@ -162,54 +161,10 @@ describe("<ListingRequestAgreementSummary />", () => {
 
     expect(screen.getByText("Currently active.")).toBeInTheDocument();
   });
-  it("keeps the agreement terms collapsed behind a toggle when collapsible", () => {
-    render(<ListingRequestAgreementSummary agreement={agreement} collapsible />);
 
-    expect(screen.getByText("Project agreement")).toBeInTheDocument();
-    expect(screen.getByText("Awaiting buyer review")).toBeInTheDocument();
-    expect(screen.queryByText("Deposit + balance")).not.toBeInTheDocument();
+  it("renders a loading state", () => {
+    render(<ListingRequestAgreementSummary agreement={null} isLoading />);
 
-    const toggle = screen.getByRole("button", { name: "Show agreement details" });
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-
-    fireEvent.click(toggle);
-
-    expect(screen.getByText("Deposit + balance")).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Hide agreement details" })
-    ).toHaveAttribute("aria-expanded", "true");
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide agreement details" }));
-
-    expect(screen.queryByText("Deposit + balance")).not.toBeInTheDocument();
-  });
-
-  it("opens by default once a loaded agreement needs attention", () => {
-    const { rerender } = render(
-      <ListingRequestAgreementSummary
-        agreement={null}
-        isLoading
-        collapsible
-        defaultOpen={false}
-      />
-    );
-
-    rerender(
-      <ListingRequestAgreementSummary agreement={agreement} collapsible defaultOpen />
-    );
-
-    expect(screen.getByText("Deposit + balance")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Hide agreement details" }));
-
-    expect(screen.queryByText("Deposit + balance")).not.toBeInTheDocument();
-  });
-
-  it("does not render a toggle when collapsible is off", () => {
-    render(<ListingRequestAgreementSummary agreement={agreement} />);
-
-    expect(
-      screen.queryByRole("button", { name: /agreement details/ })
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("Loading project agreement…")).toBeInTheDocument();
   });
 });

@@ -15,36 +15,6 @@ export type ListingRequestChangeOrderImpact = {
   changesMilestones?: boolean;
 };
 
-export const listingRequestChangeOrderStatusOptions: Array<{
-  value: ListingRequestChangeOrderStatus;
-  label: string;
-}> = [
-    {
-      value: "draft",
-      label: "Draft",
-    },
-    {
-      value: "sent",
-      label: "Awaiting buyer review",
-    },
-    {
-      value: "buyer_accepted",
-      label: "Accepted by buyer",
-    },
-    {
-      value: "buyer_declined",
-      label: "Declined by buyer",
-    },
-    {
-      value: "cancelled",
-      label: "Cancelled",
-    },
-    {
-      value: "superseded",
-      label: "Superseded",
-    },
-  ];
-
 export const getListingRequestChangeOrderStatusLabel = (
   status: ListingRequestChangeOrderStatus
 ): string =>

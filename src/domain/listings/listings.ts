@@ -3,33 +3,6 @@ export type ListingPriceType = "fixed" | "starting_at" | "range";
 export type ListingVideoSubtype = "" | "long-form" | "short-form";
 export type ListingFulfilmentMode = "request" | "instant";
 
-export const listingOfferingTypeOptions: Array<{
-  value: ListingOfferingType;
-  label: string;
-}> = [
-    { value: "digital", label: "Digital" },
-    { value: "commission", label: "Commission" },
-    { value: "service", label: "Service" },
-  ];
-
-export const listingPriceTypeOptions: Array<{
-  value: ListingPriceType;
-  label: string;
-}> = [
-    { value: "fixed", label: "Fixed price" },
-    { value: "starting_at", label: "Starting at" },
-    { value: "range", label: "Price range" },
-  ];
-
-export const listingVideoSubtypeOptions: Array<{
-  value: ListingVideoSubtype;
-  label: string;
-}> = [
-    { value: "", label: "None" },
-    { value: "long-form", label: "Long-form" },
-    { value: "short-form", label: "Short-form" },
-  ];
-
 export const listingFulfilmentModeOptions: Array<{
   value: ListingFulfilmentMode;
   label: string;
@@ -48,12 +21,6 @@ export const getAllowedFulfilmentModes = (
   offeringType: ListingOfferingType
 ): ListingFulfilmentMode[] =>
   allowsInstantFulfilment(offeringType) ? ["request", "instant"] : ["request"];
-
-// Returns the correct default fulfilment mode for the chosen offering type
-export const getDefaultFulfilmentMode = (
-  offeringType: ListingOfferingType
-): ListingFulfilmentMode =>
-  allowsInstantFulfilment(offeringType) ? "request" : "request";
 
 // Forces invalid combinations back to request mode
 export const normaliseFulfilmentMode = (

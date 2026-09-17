@@ -471,3 +471,28 @@
     background: rgb(var(--brand));
   }
 }
+
+/* Cards nested inside a request workspace section read as flat sub-panels rather than cards-in-cards.
+   Lives in the utilities layer with a descendant selector so it outranks each component's p-6 utility. */
+@layer utilities {
+  .workspacePanel .card {
+    border-radius: 1rem;
+    border-color: var(--hairline);
+    background: rgb(var(--ink) / 0.02);
+    box-shadow: none;
+    padding: 1rem;
+  }
+
+  .workspacePanel .card:hover {
+    box-shadow: none;
+  }
+
+  /* The expanding sheet is already the card; forms inside it drop their own frame. */
+  .formSheet .card,
+  .formSheet .card:hover {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+  }
+}
