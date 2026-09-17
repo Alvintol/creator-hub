@@ -9,7 +9,7 @@ import ListingSnapshotDetails from "../../components/listingRequests/workspace/L
 import RequestNextStepCard from "../../components/listingRequests/workspace/RequestNextStepCard";
 import RequestStatusNotice from "../../components/listingRequests/workspace/RequestStatusNotice";
 import RequestWorkspace from "../../components/listingRequests/workspace/RequestWorkspace";
-import RequestWorkspaceHeader from "../../components/listingRequests/workspace/RequestWorkspaceHeader";
+import StatusHeader from "../../components/ui/StatusHeader";
 import WorkspaceSectionList from "../../components/listingRequests/workspace/WorkspaceSectionList";
 import {
   getSectionFlags,
@@ -366,7 +366,7 @@ const AdminRequestDetails = () => {
   return (
     <RequestWorkspace
       header={
-        <RequestWorkspaceHeader
+        <StatusHeader
           backTo="/admin/requests"
           backLabel="Back to admin requests"
           eyebrow="Admin request review"
