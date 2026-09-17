@@ -15,7 +15,6 @@ import {
   getListingRequestFinalDeliveryStatusSummary,
   getListingRequestFinalDeliveryStatusTone,
   getSubmittedListingRequestFinalDelivery,
-  hasListingRequestFinalDeliveryContent,
   isListingRequestFinalDeliveryBuyerVisible,
 } from "../listings/listingRequestFinalDeliveries";
 
@@ -293,27 +292,6 @@ describe("listing request final deliveries", () => {
       isListingRequestFinalDeliveryBuyerVisible({
         status: "revision_requested",
         submittedAt: "2026-06-09T12:00:00.000Z",
-      })
-    ).toBe(true);
-  });
-
-  it("requires a summary or at least one delivery link", () => {
-    expect(
-      hasListingRequestFinalDeliveryContent({})
-    ).toBe(false);
-
-    expect(
-      hasListingRequestFinalDeliveryContent({
-        summary: "Final delivery is ready.",
-      })
-    ).toBe(true);
-
-    expect(
-      hasListingRequestFinalDeliveryContent({
-        deliveryLinks: [
-          "",
-          "https://example.com/final-delivery",
-        ],
       })
     ).toBe(true);
   });

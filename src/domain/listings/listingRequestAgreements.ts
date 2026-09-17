@@ -6,12 +6,6 @@ export type ListingRequestAgreementStatus =
   | "superseded"
   | "cancelled";
 
-export type ListingRequestAgreementTone =
-  | "muted"
-  | "review"
-  | "success"
-  | "danger";
-
 export type ListingRequestPaymentStructure =
   | "full_prepayment"
   | "deposit_balance"
@@ -47,18 +41,6 @@ export type ListingRequestMinimumUpdateRule = {
   recommendedCheckpoints: string[];
 };
 
-export const listingRequestAgreementStatusOptions: Array<{
-  value: ListingRequestAgreementStatus;
-  label: string;
-}> = [
-    { value: "draft", label: "Draft" },
-    { value: "sent", label: "Awaiting buyer review" },
-    { value: "buyer_accepted", label: "Accepted by buyer" },
-    { value: "buyer_declined", label: "Declined by buyer" },
-    { value: "superseded", label: "Superseded" },
-    { value: "cancelled", label: "Cancelled" },
-  ];
-
 export const listingRequestPaymentStructureOptions: Array<{
   value: ListingRequestPaymentStructure;
   label: string;
@@ -76,12 +58,6 @@ export type ListingRequestBuyerHoldReason =
   | "change_order_response_pending"
   | "change_order_payment_pending"
   | "balance_payment_pending";
-
-export type ListingRequestTimelineHold = {
-  reason: ListingRequestBuyerHoldReason;
-  startedAt: string;
-  endedAt: string | null;
-};
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -101,80 +77,6 @@ export const getListingRequestBuyerHoldReasonLabel = (
             : reason === "change_order_payment_pending"
               ? "Change order payment pending"
               : "Balance payment pending";
-
-export const calculateRoundedBuyerHoldDays = (input: {
-  startedAt: string;
-  endedAt: string;
-}): number => {
-  const startedAt = new Date(input.startedAt).getTime();
-  const endedAt = new Date(input.endedAt).getTime();
-
-  if (!Number.isFinite(startedAt) || !Number.isFinite(endedAt)) {
-    return 0;
-  }
-
-  const holdMs = endedAt - startedAt;
-
-  if (holdMs <= 0) {
-    return 0;
-  }
-
-  return Math.ceil(holdMs / MS_PER_DAY);
-};
-
-export const calculateTotalRoundedBuyerHoldDays = (
-  holds: ListingRequestTimelineHold[]
-): number =>
-  holds.reduce((total, hold) => {
-    if (!hold.endedAt) {
-      return total;
-    }
-
-    return (
-      total +
-      calculateRoundedBuyerHoldDays({
-        startedAt: hold.startedAt,
-        endedAt: hold.endedAt,
-      })
-    );
-  }, 0);
-
-export const addCalendarDaysToIsoDate = (
-  isoDate: string,
-  daysToAdd: number
-): string => {
-  const date = new Date(isoDate);
-
-  if (!Number.isFinite(date.getTime()) || daysToAdd <= 0) {
-    return isoDate;
-  }
-
-  date.setUTCDate(date.getUTCDate() + daysToAdd);
-
-  return date.toISOString();
-};
-
-export const getAdjustedEstimatedCompletionDate = (input: {
-  estimatedCompletionDate: string;
-  holds: ListingRequestTimelineHold[];
-}): string => {
-  const totalHoldDays = calculateTotalRoundedBuyerHoldDays(input.holds);
-
-  return addCalendarDaysToIsoDate(input.estimatedCompletionDate, totalHoldDays);
-};
-
-export const shouldStartBuyerTimelineHold = (input: {
-  requiresBuyerAgreement?: boolean;
-  requiresBuyerPayment?: boolean;
-  requiresBuyerMilestoneApproval?: boolean;
-  requiresBuyerChangeOrderResponse?: boolean;
-}): boolean =>
-  Boolean(
-    input.requiresBuyerAgreement ||
-    input.requiresBuyerPayment ||
-    input.requiresBuyerMilestoneApproval ||
-    input.requiresBuyerChangeOrderResponse
-  );
 
 export const getListingRequestAgreementStatusLabel = (
   status: ListingRequestAgreementStatus
@@ -206,17 +108,6 @@ export const getListingRequestAgreementStatusSummary = (
             ? "This agreement was replaced by a newer version."
             : "This agreement was cancelled.";
 
-export const getListingRequestAgreementStatusTone = (
-  status: ListingRequestAgreementStatus
-): ListingRequestAgreementTone =>
-  status === "draft" || status === "superseded" || status === "cancelled"
-    ? "muted"
-    : status === "sent"
-      ? "review"
-      : status === "buyer_accepted"
-        ? "success"
-        : "danger";
-
 export const getListingRequestPaymentStructureLabel = (
   structure: ListingRequestPaymentStructure
 ): string =>
@@ -225,15 +116,6 @@ export const getListingRequestPaymentStructureLabel = (
     : structure === "deposit_balance"
       ? "Deposit + balance"
       : "Milestone payments";
-
-export const getListingRequestPaymentStructureSummary = (
-  structure: ListingRequestPaymentStructure
-): string =>
-  structure === "full_prepayment"
-    ? "The buyer pays the full accepted price before work begins."
-    : structure === "deposit_balance"
-      ? "The buyer pays a deposit before work begins and pays the remaining balance before final release."
-      : "The buyer pays agreed milestone amounts after reviewing and approving milestone progress.";
 
 export const getListingRequestPaymentTimingLabel = (
   timing: ListingRequestPaymentTiming
@@ -249,21 +131,6 @@ export const getListingRequestPaymentTimingLabel = (
           : timing === "included_no_extra_charge"
             ? "Included, no extra charge"
             : "Optional, not selected";
-
-export const getListingRequestPaymentTimingSummary = (
-  timing: ListingRequestPaymentTiming
-): string =>
-  timing === "due_before_work_starts"
-    ? "This payment must be completed before the creator starts work."
-    : timing === "due_at_milestone_approval"
-      ? "This payment becomes due after the buyer approves the related milestone."
-      : timing === "due_before_final_release"
-        ? "This payment must be completed before final files or deliverables are released."
-        : timing === "due_on_change_order_acceptance"
-          ? "This payment becomes due when the buyer accepts the change order."
-          : timing === "included_no_extra_charge"
-            ? "This item is included in the accepted agreement at no extra charge."
-            : "This optional item is not part of the accepted agreement.";
 
 export const getMinimumCreatorUpdateRule = (
   estimatedWorkDays: number
@@ -303,10 +170,6 @@ export const canSendListingRequestAgreement = (
   status: ListingRequestAgreementStatus
 ): boolean => status === "draft";
 
-export const canBuyerAcceptListingRequestAgreement = (
-  status: ListingRequestAgreementStatus
-): boolean => status === "sent";
-
 export const canStartWorkForAcceptedRequest = (input: {
   requestStatus: string;
   agreementStatus: ListingRequestAgreementStatus;
@@ -315,25 +178,6 @@ export const canStartWorkForAcceptedRequest = (input: {
   input.requestStatus === "accepted" &&
   input.agreementStatus === "buyer_accepted" &&
   input.startingPaymentStatus !== "payment_required";
-
-export const canApplyListingRequestChangeOrder = (
-  status: ListingRequestChangeOrderStatus
-): boolean => status === "buyer_accepted";
-
-export const requiresAcceptedChangeOrderForProjectTermChange = (input: {
-  changesScope?: boolean;
-  changesPrice?: boolean;
-  changesTimeline?: boolean;
-  changesPaymentSchedule?: boolean;
-  changesDeliverables?: boolean;
-}): boolean =>
-  Boolean(
-    input.changesScope ||
-    input.changesPrice ||
-    input.changesTimeline ||
-    input.changesPaymentSchedule ||
-    input.changesDeliverables
-  );
 
 export type ListingRequestAgreementAcknowledgementInput = {
   id: string;

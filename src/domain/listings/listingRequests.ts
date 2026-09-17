@@ -22,32 +22,6 @@ export type ListingRequestArchiveContext = {
   archived_by_user_id?: string | null;
 };
 
-export const listingRequestStatusOptions: Array<{
-  value: ListingRequestStatus;
-  label: string;
-}> = [
-    {
-      value: "submitted",
-      label: "Under review",
-    },
-    {
-      value: "accepted",
-      label: "Accepted",
-    },
-    {
-      value: "completed",
-      label: "Completed",
-    },
-    {
-      value: "declined",
-      label: "Declined",
-    },
-    {
-      value: "archived",
-      label: "Archived",
-    },
-  ];
-
 export const getListingRequestStatusesForView = (
   view: ListingRequestListView
 ): ListingRequestStatus[] =>

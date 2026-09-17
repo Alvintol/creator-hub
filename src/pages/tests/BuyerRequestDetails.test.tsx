@@ -673,6 +673,23 @@ const renderPage = () =>
     </MemoryRouter>
   );
 
+// Agreements only exist once the creator has accepted the request.
+const mockAcceptedRequest = () => {
+  mocks.useBuyerRequest.mockReturnValue({
+    data: {
+      request: { ...request, status: "accepted" },
+      creator: {
+        user_id: "creator-1",
+        handle: "creatoruser",
+        display_name: "Creator User",
+        avatar_url: null,
+      },
+    },
+    isLoading: false,
+    error: null,
+  });
+};
+
 describe("<BuyerRequestDetails />", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -756,11 +773,16 @@ describe("<BuyerRequestDetails />", () => {
   it("renders structured buyer request details", () => {
     renderPage();
 
-    // Request summary and the frozen listing snapshot are collapsed by
-    // default so a request with a lot of history doesn't bury payment and
-    // messaging actions — expand both before asserting on their content.
-    fireEvent.click(screen.getByRole("button", { name: "Show request details" }));
-    fireEvent.click(screen.getByRole("button", { name: "Show listing snapshot" }));
+    // A submitted request opens its request section; the snapshot starts collapsed.
+    const requestToggle = screen.getByRole("button", { name: /Your request/ });
+    const snapshotToggle = screen.getByRole("button", { name: /Listing snapshot/ });
+
+    expect(requestToggle).toHaveAttribute("aria-expanded", "true");
+    expect(snapshotToggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(snapshotToggle);
+
+    expect(snapshotToggle).toHaveAttribute("aria-expanded", "true");
 
     expect(screen.getByText("Custom cozy emote pack")).toBeInTheDocument();
     expect(
@@ -775,12 +797,19 @@ describe("<BuyerRequestDetails />", () => {
       "https://example.com/reference"
     );
 
-    expect(screen.getByText("Custom Emote Pack")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Custom Emote Pack" })).toBeInTheDocument();
+    expect(screen.getAllByText("Custom Emote Pack")).toHaveLength(2);
     expect(screen.getByText("Conversation thread loaded")).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Next step" })).getByText("Waiting on @creatoruser")
+    ).toBeInTheDocument();
   });
 
   it("asks for confirmation before archiving a submitted request", async () => {
     renderPage();
+
+    // Archiving lives in the header's Manage menu.
+    fireEvent.click(screen.getByRole("button", { name: /Manage/ }));
 
     fireEvent.click(screen.getByRole("button", { name: "Archive request" }));
 
@@ -804,6 +833,9 @@ describe("<BuyerRequestDetails />", () => {
   it("lets the buyer cancel archive confirmation", () => {
     renderPage();
 
+    // Archiving lives in the header's Manage menu.
+    fireEvent.click(screen.getByRole("button", { name: /Manage/ }));
+
     fireEvent.click(screen.getByRole("button", { name: "Archive request" }));
 
     expect(screen.getByRole("button", { name: "Confirm archive" })).toBeInTheDocument();
@@ -818,6 +850,7 @@ describe("<BuyerRequestDetails />", () => {
   });
 
   it("lets the buyer accept a sent project agreement after checking all acknowledgements", async () => {
+    mockAcceptedRequest();
     mocks.useListingRequestAgreement.mockReturnValue({
       data: agreement,
       isLoading: false,
@@ -861,6 +894,7 @@ describe("<BuyerRequestDetails />", () => {
   });
 
   it("lets the buyer decline a sent project agreement without acknowledgements", async () => {
+    mockAcceptedRequest();
     mocks.useListingRequestAgreement.mockReturnValue({
       data: agreement,
       isLoading: false,
@@ -1408,19 +1442,16 @@ describe("<BuyerRequestDetails />", () => {
 
     renderPage();
 
-    const statusLabel = screen.getByText("Status", {
-      selector: "div",
-    });
-
-    const statusBlock = statusLabel.parentElement;
-
-    expect(statusBlock).not.toBeNull();
+    // The status pill sits beside the page title.
+    const heading = screen.getByRole("heading", { level: 1 });
 
     expect(
-      within(statusBlock as HTMLElement).getByText(
-        "Completed"
-      )
+      within(heading.parentElement as HTMLElement).getByText("Completed")
     ).toBeInTheDocument();
+
+    expect(
+      screen.queryByRole("button", { name: /Manage/ })
+    ).not.toBeInTheDocument();
 
     expect(
       screen.getByText("Conversation is read-only")

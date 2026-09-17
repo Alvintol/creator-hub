@@ -28,7 +28,8 @@ import {
   type MyModerationReport,
 } from "../../hooks/moderation/useMyModerationReports";
 import { useSubmitModerationReport } from "../../hooks/moderation/useSubmitModerationReport";
-import { Collapse, FadeIn, useStaggerIn } from "../../lib/motion";
+import { Collapse, FadeIn, prefersReducedMotion, useStaggerIn } from "../../lib/motion";
+import ActionMenu, { actionMenuItemClasses } from "../ui/ActionMenu";
 
 export type ConversationThreadConversation = Pick<
   RequestConversationRow,
@@ -65,11 +66,13 @@ const ghostButton =
 const classes = {
   card: "card overflow-hidden",
   header:
-    "flex flex-wrap items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 sm:px-6",
-  headerContent: "min-w-0 space-y-0.5",
-  headerActions: "flex flex-wrap items-center gap-2",
-  headerButton: `${ghostButton} text-zinc-700`,
-  headerDangerButton: `${ghostButton} text-red-600 hover:border-red-200 hover:bg-red-50`,
+    "flex items-start justify-between gap-4 border-b border-zinc-100 px-5 py-4 sm:px-6",
+  headerContent: "min-w-0 flex-1 space-y-0.5",
+  // Safety actions sit behind a small overflow menu so they aren't tapped by accident.
+  optionsTrigger:
+    "inline-flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800",
+  // Clears the sticky site header (and the mobile tab bar) when a form scrolls into view.
+  panelAnchor: "scroll-mt-36 lg:scroll-mt-24",
   body: "space-y-4 p-5 sm:p-6",
 
   statusNotice: "notice noticeNeutral",
@@ -165,6 +168,19 @@ const dateText = (value: string) => {
     });
 };
 
+// Scrolls a newly opened form into view and moves focus to its first field.
+const revealPanel = (panel: HTMLDivElement | null, fieldId: string) => {
+  const frame = requestAnimationFrame(() => {
+    panel?.scrollIntoView?.({
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+      block: "start",
+    });
+    panel?.querySelector<HTMLElement>(`#${fieldId}`)?.focus({ preventScroll: true });
+  });
+
+  return () => cancelAnimationFrame(frame);
+};
+
 type ReportStatusProps = {
   report: MyModerationReport;
   title: string;
@@ -221,6 +237,8 @@ const ConversationThread = ({
   const [reportSubmitted, setReportSubmitted] = useState(false);
 
   const threadRef = useRef<HTMLDivElement>(null);
+  const reportPanelRef = useRef<HTMLDivElement>(null);
+  const closePanelRef = useRef<HTMLDivElement>(null);
   const lastMarkedReadMessageAtRef = useRef<string | null>(null);
 
   const {
@@ -401,6 +419,16 @@ const ConversationThread = ({
       : "Enable client images";
 
   useEffect(() => {
+    if (!reportTarget) return undefined;
+    return revealPanel(reportPanelRef.current, "reportReason");
+  }, [reportTarget]);
+
+  useEffect(() => {
+    if (!showCloseForm) return undefined;
+    return revealPanel(closePanelRef.current, "closeReason");
+  }, [showCloseForm]);
+
+  useEffect(() => {
     if (isAdmin || !currentUserId) return;
 
     const latestMessageAt = conversation.last_message_at;
@@ -540,26 +568,42 @@ const ConversationThread = ({
         <div className={classes.headerContent}>{header}</div>
 
         {!isAdmin && (
-          <div className={classes.headerActions}>
-            <button
-              className={classes.headerButton}
-              type="button"
-              onClick={openConversationReport}
-              disabled={hasReportedConversation || reportConversationMutation.isPending}
-            >
-              {reportConversationButtonText}
-            </button>
+          <ActionMenu
+            label={<span aria-hidden="true">⋯</span>}
+            ariaLabel="Conversation options"
+            showCaret={false}
+            triggerClassName={classes.optionsTrigger}
+            panelClassName={actionMenuItemClasses.list}
+          >
+            {(closeMenu) => (
+              <>
+                <button
+                  className={actionMenuItemClasses.item}
+                  type="button"
+                  onClick={() => {
+                    closeMenu();
+                    openConversationReport();
+                  }}
+                  disabled={hasReportedConversation || reportConversationMutation.isPending}
+                >
+                  {reportConversationButtonText}
+                </button>
 
-            {canCloseConversation && (
-              <button
-                className={classes.headerDangerButton}
-                type="button"
-                onClick={() => setShowCloseForm((current) => !current)}
-              >
-                {showCloseForm ? "Cancel ending conversation" : "End conversation"}
-              </button>
+                {canCloseConversation && (
+                  <button
+                    className={actionMenuItemClasses.danger}
+                    type="button"
+                    onClick={() => {
+                      closeMenu();
+                      setShowCloseForm((current) => !current);
+                    }}
+                  >
+                    {showCloseForm ? "Cancel ending conversation" : "End conversation"}
+                  </button>
+                )}
+              </>
             )}
-          </div>
+          </ActionMenu>
         )}
       </div>
 
@@ -604,82 +648,84 @@ const ConversationThread = ({
           <div className={classes.warningNotice}>{readOnlyNotice}</div>
         )}
 
-        <Collapse open={canCloseConversation && showCloseForm}>
-          <div className={classes.dangerPanel}>
-            <div className={classes.panelTitle}>End conversation</div>
+        <div ref={closePanelRef} className={classes.panelAnchor}>
+          <Collapse open={canCloseConversation && showCloseForm}>
+            <div className={classes.dangerPanel}>
+              <div className={classes.panelTitle}>End conversation</div>
 
-            <div className={classes.warningNotice}>
-              Ending this conversation will make the thread read-only for both
-              parties. The message history and reason will remain visible.
-            </div>
-
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="closeReason">
-                Reason for ending conversation
-              </label>
-
-              <select
-                id="closeReason"
-                className={classes.select}
-                value={closeReasonCode}
-                onChange={(event) =>
-                  setCloseReasonCode(event.target.value as ConversationCloseReasonCode | "")
-                }
-              >
-                <option value="">Choose a reason</option>
-
-                {conversationCloseReasonOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="closeDetails">
-                Additional details{isOtherCloseReason ? " *" : ""}
-              </label>
-
-              <textarea
-                id="closeDetails"
-                className={classes.textarea}
-                value={closeReasonDetails}
-                onChange={(event) => setCloseReasonDetails(event.target.value)}
-                placeholder={
-                  isOtherCloseReason
-                    ? "Required. Explain why this conversation is being ended."
-                    : "Optional. Add context for both parties and admins."
-                }
-                maxLength={1000}
-              />
-
-              <div className={classes.hint}>
-                {closeReasonDetailsTrimmed.length}/1000 characters.
-                {isOtherCloseReason
-                  ? " Mandatory. Please explain why this conversation is being ended."
-                  : " Optional, but helpful for both parties and admins."}
+              <div className={classes.warningNotice}>
+                Ending this conversation will make the thread read-only for both
+                parties. The message history and reason will remain visible.
               </div>
 
-              {closeReasonDetailsError && (
-                <div className={classes.errorNotice}>{closeReasonDetailsError}</div>
-              )}
-            </div>
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="closeReason">
+                  Reason for ending conversation
+                </label>
 
-            <div className={classes.row}>
-              <button
-                className={classes.btnDanger}
-                type="button"
-                onClick={() => void handleCloseConversation()}
-                disabled={!canConfirmCloseConversation}
-              >
-                {closeConversationMutation.isPending
-                  ? "Ending conversation…"
-                  : "Confirm end conversation"}
-              </button>
+                <select
+                  id="closeReason"
+                  className={classes.select}
+                  value={closeReasonCode}
+                  onChange={(event) =>
+                    setCloseReasonCode(event.target.value as ConversationCloseReasonCode | "")
+                  }
+                >
+                  <option value="">Choose a reason</option>
+
+                  {conversationCloseReasonOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="closeDetails">
+                  Additional details{isOtherCloseReason ? " *" : ""}
+                </label>
+
+                <textarea
+                  id="closeDetails"
+                  className={classes.textarea}
+                  value={closeReasonDetails}
+                  onChange={(event) => setCloseReasonDetails(event.target.value)}
+                  placeholder={
+                    isOtherCloseReason
+                      ? "Required. Explain why this conversation is being ended."
+                      : "Optional. Add context for both parties and admins."
+                  }
+                  maxLength={1000}
+                />
+
+                <div className={classes.hint}>
+                  {closeReasonDetailsTrimmed.length}/1000 characters.
+                  {isOtherCloseReason
+                    ? " Mandatory. Please explain why this conversation is being ended."
+                    : " Optional, but helpful for both parties and admins."}
+                </div>
+
+                {closeReasonDetailsError && (
+                  <div className={classes.errorNotice}>{closeReasonDetailsError}</div>
+                )}
+              </div>
+
+              <div className={classes.row}>
+                <button
+                  className={classes.btnDanger}
+                  type="button"
+                  onClick={() => void handleCloseConversation()}
+                  disabled={!canConfirmCloseConversation}
+                >
+                  {closeConversationMutation.isPending
+                    ? "Ending conversation…"
+                    : "Confirm end conversation"}
+                </button>
+              </div>
             </div>
-          </div>
-        </Collapse>
+          </Collapse>
+        </div>
 
         {closeConversationMutation.error && (
           <FadeIn className={classes.errorNotice}>
@@ -687,86 +733,88 @@ const ConversationThread = ({
           </FadeIn>
         )}
 
-        <Collapse open={Boolean(reportTarget)}>
-          <div className={classes.dangerPanel}>
-            <div className={classes.panelTitle}>
-              {reportPanelType === "message" ? "Report message" : "Report conversation"}
-            </div>
-
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="reportReason">
-                Reason
-              </label>
-
-              <select
-                id="reportReason"
-                className={classes.select}
-                value={reportReasonCode}
-                onChange={(event) =>
-                  setReportReasonCode(event.target.value as ModerationReportReasonCode | "")
-                }
-              >
-                <option value="">Choose a reason</option>
-
-                {conversationModerationReportReasonOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="reportDetails">
-                Additional details{isOtherReportReason ? " *" : ""}
-              </label>
-
-              <textarea
-                id="reportDetails"
-                className={classes.textarea}
-                value={reportReasonDetails}
-                onChange={(event) => setReportReasonDetails(event.target.value)}
-                placeholder={
-                  isOtherReportReason
-                    ? "Required. Explain why this should be reviewed."
-                    : "Optional. Add context for the admin reviewing this report."
-                }
-                maxLength={1000}
-              />
-
-              <div className={classes.hint}>
-                {reportReasonDetailsTrimmed.length}/1000 characters.
-                {isOtherReportReason
-                  ? " Please provide a reason for the report."
-                  : " Optional unless you choose Other."}
+        <div ref={reportPanelRef} className={classes.panelAnchor}>
+          <Collapse open={Boolean(reportTarget)}>
+            <div className={classes.dangerPanel}>
+              <div className={classes.panelTitle}>
+                {reportPanelType === "message" ? "Report message" : "Report conversation"}
               </div>
 
-              {reportReasonDetailsError && (
-                <div className={classes.errorNotice}>{reportReasonDetailsError}</div>
-              )}
-            </div>
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="reportReason">
+                  Reason
+                </label>
 
-            <div className={classes.row}>
-              <button
-                className={classes.btnDanger}
-                type="button"
-                onClick={() => void handleSubmitReport()}
-                disabled={!canSubmitReport}
-              >
-                {reportConversationMutation.isPending ? "Submitting report…" : "Submit report"}
-              </button>
+                <select
+                  id="reportReason"
+                  className={classes.select}
+                  value={reportReasonCode}
+                  onChange={(event) =>
+                    setReportReasonCode(event.target.value as ModerationReportReasonCode | "")
+                  }
+                >
+                  <option value="">Choose a reason</option>
 
-              <button
-                className={classes.btnOutline}
-                type="button"
-                onClick={closeReportForm}
-                disabled={reportConversationMutation.isPending}
-              >
-                Cancel
-              </button>
+                  {conversationModerationReportReasonOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="reportDetails">
+                  Additional details{isOtherReportReason ? " *" : ""}
+                </label>
+
+                <textarea
+                  id="reportDetails"
+                  className={classes.textarea}
+                  value={reportReasonDetails}
+                  onChange={(event) => setReportReasonDetails(event.target.value)}
+                  placeholder={
+                    isOtherReportReason
+                      ? "Required. Explain why this should be reviewed."
+                      : "Optional. Add context for the admin reviewing this report."
+                  }
+                  maxLength={1000}
+                />
+
+                <div className={classes.hint}>
+                  {reportReasonDetailsTrimmed.length}/1000 characters.
+                  {isOtherReportReason
+                    ? " Please provide a reason for the report."
+                    : " Optional unless you choose Other."}
+                </div>
+
+                {reportReasonDetailsError && (
+                  <div className={classes.errorNotice}>{reportReasonDetailsError}</div>
+                )}
+              </div>
+
+              <div className={classes.row}>
+                <button
+                  className={classes.btnDanger}
+                  type="button"
+                  onClick={() => void handleSubmitReport()}
+                  disabled={!canSubmitReport}
+                >
+                  {reportConversationMutation.isPending ? "Submitting report…" : "Submit report"}
+                </button>
+
+                <button
+                  className={classes.btnOutline}
+                  type="button"
+                  onClick={closeReportForm}
+                  disabled={reportConversationMutation.isPending}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        </Collapse>
+          </Collapse>
+        </div>
 
         {reportSubmitted && (
           <FadeIn className={classes.successNotice}>

@@ -7,7 +7,28 @@ import {
   canArchiveListingRequest,
   canDeclineListingRequest,
   getListingRequestStatusLabel,
+  getListingRequestStatusTone,
 } from "../../domain/listings/listingRequests";
+import { getRequestNextStep, getRequestStages } from "../../domain/listings/requestWorkspace";
+import ExpandingFormPanel from "../../components/listingRequests/workspace/ExpandingFormPanel";
+import ListingSnapshotDetails from "../../components/listingRequests/workspace/ListingSnapshotDetails";
+import ActionMenu from "../../components/ui/ActionMenu";
+import RequestNextStepCard from "../../components/listingRequests/workspace/RequestNextStepCard";
+import RequestStatusNotice from "../../components/listingRequests/workspace/RequestStatusNotice";
+import RequestWorkspace from "../../components/listingRequests/workspace/RequestWorkspace";
+import RequestWorkspaceHeader from "../../components/listingRequests/workspace/RequestWorkspaceHeader";
+import WorkspaceSectionList from "../../components/listingRequests/workspace/WorkspaceSectionList";
+import {
+  getSectionFlags,
+  summarizeAgreement,
+  summarizeChangeOrders,
+  summarizeDeliveries,
+  summarizeMilestones,
+  summarizeProgress,
+  summarizeSchedule,
+  workspaceDate,
+  type WorkspaceSectionSpec,
+} from "../../components/listingRequests/workspace/sectionSummaries";
 import { useEffect, useState } from 'react';
 import ListingRequestAgreementBuilder from '../../components/listingRequests/agreements/ListingRequestAgreementBuilder';
 import ListingRequestAgreementCreatorActions from '../../components/listingRequests/agreements/ListingRequestAgreementCreatorActions';
@@ -17,7 +38,6 @@ import ListingRequestChangeOrderBuilder from '../../components/listingRequests/c
 import ListingRequestChangeOrderCreatorActions from '../../components/listingRequests/changeOrders/ListingRequestChangeOrderCreatorActions';
 import ListingRequestChangeOrderSummary from '../../components/listingRequests/changeOrders/ListingRequestChangeOrderSummary';
 import RequestConversationThread from '../../components/listingRequests/conversations/RequestConversationThread';
-import ListingRequestStatusCard from '../../components/listingRequests/core/ListingRequestStatusCard';
 import ListingRequestSubmissionDetails from '../../components/listingRequests/core/ListingRequestSubmissionDetails';
 import ListingRequestFinalDeliveryBuilder from '../../components/listingRequests/finalDeliveries/ListingRequestFinalDeliveryBuilder';
 import ListingRequestFinalDeliveryCreatorActions from '../../components/listingRequests/finalDeliveries/ListingRequestFinalDeliveryCreatorActions';
@@ -28,7 +48,6 @@ import ListingRequestProgressUpdateTimeline from '../../components/listingReques
 import {
   canCreateNextListingRequestFinalDelivery,
   getDraftListingRequestFinalDelivery,
-  getHasAllMilestonePaymentsPaid,
   getListingRequestFinalDeliveryCreationBlockedReason,
 } from '../../domain/listings/listingRequestFinalDeliveries';
 import { useCreateListingRequestAgreement } from '../../hooks/creatorRequests/useCreateListingRequestAgreement';
@@ -48,59 +67,30 @@ import { useListingRequestMilestones } from '../../hooks/creatorRequests/useList
 import ListingRequestMilestoneSubmissionForm from '../../components/listingRequests/milestones/ListingRequestMilestoneSubmissionForm';
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
 import { canSubmitListingRequestMilestone, getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
-import { canSendListingRequestAgreement } from "../../domain/listings/listingRequestAgreements";
-import { canCreateListingRequestChangeOrder, getDraftListingRequestChangeOrder, getHasPendingListingRequestChangeOrder } from '../../domain/listings/listingRequestChangeOrders';
+import { canStartWorkForAcceptedRequest } from '../../domain/listings/listingRequestAgreements';
+import { canCreateListingRequestChangeOrder, getDraftListingRequestChangeOrder } from '../../domain/listings/listingRequestChangeOrders';
 
 const classes = {
   page: "space-y-6",
   backLink: "backLink",
-
-  header: "space-y-1",
   h1: "pageTitle",
   sub: "pageSub",
-
-  grid: "grid gap-6 lg:grid-cols-[0.9fr_1.1fr]",
-  column: "min-w-0 space-y-6",
   card: "card p-6",
-  section: "space-y-4",
-  sectionTitle: "sectionHeading",
   text: "text-sm text-zinc-600",
-
-  metaGrid: "grid gap-4 sm:grid-cols-2",
-  metaBlock: "space-y-1",
-  metaLabel: "metaLabel",
-  metaValue: "metaValue",
-
-  snapshotHeader: "flex items-start justify-between gap-4",
-  snapshotBody: "space-y-4 pt-4",
-
-  list: "space-y-2",
-  listItem:
-    "notice noticeNeutral",
-
+  respond: "space-y-3 border-t border-[var(--hairline)] pt-4",
   row: "flex flex-wrap items-center gap-3",
-  btnOutline:
-    "btnOutline",
-
-  btnPrimary:
-    "btnPrimary",
-  btnDanger:
-    "btnDangerOutline",
-  submitError:
-    "notice noticeError",
-
+  btnOutline: "btnOutline btnSm",
+  btnPrimary: "btnPrimary",
+  btnDanger: "btnDangerOutline",
+  submitError: "notice noticeError",
   loadingText: "text-sm text-zinc-600",
-  errorCard:
-    "notice noticeError",
-
-  field: "space-y-2",
+  errorCard: "notice noticeError",
+  field: "space-y-2 pt-1",
   label: "formLabel",
   hint: "formHint",
   error: "formError",
-  textarea:
-    "formControl min-h-[140px]",
-  infoCard:
-    "notice noticeInfo",
+  textarea: "formControl min-h-[140px]",
+  infoCard: "notice noticeInfo",
 } as const;
 
 // Prefers handle for buyer display, then display name, then user id
@@ -113,32 +103,6 @@ const buyerText = (
   fallbackUserId: string
 ) =>
   buyer?.handle ? `@${buyer.handle}` : buyer?.display_name ?? fallbackUserId;
-
-// Formats timestamps for the creator request detail page
-const dateText = (value: string) => {
-  const date = new Date(value);
-
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-};
-
-const priceText = (
-  priceType: "fixed" | "starting_at" | "range",
-  priceMin: number,
-  priceMax: number | null
-) =>
-  priceType === "fixed"
-    ? `$${priceMin}`
-    : priceType === "starting_at"
-      ? `From $${priceMin}`
-      : `$${priceMin}–$${priceMax ?? priceMin}`;
 
 const getCreatorMilestoneWaitMessage = (
   milestone: {
@@ -196,7 +160,6 @@ const CreatorRequestDetails = () => {
 
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
-  const [isSnapshotOpen, setIsSnapshotOpen] = useState(false);
   const [declineReasonError, setDeclineReasonError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -427,488 +390,465 @@ const CreatorRequestDetails = () => {
           ? "Completed projects are read-only because the buyer approved the final delivery."
           : undefined;
 
+  const buyerLabel = buyerText(buyer, request.buyer_user_id);
+  const agreementAccepted = agreement?.status === "buyer_accepted";
+  const usesMilestones =
+    agreementAccepted && agreement?.payment_structure === "milestone_payments";
+  const progressUpdates = progressUpdatesQuery.data ?? [];
 
-  return (
-    <div className={classes.page}>
-      <Link to={backTo} className={classes.backLink}>
-        ← Back to creator requests
-      </Link>
+  const workspaceInput = {
+    requestStatus: request.status,
+    agreement,
+    milestones,
+    changeOrders,
+    finalDeliveries,
+  };
 
-      <div className={classes.header}>
-        <h1 className={classes.h1}>Listing request</h1>
+  const nextStep = getRequestNextStep(workspaceInput);
+  const workspaceLoading =
+    agreementQuery.isLoading ||
+    milestonesAreLoading ||
+    changeOrdersQuery.isLoading ||
+    finalDeliveriesQuery.isLoading;
+  const flags = getSectionFlags(nextStep, "creator", {
+    readOnly: requestReadOnly,
+    isLoading: workspaceLoading,
+  });
 
-        <p className={classes.sub}>
-          Review the buyer message and the frozen listing snapshot recorded at
-          submission time.
-        </p>
-      </div>
+  const canPostProgressUpdate = agreement
+    ? canStartWorkForAcceptedRequest({
+      requestStatus: request.status,
+      agreementStatus: agreement.status,
+      startingPaymentStatus: agreement.starting_payment_status,
+    })
+    : false;
 
-      {error && (
-        <div className={classes.errorCard}>
-          This request could not be loaded right now.
-        </div>
-      )}
+  // Closes the form sheet only once the save succeeds, so validation errors stay visible.
+  const thenClose = <Input,>(save: (input: Input) => Promise<unknown>, close: () => void) =>
+    async (input: Input) => {
+      await save(input);
+      close();
+    };
 
-      <div className={classes.grid}>
-        <div className={classes.column}>
-          <div className={classes.card}>
-            <ListingRequestSubmissionDetails
-              heading="Buyer request"
-              requestTitle={request.request_title}
-              requestDetails={request.request_details}
-              fallbackMessage={request.message}
-              requestedTimeline={request.requested_timeline}
-              budgetAmount={request.budget_amount}
-              referenceLinks={request.reference_links}
-            />
+  const canRespondToRequest =
+    canAcceptListingRequest(request.status) || canDeclineListingRequest(request.status);
 
-            <ListingRequestStatusCard
-              status={request.status}
-              reason={request.creator_status_reason}
-              archiveContext={request}
-            />
+  const sections: WorkspaceSectionSpec[] = [
+    {
+      id: "request",
+      title: "Buyer request",
+      summary: canRespondToRequest ? "Accept or decline" : "Brief, timeline, budget and references",
+      ...flags("request"),
+      defaultOpen: request.status === "submitted",
+      content: (
+        <>
+          <ListingRequestSubmissionDetails
+            requestTitle={request.request_title}
+            requestDetails={request.request_details}
+            fallbackMessage={request.message}
+            requestedTimeline={request.requested_timeline}
+            budgetAmount={request.budget_amount}
+            referenceLinks={request.reference_links}
+          />
 
-            <ListingRequestAgreementCreatorActions
-              agreement={agreement}
-              isPending={sendDraftAgreementMutation.isPending}
-              error={sendDraftAgreementMutation.error}
-              onSendAgreement={(agreementId) =>
-                sendDraftAgreementMutation.mutateAsync({ agreementId })
-              }
-            />
-
-            <ListingRequestAgreementWorkReadinessCard
-              requestStatus={request.status}
-              agreement={agreement}
-            />
-
-            <div className={classes.metaGrid}>
-              <div className={classes.metaBlock}>
-                <div className={classes.metaLabel}>Buyer</div>
-                <div className={classes.metaValue}>
-                  {buyerText(buyer, request.buyer_user_id)}
+          {canRespondToRequest && (
+            <div className={classes.respond}>
+              {updateStatusMutation.error && (
+                <div className={classes.submitError}>
+                  The request status could not be updated right now.
                 </div>
-              </div>
-
-              <div className={classes.metaBlock}>
-                <div className={classes.metaLabel}>Status</div>
-                <div className={classes.metaValue}>
-                  {getListingRequestStatusLabel(request.status, request)}
-                </div>
-              </div>
-
-              <div className={classes.metaBlock}>
-                <div className={classes.metaLabel}>Submitted</div>
-                <div className={classes.metaValue}>
-                  {dateText(request.created_at)}
-                </div>
-              </div>
-
-              <div className={classes.metaBlock}>
-                <div className={classes.metaLabel}>Last updated</div>
-                <div className={classes.metaValue}>
-                  {dateText(request.updated_at)}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className={classes.card}>
-            <div className={classes.section}>
-              <h2 className={classes.sectionTitle}>Request actions</h2>
-
-              <p className={classes.text}>
-                Update the request status so the buyer can clearly track your response.
-              </p>
-            </div>
-
-            {updateStatusMutation.error && (
-              <div className={classes.submitError}>
-                The request status could not be updated right now.
-              </div>
-            )}
-
-            <div className={classes.row}>
-              {canAcceptListingRequest(request.status) && (
-                <button
-                  className={classes.btnPrimary}
-                  type="button"
-                  onClick={() => void handleAcceptRequest()}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  {updateStatusMutation.isPending ? "Updating…" : "Accept request"}
-                </button>
               )}
 
-              {canDeclineListingRequest(request.status) && (
-                <button
-                  className={classes.btnDanger}
-                  type="button"
-                  onClick={() => {
-                    setShowDeclineForm((current) => !current);
-                    setDeclineReasonError(null);
-                  }}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  {showDeclineForm ? "Cancel decline" : "Decline request"}
-                </button>
-              )}
-
-              {canArchiveListingRequest(request.status) && (
-                <button
-                  className={classes.btnOutline}
-                  type="button"
-                  onClick={() => void handleArchiveRequest()}
-                  disabled={updateStatusMutation.isPending}
-                >
-                  {updateStatusMutation.isPending ? "Updating…" : "Archive request"}
-                </button>
-              )}
-            </div>
-
-            <Collapse open={showDeclineForm && canDeclineListingRequest(request.status)}>
-              <div className={classes.field}>
-                <label className={classes.label} htmlFor="declineReason">
-                  Decline reason
-                </label>
-
-                <textarea
-                  id="declineReason"
-                  className={classes.textarea}
-                  value={declineReason}
-                  onChange={(event) => {
-                    setDeclineReason(event.target.value);
-                    setDeclineReasonError(null);
-                  }}
-                  placeholder="Explain why this request is being declined for audit and client clarity."
-                  maxLength={1000}
-                />
-
-                <div className={classes.hint}>
-                  {trimmedDeclineReason.length}/1000 characters. Minimum 10 characters required.
-                </div>
-
-                {declineReasonError && (
-                  <div className={classes.error}>{declineReasonError}</div>
+              <div className={classes.row}>
+                {canAcceptListingRequest(request.status) && (
+                  <button
+                    className={classes.btnPrimary}
+                    type="button"
+                    onClick={() => void handleAcceptRequest()}
+                    disabled={updateStatusMutation.isPending}
+                  >
+                    {updateStatusMutation.isPending ? "Updating…" : "Accept request"}
+                  </button>
                 )}
 
-                <div className={classes.row}>
+                {canDeclineListingRequest(request.status) && (
                   <button
                     className={classes.btnDanger}
                     type="button"
-                    onClick={() => void handleDeclineRequest()}
-                    disabled={!canConfirmDecline}
+                    onClick={() => {
+                      setShowDeclineForm((current) => !current);
+                      setDeclineReasonError(null);
+                    }}
+                    disabled={updateStatusMutation.isPending}
                   >
-                    {updateStatusMutation.isPending
-                      ? "Declining request…"
-                      : "Confirm decline request"}
+                    {showDeclineForm ? "Cancel decline" : "Decline request"}
                   </button>
-                </div>
+                )}
               </div>
-            </Collapse>
-          </div>
 
-          {request.status === "accepted" &&
-            !agreement &&
-            !agreementQuery.isLoading &&
-            !agreementQuery.error && (
-              <ListingRequestAgreementBuilder
-                request={request}
-                isPending={createAgreementMutation.isPending}
-                error={createAgreementMutation.error}
-                onCreateAgreement={(input) => createAgreementMutation.mutateAsync(input)}
-              />
-            )}
-        </div>
+              <Collapse open={showDeclineForm && canDeclineListingRequest(request.status)}>
+                <div className={classes.field}>
+                  <label className={classes.label} htmlFor="declineReason">
+                    Decline reason
+                  </label>
 
-        <div className={classes.column}>
+                  <textarea
+                    id="declineReason"
+                    className={classes.textarea}
+                    value={declineReason}
+                    onChange={(event) => {
+                      setDeclineReason(event.target.value);
+                      setDeclineReasonError(null);
+                    }}
+                    placeholder="Explain why this request is being declined for audit and client clarity."
+                    maxLength={1000}
+                  />
+
+                  <div className={classes.hint}>
+                    {trimmedDeclineReason.length}/1000 characters. Minimum 10 characters required.
+                  </div>
+
+                  {declineReasonError && (
+                    <div className={classes.error}>{declineReasonError}</div>
+                  )}
+
+                  <div className={classes.row}>
+                    <button
+                      className={classes.btnDanger}
+                      type="button"
+                      onClick={() => void handleDeclineRequest()}
+                      disabled={!canConfirmDecline}
+                    >
+                      {updateStatusMutation.isPending
+                        ? "Declining request…"
+                        : "Confirm decline request"}
+                    </button>
+                  </div>
+                </div>
+              </Collapse>
+            </div>
+          )}
+        </>
+      ),
+    },
+    {
+      id: "agreement",
+      title: "Project agreement",
+      summary: summarizeAgreement(agreement, "Not created yet"),
+      ...flags("agreement"),
+      visible: request.status !== "submitted" || Boolean(agreement),
+      content: (
+        <>
           {agreementQuery.error && (
             <div className={classes.errorCard}>
               Project agreement could not be loaded right now.
             </div>
           )}
 
-          <ListingRequestAgreementSummary
-            agreement={agreementQuery.data ?? null}
-            isLoading={agreementQuery.isLoading}
-            collapsible
-            defaultOpen={agreement ? canSendListingRequestAgreement(agreement.status) : false}
+          <ListingRequestAgreementCreatorActions
+            agreement={agreement}
+            isPending={sendDraftAgreementMutation.isPending}
+            error={sendDraftAgreementMutation.error}
+            onSendAgreement={(agreementId) =>
+              sendDraftAgreementMutation.mutateAsync({ agreementId })
+            }
           />
 
-          <div className={classes.card}>
-            <div className={classes.snapshotHeader}>
-              <div className={classes.section}>
-                <h2 className={classes.sectionTitle}>Frozen listing snapshot</h2>
-                <p className={classes.text}>
-                  This captures the listing state the buyer reached out about.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                className={classes.btnOutline}
-                aria-expanded={isSnapshotOpen}
-                onClick={() => setIsSnapshotOpen((current) => !current)}
+          {request.status === "accepted" &&
+            !agreement &&
+            !agreementQuery.isLoading &&
+            !agreementQuery.error && (
+              <ExpandingFormPanel
+                title="Create project agreement"
+                description="Scope, price, timeline and payments for the buyer to accept."
+                launchLabel="Create agreement"
               >
-                {isSnapshotOpen ? "Hide listing snapshot" : "Show listing snapshot"}
-              </button>
-            </div>
-
-            <Collapse open={isSnapshotOpen} className={classes.snapshotBody}>
-              <div className={classes.metaGrid}>
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Title</div>
-                  <div className={classes.metaValue}>{snapshot.title}</div>
-                </div>
-
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Price</div>
-                  <div className={classes.metaValue}>
-                    {priceText(
-                      snapshot.price_type,
-                      snapshot.price_min,
-                      snapshot.price_max
-                    )}
-                  </div>
-                </div>
-
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Purchase flow</div>
-                  <div className={classes.metaValue}>{snapshot.fulfilment_mode}</div>
-                </div>
-
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Offering type</div>
-                  <div className={classes.metaValue}>{snapshot.offering_type}</div>
-                </div>
-
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Category</div>
-                  <div className={classes.metaValue}>{snapshot.category}</div>
-                </div>
-
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Listing last updated</div>
-                  <div className={classes.metaValue}>
-                    {dateText(snapshot.updated_at)}
-                  </div>
-                </div>
-
-                {request.status === "completed" &&
-                  request.completed_at && (
-                    <div className={classes.metaBlock}>
-                      <div className={classes.metaLabel}>
-                        Completed
-                      </div>
-
-                      <div className={classes.metaValue}>
-                        {dateText(request.completed_at)}
-                      </div>
-                    </div>
-                  )}
-              </div>
-
-              <div className={classes.section}>
-                <h2 className={classes.sectionTitle}>Deliverables</h2>
-
-                {snapshot.deliverables.length > 0 ? (
-                  <div className={classes.list}>
-                    {snapshot.deliverables.map((deliverable) => (
-                      <div key={deliverable} className={classes.listItem}>
-                        {deliverable}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className={classes.text}>No deliverables were listed.</p>
+                {(close) => (
+                  <ListingRequestAgreementBuilder
+                    request={request}
+                    isPending={createAgreementMutation.isPending}
+                    error={createAgreementMutation.error}
+                    onCreateAgreement={thenClose(createAgreementMutation.mutateAsync, close)}
+                  />
                 )}
-              </div>
+              </ExpandingFormPanel>
+            )}
 
-              <div className={classes.section}>
-                <h2 className={classes.sectionTitle}>Tags</h2>
-
-                {snapshot.tags.length > 0 ? (
-                  <div className={classes.list}>
-                    {snapshot.tags.map((tag) => (
-                      <div key={tag} className={classes.listItem}>
-                        {tag}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className={classes.text}>No tags were listed.</p>
-                )}
-              </div>
-            </Collapse>
-          </div>
-        </div>
-      </div>
-
-      {agreement?.status === "buyer_accepted" && (
-        <>
-          <ListingRequestChangeOrderSummary
-            changeOrders={changeOrders}
-            viewer="creator"
-            isLoading={changeOrdersQuery.isLoading}
-            error={changeOrdersQuery.error}
+          <ListingRequestAgreementSummary
+            agreement={agreement}
+            isLoading={agreementQuery.isLoading}
           />
-
-          <ListingRequestChangeOrderCreatorActions
-            changeOrder={draftChangeOrder}
-            isPending={
-              sendDraftChangeOrderMutation.isPending
-            }
-            error={sendDraftChangeOrderMutation.error}
-            onSendChangeOrder={(changeOrderId) =>
-              sendDraftChangeOrderMutation.mutateAsync({
-                changeOrderId,
-              })
-            }
-          />
-
-          {canCreateChangeOrder && (
-            <ListingRequestChangeOrderBuilder
-              requestStatus={request.status}
-              agreement={agreement}
-              isPending={
-                createChangeOrderMutation.isPending
-              }
-              error={createChangeOrderMutation.error}
-              onCreateChangeOrder={(input) =>
-                createChangeOrderMutation.mutateAsync(
-                  input
-                )
-              }
-            />
-          )}
         </>
-      )}
+      ),
+    },
+    {
+      id: "payments",
+      title: "Payments",
+      summary: summarizeSchedule(agreement),
+      ...flags("payments"),
+      visible: request.status === "accepted" || Boolean(agreement),
+      content: (
+        <ListingRequestAgreementWorkReadinessCard
+          requestStatus={request.status}
+          agreement={agreement}
+        />
+      ),
+    },
+    {
+      id: "milestones",
+      title: "Milestones",
+      summary: summarizeMilestones(milestones),
+      ...flags("milestones"),
+      visible: usesMilestones,
+      content: (
+        <>
+          {activeMilestoneWaitMessage && (
+            <div className={classes.infoCard}>{activeMilestoneWaitMessage}</div>
+          )}
 
-      {agreement?.status === "buyer_accepted" &&
-        agreement.payment_structure === "milestone_payments" && (
-          <>
-            <ListingRequestMilestoneSummary
-              milestones={milestones}
-              submissions={milestoneSubmissions}
-              viewer="creator"
-              isLoading={milestonesAreLoading}
-              error={milestoneError}
-            />
+          {!requestReadOnly &&
+            request.status === "accepted" &&
+            startingPaymentResolved &&
+            canSubmitActiveMilestone && (
+              <ExpandingFormPanel
+                title={`Submit milestone ${(activeMilestone?.sort_order ?? 0) + 1}`}
+                description={activeMilestone?.title ?? "Share the work for buyer review."}
+                launchLabel={activeMilestone?.status === "revision_requested" ? "Resubmit milestone" : "Submit milestone"}
+              >
+                {(close) => (
+                  <ListingRequestMilestoneSubmissionForm
+                    milestone={activeMilestone}
+                    isPending={submitMilestoneMutation.isPending}
+                    error={submitMilestoneMutation.error}
+                    onSubmitMilestone={thenClose(submitMilestoneMutation.mutateAsync, close)}
+                  />
+                )}
+              </ExpandingFormPanel>
+            )}
 
-            {!requestReadOnly &&
-              request.status === "accepted" &&
-              startingPaymentResolved &&
-              canSubmitActiveMilestone && (
-                <ListingRequestMilestoneSubmissionForm
-                  milestone={activeMilestone}
-                  isPending={
-                    submitMilestoneMutation.isPending
-                  }
-                  error={submitMilestoneMutation.error}
-                  onSubmitMilestone={(input) =>
-                    submitMilestoneMutation.mutateAsync(
-                      input
-                    )
-                  }
+          <ListingRequestMilestoneSummary
+            milestones={milestones}
+            submissions={milestoneSubmissions}
+            viewer="creator"
+            isLoading={milestonesAreLoading}
+            error={milestoneError}
+          />
+        </>
+      ),
+    },
+    {
+      id: "delivery",
+      title: "Final delivery",
+      summary: summarizeDeliveries(finalDeliveries),
+      ...flags("delivery"),
+      visible: agreementAccepted,
+      content: (
+        <>
+          <ListingRequestFinalDeliveryCreatorActions
+            finalDelivery={draftFinalDelivery}
+            isPending={sendDraftFinalDeliveryMutation.isPending}
+            error={sendDraftFinalDeliveryMutation.error}
+            onSubmitFinalDelivery={(finalDeliveryId) =>
+              sendDraftFinalDeliveryMutation.mutateAsync({ finalDeliveryId })
+            }
+          />
+
+          {finalDeliveryCreationBlockedReason && (
+            <div className={classes.infoCard}>{finalDeliveryCreationBlockedReason}</div>
+          )}
+
+          {canCreateFinalDelivery && agreement && (
+            <ExpandingFormPanel
+              title="Create final delivery"
+              description="Package the finished files for the buyer's approval."
+              launchLabel="Create delivery"
+            >
+              {(close) => (
+                <ListingRequestFinalDeliveryBuilder
+                  requestStatus={request.status}
+                  agreement={agreement}
+                  isPending={createFinalDeliveryMutation.isPending}
+                  error={createFinalDeliveryMutation.error}
+                  onCreateFinalDelivery={thenClose(createFinalDeliveryMutation.mutateAsync, close)}
                 />
               )}
+            </ExpandingFormPanel>
+          )}
 
-            {activeMilestoneWaitMessage && (
-              <div className={classes.infoCard}>
-                {activeMilestoneWaitMessage}
-              </div>
-            )}
-          </>
-        )}
-
-      {agreement?.status === "buyer_accepted" && (
-        <>
           <ListingRequestFinalDeliverySummary
             finalDeliveries={finalDeliveries}
             viewer="creator"
             isLoading={finalDeliveriesQuery.isLoading}
             error={finalDeliveriesQuery.error}
           />
-
-
-          <ListingRequestFinalDeliveryCreatorActions
-            finalDelivery={draftFinalDelivery}
-            isPending={
-              sendDraftFinalDeliveryMutation.isPending
-            }
-            error={sendDraftFinalDeliveryMutation.error}
-            onSubmitFinalDelivery={(finalDeliveryId) =>
-              sendDraftFinalDeliveryMutation.mutateAsync({
-                finalDeliveryId,
-              })
+        </>
+      ),
+    },
+    {
+      id: "changeOrders",
+      title: "Change orders",
+      summary: summarizeChangeOrders(changeOrders),
+      ...flags("changeOrders"),
+      visible: agreementAccepted,
+      content: (
+        <>
+          <ListingRequestChangeOrderCreatorActions
+            changeOrder={draftChangeOrder}
+            isPending={sendDraftChangeOrderMutation.isPending}
+            error={sendDraftChangeOrderMutation.error}
+            onSendChangeOrder={(changeOrderId) =>
+              sendDraftChangeOrderMutation.mutateAsync({ changeOrderId })
             }
           />
 
-          {finalDeliveryCreationBlockedReason && (
-            <div className={classes.infoCard}>
-              {finalDeliveryCreationBlockedReason}
-            </div>
+          {canCreateChangeOrder && agreement && (
+            <ExpandingFormPanel
+              title="Propose a change order"
+              description="Add scope, cost or time after the agreement was accepted."
+              launchLabel="Propose change"
+            >
+              {(close) => (
+                <ListingRequestChangeOrderBuilder
+                  requestStatus={request.status}
+                  agreement={agreement}
+                  isPending={createChangeOrderMutation.isPending}
+                  error={createChangeOrderMutation.error}
+                  onCreateChangeOrder={thenClose(createChangeOrderMutation.mutateAsync, close)}
+                />
+              )}
+            </ExpandingFormPanel>
           )}
 
-          {canCreateFinalDelivery && (
-            <ListingRequestFinalDeliveryBuilder
-              requestStatus={request.status}
-              agreement={agreement}
-              isPending={
-                createFinalDeliveryMutation.isPending
-              }
-              error={createFinalDeliveryMutation.error}
-              onCreateFinalDelivery={(input) =>
-                createFinalDeliveryMutation.mutateAsync(
-                  input
-                )
-              }
+          <ListingRequestChangeOrderSummary
+            changeOrders={changeOrders}
+            viewer="creator"
+            isLoading={changeOrdersQuery.isLoading}
+            error={changeOrdersQuery.error}
+          />
+        </>
+      ),
+    },
+    {
+      id: "progress",
+      title: "Progress updates",
+      summary: summarizeProgress(progressUpdates),
+      ...flags("progress"),
+      visible: Boolean(agreement),
+      content: (
+        <>
+          <ListingRequestProgressUpdateScheduleCard agreement={agreement} updates={progressUpdates} />
+
+          {canPostProgressUpdate && (
+            <ExpandingFormPanel
+              title="Post a progress update"
+              description="Keep the buyer in the loop and meet the update schedule."
+              launchLabel="Post update"
+            >
+              {(close) => (
+                <ListingRequestProgressUpdateForm
+                  requestStatus={request.status}
+                  agreement={agreement}
+                  isPending={createProgressUpdateMutation.isPending}
+                  error={createProgressUpdateMutation.error}
+                  onCreateProgressUpdate={thenClose(createProgressUpdateMutation.mutateAsync, close)}
+                />
+              )}
+            </ExpandingFormPanel>
+          )}
+
+          {agreementAccepted && (
+            <ListingRequestProgressUpdateTimeline
+              updates={progressUpdates}
+              isLoading={progressUpdatesQuery.isLoading}
+              error={progressUpdatesQuery.error}
             />
           )}
         </>
-      )}
+      ),
+    },
+    {
+      id: "snapshot",
+      title: "Listing snapshot",
+      summary: "As it was when the buyer reached out",
+      ...flags("snapshot"),
+      content: <ListingSnapshotDetails snapshot={snapshot} />,
+    },
+  ];
 
-      <ListingRequestProgressUpdateScheduleCard
-        agreement={agreement}
-        updates={progressUpdatesQuery.data ?? []}
-      />
+  const meta = [
+    <span key="buyer">
+      From <span className="font-semibold text-zinc-900">{buyerLabel}</span>
+    </span>,
+    <span key="submitted">Submitted {workspaceDate(request.created_at)}</span>,
+    request.status === "completed" && request.completed_at ? (
+      <span key="completed">Completed {workspaceDate(request.completed_at)}</span>
+    ) : (
+      <span key="updated">Updated {workspaceDate(request.updated_at)}</span>
+    ),
+  ];
 
-      <ListingRequestProgressUpdateForm
-        requestStatus={request.status}
-        agreement={agreement}
-        isPending={createProgressUpdateMutation.isPending}
-        error={createProgressUpdateMutation.error}
-        onCreateProgressUpdate={(input) =>
-          createProgressUpdateMutation.mutateAsync(input)
-        }
-      />
+  const manageMenu = canArchiveListingRequest(request.status) ? (
+    <ActionMenu>
+      <p className={classes.text}>
+        Archive this request to remove it from your active queue without declining it.
+      </p>
 
-      {agreement?.status === "buyer_accepted" && (
-        <ListingRequestProgressUpdateTimeline
-          updates={progressUpdatesQuery.data ?? []}
-          isLoading={progressUpdatesQuery.isLoading}
-          error={progressUpdatesQuery.error}
+      <button
+        className={classes.btnOutline}
+        type="button"
+        onClick={() => void handleArchiveRequest()}
+        disabled={updateStatusMutation.isPending}
+      >
+        {updateStatusMutation.isPending ? "Updating…" : "Archive request"}
+      </button>
+    </ActionMenu>
+  ) : undefined;
+
+  return (
+    <RequestWorkspace
+      header={
+        <RequestWorkspaceHeader
+          backTo={backTo}
+          backLabel="Back to creator requests"
+          eyebrow="Listing request"
+          title={snapshot.title}
+          meta={meta}
+          statusLabel={getListingRequestStatusLabel(request.status, request)}
+          statusTone={getListingRequestStatusTone(request.status)}
+          stages={getRequestStages(workspaceInput)}
+          actions={manageMenu}
+          notice={
+            (request.status === "declined" || request.status === "archived") && (
+              <RequestStatusNotice
+                status={request.status}
+                reason={request.creator_status_reason}
+                archiveContext={request}
+              />
+            )
+          }
         />
-      )}
-
-      <RequestConversationThread
-        requestId={request.id}
-        buyerLabel={buyerText(
-          buyer,
-          request.buyer_user_id
-        )}
-        creatorLabel="You"
-        viewer="creator"
-        requestReadOnly={requestReadOnly}
-        requestReadOnlyMessage={requestReadOnlyMessage}
-      />
-
-      <div className={classes.row}>
-        <Link className={classes.btnOutline} to="/creator/requests">
-          Back to creator requests
-        </Link>
-      </div>
-    </div>
+      }
+      nextStep={
+        <RequestNextStepCard
+          step={nextStep}
+          viewer="creator"
+          isLoading={workspaceLoading}
+          buyerLabel={buyerLabel}
+          creatorLabel="You"
+        />
+      }
+      conversation={
+        <RequestConversationThread
+          requestId={request.id}
+          buyerLabel={buyerLabel}
+          creatorLabel="You"
+          viewer="creator"
+          requestReadOnly={requestReadOnly}
+          requestReadOnlyMessage={requestReadOnlyMessage}
+        />
+      }
+      sections={<WorkspaceSectionList requestStatus={request.status} sections={sections} />}
+    />
   );
 };
 

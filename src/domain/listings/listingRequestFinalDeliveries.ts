@@ -67,36 +67,6 @@ export const getHasAllMilestonePaymentsPaid = (
   );
 };
 
-export const listingRequestFinalDeliveryStatusOptions: Array<{
-  value: ListingRequestFinalDeliveryStatus;
-  label: string;
-}> = [
-    {
-      value: "draft",
-      label: "Draft",
-    },
-    {
-      value: "submitted",
-      label: "Awaiting buyer review",
-    },
-    {
-      value: "revision_requested",
-      label: "Revision requested",
-    },
-    {
-      value: "buyer_approved",
-      label: "Approved by buyer",
-    },
-    {
-      value: "cancelled",
-      label: "Cancelled",
-    },
-    {
-      value: "superseded",
-      label: "Superseded",
-    },
-  ];
-
 export const getListingRequestFinalDeliveryStatusLabel = (
   status: ListingRequestFinalDeliveryStatus
 ): string =>
@@ -147,7 +117,6 @@ export const canSubmitListingRequestFinalDelivery = (
 export const canBuyerRespondToListingRequestFinalDelivery = (
   status: ListingRequestFinalDeliveryStatus
 ): boolean => status === "submitted";
-
 
 export const getLatestListingRequestFinalDelivery = <
   TFinalDelivery extends {
@@ -254,15 +223,6 @@ export const isListingRequestFinalDeliveryBuyerVisible = (input: {
 }): boolean =>
   input.status !== "draft" &&
   Boolean(input.submittedAt);
-
-export const hasListingRequestFinalDeliveryContent = (input: {
-  summary?: string | null;
-  deliveryLinks?: string[];
-}): boolean =>
-  Boolean(
-    input.summary?.trim() ||
-    input.deliveryLinks?.some((link) => link.trim())
-  );
 
 export const getListingRequestFinalDeliveryApprovalBlockedReason =
   (

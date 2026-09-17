@@ -22,11 +22,7 @@ type ListingRequestChangeOrderSummaryProps = {
 };
 
 const classes = {
-  card: "card p-6",
   section: "space-y-4",
-  header: "space-y-1",
-  title: "font-display text-base font-extrabold tracking-tight",
-  text: "text-sm text-zinc-600",
   loading:
     "notice noticeNeutral",
   empty:
@@ -180,18 +176,8 @@ const ListingRequestChangeOrderSummary = ({
   );
 
   return (
-    <div className={classes.card}>
+    <div>
       <div className={classes.section}>
-        <div className={classes.header}>
-          <h2 className={classes.title}>
-            Project change orders
-          </h2>
-
-          <p className={classes.text}>
-            Formal changes proposed after the original project
-            agreement was accepted.
-          </p>
-        </div>
 
         {isLoading && (
           <div className={classes.loading}>

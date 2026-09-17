@@ -618,7 +618,12 @@ describe("<AdminRequestDetails />", () => {
 
     expect(screen.getByText("@buyeruser")).toBeInTheDocument();
     expect(screen.getByText("@creatoruser")).toBeInTheDocument();
-    expect(screen.getByText("Custom Emote Pack")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Custom Emote Pack" })).toBeInTheDocument();
+    expect(screen.getAllByText("Custom Emote Pack")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "View listing revisions" })).toHaveAttribute(
+      "href",
+      "/admin/listing-revisions/listing-1"
+    );
     expect(screen.getByText("Conversation thread loaded")).toBeInTheDocument();
   });
 

@@ -736,6 +736,19 @@ const renderPage = () =>
     </MemoryRouter>
   );
 
+// Creator forms open in a full-page sheet from a launcher inside their section.
+const openForm = (launchLabel: string) => {
+  const launcher = screen.getByRole("button", { name: launchLabel, hidden: true });
+  const section = launcher.closest("section");
+  const toggle = section?.querySelector("h2 button");
+
+  if (toggle && toggle.getAttribute("aria-expanded") !== "true") {
+    fireEvent.click(toggle);
+  }
+
+  fireEvent.click(screen.getByRole("button", { name: launchLabel }));
+};
+
 describe("<CreatorRequestDetails />", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -814,10 +827,15 @@ describe("<CreatorRequestDetails />", () => {
   it("renders structured buyer request details for the creator", () => {
     renderPage();
 
-    // Buyer request details are collapsed by default so a request with a
-    // lot of history doesn't bury payment and messaging actions — expand
-    // before asserting on its content.
-    fireEvent.click(screen.getByRole("button", { name: "Show request details" }));
+    // A submitted request opens the buyer request section with its accept/decline controls.
+    expect(screen.getByRole("button", { name: /Buyer request/ })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+    expect(screen.getByRole("button", { name: "Accept request" })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Next step" })).getByText("Next step for you")
+    ).toBeInTheDocument();
 
     expect(screen.getByText("Custom cozy emote pack")).toBeInTheDocument();
     expect(
@@ -855,6 +873,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     renderPage();
+    openForm("Create agreement");
 
     expect(screen.getByText("Mock no agreement summary")).toBeInTheDocument();
     expect(screen.getByText("Mock agreement builder")).toBeInTheDocument();
@@ -879,6 +898,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     renderPage();
+    openForm("Create agreement");
 
     screen.getByRole("button", { name: "Mock agreement builder" }).click();
 
@@ -1107,6 +1127,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     renderPage();
+    openForm("Post update");
 
     screen
       .getByRole("button", {
@@ -1289,6 +1310,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     renderPage();
+    openForm("Propose change");
 
     expect(
       mocks.useListingRequestChangeOrders
@@ -1340,6 +1362,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     renderPage();
+    openForm("Propose change");
 
     screen
       .getByRole("button", {
@@ -1507,6 +1530,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     renderPage();
+    openForm("Create delivery");
 
     expect(
       mocks.useListingRequestFinalDeliveries
@@ -1554,6 +1578,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     renderPage();
+    openForm("Create delivery");
 
     screen
       .getByRole("button", {
@@ -1673,6 +1698,7 @@ describe("<CreatorRequestDetails />", () => {
     );
 
     renderPage();
+    openForm("Create delivery");
 
     expect(
       screen.getByRole("button", {
@@ -1767,18 +1793,11 @@ describe("<CreatorRequestDetails />", () => {
 
     renderPage();
 
-    const statusLabel = screen.getByText("Status", {
-      selector: "div",
-    });
-
-    const statusBlock = statusLabel.parentElement;
-
-    expect(statusBlock).not.toBeNull();
+    // The status pill sits beside the page title.
+    const heading = screen.getByRole("heading", { level: 1 });
 
     expect(
-      within(statusBlock as HTMLElement).getByText(
-        "Completed"
-      )
+      within(heading.parentElement as HTMLElement).getByText("Completed")
     ).toBeInTheDocument();
 
     expect(
@@ -1812,9 +1831,7 @@ describe("<CreatorRequestDetails />", () => {
       "/creator/requests/completed"
     );
 
-    // The completed date lives inside the collapsed listing snapshot.
-    fireEvent.click(screen.getByRole("button", { name: "Show listing snapshot" }));
-
+    // The completed date is part of the header meta row.
     expect(
       screen.getByText(/Jun 9, 2026/)
     ).toBeInTheDocument();
@@ -1926,6 +1943,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     renderPage();
+    openForm("Create delivery");
 
     expect(
       screen.getByRole("button", {
@@ -1998,6 +2016,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     renderPage();
+    openForm("Submit milestone");
 
     expect(
       mocks.useListingRequestMilestones
@@ -2072,6 +2091,7 @@ describe("<CreatorRequestDetails />", () => {
     });
 
     renderPage();
+    openForm("Submit milestone");
 
     screen
       .getByRole("button", {
