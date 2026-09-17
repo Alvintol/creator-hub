@@ -34,6 +34,7 @@ import { getActiveListingRequestMilestone } from '../../domain/listings/listingR
 import { getSentListingRequestChangeOrder } from '../../domain/listings/listingRequestChangeOrders';
 import { useListingRequestPayments } from '../../hooks/payments/useListingRequestPayments';
 import ListingRequestPaymentsCard from '../../components/listingRequests/payments/ListingRequestPaymentsCard';
+import { canBuyerAcceptListingRequestAgreement } from "../../domain/listings/listingRequestAgreements";
 
 const classes = {
   page: "space-y-6",
@@ -44,6 +45,7 @@ const classes = {
   sub: "pageSub",
 
   grid: "grid gap-6 lg:grid-cols-[0.9fr_1.1fr]",
+  column: "min-w-0 space-y-6",
   card: "card p-6",
   section: "space-y-4",
   sectionTitle: "sectionHeading",
@@ -395,11 +397,6 @@ const BuyerRequestDetails = () => {
             archiveContext={request}
           />
 
-          <ListingRequestAgreementSummary
-            agreement={buyerVisibleAgreement}
-            isLoading={agreementQuery.isLoading}
-          />
-
           <ListingRequestAgreementBuyerActions
             agreement={buyerVisibleAgreement}
             isPending={respondAgreementMutation.isPending}
@@ -457,98 +454,111 @@ const BuyerRequestDetails = () => {
           </div>
         </div>
 
-        <div className={classes.card}>
-          <div className={classes.snapshotHeader}>
-            <div className={classes.section}>
-              <h2 className={classes.sectionTitle}>Frozen listing snapshot</h2>
-              <p className={classes.text}>
-                This captures the listing state you submitted your request against.
-              </p>
+        <div className={classes.column}>
+          <ListingRequestAgreementSummary
+            agreement={buyerVisibleAgreement}
+            isLoading={agreementQuery.isLoading}
+            collapsible
+            defaultOpen={
+              buyerVisibleAgreement
+                ? canBuyerAcceptListingRequestAgreement(buyerVisibleAgreement.status)
+                : false
+            }
+          />
+
+          <div className={classes.card}>
+            <div className={classes.snapshotHeader}>
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Frozen listing snapshot</h2>
+                <p className={classes.text}>
+                  This captures the listing state you submitted your request against.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className={classes.btnOutline}
+                aria-expanded={isSnapshotOpen}
+                onClick={() => setIsSnapshotOpen((current) => !current)}
+              >
+                {isSnapshotOpen ? "Hide listing snapshot" : "Show listing snapshot"}
+              </button>
             </div>
 
-            <button
-              type="button"
-              className={classes.btnOutline}
-              aria-expanded={isSnapshotOpen}
-              onClick={() => setIsSnapshotOpen((current) => !current)}
-            >
-              {isSnapshotOpen ? "Hide listing snapshot" : "Show listing snapshot"}
-            </button>
+            <Collapse open={isSnapshotOpen} className={classes.snapshotBody}>
+              <div className={classes.metaGrid}>
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Title</div>
+                  <div className={classes.metaValue}>{snapshot.title}</div>
+                </div>
+
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Price</div>
+                  <div className={classes.metaValue}>
+                    {priceText(
+                      snapshot.price_type,
+                      snapshot.price_min,
+                      snapshot.price_max
+                    )}
+                  </div>
+                </div>
+
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Purchase flow</div>
+                  <div className={classes.metaValue}>{snapshot.fulfilment_mode}</div>
+                </div>
+
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Offering type</div>
+                  <div className={classes.metaValue}>{snapshot.offering_type}</div>
+                </div>
+
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Category</div>
+                  <div className={classes.metaValue}>{snapshot.category}</div>
+                </div>
+
+                <div className={classes.metaBlock}>
+                  <div className={classes.metaLabel}>Listing last updated</div>
+                  <div className={classes.metaValue}>
+                    {dateText(snapshot.updated_at)}
+                  </div>
+                </div>
+              </div>
+
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Deliverables</h2>
+
+                {snapshot.deliverables.length > 0 ? (
+                  <div className={classes.list}>
+                    {snapshot.deliverables.map((deliverable) => (
+                      <div key={deliverable} className={classes.listItem}>
+                        {deliverable}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={classes.text}>No deliverables were listed.</p>
+                )}
+              </div>
+
+              <div className={classes.section}>
+                <h2 className={classes.sectionTitle}>Tags</h2>
+
+                {snapshot.tags.length > 0 ? (
+                  <div className={classes.list}>
+                    {snapshot.tags.map((tag) => (
+                      <div key={tag} className={classes.listItem}>
+                        {tag}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className={classes.text}>No tags were listed.</p>
+                )}
+              </div>
+            </Collapse>
           </div>
-
-          <Collapse open={isSnapshotOpen} className={classes.snapshotBody}>
-            <div className={classes.metaGrid}>
-              <div className={classes.metaBlock}>
-                <div className={classes.metaLabel}>Title</div>
-                <div className={classes.metaValue}>{snapshot.title}</div>
-              </div>
-
-              <div className={classes.metaBlock}>
-                <div className={classes.metaLabel}>Price</div>
-                <div className={classes.metaValue}>
-                  {priceText(
-                    snapshot.price_type,
-                    snapshot.price_min,
-                    snapshot.price_max
-                  )}
-                </div>
-              </div>
-
-              <div className={classes.metaBlock}>
-                <div className={classes.metaLabel}>Purchase flow</div>
-                <div className={classes.metaValue}>{snapshot.fulfilment_mode}</div>
-              </div>
-
-              <div className={classes.metaBlock}>
-                <div className={classes.metaLabel}>Offering type</div>
-                <div className={classes.metaValue}>{snapshot.offering_type}</div>
-              </div>
-
-              <div className={classes.metaBlock}>
-                <div className={classes.metaLabel}>Category</div>
-                <div className={classes.metaValue}>{snapshot.category}</div>
-              </div>
-
-              <div className={classes.metaBlock}>
-                <div className={classes.metaLabel}>Listing last updated</div>
-                <div className={classes.metaValue}>
-                  {dateText(snapshot.updated_at)}
-                </div>
-              </div>
-            </div>
-
-            <div className={classes.section}>
-              <h2 className={classes.sectionTitle}>Deliverables</h2>
-
-              {snapshot.deliverables.length > 0 ? (
-                <div className={classes.list}>
-                  {snapshot.deliverables.map((deliverable) => (
-                    <div key={deliverable} className={classes.listItem}>
-                      {deliverable}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className={classes.text}>No deliverables were listed.</p>
-              )}
-            </div>
-
-            <div className={classes.section}>
-              <h2 className={classes.sectionTitle}>Tags</h2>
-
-              {snapshot.tags.length > 0 ? (
-                <div className={classes.list}>
-                  {snapshot.tags.map((tag) => (
-                    <div key={tag} className={classes.listItem}>
-                      {tag}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className={classes.text}>No tags were listed.</p>
-              )}
-            </div>
-          </Collapse>
         </div>
       </div>
 
