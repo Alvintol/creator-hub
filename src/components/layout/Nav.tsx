@@ -12,6 +12,7 @@ import { useAuth } from "../../providers/AuthProvider";
 import { useSellerAccess } from '../../hooks/creatorApplication/useSellerAccess';
 import { useMyAdminAccess } from '../../hooks/admin/useMyAdminAccess';
 import { useMessagesInbox } from '../../hooks/conversations/useMessagesInbox';
+import ThemeToggle from "./ThemeToggle";
 
 type CategoryLink = {
   key: string;
@@ -26,41 +27,40 @@ const brand = {
 const classes = {
   header: "topbar",
 
-  topRow: "container mx-auto flex items-center gap-4 px-4 py-3 sm:px-6",
+  topRow: "container mx-auto flex h-12 items-center gap-3 px-4 py-0 sm:px-6",
   brandLink: "shrink-0 text-lg font-black tracking-tight",
-  brandWrap: "inline-flex items-center gap-2.5",
-  brandImg: "h-8 w-8 shrink-0",
-  brandText: "font-display text-lg font-extrabold tracking-tight",
+  brandWrap: "inline-flex items-center gap-2",
+  brandImg: "brandMark h-7 w-7 shrink-0",
+  brandText: "font-display text-base font-extrabold tracking-tight",
   brandAccent: "text-[rgb(var(--brand))]",
 
   form: "flex w-full items-center gap-2",
-  searchInput: "searchInput",
-  searchButton: "btnPrimary hidden sm:inline-flex",
+  searchInput: "searchInput h-8 py-0",
+  searchButton: "btnOutline btnSm h-8 hidden sm:inline-flex",
 
   nav: "hidden items-center gap-1 md:flex",
   navPillBase: "navPill",
   navPillActive: "navPillActive",
   navPillHot: "navPillHot",
   navPillIdle: "navPillIdle",
-  navPillAuth: "navPill inline-flex items-center justify-center whitespace-nowrap px-3 py-1",
+  navPillAuth: "navPill inline-flex items-center justify-center whitespace-nowrap",
   navPillCount: "navPillCount",
   navPillDot: "navPillDot animate-pulse",
   navLabelWrap: "inline-flex items-center gap-2",
   navPillButton:
     "navPill inline-flex items-center justify-center whitespace-nowrap",
+  signInButton: "btnPrimary btnSm h-8 ml-1 whitespace-nowrap",
   settingsPill:
-    "navPill inline-flex h-9 w-9 items-center justify-center whitespace-nowrap px-0",
+    "navPill inline-flex h-8 w-8 items-center justify-center whitespace-nowrap px-0",
 
-  subbar: "subbar",
-  subbarRow:
-    "container mx-auto flex items-center justify-between gap-3 px-4 py-2 sm:px-6",
-  statement: "text-xs font-medium text-zinc-500",
-  aboutLink: "linkPill",
+  statementWrap: "flex shrink-0 items-center gap-3 border-l border-[var(--hairline)] pl-4",
+  statement: "hidden text-xs font-medium text-zinc-500 xl:inline",
+  aboutLink: "linkPill whitespace-nowrap py-0.5",
 
   categoryWrap: "categoryBar",
-  categoryInner: "categoryBarInner",
-  categoryRow: "categoryRow",
-  categoryTitle: "categoryTitle",
+  categoryInner: "categoryBarInner flex items-center gap-4",
+  categoryRow: "categoryRow min-w-0 flex-1",
+  categoryTitle: "categoryTitle hidden 2xl:inline",
 
   chip: "navChip whitespace-nowrap",
   chipActive: "navChip navChipActive whitespace-nowrap",
@@ -270,10 +270,7 @@ const Nav = () => {
           )}
 
           {!loading && !user && (
-            <NavLink
-              to="/signin"
-              className={({ isActive }) => getAuthPillClass(isActive)}
-            >
+            <NavLink to="/signin" className={classes.signInButton}>
               Sign in
             </NavLink>
           )}
@@ -288,18 +285,8 @@ const Nav = () => {
             </button>
           )}
         </nav>
-      </div>
 
-      <div className={classes.subbar}>
-        <div className={classes.subbarRow}>
-          <div className={classes.statement}>
-            Human-made only • No generative AI listings
-          </div>
-
-          <Link to="/about" className={classes.aboutLink}>
-            Learn more →
-          </Link>
-        </div>
+        <ThemeToggle />
       </div>
 
       <div className={classes.categoryWrap}>
@@ -320,6 +307,16 @@ const Nav = () => {
                 {category.label}
               </Link>
             ))}
+          </div>
+
+          <div className={classes.statementWrap}>
+            <span className={classes.statement}>
+              Human-made • No generative AI
+            </span>
+
+            <Link to="/about" className={classes.aboutLink}>
+              Learn more →
+            </Link>
           </div>
         </div>
       </div>

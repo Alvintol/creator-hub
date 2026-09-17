@@ -87,7 +87,7 @@ const classes = {
   sampleTitle: "text-sm font-extrabold text-zinc-900",
   sampleMeta: "mt-1 text-xs text-zinc-500",
   sampleDescription: "mt-2 text-sm text-zinc-700",
-  sampleLink: "mt-2 inline-flex text-sm font-semibold text-[rgb(var(--brand))] underline",
+  sampleLink: "mt-2 inline-flex text-sm font-semibold text-[rgb(var(--accent-text))] underline underline-offset-2 hover:opacity-80",
 
   chips: "mt-3 flex flex-wrap gap-2",
   chip: "chip",
@@ -103,7 +103,7 @@ const classes = {
   checkboxRow: "flex items-start gap-3 rounded-2xl border border-zinc-200 bg-white p-4",
   checkbox: "mt-1 h-4 w-4 rounded border-zinc-300",
   checkboxText: "text-sm text-zinc-700",
-  checkboxLink: "font-semibold text-[rgb(var(--brand))] underline",
+  checkboxLink: "font-semibold text-[rgb(var(--accent-text))] underline underline-offset-2 hover:opacity-80",
 } as const;
 
 // Turns unknown thrown values into readable text

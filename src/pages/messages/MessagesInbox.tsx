@@ -25,7 +25,7 @@ const classes = {
   row: "flex flex-wrap items-center gap-2",
   reportCountPill: `${pill} bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-200`,
   reportCountPillEmpty: `${pill} bg-zinc-100 text-zinc-600`,
-  reportUpdatePill: `${pill} bg-blue-600 text-white`,
+  reportUpdatePill: `${pill} bg-[rgb(var(--primary))] text-[rgb(var(--on-primary))]`,
   btnOutline: "btnOutline px-4 py-2",
 
   list: "space-y-3",
@@ -33,11 +33,11 @@ const classes = {
     "card group flex flex-col gap-4 p-5 sm:flex-row sm:items-center",
   itemUnread: "ring-1 ring-[rgb(var(--brand)/0.25)]",
   avatar:
-    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-zinc-800 to-zinc-950 font-display text-sm font-bold uppercase text-white",
+    "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[rgb(var(--primary-strong))] to-[rgb(var(--primary))] text-[rgb(var(--on-primary))] font-display text-sm font-bold uppercase",
   itemMain: "min-w-0 flex-1 space-y-1.5",
   titleRow: "flex flex-wrap items-center gap-2",
   title: "truncate font-display text-base font-bold tracking-tight text-zinc-900",
-  unreadPill: `${pill} bg-[rgb(var(--brand))] text-white`,
+  unreadPill: `${pill} bg-[rgb(var(--brand-deep))] text-white`,
   metaLine: "flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-zinc-500",
   metaDot: "text-zinc-300",
   text: "text-sm text-zinc-500",
@@ -47,7 +47,7 @@ const classes = {
   itemSide:
     "flex shrink-0 flex-row items-center justify-between gap-3 sm:flex-col sm:items-end",
   statusPill: `${pill} bg-zinc-100 text-zinc-700`,
-  updated: "text-xs text-zinc-400",
+  updated: "text-xs text-zinc-500",
   btnPrimary: "btnPrimary px-4 py-2",
 
   loadingText: "text-sm text-zinc-500",
