@@ -248,4 +248,47 @@ describe("RequestListing", () => {
       screen.queryByRole("button", { name: "Submit request" })
     ).not.toBeInTheDocument();
   });
+
+  it("flags invalid fields, focuses the first one, and does not submit", () => {
+    renderPage();
+
+    fireEvent.change(screen.getByLabelText("Budget optional"), { target: { value: "-4" } });
+    fireEvent.click(screen.getByRole("button", { name: "Submit request" }));
+
+    const title = screen.getByLabelText("Request title / summary");
+
+    expect(title).toHaveAttribute("aria-invalid", "true");
+    expect(title).toHaveFocus();
+    expect(screen.getByLabelText("Details")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("Budget optional")).toHaveAccessibleDescription(
+      "Budget must be a valid amount between 0 and 999999.99."
+    );
+    expect(screen.getByLabelText("Deadline / timeline optional")).toHaveAttribute("aria-invalid", "false");
+    expect(mocks.createRequest).not.toHaveBeenCalled();
+  });
+
+  it("counts reference links as they are added", () => {
+    renderPage();
+
+    expect(screen.getByText("0/5 links")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("References optional"), {
+      target: { value: "https://a.com\n\nhttps://b.com" },
+    });
+
+    expect(screen.getByText("2/5 links")).toBeInTheDocument();
+  });
+
+  it("explains when a listing does not take requests", () => {
+    mocks.usePublicListing.mockReturnValue({
+      data: createListingData({ fulfilment_mode: "instant" }),
+      isLoading: false,
+      error: null,
+    });
+
+    renderPage();
+
+    expect(screen.getByRole("heading", { name: "Request flow unavailable" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Submit request" })).not.toBeInTheDocument();
+  });
 });

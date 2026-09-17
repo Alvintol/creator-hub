@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { useCreateListingRequest } from "../../hooks/listings/useCreateListingRequest";
@@ -8,47 +8,84 @@ import {
 } from "../../hooks/listings/usePublicListing";
 import { buildListingRequestSnapshot } from "../../lib/listings/listingRequestSnapshot";
 import { useAuth } from "../../providers/AuthProvider";
-import { ListingRequestFormErrors, validateListingRequestForm } from '../../domain/listings/listingRequestForm';
-import { useActiveListingRequestForListing } from '../../hooks/listings/useActiveListingRequestForListing';
+import {
+  parseListingRequestReferenceLinks,
+  validateListingRequestForm,
+  type ListingRequestFormErrors,
+} from "../../domain/listings/listingRequestForm";
+import { useActiveListingRequestForListing } from "../../hooks/listings/useActiveListingRequestForListing";
+
+const TITLE_MAX = 120;
+const DETAILS_MAX = 2000;
+const TIMELINE_MAX = 160;
+const REFERENCES_MAX = 5;
 
 const classes = {
-  page: "space-y-6",
-  backLink: "backLink",
-  header: "space-y-1",
-  h1: "pageTitle",
-  sub: "pageSub",
-  grid: "grid gap-6 lg:grid-cols-[0.85fr_1.15fr]",
-  card: "card p-6",
-  section: "space-y-4",
-  sectionTitle: "sectionHeading",
-  text: "text-sm text-zinc-600",
-  metaGrid: "grid gap-4 sm:grid-cols-2",
-  metaBlock: "space-y-1",
-  metaLabel: "metaLabel",
-  metaValue: "metaValue",
-  list: "space-y-2",
-  listItem:
-    "notice noticeNeutral",
-  field: "space-y-2",
+  page: "space-y-4",
+  header: "card flex items-center gap-3 px-4 py-3 hover:shadow-[var(--shadow-md)] sm:px-5",
+  backLink: "backLink shrink-0",
+  backText: "sr-only sm:not-sr-only",
+  headerText: "min-w-0 flex-1 text-center sm:text-left",
+  eyebrow: "text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500",
+  h1: "font-display text-lg font-bold leading-tight tracking-tight text-zinc-900 sm:text-xl",
+  headerSpacer: "w-6 shrink-0 sm:hidden",
+
+  layout: "grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]",
+
+  // Form
+  form: "card min-w-0 overflow-hidden hover:shadow-[var(--shadow-md)]",
+  group: "space-y-3 px-4 py-4 sm:px-5",
+  groupDivider: "border-t border-[var(--hairline)]",
+  groupHead: "flex items-baseline justify-between gap-3",
+  groupTitle: "font-display text-sm font-bold tracking-tight text-zinc-900",
+  groupHint: "text-xs text-zinc-500",
+  row2: "grid gap-3 sm:grid-cols-2",
+  field: "space-y-1.5",
+  labelRow: "flex items-baseline justify-between gap-3",
   label: "formLabel",
+  optional: "ml-1 text-xs font-normal text-zinc-500",
+  counter: "shrink-0 text-[11px] tabular-nums text-zinc-500",
+  counterOver: "shrink-0 text-[11px] font-semibold tabular-nums text-red-600",
+  input: "formControl",
+  textarea: "formControl min-h-[150px]",
+  smallTextarea: "formControl min-h-[84px]",
+  money: "relative",
+  moneySign: "pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-zinc-500",
+  moneyInput: "formControl pl-7",
   hint: "formHint",
   error: "formError",
-  input:
-    "formControl",
-  textarea:
-    "formControl min-h-[180px]",
-  smallTextarea:
-    "min-h-[110px] w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm text-zinc-900 outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200",
-  infoBox: "rounded-2xl border border-zinc-200 bg-zinc-50 p-4",
-  infoTitle: "text-sm font-bold text-zinc-900",
-  infoText: "mt-1 text-sm text-zinc-600",
-  submitError:
-    "notice noticeError",
-  row: "flex flex-wrap items-center gap-3",
-  btnPrimary:
-    "btnPrimary",
-  btnOutline:
-    "btnOutline",
+  footer:
+    "flex flex-col-reverse gap-3 border-t border-[var(--hairline)] bg-[rgb(var(--ink)/0.02)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5",
+  footerNote: "text-xs text-zinc-500",
+  footerActions: "flex items-center justify-end gap-2",
+  submitError: "notice noticeError",
+  btnPrimary: "btnPrimary",
+  btnOutline: "btnOutline",
+  btnPrimarySm: "btnPrimary btnSm",
+  btnOutlineSm: "btnOutline btnSm",
+
+  // Listing summary
+  aside: "card overflow-hidden hover:shadow-[var(--shadow-md)] lg:order-last lg:sticky lg:top-24",
+  preview: "aspect-[16/9] w-full bg-zinc-100 object-cover",
+  summary: "space-y-3 p-4",
+  summaryTop: "flex items-start justify-between gap-3",
+  listingTitle: "font-display text-base font-bold leading-snug tracking-tight text-zinc-900",
+  creator: "text-xs text-zinc-500 hover:text-zinc-800",
+  price: "shrink-0 rounded-full bg-[rgb(var(--accent-soft))] px-2.5 py-0.5 text-xs font-bold text-[rgb(var(--accent-text))]",
+  chips: "flex flex-wrap gap-1.5",
+  chip: "rounded-full bg-zinc-100 px-2.5 py-0.5 text-xs font-medium text-zinc-700",
+  muted: "text-xs text-zinc-500",
+  steps: "space-y-2 border-t border-[var(--hairline)] pt-3",
+  stepsTitle: "text-[11px] font-semibold uppercase tracking-[0.12em] text-zinc-500",
+  step: "flex items-start gap-2 text-xs text-zinc-600",
+  stepNumber:
+    "flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--accent-soft))] text-[10px] font-bold text-[rgb(var(--accent-text))]",
+
+  // Blocked states
+  state: "card mx-auto max-w-xl space-y-3 p-5 text-center hover:shadow-[var(--shadow-md)] sm:p-6",
+  stateTitle: "font-display text-lg font-bold tracking-tight text-zinc-900",
+  stateText: "text-sm text-zinc-600",
+  stateActions: "flex flex-wrap justify-center gap-2 pt-1",
   loadingText: "text-sm text-zinc-600",
 } as const;
 
@@ -58,6 +95,55 @@ const priceText = (listing: PublicListingRow): string =>
     : listing.price_type === "starting_at"
       ? `From $${listing.price_min}`
       : `$${listing.price_min}–${listing.price_max ?? listing.price_min}`;
+
+const fieldIds: Record<keyof ListingRequestFormErrors, string> = {
+  requestTitle: "request-title",
+  requestDetails: "request-details",
+  requestedTimeline: "requested-timeline",
+  budgetAmount: "budget-amount",
+  referenceLinks: "reference-links",
+};
+
+// Matches the order the fields appear in the form.
+const fieldOrder = Object.keys(fieldIds) as Array<keyof ListingRequestFormErrors>;
+
+const nextSteps = [
+  "The creator reviews your request and can ask questions in chat.",
+  "If they accept, you agree on scope, price and timeline.",
+  "Payment happens only after you accept the agreement.",
+];
+
+type StateCardProps = {
+  backTo: string;
+  backLabel: string;
+  title: string;
+  children: ReactNode;
+  actions?: ReactNode;
+};
+
+const StateCard = ({ backTo, backLabel, title, children, actions }: StateCardProps) => (
+  <div className={classes.page}>
+    <Link className="backLink" to={backTo}>
+      ← {backLabel}
+    </Link>
+
+    <section className={classes.state}>
+      <h1 className={classes.stateTitle}>{title}</h1>
+      <p className={classes.stateText}>{children}</p>
+      {actions && <div className={classes.stateActions}>{actions}</div>}
+    </section>
+  </div>
+);
+
+const Counter = ({ value, max }: { value: string; max: number }) => {
+  const length = value.trim().length;
+
+  return (
+    <span className={length > max ? classes.counterOver : classes.counter} aria-hidden="true">
+      {length}/{max}
+    </span>
+  );
+};
 
 const RequestListing = () => {
   const { id } = useParams<{ id: string }>();
@@ -82,7 +168,13 @@ const RequestListing = () => {
     ? `@${creator.handle}`
     : creator?.display_name ?? "this creator";
 
-  const validate = () => {
+  const referenceCount = parseListingRequestReferenceLinks(referenceLinksText).length;
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+
+    if (!listing) return;
+
     const result = validateListingRequestForm({
       requestTitle,
       requestDetails,
@@ -93,19 +185,10 @@ const RequestListing = () => {
 
     setFormErrors(result.errors);
 
-    return result.values;
-  };
-
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-
-    if (!listing) {
-      return;
-    }
-
-    const validForm = validate();
-
-    if (!validForm) {
+    if (!result.values) {
+      // Move the reader to the first problem instead of leaving them at the submit button.
+      const firstInvalid = fieldOrder.find((key) => result.errors[key]);
+      if (firstInvalid) document.getElementById(fieldIds[firstInvalid])?.focus();
       return;
     }
 
@@ -113,11 +196,11 @@ const RequestListing = () => {
       const requestId = await createRequestMutation.mutateAsync({
         listingId: listing.id,
         creatorUserId: listing.user_id,
-        requestTitle: validForm.requestTitle,
-        requestDetails: validForm.requestDetails,
-        requestedTimeline: validForm.requestedTimeline,
-        budgetAmount: validForm.budgetAmount,
-        referenceLinks: validForm.referenceLinks,
+        requestTitle: result.values.requestTitle,
+        requestDetails: result.values.requestDetails,
+        requestedTimeline: result.values.requestedTimeline,
+        budgetAmount: result.values.budgetAmount,
+        referenceLinks: result.values.referenceLinks,
         listingSnapshot: buildListingRequestSnapshot(listing),
       });
 
@@ -133,79 +216,49 @@ const RequestListing = () => {
 
   if (error || !listing) {
     return (
-      <div className={classes.page}>
-        <Link className={classes.backLink} to="/market">
-          ← Back to market
-        </Link>
-
-        <div className={classes.card}>
-          <h1 className={classes.h1}>Listing not found</h1>
-          <p className={classes.text}>
-            This listing is not available for requests right now.
-          </p>
-        </div>
-      </div>
+      <StateCard backTo="/market" backLabel="Back to market" title="Listing not found">
+        This listing is not available for requests right now.
+      </StateCard>
     );
   }
 
+  const listingPath = `/listing/${listing.id}`;
+
   if (!user) {
     return (
-      <div className={classes.page}>
-        <Link className={classes.backLink} to={`/listing/${listing.id}`}>
-          ← Back to listing
-        </Link>
-
-        <div className={classes.card}>
-          <h1 className={classes.h1}>Sign in to submit a request</h1>
-          <p className={classes.text}>
-            You need to be signed in before sending a buyer request to{" "}
-            {creatorName}.
-          </p>
-
-          <div className={classes.row}>
-            <Link className={classes.btnPrimary} to="/signin">
+      <StateCard
+        backTo={listingPath}
+        backLabel="Back to listing"
+        title="Sign in to submit a request"
+        actions={
+          <>
+            <Link className={classes.btnPrimarySm} to="/signin">
               Sign in
             </Link>
-            <Link className={classes.btnOutline} to={`/listing/${listing.id}`}>
+            <Link className={classes.btnOutlineSm} to={listingPath}>
               Back to listing
             </Link>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      >
+        You need to be signed in before sending a request to {creatorName}.
+      </StateCard>
     );
   }
 
   if (listing.fulfilment_mode !== "request") {
     return (
-      <div className={classes.page}>
-        <Link className={classes.backLink} to={`/listing/${listing.id}`}>
-          ← Back to listing
-        </Link>
-
-        <div className={classes.card}>
-          <h1 className={classes.h1}>Request flow unavailable</h1>
-          <p className={classes.text}>
-            This listing is not using the request-based flow.
-          </p>
-        </div>
-      </div>
+      <StateCard backTo={listingPath} backLabel="Back to listing" title="Request flow unavailable">
+        This listing is not using the request-based flow.
+      </StateCard>
     );
   }
 
   if (user.id === listing.user_id) {
     return (
-      <div className={classes.page}>
-        <Link className={classes.backLink} to={`/listing/${listing.id}`}>
-          ← Back to listing
-        </Link>
-
-        <div className={classes.card}>
-          <h1 className={classes.h1}>Own listing</h1>
-          <p className={classes.text}>
-            You cannot submit a buyer request for your own listing.
-          </p>
-        </div>
-      </div>
+      <StateCard backTo={listingPath} backLabel="Back to listing" title="Own listing">
+        You cannot submit a buyer request for your own listing.
+      </StateCard>
     );
   }
 
@@ -214,203 +267,231 @@ const RequestListing = () => {
   }
 
   if (activeRequestQuery.data) {
-    const activeRequest = activeRequestQuery.data;
-
     return (
-      <div className={classes.page}>
-        <Link className={classes.backLink} to={`/listing/${listing.id}`}>
-          ← Back to listing
-        </Link>
-
-        <div className={classes.card}>
-          <h1 className={classes.h1}>Request already submitted</h1>
-          <p className={classes.text}>
-            You already have an active request for this listing. You can review it
-            or continue the conversation from your request detail page.
-          </p>
-
-          <div className={classes.row}>
-            <Link className={classes.btnPrimary} to={`/requests/${activeRequest.id}`}>
+      <StateCard
+        backTo={listingPath}
+        backLabel="Back to listing"
+        title="Request already submitted"
+        actions={
+          <>
+            <Link className={classes.btnPrimarySm} to={`/requests/${activeRequestQuery.data.id}`}>
               View existing request
             </Link>
-
-            <Link className={classes.btnOutline} to={`/listing/${listing.id}`}>
+            <Link className={classes.btnOutlineSm} to={listingPath}>
               Back to listing
             </Link>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      >
+        You already have an active request for this listing. Continue the conversation from
+        your request page.
+      </StateCard>
     );
   }
 
+  const fieldProps = (key: keyof ListingRequestFormErrors, errorId: string) =>
+    formErrors[key]
+      ? { "aria-invalid": true, "aria-describedby": errorId }
+      : { "aria-invalid": false };
+
   return (
     <div className={classes.page}>
-      <Link className={classes.backLink} to={`/listing/${listing.id}`}>
-        ← Back to listing
-      </Link>
+      <header className={classes.header}>
+        <Link className={classes.backLink} to={listingPath}>
+          ← <span className={classes.backText}>Back to listing</span>
+        </Link>
+        <div className={classes.headerText}>
+          <div className={classes.eyebrow}>New request</div>
+          <h1 className={classes.h1}>What do you need?</h1>
+        </div>
+        <span className={classes.headerSpacer} aria-hidden="true" />
+      </header>
 
-      <div className={classes.header}>
-        <h1 className={classes.h1}>Request this listing</h1>
-        <p className={classes.sub}>
-          Send a structured request to {creatorName} about {listing.title}.
-        </p>
-      </div>
+      <div className={classes.layout}>
+        <aside className={classes.aside} aria-label="Listing summary">
+          {listing.preview_url && (
+            <img className={`${classes.preview} hidden lg:block`} src={listing.preview_url} alt="" />
+          )}
 
-      <div className={classes.grid}>
-        <aside className={classes.card}>
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Listing context</h2>
-            <p className={classes.text}>
-              This is the listing snapshot your request will be tied to.
-            </p>
-          </div>
-
-          <div className={classes.metaGrid}>
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Title</div>
-              <div className={classes.metaValue}>{listing.title}</div>
+          <div className={classes.summary}>
+            <div className={classes.summaryTop}>
+              <div className="min-w-0">
+                <div className={classes.listingTitle}>{listing.title}</div>
+                {creator?.handle ? (
+                  <Link className={classes.creator} to={`/creator/${creator.handle}`}>
+                    {creatorName}
+                  </Link>
+                ) : (
+                  <span className={classes.creator}>{creatorName}</span>
+                )}
+              </div>
+              <span className={classes.price}>{priceText(listing)}</span>
             </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Creator</div>
-              <div className={classes.metaValue}>{creatorName}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Price</div>
-              <div className={classes.metaValue}>{priceText(listing)}</div>
-            </div>
-
-            <div className={classes.metaBlock}>
-              <div className={classes.metaLabel}>Fulfilment</div>
-              <div className={classes.metaValue}>{listing.fulfilment_mode}</div>
-            </div>
-          </div>
-
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Deliverables</h2>
 
             {listing.deliverables.length > 0 ? (
-              <div className={classes.list}>
+              <ul className={classes.chips} aria-label="Deliverables">
                 {listing.deliverables.map((deliverable) => (
-                  <div key={deliverable} className={classes.listItem}>
+                  <li key={deliverable} className={classes.chip}>
                     {deliverable}
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             ) : (
-              <p className={classes.text}>No deliverables were listed.</p>
+              <p className={classes.muted}>No deliverables were listed.</p>
             )}
-          </div>
 
-          <div className={classes.infoBox}>
-            <div className={classes.infoTitle}>Snapshot protection</div>
-            <p className={classes.infoText}>
-              Submitting this request records the listing details as they appear
-              right now, including pricing and deliverables.
+            <p className={classes.muted}>
+              Your request saves these listing details as they are now, so later edits
+              won’t change what you asked for.
             </p>
+
+            <div className={`${classes.steps} hidden lg:block`}>
+              <div className={classes.stepsTitle}>What happens next</div>
+              <ol className="space-y-2">
+                {nextSteps.map((text, index) => (
+                  <li key={text} className={classes.step}>
+                    <span className={classes.stepNumber}>{index + 1}</span>
+                    {text}
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         </aside>
 
-        <form className={classes.card} onSubmit={(event) => void handleSubmit(event)}>
-          <div className={classes.section}>
-            <h2 className={classes.sectionTitle}>Request details</h2>
+        <form className={classes.form} noValidate onSubmit={(event) => void handleSubmit(event)}>
+          <div className={classes.group}>
+            <div className={classes.groupHead}>
+              <h2 className={classes.groupTitle}>Your request</h2>
+              <span className={classes.groupHint}>Required</span>
+            </div>
 
             <div className={classes.field}>
-              <label className={classes.label} htmlFor="request-title">
-                Request title / summary
-              </label>
+              <div className={classes.labelRow}>
+                <label className={classes.label} htmlFor="request-title">
+                  Request title / summary
+                </label>
+                <Counter value={requestTitle} max={TITLE_MAX} />
+              </div>
               <input
                 id="request-title"
                 className={classes.input}
                 value={requestTitle}
                 onChange={(event) => setRequestTitle(event.target.value)}
-                placeholder="Example: Custom cozy emote pack for Twitch launch"
-                maxLength={120}
+                placeholder="e.g. Cozy emote pack for my Twitch relaunch"
+                maxLength={TITLE_MAX}
+                {...fieldProps("requestTitle", "request-title-error")}
               />
-              <div className={classes.hint}>3 to 120 characters.</div>
               {formErrors.requestTitle && (
-                <div className={classes.error}>{formErrors.requestTitle}</div>
-              )}
-            </div>
-
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="request-details">
-                Details
-              </label>
-              <textarea
-                id="request-details"
-                className={classes.textarea}
-                value={requestDetails}
-                onChange={(event) => setRequestDetails(event.target.value)}
-                placeholder="Describe what you need, intended use, style notes, required deliverables, and any important context for the creator."
-                maxLength={2000}
-              />
-              <div className={classes.hint}>
-                {requestDetails.trim().length}/2000 characters. Minimum 10.
-              </div>
-              {formErrors.requestDetails && (
-                <div className={classes.error}>{formErrors.requestDetails}</div>
-              )}
-            </div>
-
-            <div className={classes.field}>
-              <label className={classes.label} htmlFor="requested-timeline">
-                Deadline / timeline optional
-              </label>
-              <input
-                id="requested-timeline"
-                className={classes.input}
-                value={requestedTimeline}
-                onChange={(event) => setRequestedTimeline(event.target.value)}
-                placeholder="Example: Ideally before June 10, flexible"
-                maxLength={160}
-              />
-              <div className={classes.hint}>Optional. 160 characters max.</div>
-              {formErrors.requestedTimeline && (
-                <div className={classes.error}>
-                  {formErrors.requestedTimeline}
+                <div id="request-title-error" className={classes.error}>
+                  {formErrors.requestTitle}
                 </div>
               )}
             </div>
 
             <div className={classes.field}>
-              <label className={classes.label} htmlFor="budget-amount">
-                Budget optional
-              </label>
-              <input
-                id="budget-amount"
-                className={classes.input}
-                value={budgetText}
-                onChange={(event) => setBudgetText(event.target.value)}
-                placeholder={`Listing price context: ${priceText(listing)}`}
-                inputMode="decimal"
-              />
-              <div className={classes.hint}>
-                Optional. Leave blank if you want to use the listed pricing as
-                context.
+              <div className={classes.labelRow}>
+                <label className={classes.label} htmlFor="request-details">
+                  Details
+                </label>
+                <Counter value={requestDetails} max={DETAILS_MAX} />
               </div>
-              {formErrors.budgetAmount && (
-                <div className={classes.error}>{formErrors.budgetAmount}</div>
+              <textarea
+                id="request-details"
+                className={classes.textarea}
+                value={requestDetails}
+                onChange={(event) => setRequestDetails(event.target.value)}
+                placeholder="What you need, how you'll use it, style notes, and anything the creator should know."
+                maxLength={DETAILS_MAX}
+                {...fieldProps("requestDetails", "request-details-error")}
+              />
+              {formErrors.requestDetails ? (
+                <div id="request-details-error" className={classes.error}>
+                  {formErrors.requestDetails}
+                </div>
+              ) : (
+                <div className={classes.hint}>At least 10 characters.</div>
               )}
+            </div>
+          </div>
+
+          <div className={`${classes.group} ${classes.groupDivider}`}>
+            <div className={classes.groupHead}>
+              <h2 className={classes.groupTitle}>Extras</h2>
+              <span className={classes.groupHint}>Optional</span>
+            </div>
+
+            <div className={classes.row2}>
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="requested-timeline">
+                  Deadline / timeline <span className={classes.optional}>optional</span>
+                </label>
+                <input
+                  id="requested-timeline"
+                  className={classes.input}
+                  value={requestedTimeline}
+                  onChange={(event) => setRequestedTimeline(event.target.value)}
+                  placeholder="e.g. Before June 10, flexible"
+                  maxLength={TIMELINE_MAX}
+                  {...fieldProps("requestedTimeline", "requested-timeline-error")}
+                />
+                {formErrors.requestedTimeline && (
+                  <div id="requested-timeline-error" className={classes.error}>
+                    {formErrors.requestedTimeline}
+                  </div>
+                )}
+              </div>
+
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="budget-amount">
+                  Budget <span className={classes.optional}>optional</span>
+                </label>
+                <div className={classes.money}>
+                  <span className={classes.moneySign} aria-hidden="true">
+                    $
+                  </span>
+                  <input
+                    id="budget-amount"
+                    className={classes.moneyInput}
+                    value={budgetText}
+                    onChange={(event) => setBudgetText(event.target.value)}
+                    placeholder={`e.g. ${listing.price_min}`}
+                    inputMode="decimal"
+                    {...fieldProps("budgetAmount", "budget-amount-error")}
+                  />
+                </div>
+                {formErrors.budgetAmount && (
+                  <div id="budget-amount-error" className={classes.error}>
+                    {formErrors.budgetAmount}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className={classes.field}>
-              <label className={classes.label} htmlFor="reference-links">
-                References optional
-              </label>
+              <div className={classes.labelRow}>
+                <label className={classes.label} htmlFor="reference-links">
+                  References <span className={classes.optional}>optional</span>
+                </label>
+                <span
+                  className={referenceCount > REFERENCES_MAX ? classes.counterOver : classes.counter}
+                  aria-hidden="true"
+                >
+                  {referenceCount}/{REFERENCES_MAX} links
+                </span>
+              </div>
               <textarea
                 id="reference-links"
                 className={classes.smallTextarea}
                 value={referenceLinksText}
                 onChange={(event) => setReferenceLinksText(event.target.value)}
-                placeholder="Paste up to 5 links, one per line."
+                placeholder={"One link per line, e.g.\nhttps://example.com/moodboard"}
+                {...fieldProps("referenceLinks", "reference-links-error")}
               />
-              <div className={classes.hint}>
-                Optional for now. Use one http:// or https:// link per line.
-              </div>
               {formErrors.referenceLinks && (
-                <div className={classes.error}>{formErrors.referenceLinks}</div>
+                <div id="reference-links-error" className={classes.error}>
+                  {formErrors.referenceLinks}
+                </div>
               )}
             </div>
 
@@ -421,21 +502,21 @@ const RequestListing = () => {
                   : "Your request could not be submitted right now."}
               </div>
             )}
+          </div>
 
-            <div className={classes.row}>
+          <div className={classes.footer}>
+            <p className={classes.footerNote}>Nothing is charged until you accept an agreement.</p>
+            <div className={classes.footerActions}>
+              <Link className={classes.btnOutline} to={listingPath}>
+                Cancel
+              </Link>
               <button
                 className={classes.btnPrimary}
                 type="submit"
                 disabled={createRequestMutation.isPending}
               >
-                {createRequestMutation.isPending
-                  ? "Submitting request…"
-                  : "Submit request"}
+                {createRequestMutation.isPending ? "Submitting…" : "Submit request"}
               </button>
-
-              <Link className={classes.btnOutline} to={`/listing/${listing.id}`}>
-                Cancel
-              </Link>
             </div>
           </div>
         </form>
