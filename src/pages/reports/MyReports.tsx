@@ -1,74 +1,58 @@
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   getModerationReportReasonLabel,
   getModerationReportResolutionLabel,
   getModerationReportStatusLabel,
   getModerationReportTargetTypeLabel,
+  type ModerationReportStatus,
 } from "../../domain/moderation/moderationReports";
-import { useMarkMyModerationReportsSeen, useMyModerationReports } from "../../hooks/moderation/useMyModerationReports";
-import { useEffect, useMemo, useState } from 'react';
+import {
+  useMarkMyModerationReportsSeen,
+  useMyModerationReports,
+} from "../../hooks/moderation/useMyModerationReports";
+import CollapsibleSection from "../../components/ui/CollapsibleSection";
 
 const classes = {
-  page: "space-y-6",
-  backLink: "backLink",
+  card: "card overflow-hidden hover:shadow-[var(--shadow-md)]",
+  toolbar:
+    "flex flex-wrap items-center justify-between gap-3 border-b border-[var(--hairline)] px-4 py-3 sm:px-5",
+  title: "font-display text-base font-bold tracking-tight text-zinc-900",
+  sub: "text-xs text-zinc-500",
 
-  header: "space-y-1",
-  h1: "pageTitle",
-  sub: "pageSub",
+  filters:
+    "grid w-full grid-cols-4 gap-0.5 rounded-full border border-[var(--hairline-strong)] p-0.5 sm:inline-flex sm:w-auto",
+  filter:
+    "inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold transition sm:gap-1.5 sm:px-3",
+  filterActive: "bg-[rgb(var(--accent-soft))] text-[rgb(var(--accent-text))]",
+  filterIdle: "text-zinc-600 hover:text-zinc-900",
+  count: "rounded-full bg-[rgb(var(--ink)/0.06)] px-1.5 text-[10px] font-bold tabular-nums",
 
-  card: "card p-6",
-  stack: "space-y-4",
-  reportCard: "card p-5",
-  title: "font-display text-lg font-extrabold tracking-tight",
-  text: "text-sm text-zinc-600",
-  textStrong: "text-sm font-bold text-zinc-900",
+  list: "divide-y divide-[var(--hairline)]",
+  state: "px-4 py-6 text-center text-sm text-zinc-600 sm:px-5",
+  error: "m-4 notice noticeError",
 
-  metaGrid: "grid gap-3 sm:grid-cols-2 lg:grid-cols-3",
-  metaBlock: "space-y-1",
-  metaLabel: "metaLabel",
-  metaValue: "text-sm text-zinc-900 break-words",
+  badges: "flex items-center gap-1.5",
+  status: "inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+  statusSubmitted: "border-orange-200 bg-orange-50 text-orange-800",
+  statusReviewing: "border-blue-200 bg-blue-50 text-blue-800",
+  statusResolved: "border-green-200 bg-green-50 text-green-800",
+  statusMuted: "border-zinc-300 bg-zinc-100 text-zinc-700",
+  statusNeedsInfo: "border-amber-200 bg-amber-50 text-amber-800",
+  newUpdate:
+    "inline-flex rounded-full bg-[rgb(var(--brand))] px-2 py-0.5 text-[11px] font-semibold text-white",
 
-  statusPill:
-    "inline-flex rounded-full border border-zinc-300 bg-zinc-100 px-3 py-1 text-xs font-semibold text-zinc-800",
-
-  updateBox:
-    "notice noticeInfo",
-
-  loadingText: "text-sm text-zinc-600",
-  errorCard:
-    "notice noticeError",
-  statusPillBase:
-    "inline-flex rounded-full border px-3 py-1 text-xs font-semibold",
-  statusSubmitted:
-    "border-orange-200 bg-orange-50 text-orange-800",
-  statusUnderReview:
-    "border-blue-200 bg-blue-50 text-blue-800",
-  statusResolved:
-    "border-green-200 bg-green-50 text-green-800",
-  statusDismissed:
-    "border-zinc-300 bg-zinc-100 text-zinc-700",
-  statusNeedsChanges:
-    "border-amber-200 bg-amber-50 text-amber-800",
-  statusUnknown:
-    "border-zinc-300 bg-zinc-100 text-zinc-700",
-  newUpdatePill:
-    "inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800",
-
-  filterRow: "flex flex-wrap items-center gap-2",
-  filterButton:
-    "btnOutline btnSm",
-  filterButtonActive:
-    "btnPrimary btnSm",
-  filterCount:
-    "ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-extrabold text-zinc-700",
-  filterCountActive:
-    "ml-2 rounded-full bg-[rgb(var(--on-primary)/0.16)] px-2 py-0.5 text-xs font-extrabold text-[rgb(var(--on-primary))]",
+  facts: "grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4",
+  factLabel: "metaLabel",
+  factValue: "break-words text-zinc-900",
+  details: "text-sm text-zinc-700",
+  detailsLabel: "font-semibold text-zinc-900",
+  update: "notice noticeInfo",
 } as const;
 
 type ReportsFilter = "all" | "active" | "updates" | "resolved";
 
-const dateText = (value: string | null) => {
-  if (!value) return "Not set";
+const dateText = (value: string | null, withTime = false) => {
+  if (!value) return "—";
 
   const date = new Date(value);
 
@@ -78,23 +62,17 @@ const dateText = (value: string | null) => {
       year: "numeric",
       month: "short",
       day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
+      ...(withTime ? { hour: "numeric", minute: "2-digit" } : {}),
     });
 };
 
-const reportStatusPillClass = (status: string) => {
-  const statusClasses: Record<string, string> = {
-    submitted: classes.statusSubmitted,
-    under_review: classes.statusUnderReview,
-    resolved: classes.statusResolved,
-    dismissed: classes.statusDismissed,
-    rejected: classes.statusDismissed,
-    needs_changes: classes.statusNeedsChanges,
-  };
-
-  return `${classes.statusPillBase} ${statusClasses[status] ?? classes.statusUnknown
-    }`;
+const statusClass: Record<ModerationReportStatus, string> = {
+  submitted: classes.statusSubmitted,
+  reviewing: classes.statusReviewing,
+  needs_more_info: classes.statusNeedsInfo,
+  action_taken: classes.statusResolved,
+  resolved: classes.statusResolved,
+  dismissed: classes.statusMuted,
 };
 
 const MyReports = () => {
@@ -102,219 +80,157 @@ const MyReports = () => {
   const markReportsSeen = useMarkMyModerationReportsSeen();
 
   const [reportsFilter, setReportsFilter] = useState<ReportsFilter>("all");
+  // Marking updates as seen clears the flag on refetch; keep them highlighted for this visit.
+  const [freshUpdateIds, setFreshUpdateIds] = useState<ReadonlySet<string>>(() => new Set());
 
-  const activeReports = useMemo(
-    () => reports.filter((report) => !report.resolved_at),
-    [reports]
-  );
-
+  const activeReports = useMemo(() => reports.filter((report) => !report.resolved_at), [reports]);
   const reportsWithUpdates = useMemo(
-    () => reports.filter((report) => report.has_unread_update),
-    [reports]
+    () => reports.filter((report) => report.has_unread_update || freshUpdateIds.has(report.id)),
+    [reports, freshUpdateIds]
   );
-
   const resolvedReports = useMemo(
     () => reports.filter((report) => Boolean(report.resolved_at)),
     [reports]
   );
 
-  const filteredReports = useMemo(() => {
-    if (reportsFilter === "active") return activeReports;
-    if (reportsFilter === "updates") return reportsWithUpdates;
-    if (reportsFilter === "resolved") return resolvedReports;
+  const filteredReports =
+    reportsFilter === "active"
+      ? activeReports
+      : reportsFilter === "updates"
+        ? reportsWithUpdates
+        : reportsFilter === "resolved"
+          ? resolvedReports
+          : reports;
 
-    return reports;
-  }, [activeReports, reports, reportsFilter, reportsWithUpdates, resolvedReports]);
+  const reportFilters: Array<{ value: ReportsFilter; label: string; count: number }> = [
+    { value: "all", label: "All", count: reports.length },
+    { value: "active", label: "Active", count: activeReports.length },
+    { value: "updates", label: "Updates", count: reportsWithUpdates.length },
+    { value: "resolved", label: "Resolved", count: resolvedReports.length },
+  ];
 
-  const reportFilters: Array<{
-    value: ReportsFilter;
-    label: string;
-    count: number;
-  }> = [
-      {
-        value: "all",
-        label: "All",
-        count: reports.length,
-      },
-      {
-        value: "active",
-        label: "Active",
-        count: activeReports.length,
-      },
-      {
-        value: "updates",
-        label: "New updates",
-        count: reportsWithUpdates.length,
-      },
-      {
-        value: "resolved",
-        label: "Resolved",
-        count: resolvedReports.length,
-      },
-    ];
-
-  const hasUnreadReportUpdates = reportsWithUpdates.length > 0;
+  const unreadIds = reports.filter((report) => report.has_unread_update).map((report) => report.id);
+  const unreadKey = unreadIds.join(",");
+  const markedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (isLoading || error || !hasUnreadReportUpdates) return;
+    if (isLoading || error || !unreadKey || markedKeyRef.current === unreadKey) return;
 
+    markedKeyRef.current = unreadKey;
+    setFreshUpdateIds((current) => new Set([...current, ...unreadKey.split(",")]));
     markReportsSeen.mutate();
-  }, [isLoading, error, hasUnreadReportUpdates, markReportsSeen]);
+  }, [isLoading, error, unreadKey, markReportsSeen]);
+
+  const hasReports = !isLoading && !error && reports.length > 0;
 
   return (
-    <div className={classes.page}>
-      <Link to="/settings/profile" className={classes.backLink}>
-        ← Back to settings
-      </Link>
+    <div className={classes.card}>
+      <div className={classes.toolbar}>
+        <div>
+          <h2 className={classes.title}>My reports</h2>
+          <p className={classes.sub}>Reports you’ve submitted. Internal moderator notes stay private.</p>
+        </div>
 
-      <div className={classes.header}>
-        <h1 className={classes.h1}>My reports</h1>
+        {hasReports && (
+          <div className={classes.filters} role="tablist" aria-label="Filter reports">
+            {reportFilters.map((filter) => {
+              const isActive = reportsFilter === filter.value;
 
-        <p className={classes.sub}>
-          Track reports you have submitted to CreatorHub moderation. Admin-only
-          notes and internal actions are not shown here.
-        </p>
+              return (
+                <button
+                  key={filter.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={`${classes.filter} ${isActive ? classes.filterActive : classes.filterIdle}`}
+                  onClick={() => setReportsFilter(filter.value)}
+                >
+                  {filter.label}
+                  <span className={classes.count}>{filter.count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {!isLoading && !error && reports.length > 0 && (
-        <div className={classes.filterRow}>
-          {reportFilters.map((filter) => {
-            const isActive = reportsFilter === filter.value;
+      {isLoading && <p className={classes.state}>Loading reports…</p>}
 
-            return (
-              <button
-                key={filter.value}
-                className={
-                  isActive ? classes.filterButtonActive : classes.filterButton
-                }
-                type="button"
-                onClick={() => setReportsFilter(filter.value)}
-              >
-                {filter.label}
-                <span
-                  className={
-                    isActive ? classes.filterCountActive : classes.filterCount
-                  }
-                >
-                  {filter.count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {isLoading && (
-        <div className={classes.card}>
-          <div className={classes.loadingText}>Loading reports…</div>
-        </div>
-      )}
-
-      {error && (
-        <div className={classes.errorCard}>
-          Your reports could not be loaded right now.
-        </div>
-      )}
+      {error && <div className={classes.error}>Your reports could not be loaded right now.</div>}
 
       {!isLoading && !error && reports.length === 0 && (
-        <div className={classes.card}>
-          <p className={classes.text}>
-            You have not submitted any reports yet.
-          </p>
-        </div>
+        <p className={classes.state}>You have not submitted any reports yet.</p>
       )}
 
-      {!isLoading && !error && filteredReports.length > 0 && (
-        <div className={classes.stack}>
-          {filteredReports.map((report) => (
-            <div key={report.id} className={classes.reportCard}>
-              <h2 className={classes.title}>
-                {getModerationReportTargetTypeLabel(report.target_type)}
-              </h2>
+      {hasReports && filteredReports.length === 0 && (
+        <p className={classes.state}>No reports match this filter.</p>
+      )}
 
-              {report.has_unread_update && (
-                <div className={classes.statusPill}>
-                  New moderator update
-                </div>
-              )}
+      {hasReports && filteredReports.length > 0 && (
+        <div className={classes.list}>
+          {filteredReports.map((report) => {
+            const isFresh = report.has_unread_update || freshUpdateIds.has(report.id);
+            const statusLabel = getModerationReportStatusLabel(report.status);
 
-              <p className={classes.text}>
-                Target:{" "}
-                <span className={classes.textStrong}>
-                  {report.target_label}
-                </span>
-              </p>
-
-              <div className={classes.metaGrid}>
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Status</div>
-                  <div className={reportStatusPillClass(report.status)}>
-                    {getModerationReportStatusLabel(report.status)}
+            return (
+              <CollapsibleSection
+                key={report.id}
+                headingLevel="h3"
+                title={report.target_label}
+                summary={`${getModerationReportTargetTypeLabel(report.target_type)} · ${dateText(report.created_at)}`}
+                defaultOpen={isFresh}
+                badge={
+                  <span className={classes.badges}>
+                    {isFresh && (
+                      <span className={classes.newUpdate}>
+                        <span className="sm:hidden">New</span>
+                        <span className="hidden sm:inline">New moderator update</span>
+                      </span>
+                    )}
+                    <span className={`${classes.status} ${statusClass[report.status as ModerationReportStatus] ?? classes.statusMuted}`}>
+                      {statusLabel}
+                    </span>
+                  </span>
+                }
+              >
+                <dl className={classes.facts}>
+                  <div>
+                    <dt className={classes.factLabel}>Status</dt>
+                    <dd className={classes.factValue}>{statusLabel}</dd>
                   </div>
-                </div>
-
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Reason</div>
-                  <div className={classes.metaValue}>
-                    {getModerationReportReasonLabel(report.reason_code)}
+                  <div>
+                    <dt className={classes.factLabel}>Reason</dt>
+                    <dd className={classes.factValue}>{getModerationReportReasonLabel(report.reason_code)}</dd>
                   </div>
-                </div>
+                  <div>
+                    <dt className={classes.factLabel}>Resolution</dt>
+                    <dd className={classes.factValue}>
+                      {getModerationReportResolutionLabel(report.resolution_code)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className={classes.factLabel}>Resolved</dt>
+                    <dd className={classes.factValue}>{dateText(report.resolved_at)}</dd>
+                  </div>
+                </dl>
 
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Resolution</div>
-                  <div className={classes.metaValue}>
-                    {getModerationReportResolutionLabel(
-                      report.resolution_code
+                {report.reason_details && (
+                  <p className={classes.details}>
+                    <span className={classes.detailsLabel}>Your details:</span> {report.reason_details}
+                  </p>
+                )}
+
+                {report.reporter_status_message && (
+                  <div className={classes.update}>
+                    <strong>Moderator update:</strong> {report.reporter_status_message}
+                    {report.reporter_status_updated_at && (
+                      <> <span>Updated {dateText(report.reporter_status_updated_at, true)}.</span></>
                     )}
                   </div>
-                </div>
-
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Submitted</div>
-                  <div className={classes.metaValue}>
-                    {dateText(report.created_at)}
-                  </div>
-                </div>
-
-                <div className={classes.metaBlock}>
-                  <div className={classes.metaLabel}>Resolved</div>
-                  <div className={classes.metaValue}>
-                    {dateText(report.resolved_at)}
-                  </div>
-                </div>
-              </div>
-
-              {report.reason_details && (
-                <p className={classes.text}>
-                  <span className={classes.textStrong}>Your details:</span>{" "}
-                  {report.reason_details}
-                </p>
-              )}
-
-              {report.reporter_status_message && (
-                <div className={classes.updateBox}>
-                  <strong>Moderator update:</strong>{" "}
-                  {report.reporter_status_message}
-                  {report.reporter_status_updated_at && (
-                    <>
-                      {" "}
-                      <span>
-                        Updated {dateText(report.reporter_status_updated_at)}.
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!isLoading && !error && reports.length > 0 && filteredReports.length === 0 && (
-        <div className={classes.card}>
-          <p className={classes.text}>
-            No reports match this filter.
-          </p>
+                )}
+              </CollapsibleSection>
+            );
+          })}
         </div>
       )}
     </div>

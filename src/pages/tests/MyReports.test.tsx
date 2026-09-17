@@ -227,6 +227,39 @@ describe("<MyReports />", () => {
     expect(mocks.markReportsSeen).toHaveBeenCalled();
   });
 
+  it("keeps a new update highlighted and open after it is marked as seen", () => {
+    const unread = createReport({
+      has_unread_update: true,
+      reporter_status_message: "We reviewed this report.",
+      reporter_status_updated_at: "2026-05-10T12:00:00.000Z",
+    });
+
+    mocks.useMyModerationReports.mockReturnValue({ data: [unread], isLoading: false, error: null });
+
+    const view = renderPage();
+
+    expect(mocks.markReportsSeen).toHaveBeenCalledTimes(1);
+
+    // The refetch after marking clears the flag on the server copy.
+    mocks.useMyModerationReports.mockReturnValue({
+      data: [{ ...unread, has_unread_update: false }],
+      isLoading: false,
+      error: null,
+    });
+    view.rerender(
+      <MemoryRouter>
+        <MyReports />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("New moderator update")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Custom Emote Pack/ })).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+    expect(mocks.markReportsSeen).toHaveBeenCalledTimes(1);
+  });
+
   it("filters reports by active, updates, and resolved state", () => {
     mocks.useMyModerationReports.mockReturnValue({
       data: [
@@ -261,19 +294,19 @@ describe("<MyReports />", () => {
     expect(screen.getByText("Updated Report")).toBeInTheDocument();
     expect(screen.getByText("Resolved Report")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /New updates/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Updates/ }));
 
     expect(screen.queryByText("Active Report")).not.toBeInTheDocument();
     expect(screen.getByText("Updated Report")).toBeInTheDocument();
     expect(screen.queryByText("Resolved Report")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Resolved/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Resolved/ }));
 
     expect(screen.queryByText("Active Report")).not.toBeInTheDocument();
     expect(screen.queryByText("Updated Report")).not.toBeInTheDocument();
     expect(screen.getByText("Resolved Report")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Active/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Active/ }));
 
     expect(screen.getByText("Active Report")).toBeInTheDocument();
     expect(screen.getByText("Updated Report")).toBeInTheDocument();

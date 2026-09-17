@@ -16,6 +16,7 @@ import Live from "./pages/Live";
 import Market from "./pages/Market";
 import NotFound from "./pages/NotFound";
 import ProfileSettings from "./pages/ProfileSettings";
+import SettingsLayout from "./components/settings/SettingsLayout";
 import SignIn from "./pages/SignIn";
 import AdminCreatorApplications from "./pages/admin/AdminCreatorApplications";
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -78,10 +79,11 @@ const App = () => {
           />
 
           <Route element={<RequireAuth />}>
-            <Route
-              path="/settings/profile"
-              element={<ProfileSettings />}
-            />
+            <Route path="/settings" element={<SettingsLayout />}>
+              <Route index element={<Navigate to="profile" replace />} />
+              <Route path="profile" element={<ProfileSettings />} />
+              <Route path="reports" element={<MyReports />} />
+            </Route>
             <Route
               path="/apply/creator"
               element={<ApplyCreator />}
@@ -115,10 +117,6 @@ const App = () => {
             <Route
               path="/messages/:id"
               element={<MessageDetails />}
-            />
-            <Route
-              path="/settings/reports"
-              element={<MyReports />}
             />
 
             <Route
