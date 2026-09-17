@@ -6,63 +6,58 @@ import { useMarketListings, type MarketListingItem } from "../hooks/listings/use
 import { usePublicCreators, type PublicCreatorItem } from "../hooks/usePublicCreators";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
 import { StaggerGroup } from "../lib/motion";
+import HeroParallax from "../components/home/HeroParallax";
 
 const classes = {
-  page: "space-y-10",
+  page: "space-y-16",
 
-  section: "space-y-3",
-  headerRow: "flex items-baseline justify-between gap-4",
-  h2: "font-display text-xl font-extrabold tracking-tight",
-  linkSubtle: "text-sm font-semibold text-zinc-600 hover:text-zinc-900",
+  section: "space-y-5",
+  headerRow: "flex items-end justify-between gap-4",
+  eyebrow:
+    "text-[11px] font-semibold uppercase tracking-[0.14em] text-[rgb(var(--accent-text))]",
+  h2: "font-display text-2xl font-bold tracking-tight",
+  linkSubtle:
+    "shrink-0 text-sm font-semibold text-zinc-600 transition hover:text-[rgb(var(--accent-text))]",
 
-  cardLg: "card flex flex-col items-center rounded-3xl p-6",
-  card: "card p-4",
-  cardLink: "card group overflow-hidden",
+  heroTileFallback:
+    "h-full w-full bg-[radial-gradient(120%_120%_at_0%_0%,rgb(var(--accent)/0.35),transparent_60%),radial-gradient(120%_120%_at_100%_100%,rgb(var(--brand)/0.3),transparent_55%)]",
 
-  btnPrimary: "btnPrimary",
-  btnOutline: "btnOutline",
-  chip: "chip",
+  grid: "grid gap-5 sm:grid-cols-2 lg:grid-cols-3",
 
-  badgeBase: "rounded-full border bg-white px-2 py-0.5 text-xs font-semibold",
-  badgeDefault: "border-zinc-200",
-  badgeFeatured: "border-amber-200 bg-amber-50 text-amber-800",
-  badgeLive: "border-rose-200 bg-rose-50 text-rose-700",
+  card: "card group relative flex flex-col overflow-hidden hover:-translate-y-0.5",
+  media: "relative aspect-[16/10] overflow-hidden bg-zinc-100",
+  mediaImg:
+    "h-full w-full object-cover transition duration-500 ease-out group-hover:scale-[1.04]",
+  mediaBadges: "absolute left-3 top-3 flex flex-wrap gap-1.5",
+  cardBody: "flex flex-1 flex-col p-4",
 
-  heroMax: "max-w-3xl",
-  heroH1: "font-display text-3xl font-extrabold tracking-tight",
-  heroP: "mt-2 text-zinc-600",
-  heroActions: "mt-5 flex flex-wrap gap-3",
-  heroChips: "mt-6 flex flex-wrap items-center gap-2",
+  badge: "badge",
+  badgeFeatured: "badge badgeFeatured",
+  badgeLive: "badge badgeLive",
 
-  grid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
-
-  featuredMedia: "relative",
-  featuredImg: "h-40 w-full object-cover bg-zinc-100",
-  featuredBadges: "absolute left-3 top-3 flex gap-2",
-
-  featuredBody: "p-4",
   featuredTop: "flex items-start justify-between gap-3",
   featuredTitleWrap: "min-w-0",
-  featuredTitle: "font-display truncate text-base font-extrabold tracking-tight",
-  featuredMeta: "mt-1 text-sm text-zinc-600",
-  featuredPrice: "shrink-0 text-sm font-extrabold",
-  featuredShort: "mt-2 line-clamp-2 text-sm text-zinc-600",
-  featuredBy: "mt-3 text-sm text-zinc-600",
+  featuredTitle: "font-display truncate text-base font-bold tracking-tight",
+  featuredMeta: "mt-0.5 text-xs font-medium text-zinc-500",
+  featuredPrice:
+    "shrink-0 rounded-full bg-[rgb(var(--accent-soft))] px-2.5 py-1 text-sm font-semibold text-[rgb(var(--accent-text))]",
+  featuredShort: "mt-2 line-clamp-2 text-sm leading-6 text-zinc-600",
+  featuredBy: "mt-auto flex items-center gap-2 pt-4 text-sm text-zinc-600",
+  featuredAvatar:
+    "flex h-6 w-6 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-bold uppercase text-zinc-700",
   featuredByName: "font-semibold text-zinc-900",
 
-  liveCardImg: "mb-3 h-40 w-full rounded-2xl object-cover",
   liveRow: "flex flex-wrap items-center gap-2",
-  liveTitle: "font-display text-base font-extrabold tracking-tight",
-  liveDesc: "mt-2 text-sm text-zinc-600",
-  liveMeta: "mt-2 text-xs text-zinc-500",
+  liveTitle: "font-display text-base font-bold tracking-tight",
+  liveDesc: "mt-1.5 line-clamp-2 text-sm text-zinc-600",
+  liveMeta: "mt-auto pt-3 text-xs font-medium text-zinc-500",
 
-  liveErrorCard:
-    "card border border-[rgb(var(--ink)/0.18)] bg-[rgb(var(--accent)/0.20)] p-4",
-  liveErrorTitle: "text-sm font-semibold text-zinc-900",
-  liveErrorBody: "mt-1 text-sm text-zinc-700",
+  liveErrorCard: "notice noticeWarning",
+  liveErrorTitle: "text-sm font-semibold",
+  liveErrorBody: "mt-1 text-sm",
 
   loadingText: "text-sm text-zinc-600",
-  emptyText: "text-sm text-zinc-600",
+  emptyText: "notice noticeNeutral",
 } as const;
 
 // Fast lookup map for category labels by key
@@ -93,76 +88,24 @@ const priceText = (item: MarketListingItem["listing"]): string =>
         ? `$${item.price_min}–$${item.price_max ?? item.price_min}`
         : "";
 
-// Builds a badge class string from the chosen badge variant
-const getBadgeClassName = (variant: "default" | "featured" | "live"): string =>
-  variant === "featured"
-    ? `${classes.badgeBase} ${classes.badgeFeatured}`
-    : variant === "live"
-      ? `${classes.badgeBase} ${classes.badgeLive}`
-      : `${classes.badgeBase} ${classes.badgeDefault}`;
-
 type SectionHeaderProps = {
+  eyebrow: string;
   title: string;
   to: string;
   linkText: string;
 };
 
-const SectionHeader = ({ title, to, linkText }: SectionHeaderProps) => (
+const SectionHeader = ({ eyebrow, title, to, linkText }: SectionHeaderProps) => (
   <div className={classes.headerRow}>
-    <h2 className={classes.h2}>{title}</h2>
+    <div>
+      <div className={classes.eyebrow}>{eyebrow}</div>
+      <h2 className={classes.h2}>{title}</h2>
+    </div>
 
     <Link to={to} className={classes.linkSubtle}>
       {linkText}
     </Link>
   </div>
-);
-
-const HeroSection = () => (
-  <section className={classes.cardLg}>
-    <div className={classes.heroMax}>
-      <h1 className={classes.heroH1}>
-        CreatorHub — assets & services, in one trusted place.
-      </h1>
-
-      <p className={classes.heroP}>
-        Find emote artists, overlay designers, PNG/VTuber creators, riggers,
-        editors, and audio help — with clear categories and “Live now”
-        discovery.
-      </p>
-    </div>
-
-    <div className={classes.heroActions}>
-      <Link to="/market" className={classes.btnPrimary}>
-        Browse market
-      </Link>
-
-      <Link to="/creators" className={classes.btnOutline}>
-        Find creators
-      </Link>
-
-      <Link to="/live" className={classes.btnOutline}>
-        Live now
-      </Link>
-    </div>
-
-    <div className={classes.heroChips}>
-      <Link to="/market?cat=video-editing&video=long-form" className={classes.chip}>
-        Long form edits
-      </Link>
-
-      <Link to="/market?cat=video-editing&video=short-form" className={classes.chip}>
-        Short form edits
-      </Link>
-
-      <Link to="/market?cat=vtuber-rigging" className={classes.chip}>
-        PNG/VTuber rigging help
-      </Link>
-
-      <Link to="/market?cat=audio-tech-help" className={classes.chip}>
-        Audio tech help
-      </Link>
-    </div>
-  </section>
 );
 
 type FeaturedListingCardProps = {
@@ -180,29 +123,26 @@ const FeaturedListingCard = ({ item }: FeaturedListingCardProps) => {
   const creatorName = creator?.display_name ?? creator?.handle ?? "Unknown creator";
 
   return (
-    <Link to={`/listing/${listing.id}`} className={classes.cardLink}>
-      <div className={classes.featuredMedia}>
+    <Link to={`/listing/${listing.id}`} className={classes.card}>
+      <div className={classes.media}>
         {listing.preview_url ? (
           <img
             src={listing.preview_url}
             alt=""
-            className={classes.featuredImg}
+            className={classes.mediaImg}
             loading="lazy"
           />
         ) : (
-          <div className={classes.featuredImg} />
+          <div className={classes.heroTileFallback} />
         )}
 
-        <div className={classes.featuredBadges}>
-          <span className={getBadgeClassName("default")}>
-            {offeringPill(listing.offering_type)}
-          </span>
-
-          <span className={getBadgeClassName("featured")}>Featured</span>
+        <div className={classes.mediaBadges}>
+          <span className={classes.badge}>{offeringPill(listing.offering_type)}</span>
+          <span className={classes.badgeFeatured}>Featured</span>
         </div>
       </div>
 
-      <div className={classes.featuredBody}>
+      <div className={classes.cardBody}>
         <div className={classes.featuredTop}>
           <div className={classes.featuredTitleWrap}>
             <div className={classes.featuredTitle}>{listing.title}</div>
@@ -219,7 +159,12 @@ const FeaturedListingCard = ({ item }: FeaturedListingCardProps) => {
         <p className={classes.featuredShort}>{listing.short}</p>
 
         <div className={classes.featuredBy}>
-          by <span className={classes.featuredByName}>{creatorName}</span>
+          <span className={classes.featuredAvatar} aria-hidden="true">
+            {creatorName.charAt(0)}
+          </span>
+          <span>
+            by <span className={classes.featuredByName}>{creatorName}</span>
+          </span>
         </div>
       </div>
     </Link>
@@ -233,7 +178,12 @@ type FeaturedSectionProps = {
 
 const FeaturedSection = ({ featuredListings, isLoading }: FeaturedSectionProps) => (
   <section className={classes.section}>
-    <SectionHeader title="Featured" to="/market" linkText="Browse market →" />
+    <SectionHeader
+      eyebrow="Handpicked"
+      title="Featured"
+      to="/market"
+      linkText="Browse market →"
+    />
 
     {isLoading ? (
       <p className={classes.loadingText}>Loading featured listings…</p>
@@ -265,33 +215,33 @@ const LiveCreatorCard = ({ creator, verified, stream }: LiveCreatorCardProps) =>
 
   return (
     <Link to={`/creator/${creator.handle}`} className={classes.card}>
-      {Boolean(thumb) && (
-        <img
-          src={thumb}
-          alt=""
-          className={classes.liveCardImg}
-          loading="lazy"
-        />
-      )}
-
-      <div className={classes.liveRow}>
-        <div className={classes.liveTitle}>
-          {creator.display_name ?? creator.handle ?? "Creator"}
-        </div>
-
-        {verified && (
-          <span className={getBadgeClassName("default")}>Verified</span>
+      <div className={classes.media}>
+        {thumb ? (
+          <img src={thumb} alt="" className={classes.mediaImg} loading="lazy" />
+        ) : (
+          <div className={classes.heroTileFallback} />
         )}
 
-        <span className={getBadgeClassName("live")}>Live</span>
+        <div className={classes.mediaBadges}>
+          <span className={classes.badgeLive}>Live</span>
+          {verified && <span className={classes.badge}>Verified</span>}
+        </div>
       </div>
 
-      <p className={classes.liveDesc}>{stream.title ?? ""}</p>
+      <div className={classes.cardBody}>
+        <div className={classes.liveRow}>
+          <div className={classes.liveTitle}>
+            {creator.display_name ?? creator.handle ?? "Creator"}
+          </div>
+        </div>
 
-      <p className={classes.liveMeta}>
-        Twitch • {stream.viewerCount ?? 0} viewers
-        {stream.gameName ? ` • ${stream.gameName}` : ""}
-      </p>
+        <p className={classes.liveDesc}>{stream.title ?? ""}</p>
+
+        <p className={classes.liveMeta}>
+          Twitch • {stream.viewerCount ?? 0} viewers
+          {stream.gameName ? ` • ${stream.gameName}` : ""}
+        </p>
+      </div>
     </Link>
   );
 };
@@ -304,7 +254,12 @@ type LiveNowSectionProps = {
 
 const LiveNowSection = ({ liveNow, isFetching, errorMsg }: LiveNowSectionProps) => (
   <section className={classes.section}>
-    <SectionHeader title="Live now" to="/live" linkText="View all →" />
+    <SectionHeader
+      eyebrow="On air"
+      title="Live now"
+      to="/live"
+      linkText="View all →"
+    />
 
     {errorMsg && (
       <div className={classes.liveErrorCard}>
@@ -377,9 +332,14 @@ const Home = () => {
   // use the first public listings returned by the market query.
   const featuredListings = marketItems.slice(0, 6);
 
+  const heroPreviewUrls = featuredListings
+    .map((item) => item.listing.preview_url)
+    .filter((url): url is string => Boolean(url))
+    .slice(0, 3);
+
   return (
     <div className={classes.page}>
-      <HeroSection />
+      <HeroParallax previewUrls={heroPreviewUrls} />
       <FeaturedSection
         featuredListings={featuredListings}
         isLoading={isLoadingMarket}

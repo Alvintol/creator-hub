@@ -48,7 +48,7 @@ const classes = {
   liveImg: "h-56 w-full object-cover",
   liveBody: "p-4",
   liveMeta: "text-sm font-extrabold text-zinc-900",
-  liveDot: "text-zinc-400",
+  liveDot: "text-zinc-500",
   liveTitle: "mt-1 text-sm text-zinc-600",
 
   platformSection: "mt-6 space-y-3",

@@ -66,7 +66,7 @@ const classes = {
     "h-16 w-16 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100",
   avatarImage: "h-full w-full object-cover",
   avatarFallback:
-    "flex h-full w-full items-center justify-center text-xs font-bold text-zinc-500",
+    "flex h-full w-full items-center justify-center text-xs font-bold text-zinc-600",
   avatarActions: "flex min-w-[220px] flex-col items-start gap-2",
   avatarHelp: "text-xs text-zinc-500",
 

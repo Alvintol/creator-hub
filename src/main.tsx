@@ -6,6 +6,7 @@ import App from "./App";
 import AppProviders from "./providers/AppProvider";
 
 import "./styles/index.css";
+import "./styles/theme.css";
 import "./styles/ui.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

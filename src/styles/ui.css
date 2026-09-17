@@ -1,48 +1,56 @@
 @reference "./index.css";
 
+/* Colour values live in theme.css (light and dark); this file only consumes them. */
+
 @layer base {
   :root {
-    /* Neutrals */
-    --bg: 250 250 249;
-    --surface: 255 255 255;
-    --paper: 255 255 255;
-    --ink: 17 17 20;
-    --muted: 99 99 110;
-
-    /* Brand palette — from logo */
-    --brand: 240 88 40;
-    --brand-deep: 214 64 22;
-    --accent: 123 72 255;
-    --info: 59 130 246;
-
-    /* Lines & depth */
-    --border: 17 17 20;
-    --hairline: rgb(17 17 20 / 0.08);
-    --hairline-strong: rgb(17 17 20 / 0.14);
-    --shadow-sm: 0 1px 2px rgb(17 17 20 / 0.04), 0 1px 1px rgb(17 17 20 / 0.03);
-    --shadow-md: 0 1px 2px rgb(17 17 20 / 0.04),
-      0 8px 24px -12px rgb(17 17 20 / 0.12);
-    --shadow-lg: 0 2px 4px rgb(17 17 20 / 0.04),
-      0 24px 48px -20px rgb(17 17 20 / 0.18);
-    --ring: 0 0 0 4px rgb(var(--brand) / 0.16);
+    --shadow-sm: 0 1px 2px rgb(var(--shadow-color) / 0.05),
+      0 1px 1px rgb(var(--shadow-color) / 0.03);
+    --shadow-md: 0 1px 2px rgb(var(--shadow-color) / 0.05),
+      0 10px 28px -14px rgb(var(--shadow-color) / 0.16);
+    --shadow-lg: 0 2px 4px rgb(var(--shadow-color) / 0.05),
+      0 28px 56px -24px rgb(var(--shadow-color) / 0.24);
+    --ring: 0 0 0 4px rgb(var(--accent) / 0.2);
 
     --radius-card: 1.25rem;
+  }
+
+  [data-theme="dark"] {
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-md: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 32px -16px rgb(0 0 0 / 0.6);
+    --shadow-lg: 0 2px 4px rgb(0 0 0 / 0.35), 0 28px 56px -24px rgb(0 0 0 / 0.7);
+    --ring: 0 0 0 4px rgb(var(--accent) / 0.22);
   }
 
   body {
     color: rgb(var(--ink));
     background:
       radial-gradient(
-        1200px 480px at 50% -120px,
-        rgb(var(--brand) / 0.07),
+        1100px 520px at 12% -180px,
+        rgb(var(--accent) / 0.09),
+        transparent 70%
+      ),
+      radial-gradient(
+        900px 420px at 92% -160px,
+        rgb(var(--brand) / 0.06),
         transparent 70%
       ),
       rgb(var(--bg));
     background-attachment: fixed;
   }
 
+  [data-theme="dark"] body {
+    background:
+      radial-gradient(
+        1100px 520px at 12% -180px,
+        rgb(var(--accent) / 0.05),
+        transparent 70%
+      ),
+      rgb(var(--bg));
+  }
+
   ::selection {
-    background: rgb(var(--brand) / 0.18);
+    background: rgb(var(--accent) / 0.22);
   }
 
   a,
@@ -58,8 +66,10 @@
 }
 
 @layer components {
+  /* overflow-x: clip (not hidden) so full-bleed sections never add a scrollbar and sticky still works. */
   .appShell {
     @apply flex min-h-screen flex-col;
+    overflow-x: clip;
   }
 
   /* Max-width comes from Tailwind's `container` utility (steps per breakpoint); those side gutters are reserved for future banner ads. */
@@ -69,18 +79,42 @@
 
   .topbar {
     @apply sticky top-0 z-50 backdrop-blur-xl;
-    background: rgb(var(--surface) / 0.82);
+    background: rgb(var(--surface) / 0.78);
     border-bottom: 1px solid var(--hairline);
   }
 
-  .subbar {
-    border-bottom: 1px solid var(--hairline);
-    background: rgb(var(--surface) / 0.6);
+  /* The logo's darker violet disappears on dark backgrounds, so the mark sits on a light plate there. */
+  .brandMark {
+    @apply rounded-[10px] transition duration-200;
+  }
+
+  [data-theme="dark"] .brandMark {
+    background: rgb(247 247 255);
+    padding: 3px;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
+  }
+
+  .themeToggle {
+    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition duration-200;
+    color: rgb(var(--ink) / 0.72);
+    border: 1px solid var(--hairline-strong);
+    background: rgb(var(--surface));
+  }
+
+  .themeToggle:hover {
+    color: rgb(var(--ink));
+    background: rgb(var(--accent-soft));
+  }
+
+  .themeToggle:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
   }
 
   /* Cards */
   .card {
-    @apply bg-white transition duration-200;
+    @apply transition duration-200;
+    background: rgb(var(--surface));
     border-radius: var(--radius-card);
     border: 1px solid var(--hairline);
     box-shadow: var(--shadow-md);
@@ -94,32 +128,32 @@
   /* Buttons */
   .btnPrimary {
     @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200;
-    color: rgb(255 255 255);
-    background: linear-gradient(180deg, rgb(var(--brand)), rgb(var(--brand-deep)));
-    border: 1px solid rgb(var(--brand-deep));
+    color: rgb(var(--on-primary));
+    background: linear-gradient(180deg, rgb(var(--primary-strong)), rgb(var(--primary)));
+    border: 1px solid rgb(var(--primary));
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.22),
-      0 1px 2px rgb(17 17 20 / 0.08),
-      0 6px 16px -8px rgb(var(--brand) / 0.55);
+      inset 0 1px 0 rgb(255 255 255 / 0.16),
+      0 1px 2px rgb(var(--shadow-color) / 0.1),
+      0 8px 20px -10px rgb(var(--primary) / 0.55);
   }
 
   .btnPrimary:hover {
     transform: translateY(-1px);
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.22),
-      0 1px 2px rgb(17 17 20 / 0.08),
-      0 10px 22px -10px rgb(var(--brand) / 0.6);
+      inset 0 1px 0 rgb(255 255 255 / 0.16),
+      0 1px 2px rgb(var(--shadow-color) / 0.1),
+      0 14px 28px -12px rgb(var(--primary) / 0.6);
   }
 
   .btnPrimary:focus-visible {
     outline: none;
     box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.22),
+      inset 0 1px 0 rgb(255 255 255 / 0.16),
       var(--ring);
   }
 
   .btnPrimary:disabled {
-    @apply cursor-not-allowed opacity-60;
+    @apply cursor-not-allowed opacity-50;
     transform: none;
   }
 
@@ -132,8 +166,9 @@
   }
 
   .btnOutline:hover {
-    border-color: rgb(var(--ink) / 0.24);
-    background: rgb(var(--ink) / 0.03);
+    border-color: rgb(var(--accent) / 0.35);
+    background: rgb(var(--accent-soft));
+    color: rgb(var(--accent-text));
   }
 
   .btnOutline:focus-visible {
@@ -142,7 +177,7 @@
   }
 
   .btnOutline:disabled {
-    @apply cursor-not-allowed opacity-60;
+    @apply cursor-not-allowed opacity-50;
   }
 
   .btnDanger {
@@ -152,7 +187,7 @@
     border: 1px solid rgb(185 28 28);
     box-shadow:
       inset 0 1px 0 rgb(255 255 255 / 0.18),
-      0 6px 16px -8px rgb(220 38 38 / 0.5);
+      0 8px 20px -10px rgb(220 38 38 / 0.5);
   }
 
   .btnDanger:hover {
@@ -160,27 +195,26 @@
   }
 
   .btnDangerOutline {
-    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition duration-200;
-    color: rgb(185 28 28);
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-red-700 transition duration-200;
     background: rgb(var(--surface));
     border: 1px solid rgb(220 38 38 / 0.3);
     box-shadow: var(--shadow-sm);
   }
 
   .btnDangerOutline:hover {
-    background: rgb(254 242 242);
+    @apply bg-red-50;
     border-color: rgb(220 38 38 / 0.45);
   }
 
   .btnDanger:focus-visible,
   .btnDangerOutline:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 4px rgb(220 38 38 / 0.16);
+    box-shadow: 0 0 0 4px rgb(220 38 38 / 0.18);
   }
 
   .btnDanger:disabled,
   .btnDangerOutline:disabled {
-    @apply cursor-not-allowed opacity-60;
+    @apply cursor-not-allowed opacity-50;
     transform: none;
   }
 
@@ -190,12 +224,12 @@
 
   /* Page typography */
   .pageTitle {
-    @apply font-display text-2xl font-bold tracking-tight sm:text-3xl;
+    @apply font-display text-2xl font-bold tracking-tight sm:text-[2rem] sm:leading-tight;
     color: rgb(var(--ink));
   }
 
   .pageSub {
-    @apply text-sm;
+    @apply text-sm leading-6;
     color: rgb(var(--muted));
   }
 
@@ -210,7 +244,7 @@
   }
 
   .backLink:hover {
-    color: rgb(var(--ink));
+    color: rgb(var(--accent-text));
   }
 
   .metaLabel {
@@ -236,6 +270,10 @@
     border: 1px solid var(--hairline-strong);
   }
 
+  [data-theme="dark"] .formControl {
+    background: rgb(var(--surface-raised));
+  }
+
   .formControl::placeholder {
     color: rgb(var(--muted) / 0.75);
   }
@@ -246,7 +284,7 @@
 
   .formControl:focus,
   .formControl:focus-visible {
-    border-color: rgb(var(--brand) / 0.45);
+    border-color: rgb(var(--accent) / 0.55);
     box-shadow: var(--ring);
   }
 
@@ -265,7 +303,7 @@
     @apply text-xs font-medium text-red-600;
   }
 
-  /* Notices */
+  /* Notices — the tinted colours flip automatically in dark mode (see theme.css). */
   .notice {
     @apply rounded-xl border px-4 py-3 text-sm leading-6;
   }
@@ -283,7 +321,9 @@
   }
 
   .noticeInfo {
-    @apply border-blue-200 bg-blue-50 text-blue-900;
+    border-color: rgb(var(--accent) / 0.25);
+    background: rgb(var(--accent-soft));
+    color: rgb(var(--accent-text));
   }
 
   .noticeNeutral {
@@ -293,21 +333,22 @@
   /* Inputs */
   .searchInput {
     @apply w-full rounded-full px-4 py-2.5 text-sm outline-none transition duration-200;
-    background: rgb(var(--ink) / 0.035);
+    color: rgb(var(--ink));
+    background: rgb(var(--ink) / 0.045);
     border: 1px solid transparent;
   }
 
   .searchInput::placeholder {
-    color: rgb(var(--muted) / 0.8);
+    color: rgb(var(--muted) / 0.85);
   }
 
   .searchInput:hover {
-    background: rgb(var(--ink) / 0.05);
+    background: rgb(var(--ink) / 0.065);
   }
 
   .searchInput:focus-visible {
     background: rgb(var(--surface));
-    border-color: rgb(var(--brand) / 0.45);
+    border-color: rgb(var(--accent) / 0.55);
     box-shadow: var(--ring);
   }
 
@@ -320,43 +361,40 @@
   }
 
   .chip:hover {
-    color: rgb(var(--ink));
-    border-color: rgb(var(--ink) / 0.24);
-    background: rgb(var(--ink) / 0.03);
+    color: rgb(var(--accent-text));
+    border-color: rgb(var(--accent) / 0.35);
+    background: rgb(var(--accent-soft));
   }
 
   .badge {
     @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-wide;
-    background: rgb(var(--ink) / 0.04);
-    color: rgb(var(--ink) / 0.75);
+    background: rgb(var(--surface) / 0.92);
+    color: rgb(var(--ink) / 0.8);
     border: 1px solid var(--hairline);
+    backdrop-filter: blur(8px);
   }
 
   .badgeLive {
-    background: rgb(var(--info) / 0.1);
-    border-color: rgb(var(--info) / 0.25);
-    color: rgb(29 78 216);
+    @apply border-rose-200 bg-rose-50 text-rose-700;
   }
 
   .badgeFeatured {
-    background: rgb(var(--accent) / 0.08);
-    border-color: rgb(var(--accent) / 0.22);
-    color: rgb(91 44 214);
+    border-color: rgb(var(--accent) / 0.25);
+    background: rgb(var(--accent-soft));
+    color: rgb(var(--accent-text));
   }
 
   /* NAV browsing rail */
   .categoryBar {
     border-bottom: 1px solid var(--hairline);
-    background: rgb(var(--paper) / 0.6);
+    background: rgb(var(--paper) / 0.5);
   }
   .categoryBarInner {
-    @apply container mx-auto px-4 py-2.5 sm:px-6;
+    @apply container mx-auto h-[30px] px-4 sm:px-6;
   }
   .categoryRow {
-    @apply flex items-center gap-1.5 overflow-x-auto;
+    @apply flex items-center gap-1 overflow-x-auto;
     overflow-y: visible;
-    padding-top: 2px;
-    padding-bottom: 2px;
     scrollbar-width: none;
   }
   .categoryRow::-webkit-scrollbar {
@@ -368,7 +406,7 @@
   }
 
   .navChip {
-    @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition duration-200;
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition duration-200;
     color: rgb(var(--ink) / 0.72);
     border: 1px solid transparent;
     position: relative;
@@ -378,10 +416,9 @@
     background: rgb(var(--ink) / 0.05);
   }
   .navChipActive {
-    color: rgb(var(--ink));
-    background: rgb(var(--surface));
-    border-color: var(--hairline-strong);
-    box-shadow: var(--shadow-sm);
+    color: rgb(var(--accent-text));
+    background: rgb(var(--accent-soft));
+    border-color: rgb(var(--accent) / 0.2);
   }
 
   .linkPill {
@@ -390,12 +427,12 @@
     border: 1px solid var(--hairline-strong);
   }
   .linkPill:hover {
-    color: rgb(var(--ink));
-    background: rgb(var(--ink) / 0.04);
+    color: rgb(var(--accent-text));
+    background: rgb(var(--accent-soft));
   }
 
   .navPill {
-    @apply inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition duration-200;
+    @apply inline-flex h-8 items-center gap-2 rounded-full px-3 text-sm font-medium transition duration-200;
     color: rgb(var(--ink) / 0.72);
     border: 1px solid transparent;
   }
@@ -404,13 +441,17 @@
     background: rgb(var(--ink) / 0.05);
   }
   .navPillActive {
-    color: rgb(var(--ink));
-    background: rgb(var(--ink) / 0.06);
+    color: rgb(var(--accent-text));
+    background: rgb(var(--accent-soft));
   }
 
   .navPillHot {
     color: rgb(var(--brand-deep));
-    background: rgb(var(--brand) / 0.1);
+    background: rgb(var(--brand) / 0.12);
+  }
+
+  [data-theme="dark"] .navPillHot {
+    color: rgb(var(--brand));
   }
 
   .navPillCount {
@@ -419,7 +460,7 @@
     min-width: 18px;
     padding: 0 5px;
     border-radius: 999px;
-    background: rgb(var(--brand));
+    background: rgb(var(--brand-deep));
     color: rgb(255 255 255);
     font-size: 11px;
     font-weight: 600;

@@ -2,23 +2,30 @@ import { Link } from "react-router-dom";
 import FavouriteButton from '../layout/FavouriteButton';
 
 const classes = {
-  card: "group relative rounded-2xl border border-zinc-200 bg-white p-4 hover:bg-zinc-50",
-  favWrap: "absolute right-3 top-3",
+  card: "card group relative flex flex-col overflow-hidden hover:-translate-y-0.5",
+  favWrap: "absolute right-3 top-3 z-10",
 
-  titleRow: "flex items-start gap-2",
-  h3: "font-display text-base font-extrabold tracking-tight",
+  cover:
+    "h-16 bg-[radial-gradient(120%_140%_at_0%_0%,rgb(var(--accent)/0.3),transparent_60%),radial-gradient(120%_140%_at_100%_0%,rgb(var(--brand)/0.22),transparent_55%)] transition duration-500 group-hover:opacity-90",
+  body: "flex flex-1 flex-col px-4 pb-4",
+  avatar:
+    "-mt-7 flex h-14 w-14 items-center justify-center rounded-2xl border-4 border-[rgb(var(--surface))] bg-gradient-to-br from-[rgb(var(--primary-strong))] to-[rgb(var(--primary))] font-display text-lg font-bold uppercase text-[rgb(var(--on-primary))] shadow-sm",
 
-  badgeBase: "rounded-full border bg-white px-2 py-0.5 text-xs font-semibold",
-  badgeVerified: "border-zinc-200",
-  badgeLive: "border-rose-200 bg-rose-50 text-rose-700",
+  titleRow: "mt-3 flex flex-wrap items-center gap-2",
+  h3: "font-display text-base font-bold tracking-tight",
 
-  bio: "mt-2 text-sm text-zinc-600",
+  badgeBase: "badge",
+  badgeVerified: "badgeFeatured",
+  badgeLive: "badgeLive",
 
-  metaRow: "mt-3 flex flex-wrap items-center gap-2",
-  statusBase: "text-xs font-bold",
+  bio: "mt-1.5 line-clamp-2 text-sm leading-6 text-zinc-600",
 
-  tagsWrap: "flex flex-wrap gap-2",
-  tag: "rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold text-zinc-700",
+  metaRow: "mt-auto flex flex-wrap items-center gap-2 pt-4",
+  statusBase:
+    "inline-flex items-center gap-1.5 rounded-full border border-[var(--hairline-strong)] px-2.5 py-1 text-xs font-semibold before:h-1.5 before:w-1.5 before:rounded-full before:bg-current",
+
+  tagsWrap: "flex flex-wrap gap-1.5",
+  tag: "rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700",
 } as const;
 
 export type CreatorCardModel = {
@@ -77,35 +84,43 @@ const CreatorCard = ({ creator }: CreatorCardProps) => {
         <FavouriteButton kind="creator" targetId={creator.id} />
       </div>
 
-      <div className={classes.titleRow}>
-        <h3 className={classes.h3}>{creator.displayName}</h3>
+      <div className={classes.cover} aria-hidden="true" />
 
-        {creator.verified && (
-          <span className={`${classes.badgeBase} ${classes.badgeVerified}`}>
-            Verified
-          </span>
-        )}
+      <div className={classes.body}>
+        <div className={classes.avatar} aria-hidden="true">
+          {creator.displayName.charAt(0)}
+        </div>
 
-        {isLive && (
-          <span className={`${classes.badgeBase} ${classes.badgeLive}`}>
-            Live
-          </span>
-        )}
-      </div>
+        <div className={classes.titleRow}>
+          <h3 className={classes.h3}>{creator.displayName}</h3>
 
-      <p className={classes.bio}>{creator.bio}</p>
-
-      <div className={classes.metaRow}>
-        <span className={commissionClass}>
-          Commissions: {creator.commissionStatus}
-        </span>
-
-        <div className={classes.tagsWrap}>
-          {(creator.tags ?? []).slice(0, 4).map((tag) => (
-            <span key={tag} className={classes.tag}>
-              {tag}
+          {creator.verified && (
+            <span className={`${classes.badgeBase} ${classes.badgeVerified}`}>
+              Verified
             </span>
-          ))}
+          )}
+
+          {isLive && (
+            <span className={`${classes.badgeBase} ${classes.badgeLive}`}>
+              Live
+            </span>
+          )}
+        </div>
+
+        <p className={classes.bio}>{creator.bio}</p>
+
+        <div className={classes.metaRow}>
+          <span className={commissionClass}>
+            Commissions: {creator.commissionStatus}
+          </span>
+
+          <div className={classes.tagsWrap}>
+            {(creator.tags ?? []).slice(0, 4).map((tag) => (
+              <span key={tag} className={classes.tag}>
+                {tag}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
     </Link>

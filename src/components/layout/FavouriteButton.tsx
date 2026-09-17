@@ -26,9 +26,9 @@ const classes = {
   heart: "h-5 w-5",
 
   btnBase:
-    "inline-flex items-center justify-center rounded-xl border px-2 py-2",
+    "inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-sm backdrop-blur-md transition duration-200 hover:scale-105",
   btnOn: "border-rose-200 bg-rose-50 text-rose-600",
-  btnOff: "border-zinc-200 bg-white text-zinc-700 hover:bg-zinc-50",
+  btnOff: "border-[var(--hairline-strong)] bg-[rgb(var(--surface)/0.85)] text-zinc-700 hover:text-rose-600",
 } as const;
 
 // Small heart icon used by the favourite button

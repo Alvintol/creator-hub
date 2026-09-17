@@ -65,7 +65,7 @@ const classes = {
   btnDanger:
     "btnDangerOutline btnSm",
   btnAdd:
-    "inline-flex items-center justify-center rounded-full border border-[rgb(var(--brand))] bg-white px-5 py-3 text-sm font-bold text-[rgb(var(--brand))] transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-50",
+    "btnOutline",
 } as const;
 
 const roundCurrencyAmount = (

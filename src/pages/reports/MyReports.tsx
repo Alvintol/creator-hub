@@ -60,9 +60,9 @@ const classes = {
   filterButtonActive:
     "btnPrimary btnSm",
   filterCount:
-    "ml-2 rounded-full bg-white/80 px-2 py-0.5 text-xs font-extrabold text-zinc-700",
+    "ml-2 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-extrabold text-zinc-700",
   filterCountActive:
-    "ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-extrabold text-white",
+    "ml-2 rounded-full bg-[rgb(var(--on-primary)/0.16)] px-2 py-0.5 text-xs font-extrabold text-[rgb(var(--on-primary))]",
 } as const;
 
 type ReportsFilter = "all" | "active" | "updates" | "resolved";

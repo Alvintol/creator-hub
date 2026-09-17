@@ -100,18 +100,18 @@ const classes = {
   messageBubble:
     "max-w-[min(100%,36rem)] whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm leading-6",
   messageBubbleOwn:
-    "rounded-br-md bg-gradient-to-b from-zinc-800 to-zinc-900 text-white shadow-[0_6px_16px_-8px_rgb(17_17_20/0.45)]",
+    "rounded-br-md bg-gradient-to-b from-[rgb(var(--primary-strong))] to-[rgb(var(--primary))] text-[rgb(var(--on-primary))] shadow-[0_6px_16px_-8px_rgb(var(--primary)/0.5)]",
   messageBubbleOther:
     "rounded-bl-md border border-zinc-200 bg-white text-zinc-800 shadow-sm",
   systemMessage:
     "max-w-[min(100%,32rem)] rounded-full border border-zinc-200 bg-white px-3.5 py-1 text-center text-xs text-zinc-600",
-  systemMeta: "mb-1 text-[11px] text-zinc-400",
-  readReceipt: "mt-1 px-1 text-[11px] font-medium text-zinc-400",
+  systemMeta: "mb-1 text-[11px] text-zinc-500",
+  readReceipt: "mt-1 px-1 text-[11px] font-medium text-zinc-500",
   messageActions: "mt-1 px-1",
   messageActionsHidden:
     "mt-1 px-1 sm:opacity-0 sm:transition sm:group-hover:opacity-100 sm:focus-within:opacity-100",
   reportLink:
-    "text-[11px] font-medium text-zinc-400 underline-offset-2 transition hover:text-red-600 hover:underline disabled:cursor-not-allowed disabled:no-underline disabled:hover:text-zinc-400",
+    "text-[11px] font-medium text-zinc-500 underline-offset-2 transition hover:text-red-600 hover:underline disabled:cursor-not-allowed disabled:no-underline disabled:hover:text-zinc-500",
 
   reportStatusBox:
     "rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs text-rose-900",
@@ -138,7 +138,7 @@ const classes = {
     "flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 px-3 py-2.5",
   composerTools: "flex min-w-0 flex-wrap items-center gap-2",
   composerSend: "flex items-center gap-3",
-  counter: "text-xs tabular-nums text-zinc-400",
+  counter: "text-xs tabular-nums text-zinc-500",
   imageStatus:
     "inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600",
   imageStatusLabel: "font-semibold text-zinc-800",

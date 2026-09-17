@@ -53,7 +53,7 @@ const classes = {
   sampleTitle: "text-sm font-extrabold text-zinc-900",
   sampleMeta: "mt-1 text-xs text-zinc-500",
   sampleDescription: "mt-2 text-sm text-zinc-700",
-  sampleLink: "mt-2 inline-flex text-sm font-semibold text-[rgb(var(--brand))] underline",
+  sampleLink: "mt-2 inline-flex text-sm font-semibold text-[rgb(var(--accent-text))] underline underline-offset-2 hover:opacity-80",
 
   sampleUrlBlock: "mt-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3",
   sampleUrlLabel: "text-[11px] font-bold uppercase tracking-wide text-zinc-500",
