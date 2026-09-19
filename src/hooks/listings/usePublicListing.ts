@@ -20,6 +20,11 @@ export type PublicListingRow = {
   status: string;
   is_active: boolean;
   updated_at: string;
+  is_free: boolean;
+  free_delivery_type: "download" | "external_link" | null;
+  free_external_url: string | null;
+  free_file_path: string | null;
+  free_file_name: string | null;
 };
 
 export type PublicListingCreator = {
@@ -63,7 +68,12 @@ const fetchPublicListing = async (
       preview_url,
       status,
       is_active,
-      updated_at
+      updated_at,
+      is_free,
+      free_delivery_type,
+      free_external_url,
+      free_file_path,
+      free_file_name
     `)
     .eq("id", id)
     .eq("status", "published")

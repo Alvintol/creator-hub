@@ -25,6 +25,7 @@ const createState = (overrides?: Partial<HubState>): HubState => ({
     type: "all",
     category: "all",
     videoSubtype: "all",
+    freeOnly: false,
   },
   favourites: {
     creators: {},

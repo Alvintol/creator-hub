@@ -28,6 +28,7 @@ const createState = (overrides?: Partial<HubState>): HubState => ({
     type: "all",
     category: "all",
     videoSubtype: "all",
+    freeOnly: false,
   },
   favourites: {
     creators: {},
@@ -77,6 +78,7 @@ const createListing = (
   price_min: 18,
   price_max: 18,
   preview_url: "https://picsum.photos/seed/emotes/960/540",
+  is_free: false,
   ...overrides,
 });
 
@@ -218,5 +220,16 @@ describe("ListingCard", () => {
     expect(
       screen.getByRole("button", { name: "Add favourite" })
     ).toBeInTheDocument();
+  });
+
+  it("renders a Free badge and $0 price for free listings", () => {
+    const listing = createListing({ is_free: true });
+    const creator = createCreator();
+
+    renderWithProviders(<ListingCard listing={listing} creator={creator} />);
+
+    expect(screen.getByText("Free")).toBeInTheDocument();
+    expect(screen.getByText("$0")).toBeInTheDocument();
+    expect(screen.queryByText("$18")).not.toBeInTheDocument();
   });
 });

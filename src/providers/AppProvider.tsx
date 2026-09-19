@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import AuthProvider from "./AuthProvider";
+import CookiePreferencesProvider from "./CookiePreferencesProvider";
 import ThemeProvider from "./ThemeProvider";
 import HubProvider from "./hub/HubProvider";
 
@@ -20,11 +21,13 @@ const AppProviders = (props: AppProvidersProps) => {
 
   return (
     <ThemeProvider>
-      <QueryClientProvider client={client}>
-        <AuthProvider>
-          <HubProvider>{children}</HubProvider>
-        </AuthProvider>
-      </QueryClientProvider>
+      <CookiePreferencesProvider>
+        <QueryClientProvider client={client}>
+          <AuthProvider>
+            <HubProvider>{children}</HubProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </CookiePreferencesProvider>
     </ThemeProvider>
   );
 };

@@ -2,11 +2,30 @@ import { FadeIn } from "../../lib/motion";
 import { Link, useParams } from "react-router-dom";
 import { normalizeTwitchLogin } from "../../domain/twitch";
 import { useTwitchStreams } from "../../hooks/useTwitchStreams";
+import { supabase } from "../../lib/supabaseClient";
 import {
   usePublicListing,
   type PublicListingRow,
 } from "../../hooks/listings/usePublicListing";
 import { getFulfilmentModeCopy } from '../../domain/listings/listings';
+
+// Free listings never go through Stripe or the request flow: a download
+// resolves to a public storage URL, an external link is used as-is.
+const getFreeListingHref = (listing: PublicListingRow): string | null => {
+  if (!listing.is_free) return null;
+
+  if (listing.free_delivery_type === "download" && listing.free_file_path) {
+    return supabase.storage
+      .from("free-assets")
+      .getPublicUrl(listing.free_file_path).data.publicUrl;
+  }
+
+  if (listing.free_delivery_type === "external_link" && listing.free_external_url) {
+    return listing.free_external_url;
+  }
+
+  return null;
+};
 import { useState } from 'react';
 import { ModerationReportReasonCode, moderationReportReasonOptions } from '../../domain/moderation/moderationReports';
 import { useSubmitListingModerationReport } from '../../hooks/moderation/useSubmitListingModerationReport';
@@ -191,6 +210,7 @@ const ListingPage = () => {
 
   const { creator, platformAccounts } = data;
   const fulfilmentCopy = getFulfilmentModeCopy(listing.fulfilment_mode);
+  const freeListingHref = getFreeListingHref(listing);
 
   const twitchAccount =
     platformAccounts.find((account) => account.platform === "twitch") ?? null;
@@ -236,7 +256,9 @@ const ListingPage = () => {
           <p className={classes.desc}>{listing.short}</p>
 
           <div className={classes.priceRow}>
-            <div className={classes.price}>{priceText(listing)}</div>
+            <div className={classes.price}>
+              {listing.is_free ? "Free" : priceText(listing)}
+            </div>
 
             {creatorLink ? (
               <Link to={creatorLink} className={classes.creatorLink}>
@@ -295,26 +317,58 @@ const ListingPage = () => {
           )}
 
           <div className={classes.ctaBox}>
-            <div className={classes.ctaTitle}>{fulfilmentCopy.title}</div>
+            {listing.is_free && freeListingHref ? (
+              <>
+                <div className={classes.ctaTitle}>
+                  {listing.free_delivery_type === "download"
+                    ? "Free download"
+                    : "Free — hosted elsewhere"}
+                </div>
 
-            <p className={classes.ctaText}>{fulfilmentCopy.text}</p>
+                <p className={classes.ctaText}>
+                  {listing.free_delivery_type === "download"
+                    ? "No payment, no sign-in required — this file is uploaded and hosted here."
+                    : "This opens on the creator's own site or store, outside CreatorHub."}
+                </p>
 
-            {listing.fulfilment_mode === "request" ? (
-              activeRequestQuery.isLoading ? (
-                <span className={classes.ctaLink}>Checking request…</span>
-              ) : activeListingRequest ? (
-                <Link className={classes.ctaLink} to={`/requests/${activeListingRequest.id}`}>
-                  View existing request
-                </Link>
-              ) : (
-                <Link className={classes.ctaLink} to={`/listing/${listing.id}/request`}>
-                  Submit request
-                </Link>
-              )
+                <a
+                  className={classes.ctaLink}
+                  href={freeListingHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  {...(listing.free_delivery_type === "download" && listing.free_file_name
+                    ? { download: listing.free_file_name }
+                    : {})}
+                >
+                  {listing.free_delivery_type === "download"
+                    ? "Download for free"
+                    : "Get it free ↗"}
+                </a>
+              </>
             ) : (
-              <Link className={classes.ctaLink} to="#">
-                {fulfilmentCopy.primaryLabel}
-              </Link>
+              <>
+                <div className={classes.ctaTitle}>{fulfilmentCopy.title}</div>
+
+                <p className={classes.ctaText}>{fulfilmentCopy.text}</p>
+
+                {listing.fulfilment_mode === "request" ? (
+                  activeRequestQuery.isLoading ? (
+                    <span className={classes.ctaLink}>Checking request…</span>
+                  ) : activeListingRequest ? (
+                    <Link className={classes.ctaLink} to={`/requests/${activeListingRequest.id}`}>
+                      View existing request
+                    </Link>
+                  ) : (
+                    <Link className={classes.ctaLink} to={`/listing/${listing.id}/request`}>
+                      Submit request
+                    </Link>
+                  )
+                ) : (
+                  <Link className={classes.ctaLink} to="#">
+                    {fulfilmentCopy.primaryLabel}
+                  </Link>
+                )}
+              </>
             )}
           </div>
 

@@ -57,6 +57,50 @@ const Legal = () => {
               Rules and obligations for approved creators and applicants.
             </div>
           </Link>
+
+          <Link className={classes.linkCard} to="/policies/refunds">
+            <div className={classes.linkTitle}>
+              Refund, Cancellation and Dispute Policy
+            </div>
+            <div className={classes.linkText}>
+              Cancellations, partial refunds, revisions and how disputes are
+              handled.
+            </div>
+          </Link>
+
+          <Link className={classes.linkCard} to="/policies/fees">
+            <div className={classes.linkTitle}>
+              Fee Schedule and Payment Terms
+            </div>
+            <div className={classes.linkText}>
+              What buyers pay, what creators receive, and how fees are
+              calculated.
+            </div>
+          </Link>
+
+          <Link className={classes.linkCard} to="/policies/copyright">
+            <div className={classes.linkTitle}>
+              Copyright Infringement and DMCA Policy
+            </div>
+            <div className={classes.linkText}>
+              How to report infringing material and how CreatorHub responds.
+            </div>
+          </Link>
+
+          <Link className={classes.linkCard} to="/policies/cookies">
+            <div className={classes.linkTitle}>Cookie and Tracking Policy</div>
+            <div className={classes.linkText}>
+              Browser storage, optional tracking, and how to change your
+              choices.
+            </div>
+          </Link>
+
+          <Link className={classes.linkCard} to="/policies/community">
+            <div className={classes.linkTitle}>Community Guidelines</div>
+            <div className={classes.linkText}>
+              Plain-language standards for listings, messages, and content.
+            </div>
+          </Link>
         </div>
       </div>
     </div>

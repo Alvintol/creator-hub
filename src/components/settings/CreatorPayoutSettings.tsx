@@ -7,6 +7,22 @@ import {
   type StripeConnectInstance,
 } from "@stripe/connect-js";
 import { useCallback, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  creatorActivationPolicyTypes,
+  currentPolicyVersions,
+  getLatestAcceptedAt,
+  getMissingPolicyTypes,
+  stripeConnectedAccountAgreementUrl,
+  stripeServicesAgreementUrl,
+  toCurrentPolicyAcceptances,
+} from "../../domain/legal/policyAcceptance";
+import {
+  logPolicyAcceptanceFailure,
+  usePolicyAcceptances,
+  useRecordPolicyAcceptances,
+} from "../../hooks/legal/usePolicyAcceptances";
+import PolicyAcceptanceCheckbox from "../legal/PolicyAcceptanceCheckbox";
 import {
   createStripeConnectAccountSession,
 } from "../../hooks/payments/useStripeConnectAccountSession";
@@ -38,12 +54,21 @@ const classes = {
   loadingShell: "space-y-3 rounded-2xl border border-dashed border-zinc-300 p-4",
   loadingText: "text-sm text-zinc-600",
   pulseRow: "h-9 animate-pulse rounded-xl bg-zinc-200",
+  acceptedText: "text-sm text-zinc-600",
+  policyLink: "font-semibold underline underline-offset-2",
 } as const;
 
 const getErrorMessage = (error: unknown): string =>
   error && typeof error === "object" && "message" in error
     ? String((error as { message: unknown }).message)
     : "Something went wrong.";
+
+const formatAcceptedDate = (value: string): string =>
+  new Date(value).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
 // Stripe Connect onboarding, rendered inside the settings Payouts section.
 const CreatorPayoutSettings = ({ isCreatorApproved }: CreatorPayoutSettingsProps) => {
@@ -64,6 +89,26 @@ const CreatorPayoutSettings = ({ isCreatorApproved }: CreatorPayoutSettingsProps
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [creatorTermsAgreed, setCreatorTermsAgreed] = useState(false);
+
+  // Creator Terms and the Stripe agreements must be accepted, at the current
+  // version, before Stripe onboarding can start or be resumed.
+  const creatorTermsQuery = usePolicyAcceptances({
+    policyTypes: creatorActivationPolicyTypes,
+    enabled: isCreatorApproved,
+  });
+  const recordAcceptances = useRecordPolicyAcceptances();
+
+  const currentCreatorTermsAcceptances = (creatorTermsQuery.data ?? []).filter(
+    (acceptance) =>
+      acceptance.policy_version === currentPolicyVersions.creator_terms,
+  );
+  const hasAcceptedCreatorTerms =
+    Boolean(creatorTermsQuery.data) &&
+    getMissingPolicyTypes(creatorActivationPolicyTypes, creatorTermsQuery.data ?? [])
+      .length === 0;
+  const creatorTermsAcceptedAt = getLatestAcceptedAt(currentCreatorTermsAcceptances);
+  const canStartOnboarding = hasAcceptedCreatorTerms || creatorTermsAgreed;
 
   const startEmbeddedOnboarding = useCallback(async () => {
     if (!token) {
@@ -71,10 +116,32 @@ const CreatorPayoutSettings = ({ isCreatorApproved }: CreatorPayoutSettingsProps
       return;
     }
 
+    if (!hasAcceptedCreatorTerms && !creatorTermsAgreed) {
+      setErrMsg("Accept the Creator Terms and Stripe agreements to start Stripe setup.");
+      return;
+    }
+
     setIsStarting(true);
     setErrMsg(null);
     setSuccessMsg(null);
     setConnectInstance(null);
+
+    // Stripe requires a record of this acceptance, so onboarding does not
+    // start unless it was saved.
+    if (!hasAcceptedCreatorTerms) {
+      try {
+        await recordAcceptances.mutateAsync({
+          policies: toCurrentPolicyAcceptances(creatorActivationPolicyTypes),
+        });
+      } catch (error) {
+        logPolicyAcceptanceFailure("creator terms acceptance", error);
+        setErrMsg(
+          "We couldn’t record your acceptance of the Creator Terms, so Stripe setup hasn’t started. Please try again.",
+        );
+        setIsStarting(false);
+        return;
+      }
+    }
 
     try {
       const publishableKey = getStripePublishableKey();
@@ -95,7 +162,14 @@ const CreatorPayoutSettings = ({ isCreatorApproved }: CreatorPayoutSettingsProps
     } finally {
       setIsStarting(false);
     }
-  }, [country, defaultCurrency, token]);
+  }, [
+    country,
+    creatorTermsAgreed,
+    defaultCurrency,
+    hasAcceptedCreatorTerms,
+    recordAcceptances,
+    token,
+  ]);
 
   const refreshStatus = useCallback(async () => {
     setErrMsg(null);
@@ -129,6 +203,47 @@ const CreatorPayoutSettings = ({ isCreatorApproved }: CreatorPayoutSettingsProps
         <div className={classes.warning}>
           Finish Stripe setup before publishing active listings or receiving buyer payments.
         </div>
+      )}
+
+      {hasAcceptedCreatorTerms && creatorTermsAcceptedAt ? (
+        <p className={classes.acceptedText}>
+          You accepted the{" "}
+          <Link className={classes.policyLink} to="/terms/creator" target="_blank" rel="noopener">
+            Creator Terms
+          </Link>{" "}
+          and Stripe agreements on {formatAcceptedDate(creatorTermsAcceptedAt)}.
+        </p>
+      ) : (
+        <PolicyAcceptanceCheckbox
+          id="creator-terms-acceptance"
+          checked={creatorTermsAgreed}
+          onChange={setCreatorTermsAgreed}
+          disabled={isStarting || creatorTermsQuery.isLoading}
+        >
+          I accept the CreatorHub{" "}
+          <Link className={classes.policyLink} to="/terms/creator" target="_blank" rel="noopener">
+            Creator Terms
+          </Link>{" "}
+          and the{" "}
+          <a
+            className={classes.policyLink}
+            href={stripeConnectedAccountAgreementUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Stripe Connected Account Agreement
+          </a>
+          , including its incorporated{" "}
+          <a
+            className={classes.policyLink}
+            href={stripeServicesAgreementUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Stripe Services Agreement
+          </a>
+          .
+        </PolicyAcceptanceCheckbox>
       )}
 
       <div className={classes.form}>
@@ -167,7 +282,7 @@ const CreatorPayoutSettings = ({ isCreatorApproved }: CreatorPayoutSettingsProps
           <button
             className={classes.button}
             type="button"
-            disabled={isStarting}
+            disabled={isStarting || !canStartOnboarding || creatorTermsQuery.isLoading}
             onClick={() => void startEmbeddedOnboarding()}
           >
             {isStarting

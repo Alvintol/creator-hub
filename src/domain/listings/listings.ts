@@ -47,6 +47,79 @@ export const getFulfilmentModeCopy = (
       primaryLabel: "Request this listing soon",
     };
 
+// Free listings skip Stripe entirely: a creator gives a listing away either
+// as a direct file download (uploaded to the free-assets storage bucket) or
+// as a redirect to something hosted elsewhere (itch.io, Steam, GitHub, a
+// playable build). Exactly one of the two must be set when isFree is true.
+export type FreeDeliveryType = "download" | "external_link";
+
+export const freeDeliveryTypeOptions: Array<{
+  value: FreeDeliveryType;
+  label: string;
+}> = [
+    { value: "download", label: "Direct download (upload a file)" },
+    { value: "external_link", label: "External link (itch.io, Steam, GitHub, etc.)" },
+  ];
+
+// Only digital listings can be marked free in this first pass — commissions
+// and services always involve custom work for a specific buyer.
+export const allowsFreeListing = (
+  offeringType: ListingOfferingType
+): boolean => offeringType === "digital";
+
+export const isValidFreeExternalUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
+
+// Keep uploads well below typical free-tier Supabase Storage request limits.
+export const FREE_ASSET_MAX_BYTES = 200 * 1024 * 1024; // 200MB
+
+export type FreeListingInput = {
+  isFree: boolean;
+  deliveryType: FreeDeliveryType | null;
+  externalUrl: string;
+  hasFile: boolean;
+  fileSizeBytes?: number | null;
+};
+
+// Validates the free-listing fields of the create-listing form. Returns
+// null when valid, or a single user-facing error message otherwise.
+export const validateFreeListingInput = (
+  input: FreeListingInput
+): string | null => {
+  if (!input.isFree) return null;
+
+  if (!input.deliveryType) {
+    return "Choose how buyers will get this free listing.";
+  }
+
+  if (input.deliveryType === "external_link") {
+    if (!isValidFreeExternalUrl(input.externalUrl.trim())) {
+      return "Enter a valid link starting with http:// or https://.";
+    }
+  }
+
+  if (input.deliveryType === "download") {
+    if (!input.hasFile) {
+      return "Upload a file for buyers to download.";
+    }
+
+    if (
+      typeof input.fileSizeBytes === "number" &&
+      input.fileSizeBytes > FREE_ASSET_MAX_BYTES
+    ) {
+      return "That file is larger than the 200MB limit for free downloads.";
+    }
+  }
+
+  return null;
+};
+
 export const isAdminHiddenListing = (listing: {
   admin_hidden_at?: string | null;
 }): boolean => Boolean(listing.admin_hidden_at);

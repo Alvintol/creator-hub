@@ -55,7 +55,7 @@ export const canOpenListingRequestPaymentCheckout = (
   payment.status === "failed";
 
 export const getListingRequestPaymentTitle = (
-  payment: ListingRequestPaymentRow,
+  payment: Pick<ListingRequestPaymentRow, "metadata" | "payment_type">,
 ): string => {
   const metadataTitle = payment.metadata?.payment_title;
 
@@ -63,3 +63,11 @@ export const getListingRequestPaymentTitle = (
     ? metadataTitle.trim()
     : getListingRequestPaymentTypeLabel(payment.payment_type);
 };
+
+// Payment amounts are stored in minor units. This assumes a two-decimal
+// currency, which holds for the CAD and USD amounts supported today.
+export const formatPaymentCents = (cents: number, currency: string): string =>
+  new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+  }).format(cents / 100);

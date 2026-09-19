@@ -1,5 +1,11 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import PolicyAcceptanceCheckbox from "../components/legal/PolicyAcceptanceCheckbox";
+import {
+  signupPolicyTypes,
+  toCurrentPolicyAcceptances,
+} from "../domain/legal/policyAcceptance";
+import { savePendingPolicyAcceptance } from "../lib/legal/pendingPolicyAcceptance";
 import { supabase } from "../lib/supabaseClient";
 import { useAuth } from "../providers/AuthProvider";
 
@@ -57,6 +63,8 @@ const classes = {
   msgOk: "text-sm font-semibold text-emerald-700",
   msgErr: "text-sm font-semibold text-rose-700",
   msgErrTop: "mt-3 text-sm font-semibold text-rose-700",
+
+  policyLink: "font-semibold underline underline-offset-2",
 } as const;
 
 // Pulls a readable message from an unknown thrown value
@@ -64,6 +72,10 @@ const getErrorMessage = (error: unknown, fallback: string): string =>
   error && typeof error === "object" && "message" in error
     ? String((error as { message: unknown }).message)
     : fallback;
+
+// Asked before every sign-in method; there is no separate sign-up step.
+const POLICY_REQUIRED_MESSAGE =
+  "Please accept the Terms of Service and Privacy Policy to continue.";
 
 // Standard post-auth redirect back into the app
 const getRedirectTo = (): string => `${window.location.origin}/`;
@@ -149,14 +161,27 @@ const SignIn = () => {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [agreed, setAgreed] = useState(false);
+
+  // Sign-in redirects away, so the acceptance is parked and recorded by
+  // PolicyAcceptanceGate once the user is authenticated.
+  const parkPolicyAcceptance = () => {
+    savePendingPolicyAcceptance(toCurrentPolicyAcceptances(signupPolicyTypes));
+  };
 
   // Starts OAuth sign-in with the selected provider
   const onOAuthSignIn = async (provider: "twitch" | "google") => {
     setErr(null);
     setSent(false);
 
+    if (!agreed) {
+      setErr(POLICY_REQUIRED_MESSAGE);
+      return;
+    }
+
     try {
       setBusy(true);
+      parkPolicyAcceptance();
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -190,8 +215,14 @@ const SignIn = () => {
       return;
     }
 
+    if (!agreed) {
+      setErr(POLICY_REQUIRED_MESSAGE);
+      return;
+    }
+
     try {
       setBusy(true);
+      parkPolicyAcceptance();
 
       const { error } = await supabase.auth.signInWithOtp({
         email: value,
@@ -274,19 +305,36 @@ const SignIn = () => {
         </p>
 
         <div className={classes.authStack}>
+          <PolicyAcceptanceCheckbox
+            id="signin-policy-acceptance"
+            checked={agreed}
+            onChange={setAgreed}
+            disabled={busy}
+          >
+            I agree to the{" "}
+            <Link className={classes.policyLink} to="/terms" target="_blank" rel="noopener">
+              Terms of Service
+            </Link>{" "}
+            and the{" "}
+            <Link className={classes.policyLink} to="/privacy" target="_blank" rel="noopener">
+              Privacy Policy
+            </Link>
+            .
+          </PolicyAcceptanceCheckbox>
+
           <div className={classes.providerStack}>
             <SocialButton
               provider="twitch"
               label="Sign in with Twitch"
               onClick={() => void onOAuthSignIn("twitch")}
-              disabled={busy}
+              disabled={busy || !agreed}
             />
 
             <SocialButton
               provider="google"
               label="Sign in with Google"
               onClick={() => void onOAuthSignIn("google")}
-              disabled={busy}
+              disabled={busy || !agreed}
             />
           </div>
 
@@ -311,7 +359,7 @@ const SignIn = () => {
             </div>
 
             <div className={classes.row}>
-              <button className={classes.btn} type="submit" disabled={busy}>
+              <button className={classes.btn} type="submit" disabled={busy || !agreed}>
                 {busy ? "Working…" : "Send sign-in link"}
               </button>
 

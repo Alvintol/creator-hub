@@ -2,7 +2,17 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../providers/AuthProvider";
-import { getAllowedFulfilmentModes, ListingFulfilmentMode, listingFulfilmentModeOptions, normaliseFulfilmentMode } from '../../domain/listings/listings';
+import {
+  allowsFreeListing,
+  FREE_ASSET_MAX_BYTES,
+  freeDeliveryTypeOptions,
+  FreeDeliveryType,
+  getAllowedFulfilmentModes,
+  ListingFulfilmentMode,
+  listingFulfilmentModeOptions,
+  normaliseFulfilmentMode,
+  validateFreeListingInput,
+} from '../../domain/listings/listings';
 
 type ListingOfferingType = "digital" | "commission" | "service";
 type ListingPriceType = "fixed" | "starting_at" | "range";
@@ -21,10 +31,14 @@ type FormState = {
   deliverablesText: string;
   tagsText: string;
   previewUrl: string;
+  isFree: boolean;
+  freeDeliveryType: FreeDeliveryType | "";
+  freeExternalUrl: string;
 };
 
 type FormErrors = Partial<Record<keyof FormState, string>> & {
   submit?: string;
+  free?: string;
 };
 
 const classes = {
@@ -108,7 +122,14 @@ const initialState: FormState = {
   deliverablesText: "",
   tagsText: "",
   previewUrl: "",
+  isFree: false,
+  freeDeliveryType: "",
+  freeExternalUrl: "",
 };
+
+// Keeps the free-listing file input's error text short and readable
+const formatFileSize = (bytes: number): string =>
+  `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 
 // Splits newline-separated deliverables into a clean array
 const parseDeliverables = (value: string) =>
@@ -143,8 +164,11 @@ const CreateListing = () => {
   const [form, setForm] = useState<FormState>(initialState);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [freeFile, setFreeFile] = useState<File | null>(null);
 
   const isRangePrice = form.priceType === "range";
+  const canOfferFree = allowsFreeListing(form.offeringType);
+  const isFreeListing = canOfferFree && form.isFree;
 
   const deliverablePreview = useMemo(
     () => parseDeliverables(form.deliverablesText),
@@ -163,12 +187,28 @@ const CreateListing = () => {
       ...current,
       offeringType: value,
       fulfilmentMode: normaliseFulfilmentMode(value, current.fulfilmentMode),
+      // Free listings are digital-only: switching away clears it rather
+      // than leaving a hidden, invalid combination in state.
+      isFree: allowsFreeListing(value) ? current.isFree : false,
     }));
 
     setErrors((current) => ({
       ...current,
       offeringType: undefined,
       fulfilmentMode: undefined,
+      submit: undefined,
+    }));
+  };
+
+  const setIsFree = (value: boolean) => {
+    setForm((current) => ({ ...current, isFree: value }));
+    if (!value) setFreeFile(null);
+
+    setErrors((current) => ({
+      ...current,
+      free: undefined,
+      priceMin: undefined,
+      priceMax: undefined,
       submit: undefined,
     }));
   };
@@ -210,18 +250,30 @@ const CreateListing = () => {
       nextErrors.category = "Category is required.";
     }
 
-    if (priceMin === null || priceMin < 0) {
-      nextErrors.priceMin = "Price min must be 0 or greater.";
-    }
+    if (isFreeListing) {
+      const freeError = validateFreeListingInput({
+        isFree: true,
+        deliveryType: form.freeDeliveryType || null,
+        externalUrl: form.freeExternalUrl,
+        hasFile: Boolean(freeFile),
+        fileSizeBytes: freeFile?.size ?? null,
+      });
 
-    if (form.priceType === "range") {
-      if (rawPriceMax === null) {
-        nextErrors.priceMax = "Price max is required for a range listing.";
-      } else if (priceMin !== null && rawPriceMax < priceMin) {
+      if (freeError) nextErrors.free = freeError;
+    } else {
+      if (priceMin === null || priceMin < 0) {
+        nextErrors.priceMin = "Price min must be 0 or greater.";
+      }
+
+      if (form.priceType === "range") {
+        if (rawPriceMax === null) {
+          nextErrors.priceMax = "Price max is required for a range listing.";
+        } else if (priceMin !== null && rawPriceMax < priceMin) {
+          nextErrors.priceMax = "Price max must be greater than or equal to price min.";
+        }
+      } else if (rawPriceMax !== null && priceMin !== null && rawPriceMax < priceMin) {
         nextErrors.priceMax = "Price max must be greater than or equal to price min.";
       }
-    } else if (rawPriceMax !== null && priceMin !== null && rawPriceMax < priceMin) {
-      nextErrors.priceMax = "Price max must be greater than or equal to price min.";
     }
 
     if (
@@ -252,7 +304,8 @@ const CreateListing = () => {
     event.preventDefault();
 
     const { isValid, priceMin, rawPriceMax } = validate();
-    if (!isValid || !user?.id || priceMin === null) return;
+    if (!isValid || !user?.id) return;
+    if (!isFreeListing && priceMin === null) return;
 
     setIsSaving(true);
 
@@ -264,6 +317,52 @@ const CreateListing = () => {
             ? null
             : rawPriceMax;
 
+      // Free listings skip pricing entirely and carry their own delivery
+      // fields instead: either an uploaded file, or an external link.
+      let freeFields: {
+        is_free: boolean;
+        free_delivery_type: FreeDeliveryType | null;
+        free_external_url: string | null;
+        free_file_path: string | null;
+        free_file_name: string | null;
+        free_file_size_bytes: number | null;
+      } = {
+        is_free: false,
+        free_delivery_type: null,
+        free_external_url: null,
+        free_file_path: null,
+        free_file_name: null,
+        free_file_size_bytes: null,
+      };
+
+      if (isFreeListing && form.freeDeliveryType === "download" && freeFile) {
+        const filePath = `${user.id}/${crypto.randomUUID()}-${freeFile.name}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("free-assets")
+          .upload(filePath, freeFile);
+
+        if (uploadError) throw uploadError;
+
+        freeFields = {
+          is_free: true,
+          free_delivery_type: "download",
+          free_external_url: null,
+          free_file_path: filePath,
+          free_file_name: freeFile.name,
+          free_file_size_bytes: freeFile.size,
+        };
+      } else if (isFreeListing && form.freeDeliveryType === "external_link") {
+        freeFields = {
+          is_free: true,
+          free_delivery_type: "external_link",
+          free_external_url: form.freeExternalUrl.trim(),
+          free_file_path: null,
+          free_file_name: null,
+          free_file_size_bytes: null,
+        };
+      }
+
       const { error } = await supabase.from("listings").insert({
         user_id: user.id,
         title: form.title.trim(),
@@ -271,9 +370,11 @@ const CreateListing = () => {
         offering_type: form.offeringType,
         category: form.category.trim(),
         video_subtype: form.videoSubtype || null,
-        price_type: form.priceType,
-        price_min: priceMin,
-        price_max: nextPriceMax,
+        // Free listings always carry a "fixed $0" price so the not-null
+        // price columns stay satisfied without a schema change.
+        price_type: isFreeListing ? "fixed" : form.priceType,
+        price_min: isFreeListing ? 0 : priceMin,
+        price_max: isFreeListing ? 0 : nextPriceMax,
         deliverables: parseDeliverables(form.deliverablesText),
         tags: parseTags(form.tagsText),
         preview_url: form.previewUrl.trim() || null,
@@ -283,6 +384,7 @@ const CreateListing = () => {
           form.offeringType,
           form.fulfilmentMode
         ),
+        ...freeFields,
       });
 
       if (error) {
@@ -479,9 +581,120 @@ const CreateListing = () => {
                 <div className={classes.error}>{errors.videoSubtype}</div>
               )}
             </div>
+
+            {canOfferFree && (
+              <div className={`${classes.field} ${classes.full}`}>
+                <label className={classes.label} htmlFor="isFree">
+                  <input
+                    id="isFree"
+                    type="checkbox"
+                    checked={form.isFree}
+                    onChange={(event) => setIsFree(event.target.checked)}
+                  />{" "}
+                  Give this away for free
+                </label>
+
+                <div className={classes.hint}>
+                  Free listings skip pricing and Stripe entirely. Buyers get it
+                  through a direct download or a link you provide, no payment step.
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
+        {isFreeListing ? (
+          <div className={classes.section}>
+            <div>
+              <h2 className={classes.sectionTitle}>Free delivery</h2>
+              <p className={classes.sectionText}>
+                Choose how buyers get this listing. Downloadable assets are
+                uploaded and hosted here; games or anything not downloadable
+                should link out to wherever it&apos;s hosted.
+              </p>
+            </div>
+
+            <div className={classes.grid}>
+              <div className={classes.field}>
+                <label className={classes.label} htmlFor="freeDeliveryType">
+                  Delivery method
+                </label>
+
+                <select
+                  id="freeDeliveryType"
+                  className={classes.select}
+                  value={form.freeDeliveryType}
+                  onChange={(event) =>
+                    setField(
+                      "freeDeliveryType",
+                      event.target.value as FreeDeliveryType | ""
+                    )
+                  }
+                >
+                  <option value="">Choose one…</option>
+                  {freeDeliveryTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {form.freeDeliveryType === "download" && (
+                <div className={classes.field}>
+                  <label className={classes.label} htmlFor="freeFile">
+                    File
+                  </label>
+
+                  <input
+                    id="freeFile"
+                    className={classes.input}
+                    type="file"
+                    onChange={(event) =>
+                      setFreeFile(event.target.files?.[0] ?? null)
+                    }
+                  />
+
+                  <div className={classes.hint}>
+                    {freeFile
+                      ? `${freeFile.name} (${formatFileSize(freeFile.size)})`
+                      : `Up to ${formatFileSize(FREE_ASSET_MAX_BYTES)} per file.`}
+                  </div>
+                </div>
+              )}
+
+              {form.freeDeliveryType === "external_link" && (
+                <div className={classes.field}>
+                  <label className={classes.label} htmlFor="freeExternalUrl">
+                    Link
+                  </label>
+
+                  <input
+                    id="freeExternalUrl"
+                    className={classes.input}
+                    type="text"
+                    value={form.freeExternalUrl}
+                    onChange={(event) =>
+                      setField("freeExternalUrl", event.target.value)
+                    }
+                    placeholder="https://itch.io/my-game"
+                  />
+
+                  <div className={classes.hint}>
+                    Buyers are sent here directly — itch.io, Steam, GitHub, a
+                    playable build, wherever it lives.
+                  </div>
+                </div>
+              )}
+
+              {errors.free && (
+                <div className={`${classes.error} ${classes.full}`}>
+                  {errors.free}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
         <div className={classes.section}>
           <div>
             <h2 className={classes.sectionTitle}>Pricing</h2>
@@ -565,6 +778,7 @@ const CreateListing = () => {
             )}
           </div>
         </div>
+        )}
 
         <div className={classes.section}>
           <div>

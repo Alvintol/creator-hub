@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 import ListingCard from "../components/listings/ListingCard";
 import { StaggerGroup } from "../lib/motion";
+import { CATEGORIES } from "../domain/catalog";
 import { normalizeTwitchLogin } from "../domain/twitch";
 import { useTwitchStreams } from "../hooks/useTwitchStreams";
 import { useMarketListings, type MarketListingItem } from "../hooks/listings/useMarketListings";
@@ -24,22 +25,20 @@ const classes = {
   filtersGrid: "grid gap-3 md:grid-cols-3",
   input: "searchInput md:col-span-1",
   select: "searchInput",
+  freeToggleRow: "flex items-center gap-2",
+  freeToggle: "navChip whitespace-nowrap",
+  freeToggleActive: "navChip navChipActive whitespace-nowrap",
 
   grid: "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
   loadingText: "text-sm text-zinc-600",
   emptyText: "text-sm text-zinc-600",
 } as const;
 
-// Temporary category list until categories move to db/config
+// Sourced from src/domain/catalog.ts so Market and the rest of the app
+// (creator specialty labels, etc.) can never drift out of sync again.
 const categoryOptions = [
   { key: "all", label: "All categories" },
-  { key: "emotes", label: "Emotes" },
-  { key: "overlays", label: "Overlays" },
-  { key: "pngtuber-models", label: "PNG-tuber models" },
-  { key: "vtuber-models", label: "VTuber models" },
-  { key: "vtuber-rigging", label: "VTuber rigging" },
-  { key: "video-editing", label: "Video editing" },
-  { key: "audio-tech-help", label: "Audio tech help" },
+  ...CATEGORIES,
 ] as const;
 
 // Builds a search string for listing filtering
@@ -83,7 +82,13 @@ const parseFromUrl = (search: string): Partial<HubFilters> => {
   };
 };
 
-const Market = () => {
+type MarketProps = {
+  // Renders the dedicated /free page: pre-filters to free listings, hides
+  // the redundant type filter, and swaps the free toggle for a fixed label.
+  forceFree?: boolean;
+};
+
+const Market = ({ forceFree = false }: MarketProps) => {
   const { filters } = useHubState();
   const { setFilters } = useHubActions();
   const { search } = useLocation();
@@ -137,7 +142,12 @@ const Market = () => {
     return items.filter((item) => {
       const { listing } = item;
 
+      if ((forceFree || filters.freeOnly) && !listing.is_free) {
+        return false;
+      }
+
       if (
+        !forceFree &&
         filters.type !== "all" &&
         listing.offering_type !== filters.type
       ) {
@@ -162,13 +172,17 @@ const Market = () => {
 
       return getListingHaystack(item).includes(searchValue);
     });
-  }, [filters, items]);
+  }, [filters, items, forceFree]);
 
   return (
     <div className={classes.page}>
       <div className={classes.headerWrap}>
-        <h1 className={classes.h1}>Market</h1>
-        <p className={classes.subtitle}>Digital packs + commission offerings.</p>
+        <h1 className={classes.h1}>{forceFree ? "Free" : "Market"}</h1>
+        <p className={classes.subtitle}>
+          {forceFree
+            ? "Free assets and games creators are giving away to try out."
+            : "Digital packs + commission offerings."}
+        </p>
       </div>
 
       <div className={classes.filtersGrid}>
@@ -179,18 +193,20 @@ const Market = () => {
           placeholder="Search listings..."
         />
 
-        <select
-          className={classes.select}
-          value={filters.type}
-          onChange={(event) =>
-            setFilters({ type: event.currentTarget.value as OfferingType })
-          }
-        >
-          <option value="all">All types</option>
-          <option value="digital">Digital</option>
-          <option value="commission">Commission</option>
-          <option value="service">Service</option>
-        </select>
+        {!forceFree && (
+          <select
+            className={classes.select}
+            value={filters.type}
+            onChange={(event) =>
+              setFilters({ type: event.currentTarget.value as OfferingType })
+            }
+          >
+            <option value="all">All types</option>
+            <option value="digital">Digital</option>
+            <option value="commission">Commission</option>
+            <option value="service">Service</option>
+          </select>
+        )}
 
         <select
           className={classes.select}
@@ -206,6 +222,21 @@ const Market = () => {
           ))}
         </select>
       </div>
+
+      {!forceFree && (
+        <div className={classes.freeToggleRow}>
+          <button
+            type="button"
+            className={
+              filters.freeOnly ? classes.freeToggleActive : classes.freeToggle
+            }
+            aria-pressed={filters.freeOnly}
+            onClick={() => setFilters({ freeOnly: !filters.freeOnly })}
+          >
+            Free only
+          </button>
+        </div>
+      )}
 
       {isLoading && <div className={classes.loadingText}>Loading…</div>}
 
@@ -249,6 +280,7 @@ const Market = () => {
                 price_min: listing.price_min,
                 price_max: listing.price_max,
                 preview_url: listing.preview_url,
+                is_free: listing.is_free,
               }}
               creator={{
                 name: creator?.display_name ?? creator?.handle ?? "Unknown creator",
