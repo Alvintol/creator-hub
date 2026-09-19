@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useCookiePreferences } from "../../providers/CookiePreferencesProvider";
 
 const classes = {
   footer: "mt-16 border-t border-[var(--hairline)] bg-[rgb(var(--surface)/0.55)]",
@@ -13,6 +14,7 @@ const classes = {
   columnTitle: "text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500",
   nav: "flex flex-col gap-2 text-sm",
   link: "text-zinc-600 transition hover:text-[rgb(var(--accent-text))]",
+  linkButton: "text-left text-zinc-600 transition hover:text-[rgb(var(--accent-text))]",
   bottom:
     "container mx-auto flex flex-col gap-2 border-t border-[var(--hairline)] px-4 py-5 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between sm:px-6",
   credit: "text-zinc-500",
@@ -21,6 +23,7 @@ const classes = {
 
 const Footer = () => {
   const year = new Date().getFullYear();
+  const { openSettings } = useCookiePreferences();
 
   return (
     <footer className={classes.footer}>
@@ -68,6 +71,10 @@ const Footer = () => {
             <Link className={classes.link} to="/terms/creator">
               Creator Terms
             </Link>
+
+            <button className={classes.linkButton} type="button" onClick={openSettings}>
+              Cookie settings
+            </button>
           </nav>
         </div>
       </div>

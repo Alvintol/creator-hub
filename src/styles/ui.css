@@ -398,7 +398,7 @@
     @apply container mx-auto h-[30px] px-4 sm:px-6;
   }
   .categoryRow {
-    @apply flex items-center gap-1 overflow-x-auto;
+    @apply flex items-center gap-0.5 overflow-x-auto scroll-smooth sm:gap-1;
     overflow-y: visible;
     scrollbar-width: none;
   }
@@ -410,8 +410,11 @@
     color: rgb(var(--muted));
   }
 
+  /* Chip text/padding steps up at each breakpoint so the full category set
+     (12 categories + All + Free) fits more of the rail before scrolling is
+     needed, while staying legible at the smallest sizes. */
   .navChip {
-    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition duration-200;
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium transition duration-200 sm:px-2.5 sm:text-xs;
     color: rgb(var(--ink) / 0.72);
     border: 1px solid transparent;
     position: relative;
@@ -424,6 +427,23 @@
     color: rgb(var(--accent-text));
     background: rgb(var(--accent-soft));
     border-color: rgb(var(--accent) / 0.2);
+  }
+
+  /* Compact scroll affordance for the category rail — shown only below md,
+     where the full chip set is most likely to overflow the banner. */
+  .categoryScrollBtn {
+    @apply h-6 w-6 shrink-0 items-center justify-center rounded-full text-sm font-semibold leading-none transition duration-150;
+    color: rgb(var(--ink) / 0.6);
+    border: 1px solid var(--hairline-strong);
+    background: rgb(var(--surface));
+  }
+  .categoryScrollBtn:hover {
+    color: rgb(var(--ink));
+    background: rgb(var(--accent-soft));
+  }
+  .categoryScrollBtn:focus-visible {
+    outline: none;
+    box-shadow: var(--ring);
   }
 
   .linkPill {

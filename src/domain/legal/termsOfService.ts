@@ -1,138 +1,101 @@
-export const termsVersion = "2026-04-16-v1";
+// REVIEW DRAFT: placeholders ([OPERATOR_LEGAL_NAME], [SUPPORT_EMAIL], etc.)
+// are intentionally left in place until the operating entity, brand and
+// domain are finalized. Safe to keep live pre-launch; must be resolved
+// before public launch.
+export const termsVersion = "2026-09-19-draft-2";
 
 export const termsSections = [
   {
-    title: "Overview",
-    body: [
-      "Welcome to CreatorHub. CreatorHub is an online marketplace and community platform for digital creator services and assets.",
-      "These Terms of Service govern your access to and use of the CreatorHub website, applications, marketplace features, messaging tools, creator application process, and related services.",
-      "By accessing or using CreatorHub, you agree to these Terms. If you do not agree, do not use the platform.",
-    ],
+    "title": "1. Overview and operator",
+    "body": [
+      "CreatorHub is an online marketplace and community for digital creator services and assets. It is operated by [OPERATOR_LEGAL_NAME], at [BUSINESS_POSTAL_ADDRESS]. General and legal enquiries: [SUPPORT_EMAIL]. Privacy enquiries: [PRIVACY_EMAIL].",
+      "These Terms govern accounts, creator applications, listings, messaging, project agreements, payments and related services. Before creating an account or accepting a paid agreement, you must be shown these Terms and affirmatively accept the terms applicable to that activity. If you do not agree, do not create an account or enter a transaction."
+    ]
   },
   {
-    title: "Eligibility and accounts",
-    body: [
-      "You must be legally able to enter into a binding agreement to use CreatorHub. You are responsible for maintaining accurate account information and for activity that occurs under your account.",
-      "You may not impersonate another person, misrepresent your identity, or create an account for unlawful, deceptive, or abusive purposes.",
-      "To apply for creator access, publish listings, accept commissions, receive payouts, or otherwise use CreatorHub as a selling creator, you must be at least 18 years old and legally capable of entering a binding agreement.",
-      "If the age of majority or legal contracting age in your jurisdiction is higher than 18, you must meet that higher requirement.",
-    ],
+    "title": "2. Policies and order of priority",
+    "body": [
+      "The Fee Schedule and Payment Terms, Refund, Cancellation and Dispute Policy, Copyright Infringement and DMCA Policy, and Community Guidelines form part of these Terms. Creators must also accept the Creator Terms. The Privacy Policy and Cookie and Tracking Policy explain data practices and choices; accepting these Terms is not consent to optional tracking or unrelated marketing.",
+      "Mandatory law takes priority. The refund policy governs payment remedies, the fee schedule governs fees and the copyright policy governs its notice process. The Creator Terms govern additional creator obligations. A project agreement can specify scope, delivery, revisions and usage rights, but cannot impose hidden fees or reduce platform or mandatory protections. More generous buyer protections can be agreed. Stripe's own agreements govern its services and cannot be amended by a project agreement."
+    ]
   },
   {
-    title: "Platform role",
-    body: [
-      "CreatorHub provides a platform that allows users to apply for creator access, publish approved creator offerings, communicate about potential work, and manage related marketplace activity.",
-      "CreatorHub is not the creator, buyer, employer, agent, insurer, guarantor, or legal representative of users.",
-      "Unless explicitly stated otherwise, CreatorHub does not guarantee quality, legality, timing, safety, compatibility, or completion of transactions between users.",
-    ],
+    "title": "3. Eligibility and accounts",
+    "body": [
+      "Registered users must be at least 18 and meet any higher legal contracting age applicable to them. Creator applicants, sellers and payout recipients must satisfy the same requirement. You must have authority to bind any business you represent. Do not misstate your age, identity, authority or ownership of a linked account.",
+      "Keep your account information accurate and access secure. Notify support promptly of suspected compromise. You are responsible for your conduct and authorised account activity; these Terms do not make you automatically liable for every unauthorised act irrespective of applicable law or fault."
+    ]
   },
   {
-    title: "Creator access and approvals",
-    body: [
-      "Users may access CreatorHub without creator status. Creator access requires a completed creator application and manual approval.",
-      "CreatorHub may approve, reject, request changes, suspend, limit, pause, or revoke creator access in its discretion to protect platform trust, user safety, moderation capacity, and marketplace quality.",
-      "Linked third-party accounts such as Twitch or YouTube are trust signals only and do not guarantee approval.",
-    ],
+    "title": "4. Platform role and creator approval",
+    "body": [
+      "CreatorHub provides discovery, communication, project administration and payment-related tools. The identified creator supplies the commissioned work and is responsible for performing the project agreement. Creators are independent users, not CreatorHub employees. CreatorHub is responsible for its own services, representations and obligations; nothing here removes duties imposed on a marketplace by law.",
+      "Creator access requires a completed application and approval. We may request samples, review linked accounts, request changes or restrict creator access for reasonable safety, integrity, capacity or compliance reasons. A linked Twitch or YouTube account is not a guarantee of approval, quality or identity. We do not guarantee demand, earnings or the outcome of a commission."
+    ]
   },
   {
-    title: "Listings, creator responsibilities, and mature content",
-    body: [
-      "Approved creators are responsible for ensuring that listings, samples, pricing, turnaround, deliverables, portfolio examples, and communications are accurate and not misleading.",
-      "Creators may only offer work they are legally permitted to sell or license. Creators must not upload, advertise, or deliver stolen, infringing, plagiarised, deceptive, or unlawful content.",
-      "CreatorHub may permit some mature but non-explicit content, such as suggestive themes, limited gore, violent-adjacent themes, strong language, horror, and similar material, provided that it is properly labelled, not misleading, and not otherwise prohibited.",
-      "CreatorHub does not permit pornographic, sexually explicit, or sexual-gratification content, sexual services, exploitative sexual content, or listings primarily intended for explicit adult activity.",
-      "CreatorHub may require mature-content labelling, visibility limits, or account-level restrictions for content that is allowed but sensitive.",
-    ],
+    "title": "5. Listings and project agreements",
+    "body": [
+      "Listings and samples must accurately describe skills, ownership, price, deliverables, availability, revisions, licence and timing. Creators may offer only work they can lawfully supply. Both parties must record the accepted scope, payment schedule, essential deadlines and licence before payment; an accepted change order is required for paid changes.",
+      "Buyers must review the offer, provide necessary information and communicate respectfully. Creators must perform the accepted work and notify buyers of material delays. Neither party may use an uncertain estimate, an ambiguous message or a silence deadline to create an unauthorised charge."
+    ]
   },
   {
-    title: "Buyer responsibilities",
-    body: [
-      "Buyers are responsible for reviewing listing details carefully before placing an order or commissioning work, including scope, pricing, revisions, and any creator-specific requirements.",
-      "Buyers must communicate respectfully, provide reasonably accurate project details, and avoid abuse, fraud, chargeback misuse, harassment, and deceptive conduct.",
-    ],
+    "title": "6. Payments, pricing, refunds and disputes",
+    "body": [
+      "The Fee Schedule and Payment Terms states CreatorHub's buyer service fee and creator platform fee, each currently 5% of the base payment with the currency-specific minimums listed there. Fees apply per successful instalment. Creator tips are excluded from CreatorHub fees, and optional CreatorHub support is separate and voluntary. Taxes and all mandatory charges must be disclosed before payment.",
+      "Commission payments use Stripe Connect direct charges on the creator's connected account. CreatorHub's fees are collected through that arrangement. Stripe processes payments and applies its own conditions. CreatorHub does not provide escrow or guarantee that funds are held until completion.",
+      "The Refund, Cancellation and Dispute Policy governs cancellation, deposits, earned milestone value, revisions, unresponsive parties, refunds and escalation. Buyers can cancel before substantive work for a full refund; after work begins, unearned amounts remain refundable under that policy. Neither a “no refunds” listing nor conversation closure overrides it. Internal review does not remove a right to a lawful bank dispute, consumer remedy or court proceeding."
+    ]
   },
   {
-    title: "Payments, pricing, refunds, and disputes",
-    body: [
-      "CreatorHub may display pricing, order terms, and related fee information on listing, checkout, or policy pages.",
-      "Additional rules about orders, cancellations, refunds, revisions, disputes, and delivery may appear in separate policies or transaction-specific flows. Where those policies apply, they form part of these Terms.",
-    ],
+    "title": "7. Content, mature material and conduct",
+    "body": [
+      "Follow the Community Guidelines on every surface, including private messages and externally linked deliveries. Some mature, non-explicit material may be permitted with accurate labels, safe previews and working visibility controls. Pornography, sexual-gratification content, sexual services, exploitative or non-consensual sexual material, sexualised minors or minor-looking characters, and other prohibited content are not permitted. A mature label does not make prohibited material acceptable.",
+      "Do not infringe rights; harass, threaten, scam, spam or impersonate; disclose private information without authority; submit false applications or reviews; distribute malware; solicit unlawful conduct; evade moderation; or interfere with platform security or availability. Do not harvest user data, abuse automated access or reverse engineer systems except where authorised or protected by applicable law. Report security concerns responsibly without accessing unnecessary personal data."
+    ]
   },
   {
-    title: "Messaging and conduct",
-    body: [
-      "Users must not use CreatorHub to harass, scam, threaten, spam, impersonate, distribute malware, solicit illegal conduct, or pressure others into unsafe or deceptive off-platform behaviour.",
-      "CreatorHub may moderate, limit, or suspend messaging and other platform features to protect users and platform integrity.",
-    ],
+    "title": "8. Ownership and licences",
+    "body": [
+      "Users retain rights they own. Uploading content does not transfer copyright to CreatorHub. You give CreatorHub a non-exclusive, worldwide, royalty-free licence to store, reproduce, transmit, display and technically process your content only as reasonably needed to operate the features you use, deliver the service, protect users and resolve disputes. We may use service providers for these purposes under appropriate restrictions.",
+      "Public profiles, listings and portfolio previews can be displayed as part of discovery. Private messages and project deliverables are not licensed for public advertising merely because they were uploaded. We require separate permission to use private work in promotional material or for a separate AI-training purpose. The operating licence ends when content is deleted, except for reasonable backup expiry, legally required retention, unresolved disputes and copies already lawfully received by other users.",
+      "The creator-buyer agreement must state the intended use and whether it grants a licence or transfers specified rights. Unless it expressly states otherwise, the creator retains copyright; after payment for a delivered item, the buyer receives a non-exclusive, worldwide, continuing licence to use it for the purpose recorded in the agreement, including commercial use if that purpose includes it. Unstated exclusivity, standalone resale rights, source files and third-party rights are not implied. Any required signed assignment must be completed separately. Mandatory rights remain unaffected.",
+      "Rights in fully refunded work and separately retained paid work follow the refund policy. A payment alone does not cure infringement or authorise the creator to publish confidential client work."
+    ]
   },
   {
-    title: "Intellectual property",
-    body: [
-      "Users retain ownership of content they own, subject to any licences granted through marketplace transactions, listing publication, portfolio display, or platform operation.",
-      "By uploading content to CreatorHub, you represent that you have the rights needed to upload, display, and use that content on the platform.",
-      "You grant CreatorHub a non-exclusive, worldwide, royalty-free licence to host, display, reproduce, and process that content as reasonably necessary to operate, secure, review, promote, and improve the platform.",
-    ],
+    "title": "9. Copyright complaints",
+    "body": [
+      "Use the Copyright Infringement and DMCA Policy for notices, counter-notices, agent contact information and the restoration process. We may remove or restrict reported material and terminate repeat infringers in appropriate circumstances. Copyright declarations must be truthful. Other intellectual-property or privacy complaints may be sent to support."
+    ]
   },
   {
-    title: "Prohibited conduct",
-    body: [
-      "You must not violate applicable law.",
-      "You must not infringe another person’s intellectual property or privacy rights.",
-      "You must not submit false or misleading listings, applications, reviews, or profile information.",
-      "You must not upload, promote, or sell pornographic, sexually explicit, or sexually gratifying content or services.",
-      "You must not upload exploitative sexual content, non-consensual sexual content, or sexualised content involving minors or minor-looking persons.",
-      "You must not evade moderation, safety, age-gating, or enforcement actions.",
-      "You must not interfere with platform security, availability, or normal operation.",
-      "You must not scrape, harvest, reverse engineer, or abuse platform systems except as permitted by law.",
-    ],
+    "title": "10. Enforcement, suspension and account closure",
+    "body": [
+      "We may investigate credible misuse and take proportionate action, including requesting corrections, restricting visibility, removing content, pausing listings or messaging, suspending creator access or terminating an account. Urgent safety, fraud, legal or payment risks may require immediate action. Where lawful and appropriate, we provide a reason and a route to appeal under the Community Guidelines.",
+      "Restrictions or account closure do not automatically confiscate funds, release a party from a refund, erase legal records or transfer rights in unfinished work. We maintain a support route for resolving existing obligations. You may request account closure at [SUPPORT_EMAIL]. Closing your account deletes or anonymises your personal information as the Privacy Policy describes, but we keep a record of the versions of these Terms, our other policies and any project agreements you accepted, together with a copy of those documents, for the periods the Privacy Policy sets out."
+    ]
   },
   {
-    title: "Enforcement and suspension",
-    body: [
-      "CreatorHub may investigate suspected misuse and may remove content, restrict visibility, suspend accounts, revoke creator access, cancel listings, or take other reasonable action where necessary to protect users or the platform.",
-    ],
+    "title": "11. Availability, disclaimers and liability",
+    "body": [
+      "We take reasonable care in operating CreatorHub but do not promise uninterrupted access, error-free software or guaranteed commercial results. To the extent permitted by law, services are provided on an as-available basis. These qualifications do not exclude an express commitment in these policies or a non-waivable standard of care or consumer guarantee.",
+      "To the extent permitted by law, CreatorHub and its operators are not liable for indirect or consequential loss such as lost profits, revenue or goodwill arising from use of the service. Nothing excludes or limits liability where unlawful, including non-excludable consumer remedies or liability for fraud or other conduct that cannot lawfully be excluded. This clause does not cancel an agreed or legally owed refund."
+    ]
   },
   {
-    title: "Disclaimers",
-    body: [
-      "CreatorHub is provided on an 'as is' and 'as available' basis to the extent permitted by law.",
-      "We do not promise uninterrupted access, error-free operation, or guaranteed outcomes from marketplace use.",
-    ],
+    "title": "12. Global use and disputes",
+    "body": [
+      "The laws of Alberta, Canada govern these Terms, subject to any mandatory law applicable to you. Consumers retain non-waivable protections, local remedies and rights concerning governing law or jurisdiction. These Terms do not impose mandatory arbitration or require exclusive proceedings in Alberta where the law gives you another forum.",
+      "Contact [SUPPORT_EMAIL] to seek informal resolution. That option does not restrict urgent relief or extend a statutory or payment-provider deadline. Questions about a specific commission should use the refund policy's evidence and escalation process."
+    ]
   },
   {
-    title: "Limitation of liability",
-    body: [
-      "To the extent permitted by law, CreatorHub and its operators will not be liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for loss of profits, revenue, goodwill, or data arising from or related to platform use.",
-      "Nothing in these Terms limits rights that cannot be lawfully excluded under applicable consumer-protection law.",
-    ],
-  },
-  {
-    title: "Global use and local mandatory rights",
-    body: [
-      "CreatorHub is intended for use by people in multiple jurisdictions. Some countries, states, provinces, or regions give users mandatory legal rights that cannot be limited or waived by contract.",
-      "Nothing in these Terms is intended to exclude, restrict, or override any mandatory consumer, privacy, e-commerce, or other non-waivable rights that apply to you under applicable law.",
-      "Where local law grants protections that are more protective than these Terms, those local protections will apply to the extent required.",
-    ],
-  },
-  {
-    title: "Changes to the platform or terms",
-    body: [
-      "CreatorHub may update the platform, features, policies, and these Terms over time.",
-      "Where legally required, material changes will be communicated appropriately.",
-      "Continued use after changes take effect means you accept the updated Terms.",
-    ],
-  },
-  {
-    title: "Governing law and disputes",
-    body: [
-      "These Terms are intended to be interpreted under the laws of Alberta, Canada, unless mandatory local law requires otherwise.",
-      "If you are a consumer in a jurisdiction that gives you non-waivable rights, access to local consumer remedies, or restrictions on choice-of-law or forum clauses, those rights remain available to you.",
-    ],
-  },
-  {
-    title: "Contact",
-    body: [
-      "CreatorHub may provide contact details, support channels, or legal notices on a separate contact or policy page.",
-    ],
-  },
+    "title": "13. Changes and continuing obligations",
+    "body": [
+      "We publish revised versions and effective dates. Discretionary material contractual changes normally receive at least 30 days' notice; urgent legal or safety changes may take effect sooner with an explanation where appropriate. Where consent is required, we obtain it rather than treating silence as agreement.",
+      "Accepted project agreements keep the version and fee schedule recorded at acceptance unless both parties expressly accept a lawful change. Rules needed to stop unlawful or unsafe activity can apply immediately without retroactively eliminating accrued refund or payment rights. Provisions needed to settle payments, rights, complaints and lawful record retention survive closure to that extent."
+    ]
+  }
 ] as const;

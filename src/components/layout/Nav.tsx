@@ -4,7 +4,7 @@ import {
   useNavigate,
   useLocation,
 } from "react-router-dom";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CATEGORIES } from "../../domain/catalog";
 import { useTwitchStreams } from "../../hooks/useTwitchStreams";
 import { supabase } from "../../lib/supabaseClient";
@@ -58,9 +58,10 @@ const classes = {
   aboutLink: "linkPill whitespace-nowrap py-0.5",
 
   categoryWrap: "categoryBar",
-  categoryInner: "categoryBarInner flex items-center gap-4",
+  categoryInner: "categoryBarInner flex items-center gap-2",
   categoryRow: "categoryRow min-w-0 flex-1",
   categoryTitle: "categoryTitle hidden 2xl:inline",
+  categoryScrollBtn: "categoryScrollBtn flex md:hidden",
 
   chip: "navChip whitespace-nowrap",
   chipActive: "navChip navChipActive whitespace-nowrap",
@@ -108,8 +109,9 @@ const SettingsIcon = () => (
 
 const Nav = () => {
   const navigate = useNavigate();
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   const [q, setQ] = useState("");
+  const categoryRowRef = useRef<HTMLDivElement | null>(null);
 
   const { twitchByLogin, isFetching } = useTwitchStreams();
   const { user, loading } = useAuth();
@@ -128,6 +130,8 @@ const Nav = () => {
   const unreadMessageLabel =
     unreadMessageCount > 99 ? "99+" : String(unreadMessageCount);
 
+  const isFreeRoute = pathname === "/free";
+
   const activeCat = useMemo(() => {
     const params = new URLSearchParams(search);
     return params.get("cat") ?? "";
@@ -142,10 +146,27 @@ const Nav = () => {
     []
   );
 
+  // Category chips only reflect the ?cat= param while on /market — on /free
+  // (its own route, not a category filter) none of them should read as active.
   const chipClass = (key: string | null): string => {
+    if (isFreeRoute) return classes.chip;
     const isAll = key === null;
     const isActive = isAll ? !activeCat : activeCat === key;
     return isActive ? classes.chipActive : classes.chip;
+  };
+
+  const freeChipClass = isFreeRoute ? classes.chipActive : classes.chip;
+
+  // Scrolls the category rail by ~60% of its visible width per tap —
+  // primarily for small screens where the rail can't show every chip at once.
+  const scrollCategories = (direction: "left" | "right") => {
+    const node = categoryRowRef.current;
+    if (!node) return;
+    const amount = Math.round(node.clientWidth * 0.6) || 160;
+    node.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
   };
 
   const onSubmit: React.FormEventHandler<HTMLFormElement> = (event) => {
@@ -291,11 +312,24 @@ const Nav = () => {
 
       <div className={classes.categoryWrap}>
         <div className={classes.categoryInner}>
-          <div className={classes.categoryRow}>
+          <button
+            type="button"
+            aria-label="Scroll categories left"
+            className={classes.categoryScrollBtn}
+            onClick={() => scrollCategories("left")}
+          >
+            ‹
+          </button>
+
+          <div className={classes.categoryRow} ref={categoryRowRef}>
             <span className={classes.categoryTitle}>Browse categories</span>
 
             <Link to="/market" className={chipClass(null)}>
               All
+            </Link>
+
+            <Link to="/free" className={freeChipClass}>
+              Free
             </Link>
 
             {categoryLinks.map((category) => (
@@ -308,6 +342,15 @@ const Nav = () => {
               </Link>
             ))}
           </div>
+
+          <button
+            type="button"
+            aria-label="Scroll categories right"
+            className={classes.categoryScrollBtn}
+            onClick={() => scrollCategories("right")}
+          >
+            ›
+          </button>
 
           <div className={classes.statementWrap}>
             <span className={classes.statement}>

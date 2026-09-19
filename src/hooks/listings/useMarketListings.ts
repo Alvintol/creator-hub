@@ -19,6 +19,11 @@ export type MarketListingRow = {
   preview_url: string | null;
   status: string;
   is_active: boolean;
+  is_free: boolean;
+  free_delivery_type: "download" | "external_link" | null;
+  free_external_url: string | null;
+  free_file_path: string | null;
+  free_file_name: string | null;
 };
 
 export type MarketCreatorRow = {
@@ -55,7 +60,12 @@ const fetchMarketListings = async (): Promise<MarketListingItem[]> => {
       preview_url,
       status,
       is_active,
-      fulfilment_mode
+      fulfilment_mode,
+      is_free,
+      free_delivery_type,
+      free_external_url,
+      free_file_path,
+      free_file_name
     `)
     .eq("status", "published")
     .eq("is_active", true)

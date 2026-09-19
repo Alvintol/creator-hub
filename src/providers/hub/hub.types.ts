@@ -15,6 +15,7 @@ export type HubFilters = {
   type: OfferingType;
   category: CategoryKey;
   videoSubtype: VideoSubtype;
+  freeOnly: boolean;
 };
 
 export type FavouritesMap = Record<string, true>;

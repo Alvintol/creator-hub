@@ -5,7 +5,13 @@ import {
 import type { Stripe } from "@stripe/stripe-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import CheckoutPolicyAcceptance from "../../components/legal/CheckoutPolicyAcceptance";
+import {
+  formatPaymentCents,
+  getListingRequestPaymentTitle,
+} from "../../domain/payments/listingRequestPaymentDisplay";
 import { useCreateListingRequestPaymentCheckout } from "../../hooks/payments/useCreateListingRequestPaymentCheckout";
+import { useListingRequestPayment } from "../../hooks/payments/useListingRequestPayments";
 import { getStripeForConnectedAccount } from "../../lib/stripeClient";
 
 const classes = {
@@ -20,6 +26,10 @@ const classes = {
   actions: "flex flex-wrap items-center gap-3",
   btn:
     "btnOutline",
+  summaryTitle: "font-display text-base font-extrabold tracking-tight",
+  amounts: "mt-3 space-y-1 text-sm text-zinc-700",
+  amountRow: "flex justify-between gap-4",
+  totalRow: "flex justify-between gap-4 border-t border-zinc-200 pt-2 font-bold text-zinc-950",
 } as const;
 
 const getErrorMessage = (error: unknown): string =>
@@ -30,6 +40,13 @@ const getErrorMessage = (error: unknown): string =>
 const ListingRequestPaymentCheckout = () => {
   const { paymentId = "" } = useParams<{ paymentId: string }>();
   const createCheckout = useCreateListingRequestPaymentCheckout();
+  const paymentQuery = useListingRequestPayment(paymentId);
+  const payment = paymentQuery.data ?? null;
+
+  // Stripe checkout opens only after the buyer has accepted the project
+  // terms and policies for this request.
+  const [policiesAccepted, setPoliciesAccepted] = useState(false);
+  const onPoliciesAccepted = useCallback(() => setPoliciesAccepted(true), []);
 
   const startedPaymentIdRef = useRef<string | null>(null);
 
@@ -70,8 +87,10 @@ const ListingRequestPaymentCheckout = () => {
   }, [createCheckout.mutateAsync, paymentId]);
 
   useEffect(() => {
+    if (!policiesAccepted) return;
+
     void startCheckout();
-  }, [startCheckout]);
+  }, [policiesAccepted, startCheckout]);
 
   const checkoutOptions = useMemo(
     () => (clientSecret ? { clientSecret } : undefined),
@@ -88,9 +107,62 @@ const ListingRequestPaymentCheckout = () => {
         </p>
       </section>
 
+      {paymentQuery.isLoading && (
+        <section className={classes.card}>
+          <p className={classes.text}>Loading payment details…</p>
+        </section>
+      )}
+
+      {paymentQuery.isError && (
+        <div className={classes.error}>We couldn’t load this payment. Please try again.</div>
+      )}
+
+      {!paymentQuery.isLoading && !paymentQuery.isError && !payment && (
+        <div className={classes.error}>This payment could not be found.</div>
+      )}
+
+      {payment && (
+        <section className={classes.card}>
+          <h2 className={classes.summaryTitle}>{getListingRequestPaymentTitle(payment)}</h2>
+          <dl className={classes.amounts}>
+            <div className={classes.amountRow}>
+              <dt>Project payment</dt>
+              <dd>{formatPaymentCents(payment.base_amount_cents, payment.currency)}</dd>
+            </div>
+            <div className={classes.amountRow}>
+              <dt>Buyer service fee</dt>
+              <dd>{formatPaymentCents(payment.buyer_service_fee_cents, payment.currency)}</dd>
+            </div>
+            {payment.creator_tip_cents > 0 && (
+              <div className={classes.amountRow}>
+                <dt>Creator tip</dt>
+                <dd>{formatPaymentCents(payment.creator_tip_cents, payment.currency)}</dd>
+              </div>
+            )}
+            {payment.platform_support_cents > 0 && (
+              <div className={classes.amountRow}>
+                <dt>CreatorHub support</dt>
+                <dd>{formatPaymentCents(payment.platform_support_cents, payment.currency)}</dd>
+              </div>
+            )}
+            <div className={classes.totalRow}>
+              <dt>Total</dt>
+              <dd>{formatPaymentCents(payment.total_checkout_cents, payment.currency)}</dd>
+            </div>
+          </dl>
+        </section>
+      )}
+
+      {payment && (
+        <CheckoutPolicyAcceptance
+          listingRequestId={payment.listing_request_id}
+          onAccepted={onPoliciesAccepted}
+        />
+      )}
+
       {errMsg && <div className={classes.error}>{errMsg}</div>}
 
-      {!errMsg && (!stripePromise || !checkoutOptions) && (
+      {policiesAccepted && !errMsg && (!stripePromise || !checkoutOptions) && (
         <section className={classes.card}>
           <p className={classes.text}>Preparing secure checkout…</p>
         </section>

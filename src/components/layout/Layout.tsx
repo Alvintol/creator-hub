@@ -2,6 +2,8 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Nav from './Nav';
 import Footer from './Footer';
 import { PageTransition } from '../../lib/motion';
+import CookieConsent from '../legal/CookieConsent';
+import PolicyAcceptanceGate from '../legal/PolicyAcceptanceGate';
 
 const classes = {
   shell: 'appShell',
@@ -15,11 +17,14 @@ const Layout = () => {
     <div className={classes.shell}>
       <Nav />
       <main className={classes.main}>
-        <PageTransition transitionKey={pathname}>
-          <Outlet />
-        </PageTransition>
+        <PolicyAcceptanceGate>
+          <PageTransition transitionKey={pathname}>
+            <Outlet />
+          </PageTransition>
+        </PolicyAcceptanceGate>
       </main>
       <Footer />
+      <CookieConsent />
     </div>
   );
 };

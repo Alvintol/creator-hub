@@ -104,3 +104,48 @@ export const useListingRequestPayments = (
     },
   });
 };
+
+export type ListingRequestPaymentSummary = Pick<
+  ListingRequestPaymentRow,
+  | "id"
+  | "listing_request_id"
+  | "payment_type"
+  | "status"
+  | "currency"
+  | "base_amount_cents"
+  | "creator_tip_cents"
+  | "buyer_service_fee_cents"
+  | "platform_support_cents"
+  | "total_checkout_cents"
+  | "metadata"
+>;
+
+// One payment, as the buyer sees it before checkout. RLS limits this to the
+// payer, the creator and admins.
+export const useListingRequestPayment = (paymentId?: string | null) => {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ["listingRequestPayment", paymentId],
+    enabled: Boolean(user?.id && paymentId),
+    queryFn: async (): Promise<ListingRequestPaymentSummary | null> => {
+      if (!user?.id || !paymentId) {
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .from("listing_request_payments")
+        .select(
+          "id, listing_request_id, payment_type, status, currency, base_amount_cents, creator_tip_cents, buyer_service_fee_cents, platform_support_cents, total_checkout_cents, metadata",
+        )
+        .eq("id", paymentId)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      return (data as ListingRequestPaymentSummary | null) ?? null;
+    },
+  });
+};

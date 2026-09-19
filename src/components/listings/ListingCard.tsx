@@ -22,6 +22,8 @@ const classes = {
   bottomRow: "mt-auto flex items-center justify-between gap-3 pt-4",
   price:
     "rounded-full bg-[rgb(var(--accent-soft))] px-2.5 py-1 text-sm font-semibold text-[rgb(var(--accent-text))]",
+  freePrice:
+    "rounded-full bg-emerald-100 px-2.5 py-1 text-sm font-semibold text-emerald-800",
   creatorWrap: "flex min-w-0 items-center gap-2",
   avatar:
     "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-200 text-[10px] font-bold uppercase text-zinc-700",
@@ -37,6 +39,7 @@ export type ListingCardListing = {
   price_min: number;
   price_max: number | null;
   preview_url: string | null;
+  is_free?: boolean;
 };
 
 export type ListingCardCreator = {
@@ -84,6 +87,8 @@ const ListingCard = ({ listing, creator }: ListingCardProps) => {
         <div className={classes.badges}>
           <span className={classes.badge}>{listing.offering_type}</span>
 
+          {listing.is_free && <span className={classes.badge}>Free</span>}
+
           {creator.isLive && <span className={classes.liveBadge}>Live</span>}
         </div>
       </div>
@@ -101,7 +106,11 @@ const ListingCard = ({ listing, creator }: ListingCardProps) => {
             <span className={classes.creator}>{creatorLabel}</span>
           </span>
 
-          <span className={classes.price}>{priceText(listing)}</span>
+          {listing.is_free ? (
+            <span className={classes.freePrice}>$0</span>
+          ) : (
+            <span className={classes.price}>{priceText(listing)}</span>
+          )}
         </div>
       </div>
     </Link>

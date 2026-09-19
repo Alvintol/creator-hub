@@ -41,9 +41,14 @@ import CreatorListings from "./pages/listings/CreatorListings";
 import EditListing from "./pages/listings/EditListing";
 import Listing from "./pages/listings/Listing";
 import RequestListing from "./pages/listings/RequestListing";
+import CommunityGuidelines from "./pages/legal/CommunityGuidelines";
+import CookiePolicy from "./pages/legal/CookiePolicy";
+import CopyrightPolicy from "./pages/legal/CopyrightPolicy";
 import CreatorTerms from "./pages/legal/CreatorTerms";
+import FeeSchedule from "./pages/legal/FeeSchedule";
 import Legal from "./pages/legal/Legal";
 import Privacy from "./pages/legal/Privacy";
+import RefundPolicy from "./pages/legal/RefundPolicy";
 import Terms from "./pages/legal/Terms";
 import MessageDetails from "./pages/messages/MessageDetails";
 import MessagesInbox from "./pages/messages/MessagesInbox";
@@ -64,6 +69,7 @@ const App = () => {
           <Route path="/about" element={<About />} />
           <Route path="/live" element={<Live />} />
           <Route path="/market" element={<Market />} />
+          <Route path="/free" element={<Market forceFree />} />
           <Route path="/creators" element={<Creators />} />
           <Route path="/listing/:id" element={<Listing />} />
           <Route
@@ -76,6 +82,23 @@ const App = () => {
           <Route
             path="/terms/creator"
             element={<CreatorTerms />}
+          />
+          {/*
+            Draft policies (2026-09-17-draft-1), now linked from Legal.tsx.
+            All eight legal documents still contain bracketed placeholders
+            ([OPERATOR_LEGAL_NAME], [SUPPORT_EMAIL], [DMCA_AGENT_*], etc.) —
+            left in deliberately while brand/domain/entity are unsettled and
+            the site is pre-launch. Every placeholder must be resolved
+            before public launch. See the legal-documentation review notes
+            and objectives doc for the full pre-launch checklist.
+          */}
+          <Route path="/policies/refunds" element={<RefundPolicy />} />
+          <Route path="/policies/copyright" element={<CopyrightPolicy />} />
+          <Route path="/policies/fees" element={<FeeSchedule />} />
+          <Route path="/policies/cookies" element={<CookiePolicy />} />
+          <Route
+            path="/policies/community"
+            element={<CommunityGuidelines />}
           />
 
           <Route element={<RequireAuth />}>

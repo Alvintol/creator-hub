@@ -1,0 +1,74 @@
+// REVIEW DRAFT: resolve publication inputs and implement linked workflows before adoption.
+export const paymentTermsVersion = "2026-09-17-draft-1";
+
+export const paymentTermsSections = [
+  {
+    "title": "1. What you pay",
+    "body": [
+      "The base payment is the agreed amount for a commission, milestone or accepted change order before CreatorHub fees, creator tips, optional platform support and separately identified taxes. The buyer pays the base amount plus the buyer service fee, any voluntarily chosen tip or support contribution, and applicable taxes disclosed before payment. The creator platform fee is deducted from the creator's base proceeds; it is not an additional charge to the buyer.",
+      "Charge: Buyer service fee; Rate: 5% of the base amount; Minimum per successful base payment: CAD 1.00 for CAD payments; USD 1.00 for USD payments",
+      "Charge: Creator platform fee; Rate: 5% of the base amount; Minimum per successful base payment: CAD 1.50 for CAD payments; USD 1.50 for USD payments",
+      "Charge: Creator tip; Rate: Optional amount chosen by the buyer; Minimum per successful base payment: No CreatorHub percentage or minimum fee on the tip",
+      "Charge: CreatorHub support; Rate: Optional amount chosen by the buyer, paid to CreatorHub; Minimum per successful base payment: No additional CreatorHub percentage or minimum fee on the contribution",
+      "The CAD and USD minimums are separate fixed amounts, not an exchange-rate promise. Other currencies may be enabled only after their minimums and rounding rules are added to this schedule and displayed before checkout. A currency selector does not by itself mean that a payment currency is available. Stripe, country, payment-method and regulatory availability may limit payment or payout options."
+    ]
+  },
+  {
+    "title": "2. Instalments and rounding",
+    "body": [
+      "Fees apply separately to each successful base payment, including a deposit, milestone, balance or separately paid change order. For CAD and USD, calculate 5% and round up to the next cent, then apply the relevant minimum. Failed attempts and retrying the same unpaid obligation do not create additional CreatorHub fees. Each separately collected instalment can incur a minimum, so splitting a project can cost more than one payment.",
+      "The agreement must show the payment schedule and estimated aggregate CreatorHub fees before acceptance. A creator cannot add instalments to an accepted schedule without buyer agreement. Refunds use the original fee amounts and the refund policy's proportional formula; minimums are not recalculated on the remaining balance."
+    ]
+  },
+  {
+    "title": "3. Examples",
+    "body": [
+      "These examples exclude tax, currency conversion and Stripe costs.",
+      "Example: CAD 100 base, no extras; Buyer pays: CAD 105; Creator receives before Stripe costs: CAD 95; CreatorHub allocation: CAD 10",
+      "Example: CAD 100 base + CAD 20 tip; Buyer pays: CAD 125; Creator receives before Stripe costs: CAD 115; CreatorHub allocation: CAD 10",
+      "Example: CAD 100 base + CAD 20 tip + CAD 3 support; Buyer pays: CAD 128; Creator receives before Stripe costs: CAD 115; CreatorHub allocation: CAD 13",
+      "Example: CAD 10 base, one payment; Buyer pays: CAD 11; Creator receives before Stripe costs: CAD 8.50; CreatorHub allocation: CAD 2.50",
+      "Example: CAD 20 base, one payment; Buyer pays: CAD 21; Creator receives before Stripe costs: CAD 18.50; CreatorHub allocation: CAD 2.50",
+      "Example: CAD 20 base, two CAD 10 payments; Buyer pays: CAD 22 total; Creator receives before Stripe costs: CAD 17 total; CreatorHub allocation: CAD 5 total",
+      "For the CAD 100 base example, refunding CAD 40 of the base also returns CAD 2 of the buyer fee and reverses CAD 2 of the creator fee. Buyer refund: CAD 42, before any separate tip, support or tax adjustment."
+    ]
+  },
+  {
+    "title": "4. Tips and voluntary support",
+    "body": [
+      "A creator tip goes to the creator's allocation and is excluded from both CreatorHub fee calculations. Stripe processing or other provider costs may still apply. “Fee-exempt tip” means exempt from CreatorHub's fees, not a guarantee that the creator receives the tip without any processor costs.",
+      "Optional CreatorHub support goes to CreatorHub, not the creator. Tips and support default to zero and must be affirmatively selected; neither is required for checkout, delivery, ordinary support or a fair moderation decision. They do not purchase priority dispute treatment. CreatorHub support is not represented as a charitable donation and does not produce a charitable tax receipt. The refund policy explains contribution refunds."
+    ]
+  },
+  {
+    "title": "5. Stripe payments and creator payouts",
+    "body": [
+      "Commission payments are processed as direct charges on the creator's Stripe connected account. CreatorHub collects its buyer and creator fees and any optional platform support through the payment arrangement. The creator is the supplier of the commissioned work. This description does not waive CreatorHub's own obligations or determine every tax or regulatory responsibility.",
+      "Stripe processing, payout, conversion and dispute charges are separate from CreatorHub fees. The creator is responsible for those transaction-related charges to the extent charged to their connected account or expressly disclosed to and accepted by them. CreatorHub will not silently pass on a new category of platform expense. The allocation of liabilities between Stripe and CreatorHub remains governed by their actual agreement and account configuration.",
+      "Payout timing depends on Stripe account status, settlement, verification, reserves and banking systems. A displayed estimate is not a guarantee. Payment confirmation, project acceptance and bank payout are separate events. CreatorHub does not provide escrow, a trust account or a promise that all funds are held pending acceptance.",
+      "Creators must complete required onboarding, keep information current and maintain payment readiness. We may pause new paid work if required capabilities are restricted; existing refund and support obligations continue."
+    ]
+  },
+  {
+    "title": "6. Taxes, exchange rates and receipts",
+    "body": [
+      "Applicable taxes must be identified before payment. Creators are responsible for taxes and filings on their business income and supplies except where applicable law assigns collection or remittance to CreatorHub or another party. CreatorHub remains responsible for taxes legally imposed on its own services and any marketplace obligations that apply. This policy does not claim that all taxes are automatically collected.",
+      "Payments and refunds are denominated in the transaction currency shown on the receipt. A bank or payment provider may convert that amount and apply its own rates or charges, so a converted refund can differ from the original converted debit. CreatorHub does not promise a particular external exchange rate.",
+      "The payment record must separately identify base price, buyer fee, creator tip, support contribution, tax and total. The creator's statement also identifies the creator fee and any available provider deductions. The seller's identity must be available before purchase."
+    ]
+  },
+  {
+    "title": "7. Refunds, reversals and unauthorised payments",
+    "body": [
+      "The Refund, Cancellation and Dispute Policy governs full and partial refunds, including proportional returns of both CreatorHub fees. The buyer refund is not reduced by unrecovered processing costs. CreatorHub returns its refundable fee allocation; the creator remains responsible for returning refundable creator proceeds. Each party bears provider costs allocated to it under the applicable accepted terms. A party responsible for a duplicate or erroneous platform charge must correct the error without making the buyer pay to obtain the correction.",
+      "CreatorHub may submit refunds and necessary fee reversals under the Creator Terms. A chargeback may reverse a payment independently of this process; we account for amounts already returned and do not seek duplicate recovery. Fraud or unauthorised-payment claims are reviewed promptly and do not require a buyer to exhaust informal negotiations first."
+    ]
+  },
+  {
+    "title": "8. Changes and future subscriptions",
+    "body": [
+      "This schedule contains no active creator subscription or subscription discount. Any future subscription requires separately disclosed pricing, billing frequency, renewal, cancellation and fee effects before enrolment.",
+      "CreatorHub will provide at least 30 days' notice before a discretionary fee increase takes effect. Accepted project agreements keep the CreatorHub fee schedule recorded at acceptance for their agreed instalments. A change order must disclose any proposed fee-version change and obtain express acceptance; it does not silently reprice prior obligations. Changes required by law or payment networks may take effect sooner where necessary, with notice explaining the effect and any available choices."
+    ]
+  }
+] as const;

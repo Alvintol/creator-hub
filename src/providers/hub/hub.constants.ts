@@ -8,6 +8,7 @@ export const initialFilters: HubFilters = {
   type: "all",
   category: "all",
   videoSubtype: "all",
+  freeOnly: false,
 };
 
 // Empty favourites state used:
