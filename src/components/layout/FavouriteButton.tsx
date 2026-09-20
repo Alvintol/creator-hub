@@ -23,7 +23,7 @@ type FavouriteButtonProps = {
 };
 
 const classes = {
-  heart: "h-5 w-5 shrink-0 overflow-visible",
+  heart: "h-5 w-5 shrink-0",
 
   btnBase:
     "inline-flex h-9 w-9 items-center justify-center rounded-full border shadow-sm backdrop-blur-md transition duration-200 hover:scale-105",
@@ -33,12 +33,16 @@ const classes = {
 
 // Small heart icon used by the favourite button
 const Heart = (props: HeartProps) => (
-  <svg viewBox="-1 -1 26 26" className={classes.heart} aria-hidden="true">
+  <svg
+    viewBox="0 0 24 24"
+    className={classes.heart}
+    aria-hidden="true"
+    fill={props.filled ? "currentColor" : "none"}
+  >
     <path
-      d="M12 21s-7.2-4.7-9.6-9.2C.7 8.4 2.4 5.6 5.5 5.1c1.7-.3 3.3.4 4.4 1.6 1.1-1.2 2.7-1.9 4.4-1.6 3.1.5 4.8 3.3 3.1 6.7C19.2 16.3 12 21 12 21z"
-      fill={props.filled ? "currentColor" : "none"}
+      d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78Z"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
