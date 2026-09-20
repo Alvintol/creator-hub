@@ -78,6 +78,19 @@ describe("FavouriteButton", () => {
     expect(button).toHaveAttribute("title", "Favourite");
   });
 
+  it("gives the heart outline enough view-box space to avoid clipping", () => {
+    renderWithHub(
+      <FavouriteButton kind="creator" targetId="creator-amatrine" />
+    );
+
+    const heart = screen
+      .getByRole("button", { name: "Add favourite" })
+      .querySelector("svg");
+
+    expect(heart).toHaveAttribute("viewBox", "-1 -1 26 26");
+    expect(heart).toHaveClass("overflow-visible");
+  });
+
   it("renders a favourited creator button when the creator is in state", () => {
     renderWithHub(
       <FavouriteButton kind="creator" targetId="creator-amatrine" />,
