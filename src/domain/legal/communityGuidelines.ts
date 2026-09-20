@@ -1,12 +1,12 @@
 // REVIEW DRAFT: resolve publication inputs and implement linked workflows before adoption.
-export const communityGuidelinesVersion = "2026-09-17-draft-1";
+export const communityGuidelinesVersion = "2026-09-20-draft-1";
 
 export const communityGuidelinesSections = [
   {
     "title": "1. The basic standard",
     "body": [
       "Be honest about your work, respect other people and deliver what you agree to provide. These standards apply to profiles, listings, portfolios, previews, project files, messages, reviews and linked material used to offer or deliver a service. Private messages and external delivery links are not exceptions to the rules.",
-      "These guidelines form part of the Terms of Service and Creator Terms. A mature label permits only content that is otherwise allowed. CreatorHub approval is not a promise that content is lawful or acceptable to every payment provider."
+      "These guidelines form part of the Terms of Service and Creator Terms. A mature label permits only content that is otherwise allowed. Made for Stream approval is not a promise that content is lawful or acceptable to every payment provider."
     ]
   },
   {
@@ -46,13 +46,13 @@ export const communityGuidelinesSections = [
     "body": [
       "Describe price, deliverables, included revisions, timing and licence terms before payment. Do not bait buyers with a price that cannot purchase the advertised deliverable. Buyers must provide accurate instructions and timely feedback; creators must provide honest progress updates and explain delays.",
       "An in-scope correction is not a paid upgrade. Extra work needs an accepted change order. Do not use threats, abusive messages, fake legal claims, withholding already-paid work or review extortion to force agreement. A good-faith complaint or bank dispute is not, by itself, abuse.",
-      "Tips and CreatorHub support are voluntary. Do not demand them as a condition of delivery, ordinary customer service or a favourable moderation outcome. Never ask for passwords, full card details or unnecessary identity documents in messages."
+      "Tips and Made for Stream support are voluntary. Do not demand them as a condition of delivery, ordinary customer service or a favourable moderation outcome. Never ask for passwords, full card details or unnecessary identity documents in messages."
     ]
   },
   {
     "title": "6. Reporting, moderation and appeals",
     "body": [
-      "Use the report option where available, or email [SUPPORT_EMAIL] with the URL or project ID, the rule involved and a concise explanation. For suspected child exploitation, report the location without downloading, forwarding or attaching the material. For immediate danger, use the appropriate emergency service; CreatorHub support is not an emergency response service.",
+      "Use the report option where available, or email [SUPPORT_EMAIL] with the URL or project ID, the rule involved and a concise explanation. For suspected child exploitation, report the location without downloading, forwarding or attaching the material. For immediate danger, use the appropriate emergency service; Made for Stream support is not an emergency response service.",
       "We may request edits, change visibility, remove content, pause listings or messaging, restrict payments where authorised, or suspend or terminate an account. Serious safety risks can require immediate action. We consider context, severity, repeated conduct and the reliability of evidence. Linked accounts are trust signals, not an exemption from these standards.",
       "Where lawful and appropriate, we explain the reason for an action and how to request review. Appeal to [SUPPORT_EMAIL] within 14 days with the decision reference, the error you believe occurred and any new evidence. Copyright counter-notices follow their separate legal process. We do not promise a different reviewer when a sole operator handles support.",
       "Account restrictions do not automatically forfeit money, erase records or end refund rights. We preserve an appropriate support route for existing projects. Do not evade restrictions by opening another account or reposting prohibited material."

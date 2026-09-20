@@ -11,7 +11,7 @@ unmatched_tier: 2
 
 # Sign-in — Support Playbook
 
-**CreatorHub has no passwords.** Sign-in is a Supabase magic link (email OTP) or
+**Made for Stream has no passwords.** Sign-in is a Supabase magic link (email OTP) or
 an OAuth provider. That removes a whole category of support load — there are no
 password resets, no lockouts from failed attempts, no credential stuffing
 against our own store — and replaces it with a narrower one: **email delivery**.

@@ -8,7 +8,7 @@ const CopyrightPolicy = () => {
   return (
     <LegalPolicySections
       title="Copyright Infringement and DMCA Policy"
-      subtitle="How to report infringing material, submit a counter-notice, and how CreatorHub responds."
+      subtitle="How to report infringing material, submit a counter-notice, and how Made for Stream responds."
       sections={copyrightPolicySections}
       version={copyrightPolicyVersion}
     />

@@ -37,7 +37,7 @@ const creatorStep = (status: AccountSetupInput["applicationStatus"]): AccountSet
       return {
         ...base,
         state: "waiting",
-        detail: "Application is with CreatorHub review",
+        detail: "Application is with Made for Stream review",
         actionLabel: "View application",
       };
     case "needs_changes":
@@ -53,7 +53,7 @@ const creatorStep = (status: AccountSetupInput["applicationStatus"]): AccountSet
         actionLabel: "View status",
       };
     default:
-      return { ...base, state: "optional", detail: "Apply if you want to sell on CreatorHub", actionLabel: "Start application" };
+      return { ...base, state: "optional", detail: "Apply if you want to sell on Made for Stream", actionLabel: "Start application" };
   }
 };
 

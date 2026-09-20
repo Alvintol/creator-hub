@@ -14,7 +14,7 @@ unmatched_tier: 2
 # Stripe Connect Onboarding — Support Playbook
 
 Creators must connect a Stripe account before they can publish an active listing
-or receive a payment. CreatorHub keeps a mirror of each creator's account state
+or receive a payment. Made for Stream keeps a mirror of each creator's account state
 in `creator_payment_accounts` — `charges_enabled`, `payouts_enabled`,
 `details_submitted` — and a database trigger blocks publishing when that mirror
 says the creator is not ready.
@@ -22,7 +22,7 @@ says the creator is not ready.
 **The mirror is the weak point of this whole feature.** Nothing refreshes it
 automatically. It updates only when the creator loads their settings page and the
 client calls the sync endpoint. Stripe sends `account.updated` when an account's
-capabilities change, and CreatorHub currently ignores that event entirely.
+capabilities change, and Made for Stream currently ignores that event entirely.
 
 So the mirror drifts in both directions, and both are bad:
 
@@ -77,7 +77,7 @@ nothing told us. Because only the settings page triggers a sync, a creator who
 finishes onboarding and navigates away can stay blocked indefinitely.
 
 **What the user sees.** They completed everything Stripe asked for, and
-CreatorHub still behaves as though they have not. From their side this looks like
+Made for Stream still behaves as though they have not. From their side this looks like
 the product is broken, and they are right.
 
 **Fix.** Re-sync from Stripe. If they are ready, this unblocks them immediately.
@@ -192,7 +192,7 @@ volume grows, and Stripe asks for identity documents, a bank account, or
 business details.
 
 **What the user sees.** They submitted everything and are still not enabled,
-with no clear explanation on the CreatorHub side.
+with no clear explanation on the Made for Stream side.
 
 **Fix.** The creator completes the requirements in Stripe. Support's job is to
 tell them *specifically* what is outstanding — the requirement list is readable
@@ -225,7 +225,7 @@ a user error.
 
 **What the user sees.** Onboarding or sync fails with an opaque error.
 
-**Fix.** Manual investigation. Note that CreatorHub's fee minimums are
+**Fix.** Manual investigation. Note that Made for Stream's fee minimums are
 USD-denominated, so a non-US creator raises a question well beyond this error —
 see the currency note in [`checkout.md`](checkout.md) `PAY-004`.
 

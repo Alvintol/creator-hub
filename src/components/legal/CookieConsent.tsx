@@ -80,7 +80,7 @@ const CookieSettingsDialog = () => {
 
         {activeInfo.length === 0 ? (
           <p className={classes.text}>
-            CreatorHub doesn&rsquo;t use any optional cookies or similar
+            Made for Stream doesn&rsquo;t use any optional cookies or similar
             technologies right now, so there is nothing to turn on. If that
             changes, we&rsquo;ll ask you first.
           </p>

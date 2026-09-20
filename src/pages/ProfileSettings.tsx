@@ -114,7 +114,7 @@ const creatorRequirements = [
   "Link at least one creator platform",
   "Link your most recent upload or VOD from the last 30 days",
   "Add work samples in the creator application",
-  "Pass manual CreatorHub review",
+  "Pass manual Made for Stream review",
 ];
 
 // Pulls a readable error message from an unknown thrown value
@@ -231,7 +231,7 @@ const ProfileSettings = () => {
 
       if (!updateError) {
         setInfoMsg(
-          "Welcome to CreatorHub. Work through the checklist at your own pace — only your profile is needed to get started."
+          "Welcome to Made for Stream. Work through the checklist at your own pace — only your profile is needed to get started."
         );
         await refetch();
       }
@@ -538,7 +538,7 @@ const ProfileSettings = () => {
                   rows={3}
                   value={bio}
                   onChange={(event) => setBio(event.currentTarget.value)}
-                  placeholder="What do you make, what do you stream, and what are you looking for on CreatorHub?"
+                  placeholder="What do you make, what do you stream, and what are you looking for on Made for Stream?"
                 />
               </label>
             </div>

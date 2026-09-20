@@ -38,7 +38,7 @@ export const optionalCookieCategoryInfo: OptionalCookieCategoryInfo[] = [
   },
 ];
 
-// Optional categories CreatorHub actually uses. Empty today: nothing optional
+// Optional categories Made for Stream actually uses. Empty today: nothing optional
 // is active (Cookie Policy section 3), so visitors are not asked anything.
 // Add a category here when a feature that needs it ships. Every visitor is
 // then asked again, because a new purpose is not covered by an earlier

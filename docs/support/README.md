@@ -1,4 +1,4 @@
-# CreatorHub Support Playbooks
+# Made for Stream Support Playbooks
 
 Every feature ships with a playbook describing how to support it. A feature is
 not done when the code merges — it is done when someone (or something) on call
@@ -142,7 +142,7 @@ how it fails.
 ## Status of the agent
 
 **The support agent is not running.** It is specified here and configured in
-`agent.config.yaml`, but it is deliberately dormant until CreatorHub deploys to
+`agent.config.yaml`, but it is deliberately dormant until Made for Stream deploys to
 production. Nothing in this directory consumes tokens or touches infrastructure
 while the product is still being built.
 

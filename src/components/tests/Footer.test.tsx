@@ -6,7 +6,7 @@ import CookiePreferencesProvider from "../../providers/CookiePreferencesProvider
 import { describe, expect, it } from 'vitest';
 
 describe("<Footer />", () => {
-  it("renders CreatorHub text", () => {
+  it("renders Made for Stream text", () => {
     render(
       <MemoryRouter>
         <CookiePreferencesProvider>
@@ -15,7 +15,7 @@ describe("<Footer />", () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText(/CreatorHub/i)).toBeInTheDocument();
+    expect(screen.getByText(/Made for Stream/i)).toBeInTheDocument();
   });
 
   it("opens Cookie settings from the footer", () => {

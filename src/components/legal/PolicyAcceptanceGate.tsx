@@ -47,7 +47,7 @@ const isExemptPath = (pathname: string): boolean =>
   pathname.startsWith("/policies/");
 
 // Signed-in users must accept the current Terms of Service and Privacy
-// Policy before using CreatorHub.
+// Policy before using Made for Stream.
 //
 // Acceptance given on the sign-in page is recorded here once the user is
 // authenticated (sign-in redirects away, so it is parked in the browser).
@@ -194,7 +194,7 @@ const PolicyAcceptanceGate = (props: PolicyAcceptanceGateProps) => {
     <section className={classes.card} aria-label="Accept terms and privacy policy">
       <h1 className={classes.title}>Please review our terms</h1>
       <p className={classes.text}>
-        To keep using CreatorHub, please review and accept the current Terms of
+        To keep using Made for Stream, please review and accept the current Terms of
         Service and Privacy Policy.
       </p>
 

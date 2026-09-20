@@ -12,16 +12,16 @@ unmatched_tier: 2
 
 # Checkout — Support Playbook
 
-Checkout is where a buyer actually pays. CreatorHub uses **direct charges on the
+Checkout is where a buyer actually pays. Made for Stream uses **direct charges on the
 creator's connected account** with an application fee, so the money lands in the
-creator's Stripe account and CreatorHub takes its cut from the same charge.
+creator's Stripe account and Made for Stream takes its cut from the same charge.
 
 Two consequences that shape everything in this playbook:
 
 - A checkout cannot open unless the **creator's** Stripe account is ready. Most
   checkout failures are actually creator-onboarding failures wearing a buyer's
   error message.
-- The charge belongs to the connected account, not to CreatorHub. Looking for it
+- The charge belongs to the connected account, not to Made for Stream. Looking for it
   in the platform dashboard will find nothing — it has to be looked up on the
   creator's account.
 
@@ -269,9 +269,9 @@ guards did not hold — which is worth finding rather than just refunding.
 **What the user sees.** Two charges on their statement.
 
 **Fix.** Manual, and it requires a refund. **The agent may not issue refunds**,
-and CreatorHub has no refund workflow yet at all — see
+and Made for Stream has no refund workflow yet at all — see
 [`refunds-and-disputes.md`](refunds-and-disputes.md). Today this is done by hand
-in the creator's Stripe account, and the CreatorHub record will not reflect it.
+in the creator's Stripe account, and the Made for Stream record will not reflect it.
 
 **Money impact.** Direct and immediate. The buyer has paid twice. Treat this as
 the highest-urgency Tier 2 there is — trust damage here is disproportionate.
@@ -309,7 +309,7 @@ open a long time.
 ## Known gaps
 
 - **No refund path exists.** `PAY-006` has no clean resolution inside
-  CreatorHub. This is a launch blocker, tracked in
+  Made for Stream. This is a launch blocker, tracked in
   [`refunds-and-disputes.md`](refunds-and-disputes.md).
 - **`stripe_charge_id` is never stored**, so finding the charge for a given
   payment means searching the connected account by metadata rather than looking

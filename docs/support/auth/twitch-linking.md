@@ -11,7 +11,7 @@ unmatched_tier: 2
 # Twitch Account Linking — Support Playbook
 
 Creators link a Twitch account to prove who they are and to power the "Live now"
-surface. The flow is a signed-state OAuth round trip: CreatorHub issues a state
+surface. The flow is a signed-state OAuth round trip: Made for Stream issues a state
 token bound to the user id with an expiry and an HMAC signature, Twitch redirects
 back with it, and the callback verifies the signature and expiry before storing
 the account.
@@ -90,7 +90,7 @@ state values to bind a Twitch account to an account that is not theirs.
 
 **Why that matters.** The whole point of linking is proving identity. A forged
 link would let someone claim another creator's Twitch presence — which is
-exactly the impersonation problem CreatorHub exists to prevent. Treat repetition
+exactly the impersonation problem Made for Stream exists to prevent. Treat repetition
 as hostile until shown otherwise.
 
 **Fix.** For the benign case, retry. A secret rotation resolves itself once

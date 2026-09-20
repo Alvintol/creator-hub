@@ -2,13 +2,13 @@
 // are intentionally left in place until the operating entity, brand and
 // domain are finalized. Safe to keep live pre-launch; must be resolved
 // before public launch.
-export const termsVersion = "2026-09-19-draft-2";
+export const termsVersion = "2026-09-20-draft-1";
 
 export const termsSections = [
   {
     "title": "1. Overview and operator",
     "body": [
-      "CreatorHub is an online marketplace and community for digital creator services and assets. It is operated by [OPERATOR_LEGAL_NAME], at [BUSINESS_POSTAL_ADDRESS]. General and legal enquiries: [SUPPORT_EMAIL]. Privacy enquiries: [PRIVACY_EMAIL].",
+      "Made for Stream is an online marketplace and community for digital creator services and assets. It is operated by [OPERATOR_LEGAL_NAME], at [BUSINESS_POSTAL_ADDRESS]. General and legal enquiries: [SUPPORT_EMAIL]. Privacy enquiries: [PRIVACY_EMAIL].",
       "These Terms govern accounts, creator applications, listings, messaging, project agreements, payments and related services. Before creating an account or accepting a paid agreement, you must be shown these Terms and affirmatively accept the terms applicable to that activity. If you do not agree, do not create an account or enter a transaction."
     ]
   },
@@ -29,7 +29,7 @@ export const termsSections = [
   {
     "title": "4. Platform role and creator approval",
     "body": [
-      "CreatorHub provides discovery, communication, project administration and payment-related tools. The identified creator supplies the commissioned work and is responsible for performing the project agreement. Creators are independent users, not CreatorHub employees. CreatorHub is responsible for its own services, representations and obligations; nothing here removes duties imposed on a marketplace by law.",
+      "Made for Stream provides discovery, communication, project administration and payment-related tools. The identified creator supplies the commissioned work and is responsible for performing the project agreement. Creators are independent users, not Made for Stream employees. Made for Stream is responsible for its own services, representations and obligations; nothing here removes duties imposed on a marketplace by law.",
       "Creator access requires a completed application and approval. We may request samples, review linked accounts, request changes or restrict creator access for reasonable safety, integrity, capacity or compliance reasons. A linked Twitch or YouTube account is not a guarantee of approval, quality or identity. We do not guarantee demand, earnings or the outcome of a commission."
     ]
   },
@@ -43,8 +43,8 @@ export const termsSections = [
   {
     "title": "6. Payments, pricing, refunds and disputes",
     "body": [
-      "The Fee Schedule and Payment Terms states CreatorHub's buyer service fee and creator platform fee, each currently 5% of the base payment with the currency-specific minimums listed there. Fees apply per successful instalment. Creator tips are excluded from CreatorHub fees, and optional CreatorHub support is separate and voluntary. Taxes and all mandatory charges must be disclosed before payment.",
-      "Commission payments use Stripe Connect direct charges on the creator's connected account. CreatorHub's fees are collected through that arrangement. Stripe processes payments and applies its own conditions. CreatorHub does not provide escrow or guarantee that funds are held until completion.",
+      "The Fee Schedule and Payment Terms states Made for Stream's buyer service fee and creator platform fee, each currently 5% of the base payment with the currency-specific minimums listed there. Fees apply per successful instalment. Creator tips are excluded from Made for Stream fees, and optional Made for Stream support is separate and voluntary. Taxes and all mandatory charges must be disclosed before payment.",
+      "Commission payments use Stripe Connect direct charges on the creator's connected account. Made for Stream's fees are collected through that arrangement. Stripe processes payments and applies its own conditions. Made for Stream does not provide escrow or guarantee that funds are held until completion.",
       "The Refund, Cancellation and Dispute Policy governs cancellation, deposits, earned milestone value, revisions, unresponsive parties, refunds and escalation. Buyers can cancel before substantive work for a full refund; after work begins, unearned amounts remain refundable under that policy. Neither a “no refunds” listing nor conversation closure overrides it. Internal review does not remove a right to a lawful bank dispute, consumer remedy or court proceeding."
     ]
   },
@@ -58,7 +58,7 @@ export const termsSections = [
   {
     "title": "8. Ownership and licences",
     "body": [
-      "Users retain rights they own. Uploading content does not transfer copyright to CreatorHub. You give CreatorHub a non-exclusive, worldwide, royalty-free licence to store, reproduce, transmit, display and technically process your content only as reasonably needed to operate the features you use, deliver the service, protect users and resolve disputes. We may use service providers for these purposes under appropriate restrictions.",
+      "Users retain rights they own. Uploading content does not transfer copyright to Made for Stream. You give Made for Stream a non-exclusive, worldwide, royalty-free licence to store, reproduce, transmit, display and technically process your content only as reasonably needed to operate the features you use, deliver the service, protect users and resolve disputes. We may use service providers for these purposes under appropriate restrictions.",
       "Public profiles, listings and portfolio previews can be displayed as part of discovery. Private messages and project deliverables are not licensed for public advertising merely because they were uploaded. We require separate permission to use private work in promotional material or for a separate AI-training purpose. The operating licence ends when content is deleted, except for reasonable backup expiry, legally required retention, unresolved disputes and copies already lawfully received by other users.",
       "The creator-buyer agreement must state the intended use and whether it grants a licence or transfers specified rights. Unless it expressly states otherwise, the creator retains copyright; after payment for a delivered item, the buyer receives a non-exclusive, worldwide, continuing licence to use it for the purpose recorded in the agreement, including commercial use if that purpose includes it. Unstated exclusivity, standalone resale rights, source files and third-party rights are not implied. Any required signed assignment must be completed separately. Mandatory rights remain unaffected.",
       "Rights in fully refunded work and separately retained paid work follow the refund policy. A payment alone does not cure infringement or authorise the creator to publish confidential client work."
@@ -80,8 +80,8 @@ export const termsSections = [
   {
     "title": "11. Availability, disclaimers and liability",
     "body": [
-      "We take reasonable care in operating CreatorHub but do not promise uninterrupted access, error-free software or guaranteed commercial results. To the extent permitted by law, services are provided on an as-available basis. These qualifications do not exclude an express commitment in these policies or a non-waivable standard of care or consumer guarantee.",
-      "To the extent permitted by law, CreatorHub and its operators are not liable for indirect or consequential loss such as lost profits, revenue or goodwill arising from use of the service. Nothing excludes or limits liability where unlawful, including non-excludable consumer remedies or liability for fraud or other conduct that cannot lawfully be excluded. This clause does not cancel an agreed or legally owed refund."
+      "We take reasonable care in operating Made for Stream but do not promise uninterrupted access, error-free software or guaranteed commercial results. To the extent permitted by law, services are provided on an as-available basis. These qualifications do not exclude an express commitment in these policies or a non-waivable standard of care or consumer guarantee.",
+      "To the extent permitted by law, Made for Stream and its operators are not liable for indirect or consequential loss such as lost profits, revenue or goodwill arising from use of the service. Nothing excludes or limits liability where unlawful, including non-excludable consumer remedies or liability for fraud or other conduct that cannot lawfully be excluded. This clause does not cancel an agreed or legally owed refund."
     ]
   },
   {

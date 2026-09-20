@@ -1,4 +1,4 @@
-# CreatorHub support agent — runtime configuration.
+# Made for Stream support agent — runtime configuration.
 #
 # STATUS: dormant. The agent is not running. This file is the specification it
 # will load at production deploy. See agent-contract.md for the reasoning behind

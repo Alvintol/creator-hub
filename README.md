@@ -1,4 +1,10 @@
-# CreatorHub
+# Made for Stream
+
+**By creators, for creators.**
+
+Production domain: [madeforstream.com](https://madeforstream.com).
+
+Branding compatibility and domain launch settings: [Rebranding notes](docs/rebranding.md).
 
 A creator-first hub and marketplace for digital creator work: emotes, PNG/VTuber models, overlays, rigging, video editing and more. It is built around **trust** (verified creators, agreements, protected payments) and **discoverability** (market browsing, creator profiles, "Live now").
 
@@ -6,14 +12,14 @@ A creator-first hub and marketplace for digital creator work: emotes, PNG/VTuber
 
 ---
 
-## Why CreatorHub exists
+## Why Made for Stream exists
 
 Creators often struggle to:
 - get discovered by a niche audience
 - prove legitimacy and avoid impersonation
 - avoid scams (buyers or sellers disappearing, refusing to pay, or not delivering)
 
-CreatorHub makes it easy to find trusted creators, agree on the work up front, and pay safely in stages so both sides are protected.
+Made for Stream makes it easy to find trusted creators, agree on the work up front, and pay safely in stages so both sides are protected.
 
 ---
 

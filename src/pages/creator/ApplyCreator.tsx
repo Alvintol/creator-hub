@@ -442,7 +442,7 @@ const ApplyCreator = () => {
       backTo="/settings/profile"
       backLabel="Back to settings"
       eyebrow="Creator application"
-      title="Apply to sell on CreatorHub"
+      title="Apply to sell on Made for Stream"
       meta={[
         <span key="review">Manually reviewed</span>,
         <span key="human">Human-made work only</span>,
@@ -532,7 +532,7 @@ const ApplyCreator = () => {
           <div>
             <h2 className={classes.cardTitle}>What you’ll need</h2>
             <p className={classes.text}>
-              Applications are reviewed by the CreatorHub team to keep the marketplace human-made and trustworthy.
+              Applications are reviewed by the Made for Stream team to keep the marketplace human-made and trustworthy.
             </p>
           </div>
 

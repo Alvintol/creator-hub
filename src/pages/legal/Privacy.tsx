@@ -19,7 +19,7 @@ const Privacy = () => {
     <div className={classes.page}>
       <div className={classes.header}>
         <h1 className={classes.h1}>Privacy Policy</h1>
-        <p className={classes.sub}>How CreatorHub handles personal information.</p>
+        <p className={classes.sub}>How Made for Stream handles personal information.</p>
       </div>
 
       <div className={classes.card}>

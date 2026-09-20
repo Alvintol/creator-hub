@@ -33,7 +33,7 @@ connected account.
 ## What this means operationally, today
 
 A refund issued by hand in the Stripe dashboard **does not appear in
-CreatorHub at all**. The payment continues to read `paid`. The request continues
+Made for Stream at all**. The payment continues to read `paid`. The request continues
 to behave as though the money is there. The buyer has been refunded and the
 system still thinks they paid.
 
@@ -41,7 +41,7 @@ That divergence is the real risk here — not the missing button. Every manual
 refund silently makes our records wrong, and nothing detects it.
 
 **The same is true for disputes.** A buyer who disputes a charge with their bank
-triggers a Stripe dispute against the *creator's* connected account. CreatorHub
+triggers a Stripe dispute against the *creator's* connected account. Made for Stream
 learns nothing. The creator may lose the money and the disputed amount plus a
 fee, while the project continues as though everything is settled.
 
@@ -91,12 +91,12 @@ Decide explicitly, and record the decision:
 None of these have a policy yet. **That policy is a prerequisite for building
 the feature**, not a detail to settle during the first refund.
 
-**Money impact.** Direct. And the CreatorHub record will be wrong afterwards
+**Money impact.** Direct. And the Made for Stream record will be wrong afterwards
 until this feature exists.
 
 ---
 
-## `REF-002` — Refund issued in Stripe, not reflected in CreatorHub
+## `REF-002` — Refund issued in Stripe, not reflected in Made for Stream
 
 ```yaml
 id: REF-002
@@ -109,7 +109,7 @@ auto_fix: none
 reason_not_automatable: "no sanctioned write path for refund status"
 escalate_with:
   - "the refund amount and whether it was full or partial"
-  - "the CreatorHub payment it corresponds to"
+  - "the Made for Stream payment it corresponds to"
   - "the request's current stage"
 ```
 
@@ -166,7 +166,7 @@ automatic loss. There is no version of this that waits.
 **Fix.** Manual and time-critical:
 
 1. Note the evidence deadline immediately. It is short.
-2. Gather the record — this is exactly what CreatorHub is for. The agreement,
+2. Gather the record — this is exactly what Made for Stream is for. The agreement,
    the buyer's acceptance, the delivery, the messages. That evidence is the
    product's core value proposition, and a dispute is where it proves out.
 3. Tell the creator. It is their account and their money.
@@ -226,7 +226,7 @@ Recorded here so the work is specified before it starts:
 This entire playbook is a known gap. In priority order:
 
 - No refund capability in the product at all.
-- No dispute visibility. A creator can lose money and a case without CreatorHub
+- No dispute visibility. A creator can lose money and a case without Made for Stream
   ever knowing.
 - `stripe_charge_id` / `stripe_application_fee_id` never populated, which blocks
   the rest.

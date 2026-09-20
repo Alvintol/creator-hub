@@ -181,7 +181,7 @@ const ListingRequestPaymentsCard = ({
                       payment.platform_support_cents,
                       payment.currency,
                     )}{" "}
-                    optional CreatorHub support.
+                    optional Made for Stream support.
                   </p>
                 )}
 

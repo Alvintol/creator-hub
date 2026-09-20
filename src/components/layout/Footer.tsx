@@ -30,15 +30,14 @@ const Footer = () => {
       <div className={classes.inner}>
         <div className={classes.brand}>
           <Link to="/" className={classes.brandRow} aria-label="Home">
-            <img src="/logo-mark.png" alt="" className={classes.brandMark} draggable={false} />
+            <img src="/made-for-stream-mark.svg" alt="" className={classes.brandMark} draggable={false} />
             <span className={classes.brandText}>
-              <span className={classes.brandAccent}>Creator</span>
-              <span>Hub</span>
+              Made for <span className={classes.brandAccent}>Stream</span>
             </span>
           </Link>
 
           <p className={classes.tagline}>
-            A human-made marketplace for emotes, overlays, VTuber models, editing
+            By creators, for creators. A human-made marketplace for emotes, overlays, VTuber models, editing
             and audio help.
           </p>
         </div>
@@ -80,7 +79,7 @@ const Footer = () => {
       </div>
 
       <div className={classes.bottom}>
-        <div>© {year} CreatorHub • Marketplace for creator assets & services</div>
+        <div>© {year} Made for Stream • Marketplace for creator assets & services</div>
 
         <div className={classes.credit}>
           Built by Alvin (Beans) •{" "}

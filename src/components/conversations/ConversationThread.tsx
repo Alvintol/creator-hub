@@ -336,7 +336,7 @@ const ConversationThread = ({
       ? buyerLabel
       : senderUserId === conversation.creator_user_id
         ? creatorLabel
-        : "CreatorHub";
+        : "Made for Stream";
 
   const otherParticipantUserId =
     viewer === "buyer"

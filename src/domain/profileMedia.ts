@@ -3,7 +3,7 @@ import type { ProfilePlatformAccountRow } from "../hooks/profile/useProfilePlatf
 
 // Returns the best available avatar URL for a user profile
 // Priority:
-// 1) manual CreatorHub avatar upload (future)
+// 1) manual Made for Stream avatar upload (future)
 // 2) linked Twitch avatar from metadata
 export const getProfileAvatarUrl = (
   profile: ProfileRow | null | undefined,
