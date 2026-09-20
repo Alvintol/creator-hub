@@ -20,8 +20,8 @@ type CategoryLink = {
 };
 
 const brand = {
-  markSrc: "/logo-mark.png",
-  alt: "CreatorHub",
+  markSrc: "/made-for-stream-mark.svg",
+  alt: "",
 } as const;
 
 const classes = {
@@ -29,12 +29,12 @@ const classes = {
 
   topRow: "container mx-auto flex h-12 items-center gap-3 px-4 py-0 sm:px-6",
   brandLink: "shrink-0 text-lg font-black tracking-tight",
-  brandWrap: "inline-flex items-center gap-2",
+  brandWrap: "inline-flex items-center gap-2 whitespace-nowrap",
   brandImg: "brandMark h-7 w-7 shrink-0",
-  brandText: "font-display text-base font-extrabold tracking-tight",
+  brandText: "font-display text-xs sm:text-base font-extrabold tracking-tight",
   brandAccent: "text-[rgb(var(--brand))]",
 
-  form: "flex w-full items-center gap-2",
+  form: "flex min-w-0 w-full items-center gap-2",
   searchInput: "searchInput h-8 py-0",
   searchButton: "btnOutline btnSm h-8 hidden sm:inline-flex",
 
@@ -191,7 +191,7 @@ const Nav = () => {
             />
 
             <span className={classes.brandText}>
-              <span className={classes.brandAccent}>Creator</span>Hub
+              Made for <span className={classes.brandAccent}>Stream</span>
             </span>
           </span>
         </Link>

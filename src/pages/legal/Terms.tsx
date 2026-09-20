@@ -19,7 +19,7 @@ const Terms = () => {
     <div className={classes.page}>
       <div className={classes.header}>
         <h1 className={classes.h1}>Terms of Service</h1>
-        <p className={classes.sub}>Platform-wide terms for CreatorHub.</p>
+        <p className={classes.sub}>Platform-wide terms for Made for Stream.</p>
       </div>
 
       <div className={classes.card}>

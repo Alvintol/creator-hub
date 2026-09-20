@@ -24,7 +24,7 @@ const Legal = () => {
         <h1 className={classes.h1}>Legal</h1>
 
         <p className={classes.sub}>
-          Public policies and platform terms for CreatorHub.
+          Public policies and platform terms for Made for Stream.
         </p>
       </div>
 
@@ -32,7 +32,7 @@ const Legal = () => {
         <div className={classes.sectionTitle}>Policies and terms</div>
 
         <p className={classes.sectionText}>
-          These pages explain how CreatorHub works, how user data is handled,
+          These pages explain how Made for Stream works, how user data is handled,
           and what rules apply to creators and buyers.
         </p>
 
@@ -40,14 +40,14 @@ const Legal = () => {
           <Link className={classes.linkCard} to="/terms">
             <div className={classes.linkTitle}>Terms of Service</div>
             <div className={classes.linkText}>
-              Platform-wide rules for using CreatorHub.
+              Platform-wide rules for using Made for Stream.
             </div>
           </Link>
 
           <Link className={classes.linkCard} to="/privacy">
             <div className={classes.linkTitle}>Privacy Policy</div>
             <div className={classes.linkText}>
-              How CreatorHub collects, uses, and protects information.
+              How Made for Stream collects, uses, and protects information.
             </div>
           </Link>
 
@@ -83,7 +83,7 @@ const Legal = () => {
               Copyright Infringement and DMCA Policy
             </div>
             <div className={classes.linkText}>
-              How to report infringing material and how CreatorHub responds.
+              How to report infringing material and how Made for Stream responds.
             </div>
           </Link>
 

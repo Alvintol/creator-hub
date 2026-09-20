@@ -8,7 +8,7 @@ const RefundPolicy = () => {
   return (
     <LegalPolicySections
       title="Refund, Cancellation and Dispute Policy"
-      subtitle="How cancellations, partial refunds, revisions and disputes work on CreatorHub."
+      subtitle="How cancellations, partial refunds, revisions and disputes work on Made for Stream."
       sections={refundPolicySections}
       version={refundPolicyVersion}
     />

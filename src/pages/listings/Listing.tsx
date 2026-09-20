@@ -328,7 +328,7 @@ const ListingPage = () => {
                 <p className={classes.ctaText}>
                   {listing.free_delivery_type === "download"
                     ? "No payment, no sign-in required — this file is uploaded and hosted here."
-                    : "This opens on the creator's own site or store, outside CreatorHub."}
+                    : "This opens on the creator's own site or store, outside Made for Stream."}
                 </p>
 
                 <a
@@ -377,7 +377,7 @@ const ListingPage = () => {
 
             <p className={classes.reportText}>
               Report this listing if it appears unsafe, misleading, stolen, abusive, or
-              against CreatorHub rules. Reporting does not automatically hide the listing.
+              against Made for Stream rules. Reporting does not automatically hide the listing.
             </p>
 
             {reportSuccess && (

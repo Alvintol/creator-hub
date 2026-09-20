@@ -69,7 +69,7 @@ const renderSettings = (isCreatorApproved = true) =>
   );
 
 const getStartButton = () => screen.getByRole("button", { name: /Start Stripe setup/i });
-const getTermsCheckbox = () => screen.getByRole("checkbox", { name: /I accept the CreatorHub Creator Terms/i });
+const getTermsCheckbox = () => screen.getByRole("checkbox", { name: /I accept the Made for Stream Creator Terms/i });
 
 describe("CreatorPayoutSettings creator terms acceptance", () => {
   beforeEach(() => {
@@ -93,7 +93,7 @@ describe("CreatorPayoutSettings creator terms acceptance", () => {
 
     expect(getTermsCheckbox()).not.toBeChecked();
     expect(getTermsCheckbox().closest("label")).toHaveTextContent(
-      "I accept the CreatorHub Creator Terms and the Stripe Connected Account Agreement, including its incorporated Stripe Services Agreement.",
+      "I accept the Made for Stream Creator Terms and the Stripe Connected Account Agreement, including its incorporated Stripe Services Agreement.",
     );
     expect(screen.getByRole("link", { name: "Creator Terms" })).toHaveAttribute("href", "/terms/creator");
     expect(screen.getByRole("link", { name: "Stripe Connected Account Agreement" })).toHaveAttribute(

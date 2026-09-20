@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>Made for Stream</title>
+  <rect width="64" height="64" rx="16" fill="#181321"/>
+  <path d="M12 46V18L27 32L42 18V46" stroke="#A78BFA" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M45 28L57 36L45 44V28Z" fill="#F45C2C"/>
+</svg>

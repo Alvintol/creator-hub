@@ -26,7 +26,7 @@ const getPaymentMessage = ({
       className: classes.success,
       title: "Payment received",
       text:
-        "Stripe confirmed the payment. CreatorHub will unlock the next workflow step shortly.",
+        "Stripe confirmed the payment. Made for Stream will unlock the next workflow step shortly.",
     };
   }
 
@@ -43,7 +43,7 @@ const getPaymentMessage = ({
     className: classes.info,
     title: "Checking payment",
     text:
-      "CreatorHub is checking the latest payment status from Stripe. Webhooks remain the source of truth for paid status.",
+      "Made for Stream is checking the latest payment status from Stripe. Webhooks remain the source of truth for paid status.",
   };
 };
 
@@ -67,7 +67,7 @@ const PaymentReturn = () => {
       <section className={classes.card}>
         <h1 className={classes.title}>Payment status</h1>
         <p className={classes.text}>
-          Thanks for returning to CreatorHub. Stripe confirms payment status
+          Thanks for returning to Made for Stream. Stripe confirms payment status
           through webhooks, so this page may update slightly before the request
           page does.
         </p>

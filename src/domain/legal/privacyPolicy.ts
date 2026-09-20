@@ -1,13 +1,13 @@
 // REVIEW DRAFT: placeholders are intentionally left in place until the
 // operating entity, brand and domain are finalized. Safe to keep live
 // pre-launch; must be resolved before public launch.
-export const privacyVersion = "2026-09-19-draft-2";
+export const privacyVersion = "2026-09-20-draft-1";
 
 export const privacySections = [
   {
     "title": "1. Who is responsible",
     "body": [
-      "CreatorHub is operated by [OPERATOR_LEGAL_NAME], at [BUSINESS_POSTAL_ADDRESS]. The individual responsible for privacy enquiries can be reached at [PRIVACY_EMAIL]. This policy explains personal information handled through accounts, creator applications, listings, messaging, projects, payments and support.",
+      "Made for Stream is operated by [OPERATOR_LEGAL_NAME], at [BUSINESS_POSTAL_ADDRESS]. The individual responsible for privacy enquiries can be reached at [PRIVACY_EMAIL]. This policy explains personal information handled through accounts, creator applications, listings, messaging, projects, payments and support.",
       "It does not replace the privacy notices of services you choose to use, such as Stripe or a sign-in provider. We identify relevant sharing below. Where privacy law imposes additional mandatory requirements, those requirements apply."
     ]
   },
@@ -22,7 +22,7 @@ export const privacySections = [
       "Information: Technical and security; Examples and sources: IP address, device and browser information, access and error logs, security events and relevant session identifiers",
       "Information: Choices and acceptance records; Examples and sources: Terms version and time of acceptance, privacy preferences, cookie choices and marketing consent where applicable",
       "Information: Copyright reports; Examples and sources: Contact information, work locations, declarations, notices, counter-notices and related decisions",
-      "Do not send full payment-card numbers, account passwords or unnecessary government identification through project messages. Payment-card entry and required Stripe identity verification occur through Stripe's interfaces. CreatorHub receives operational account and payment information; we do not require full card details in our ordinary application database. Any additional access to verification data is limited to authorised needs and actual integration permissions."
+      "Do not send full payment-card numbers, account passwords or unnecessary government identification through project messages. Payment-card entry and required Stripe identity verification occur through Stripe's interfaces. Made for Stream receives operational account and payment information; we do not require full card details in our ordinary application database. Any additional access to verification data is limited to authorised needs and actual integration permissions."
     ]
   },
   {
@@ -36,8 +36,8 @@ export const privacySections = [
   {
     "title": "4. Public information and recipients",
     "body": [
-      "Public profile fields, published listings and portfolio previews are visible to other users and may be indexed or copied by others. A draft application, private message or private project delivery is not public merely because CreatorHub stores it. Necessary project details are shared with the other party, and authorised personnel may review relevant records for support, safety or legal reasons. Access is limited to the task.",
-      "We use service providers for hosting, databases, authentication, storage, payment services and enabled communications. CreatorHub uses Supabase for account and database functions and Stripe for payment and connected-account services. Where externally served Google Fonts are enabled, the browser also makes requests to Google to obtain font resources; those requests can reveal technical data such as the visitor's IP address even without an analytics cookie. Other enabled infrastructure, messaging or analytics providers must be listed in the published Service Provider Register with their functions and relevant processing locations. We share only what is needed for the stated service and require appropriate safeguards.",
+      "Public profile fields, published listings and portfolio previews are visible to other users and may be indexed or copied by others. A draft application, private message or private project delivery is not public merely because Made for Stream stores it. Necessary project details are shared with the other party, and authorised personnel may review relevant records for support, safety or legal reasons. Access is limited to the task.",
+      "We use service providers for hosting, databases, authentication, storage, payment services and enabled communications. Made for Stream uses Supabase for account and database functions and Stripe for payment and connected-account services. Where externally served Google Fonts are enabled, the browser also makes requests to Google to obtain font resources; those requests can reveal technical data such as the visitor's IP address even without an analytics cookie. Other enabled infrastructure, messaging or analytics providers must be listed in the published Service Provider Register with their functions and relevant processing locations. We share only what is needed for the stated service and require appropriate safeguards.",
       "Google, Twitch or other providers you select supply the identity or connection information covered by your authorisation. Their own services remain governed by their notices. We do not need your sign-in-provider password. Disconnecting an optional link stops future access through that authorisation, subject to existing records and provider controls.",
       "We may disclose information when law requires it, in response to valid legal process, or where law permits necessary protection against fraud or serious harm. Any business transfer must preserve applicable privacy obligations and be accompanied by notice where required."
     ]
@@ -45,7 +45,7 @@ export const privacySections = [
   {
     "title": "5. Stripe and transaction information",
     "body": [
-      "When you provide personal data through Stripe payment or onboarding features, Stripe receives it and processes it under Stripe's Privacy Policy (https://stripe.com/privacy). Relevant account, business, verification, transaction, device and fraud-prevention information may pass between CreatorHub and Stripe to operate the requested service. Stripe may process some information for its own legal, regulatory and risk-management purposes.",
+      "When you provide personal data through Stripe payment or onboarding features, Stripe receives it and processes it under Stripe's Privacy Policy (https://stripe.com/privacy). Relevant account, business, verification, transaction, device and fraud-prevention information may pass between Made for Stream and Stripe to operate the requested service. Stripe may process some information for its own legal, regulatory and risk-management purposes.",
       "Creators must complete the agreement and consent steps required by Stripe. For Canadian connected accounts, this can include consent to credit-agency information for identity verification. We do not treat that as permission to obtain an unrelated consumer credit report for our own marketing or lending purposes.",
       "For a payment complaint or chargeback, relevant agreements, communications, delivery evidence and transaction records may be shared with Stripe, a bank or payment network. We avoid sharing unrelated message history where it is not necessary."
     ]
@@ -62,7 +62,7 @@ export const privacySections = [
     "body": [
       "The Cookie and Tracking Policy and its Storage Register explain browser storage, optional analytics and external services. Optional tracking requires the choices stated there. You can change them through Cookie settings. Security logs necessary to operate the service are assessed separately and are not automatically erased by rejecting analytics.",
       "Service emails can include security alerts, application decisions, project messages and payment or support updates. Marketing subscriptions are separate, with consent where required and an accessible unsubscribe option. Opting out of marketing does not prevent necessary service notices.",
-      "CreatorHub does not sell personal information or share it for cross-context behavioural advertising under this draft service model. Before introducing advertising arrangements that change that position, we must provide the applicable disclosures and choices, honour legally required opt-out signals and obtain consent where needed. Future advertising plans are not a statement that tracking is currently active."
+      "Made for Stream does not sell personal information or share it for cross-context behavioural advertising under this draft service model. Before introducing advertising arrangements that change that position, we must provide the applicable disclosures and choices, honour legally required opt-out signals and obtain consent where needed. Future advertising plans are not a statement that tracking is currently active."
     ]
   },
   {
@@ -84,7 +84,7 @@ export const privacySections = [
   {
     "title": "9. International processing and security",
     "body": [
-      "CreatorHub operates from Canada. Providers may process data in other countries, where authorities may have lawful access under local rules. The Service Provider Register identifies verified locations. Where applicable law requires a transfer mechanism or assessment, we use the appropriate contractual or other safeguards before the transfer and explain how to obtain relevant information by contacting [PRIVACY_EMAIL]. We do not promise Canadian-only storage without a verified basis.",
+      "Made for Stream operates from Canada. Providers may process data in other countries, where authorities may have lawful access under local rules. The Service Provider Register identifies verified locations. Where applicable law requires a transfer mechanism or assessment, we use the appropriate contractual or other safeguards before the transfer and explain how to obtain relevant information by contacting [PRIVACY_EMAIL]. We do not promise Canadian-only storage without a verified basis.",
       "We use reasonable technical and organisational safeguards appropriate to the data, including access controls and restricted operational access. No service can guarantee absolute security. We assess incidents and notify affected people and authorities where required by applicable law."
     ]
   },

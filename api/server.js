@@ -200,7 +200,7 @@ app.use(express.json());
 app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
-    service: "creator-hub-api",
+    service: "made-for-stream-api",
   });
 });
 
@@ -590,7 +590,7 @@ const markListingRequestPaymentProcessingFromCheckoutSession =
 
     if (!paymentId) {
       throw new Error(
-        "Stripe checkout session is missing CreatorHub payment metadata.",
+        "Stripe checkout session is missing Made for Stream payment metadata.",
       );
     }
 
@@ -640,7 +640,7 @@ const markListingRequestPaymentPaidFromCheckoutSession =
 
     if (!paymentId) {
       throw new Error(
-        "Stripe checkout session is missing CreatorHub payment metadata.",
+        "Stripe checkout session is missing Made for Stream payment metadata.",
       );
     }
 
@@ -749,7 +749,7 @@ const markListingRequestPaymentCancelledFromCheckoutSession =
 
     if (!paymentId) {
       throw new Error(
-        "Stripe checkout session is missing CreatorHub payment metadata.",
+        "Stripe checkout session is missing Made for Stream payment metadata.",
       );
     }
 
@@ -798,7 +798,7 @@ const markListingRequestPaymentFailedFromPaymentIntent =
       getPaymentIdFromStripeObject(paymentIntent);
 
     // Stripe may send PaymentIntent events unrelated to
-    // CreatorHub's payment ledger.
+    // Made for Stream's payment ledger.
     if (!paymentId) {
       return;
     }
@@ -1053,7 +1053,7 @@ const getStripeConnectSetupRequiredResponse = (message) => {
     body: {
       code: "stripe_connect_platform_setup_required",
       error:
-        "CreatorHub's Stripe platform account needs Connect setup before creator payout onboarding can start.",
+        "Made for Stream's Stripe platform account needs Connect setup before creator payout onboarding can start.",
       actionUrl: STRIPE_CONNECT_SETUP_URL,
     },
   };
@@ -1170,14 +1170,14 @@ const assertCheckoutPaymentCanBeOpened = ({ payment, userId }) => {
 
 const getPaymentCheckoutTitle = (payment) => {
   const labelByType = {
-    one_time: "CreatorHub one-time payment",
-    starting_payment: "CreatorHub starting payment",
-    milestone_payment: "CreatorHub milestone payment",
-    change_order_payment: "CreatorHub change-order payment",
-    final_balance: "CreatorHub final balance",
+    one_time: "Made for Stream one-time payment",
+    starting_payment: "Made for Stream starting payment",
+    milestone_payment: "Made for Stream milestone payment",
+    change_order_payment: "Made for Stream change-order payment",
+    final_balance: "Made for Stream final balance",
   };
 
-  return labelByType[payment.payment_type] || "CreatorHub project payment";
+  return labelByType[payment.payment_type] || "Made for Stream project payment";
 };
 
 const getStripePaymentMetadata = (payment) => ({

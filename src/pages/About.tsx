@@ -31,9 +31,9 @@ const About = () => {
   return (
     <div className={classes.page}>
       <section className={classes.hero}>
-        <h1 className={classes.h1}>About CreatorHub</h1>
+        <h1 className={classes.h1}>About Made for Stream</h1>
         <p className={classes.lead}>
-          CreatorHub is a discovery-first marketplace for creator-made assets and services —
+          Made for Stream is a discovery-first marketplace for creator-made assets and services —
           emotes, overlays, PNG/VTuber models, rigging, editing, and audio help — in one trusted place.
         </p>
 

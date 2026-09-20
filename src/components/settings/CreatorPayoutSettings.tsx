@@ -220,7 +220,7 @@ const CreatorPayoutSettings = ({ isCreatorApproved }: CreatorPayoutSettingsProps
           onChange={setCreatorTermsAgreed}
           disabled={isStarting || creatorTermsQuery.isLoading}
         >
-          I accept the CreatorHub{" "}
+          I accept the Made for Stream{" "}
           <Link className={classes.policyLink} to="/terms/creator" target="_blank" rel="noopener">
             Creator Terms
           </Link>{" "}

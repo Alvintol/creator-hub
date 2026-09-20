@@ -173,7 +173,7 @@ escalate_with:
 ```
 
 **Cause.** Someone is being defrauded, or a creator is being impersonated —
-exactly the failure CreatorHub exists to prevent.
+exactly the failure Made for Stream exists to prevent.
 
 **Why Tier 3 immediately.** Money may be moving right now, and delay is the cost.
 Multiple reports against one target within a short window is a strong signal

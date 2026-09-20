@@ -12,7 +12,7 @@ unmatched_tier: 2
 
 # Stripe Webhooks — Support Playbook
 
-Webhooks are how CreatorHub learns that money moved. Everything downstream —
+Webhooks are how Made for Stream learns that money moved. Everything downstream —
 a request advancing past its payment gate, a milestone unlocking, a final
 delivery becoming allowed — happens because a webhook was processed.
 
@@ -166,7 +166,7 @@ id: WHK-004
 tier: 2
 signals:
   - source: api
-    match: "Stripe checkout session is missing CreatorHub payment metadata."
+    match: "Stripe checkout session is missing Made for Stream payment metadata."
   - source: api
     match: "Payment record was not found."
 auto_fix: none

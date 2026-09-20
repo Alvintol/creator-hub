@@ -505,7 +505,7 @@ const CreatorProfile = () => {
 
         <p className={classes.reportText}>
           Report this creator profile if it appears unsafe, misleading, abusive,
-          impersonated, or against CreatorHub rules. Reporting does not automatically
+          impersonated, or against Made for Stream rules. Reporting does not automatically
           restrict the profile.
         </p>
 

@@ -8,7 +8,7 @@ const FeeSchedule = () => {
   return (
     <LegalPolicySections
       title="Fee Schedule and Payment Terms"
-      subtitle="What buyers pay, what creators receive, and how CreatorHub's fees are calculated."
+      subtitle="What buyers pay, what creators receive, and how Made for Stream's fees are calculated."
       sections={paymentTermsSections}
       version={paymentTermsVersion}
     />

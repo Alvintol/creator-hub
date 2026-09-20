@@ -102,7 +102,7 @@ const ListingRequestPaymentCheckout = () => {
       <section className={classes.card}>
         <h1 className={classes.title}>Complete payment</h1>
         <p className={classes.text}>
-          Your payment is processed securely by Stripe inside CreatorHub. Payment
+          Your payment is processed securely by Stripe inside Made for Stream. Payment
           status updates after Stripe confirms the transaction.
         </p>
       </section>
@@ -141,7 +141,7 @@ const ListingRequestPaymentCheckout = () => {
             )}
             {payment.platform_support_cents > 0 && (
               <div className={classes.amountRow}>
-                <dt>CreatorHub support</dt>
+                <dt>Made for Stream support</dt>
                 <dd>{formatPaymentCents(payment.platform_support_cents, payment.currency)}</dd>
               </div>
             )}

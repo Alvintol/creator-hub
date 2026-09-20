@@ -83,15 +83,8 @@
     border-bottom: 1px solid var(--hairline);
   }
 
-  /* The logo's darker violet disappears on dark backgrounds, so the mark sits on a light plate there. */
   .brandMark {
     @apply rounded-[10px] transition duration-200;
-  }
-
-  [data-theme="dark"] .brandMark {
-    background: rgb(247 247 255);
-    padding: 3px;
-    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06);
   }
 
   .themeToggle {
