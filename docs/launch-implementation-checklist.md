@@ -8,8 +8,9 @@ Every item follows `AGENTS.md`: enforcement at the database and API rather than 
 UI alone, the next free migration number taken from `supabase/migrations/`, and a
 support playbook written or updated before the branch is ready.
 
-**Baselines to hold** (as of 2026-09-17): 740 tests passing, eslint 21 pre-existing
-errors, tsc 19 lines. Do not let them grow.
+**Baselines to hold** (measured 2026-09-21): **837 tests passing, eslint clean, tsc
+clean.** `AGENTS.md` still records the older 740 / 21 errors / 19 lines — those were
+cleaned up since and it is gitignored, so this file is the current reference.
 
 ---
 
@@ -44,11 +45,6 @@ several are invisible from the codebase and will otherwise be re-derived wrongly
 - [ ] Verify how `delay_days` interacts with a **weekly** interval before
       implementing the 14-day hold — `delay_days` is a `daily` schedule parameter.
       The interval itself is decided (§6.3): weekly, not daily.
-- [ ] **Read Stripe's Instant Payout fee for each country we onboard in** (§6.4).
-      It is not on the public docs pages. Confirm on the account.
-- [ ] Confirm Instant Payout eligibility requirements per country — in Canada the
-      destination must be a **debit card**, not a bank account, which changes what
-      onboarding has to collect.
 - [ ] Confirm the per-payout 0.25% volume fee is understood as a standing cost: at a
       5% creator fee it consumes about 5% of gross revenue.
 
@@ -87,15 +83,17 @@ new currency ships wrong money rather than a new market.
 - [ ] **Creator fee minimum only.** The buyer service fee is a flat 5% with no
       minimum — do not carry a buyer minimum through the new code path.
 - [ ] Model the creator's monthly period as one shared concept, and give the
-      consumption record a **waiver reason** field (§3.3). Both are small now and
+      consumption record a **waiver reason** field (§3.4). Both are small now and
       both are what a future subscription reads.
 - [ ] Tests: second payment in a month pays percentage only; refund of the consuming
       payment re-arms the minimum; two currencies in one month consume separately;
       a month boundary in UTC; a waived month is recorded with its reason.
 - [ ] Apply `amount_multiple` rounding for three-decimal currencies.
-- [ ] Enforce the instalment floor before a payment row is created — the registry's
-      `minimum_instalment` for a month's first payment, `stripe_minimum_charge` after
-      that (§3.1) — with a clear message rather than `PAY-004`'s generic failure.
+- [ ] Enforce the registry's `minimum_instalment` before a payment row is created —
+      **the same floor on every instalment**, not a lower one after the month's
+      first (§3.1). Below a base of about 4.31 the platform loses money on the
+      transaction (§3.3). Give it a clear message rather than `PAY-004`'s generic
+      failure.
 - [ ] Fix `formatPaymentCents` (`src/domain/payments/listingRequestPaymentDisplay.ts`)
       to divide by the registry exponent, not by 100. Extend
       `src/lib/formatMoney.ts` the same way.
@@ -114,11 +112,12 @@ new currency ships wrong money rather than a new market.
 - [ ] First server-side tests for `api/server.js` start here — registry validation is
       a pure function and a good place to begin closing that gap.
 
-**Also in this sprint, because it is two lines and blocks free-listing creators:**
+**Done:**
 
-- [ ] Migration: exempt `is_free` listings from
-      `enforce_listing_payment_account_readiness`.
-- [ ] Playbook: update `listings/listings.md`.
+- [x] Migration: exempt `is_free` listings from
+      `enforce_listing_payment_account_readiness`, and make the trigger watch
+      `is_free` so a free listing flipped to paid is still checked. Playbook and UI
+      guard updated with it. *(#104)*
 
 ---
 
@@ -174,36 +173,6 @@ never need platform funding; the charge handle is what a refund is issued agains
       per-payout fee makes daily cost up to CA$7.50 a month against about CA$1.00.
 - [ ] Confirm how a weekly schedule expresses the hold before implementing.
       `delay_days` is a `daily` schedule parameter.
-
-**Instant payouts (§6.4)**
-
-- [ ] Offer instant payout **only against funds that have already cleared the 14-day
-      hold**. Stripe makes card funds instantly available on day 0; exposing that
-      directly would undo §6.3 for exactly the creators most likely to need a refund
-      funded. This constraint is the feature, not a limitation of it.
-- [ ] Gate on eligibility: supported country, full terms of service onboarding,
-      eligible external account, and Stripe's own account-standing check. Surface
-      why it is unavailable rather than hiding the option.
-- [ ] Collect a **debit card** as the payout destination where the country requires
-      one — Canada does, and a creator with only a bank account cannot use this.
-      Onboarding has to ask for it.
-- [ ] Price it. **Pass Stripe's fee through at cost initially** (§6.4) and show the
-      exact amount before the creator confirms.
-- [ ] Respect daily volume limits and region-specific reset times; fail with a clear
-      message rather than a Stripe error.
-- [ ] Playbook: instant payout failures in `payments/connect-onboarding.md` —
-      ineligible account, missing debit card, daily limit reached, and the
-      distinction between "not eligible yet" and "not available in your country".
-- [ ] Apply the same schedule to every existing connected account. **They are all on
-      `manual` today and nothing has ever created a payout** — so this is the change
-      that starts paying creators at all, not just the change that delays them.
-- [ ] Check whether any creator is holding an unpaid Stripe balance from before this
-      change, and make sure it releases rather than sitting behind the new schedule.
-- [ ] Surface the hold in creator payout settings: balance, when it releases, and
-      what is still held.
-- [ ] Disclose the hold in Fee Schedule §5 and the Creator Terms **before** it ships.
-- [ ] Playbook: new issues in `payments/connect-onboarding.md` for "my money has not
-      arrived" — which will be the most common creator ticket this creates.
 
 **Charge traceability**
 

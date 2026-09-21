@@ -369,14 +369,20 @@ where we are weakest, and 5% flat is a number that can be stated in four words.
 #### The instalment floor follows from it
 
 The 10.00 per-instalment floor existed to stop the flat minimum eating a payment.
-Where there is no minimum, that reason disappears.
+Where there is no minimum, that reason disappears — but a different one replaces it.
 
-**Decision: the floor is 10.00 for a month's first payment, and for every later
-payment it drops to that currency's `stripe_minimum_charge` from the registry.**
+**Correction to an earlier draft**, which said the floor could drop to that
+currency's `stripe_minimum_charge` for any payment after the month's first. It
+cannot. §3.4 works out that with no minimum applying, **the platform loses money on
+any base below about 4.31** — Stripe's flat 0.30 exceeds our whole take. A floor at
+Stripe's minimum charge would wave those through.
 
-A creator can then take a 3.00 follow-up payment — fees 0.15 and 0.15 — which was
-the point of the change. The 10.00 first-payment floor stays because at 2.50 the
-creator still receives nothing, and no pricing rule should permit that.
+**Decision: the floor stays 10.00 for every instalment,** first of the month or not.
+
+At 10.00 later in the month the platform nets 0.40 (§3.4) — thin, but positive and
+predictable. Below that the fixed 0.30 dominates fast, and a floor is a much
+simpler instrument than a rule that varies by position in the month. One number is
+also far easier to publish and to explain in an error message.
 
 **Build:** validate at agreement send time and again at schedule item creation, with
 a real message naming the applicable floor, and leave the `PAY-004` guard as a
@@ -446,7 +452,58 @@ different answer. That is Sprint 0.5's second item and it is unresolved.
 charge.** One number the creator can understand beats two, and it does not touch
 the buyer-facing price or the surcharging rules.
 
-### 3.3 Leaving room for creator subscriptions
+### 3.3 What the platform actually nets
+
+The 10% combined fee is gross, not profit. If the platform bears Stripe's
+processing — the open question in §3.1 — the net is:
+
+```
+platform net = 10% of base           (our fee)
+             − 2.9% of (base × 1.05) (Stripe's percentage, charged on the total)
+             − 0.30                  (Stripe's flat fee)
+
+             = 6.955% of base − 0.30
+```
+
+So **6.955% is the ceiling**, approached from below as transactions get larger, and
+the flat 0.30 is what pulls it down. "Roughly 7%" is right for a healthy commission
+and increasingly wrong as the amount falls:
+
+| Base | Buyer pays | Our fee | Stripe | **Net** | **% of base** |
+| --- | --- | --- | --- | --- | --- |
+| 5.00 | 5.25 | 0.50 | 0.45 | **0.05** | 0.96% |
+| 10.00 | 10.50 | 1.00 | 0.60 | **0.40** | 3.95% |
+| 20.00 | 21.00 | 2.00 | 0.91 | **1.09** | 5.46% |
+| 50.00 | 52.50 | 5.00 | 1.82 | **3.18** | 6.35% |
+| 100.00 | 105.00 | 10.00 | 3.35 | **6.65** | 6.65% |
+| 500.00 | 525.00 | 50.00 | 15.53 | **34.47** | 6.89% |
+| 1000.00 | 1050.00 | 100.00 | 30.75 | **69.25** | 6.93% |
+
+*(Later in the month, so no creator minimum applies. On a month's first payment the
+1.50 minimum lifts the small rows.)*
+
+**Break-even is a base of 4.31.** Below that we pay Stripe more than we collect.
+That is what fixes the instalment floor at 10.00 (§3.1) rather than letting it slide
+to Stripe's own minimum charge.
+
+**Per-transaction is not the whole cost.** Two more come off monthly, per creator:
+
+| | Cost |
+| --- | --- |
+| Connect active account | CA$2.00 per creator per month |
+| Payout fixed fee | ~CA$1.00 per creator per month at weekly |
+| Payout volume fee | 0.25% of everything paid out |
+
+For a creator doing CAD 1000 a month across five commissions, that is roughly
+**6.3% of GMV** all-in rather than 6.9%. The monthly creator fee minimum is what
+offsets the CA$2; the 0.25% is unavoidable and is simply a cost of the model.
+
+**If the creator bears processing instead**, the whole of this section falls away
+and the platform nets the full 10%. Which of the two applies is Sprint 0.5's second
+item and is still unanswered — it is the single largest open number in this
+document.
+
+### 3.4 Leaving room for creator subscriptions
 
 Subscriptions for premium creator features stay **Later** (§8). But the monthly
 minimum lands first and shares their shape, so two small choices now keep the door
@@ -726,55 +783,35 @@ first payment. Worth revisiting later with a shorter hold for creators with a cl
 history — Stripe supports per-account schedules, so that is a later tuning knob, not
 a redesign.
 
-### 6.4 Instant payouts — and the tension with the hold
 
-**Decision: offer creators a paid instant payout — but only on funds that have
-already cleared the 14-day hold.**
+### 6.4 Instant payouts — considered and not offered
 
-Stripe supports Instant Payouts for Connect, it settles in about 30 minutes
-including weekends, and platforms are explicitly invited to "realize additional
-revenue by assessing a fee". It is a good creator feature and a clean revenue line.
+**Decision: no instant payout option. The 14-day hold is the point, and an instant
+payout would sell a way around it.**
 
-**But read plainly, it undoes §6.3.** Stripe's own description is that funds from
-card payments are available for instant payout *as soon as the charge completes*.
-If a creator can pull money on day 0, the hold protects nothing, every refund goes
-back to being platform-funded, and we have paid for a mechanism we then bypass for
-the creators most likely to need it.
+Recorded here because it looks like an easy win and will be proposed again. Stripe
+supports Instant Payouts for Connect, settles in about 30 minutes including
+weekends, and explicitly invites platforms to "realize additional revenue by
+assessing a fee".
 
-So the two have to be reconciled deliberately rather than shipped side by side:
+**The problem is what it would be instant *from*.** Stripe makes funds from card
+payments available for instant payout as soon as the charge completes — day 0. The
+hold exists so that money is still there when a refund is needed, and the creators
+most likely to generate a refund are exactly the ones most likely to take the
+money early. Offering it undoes §6.3 for the cases §6.3 was built for, and pushes
+every one of those refunds back onto platform funding (§6.5).
 
-| | What it accelerates | Hold intact? |
-| --- | --- | --- |
-| **Instant payout of released funds** *(decided)* | From "next Friday" to "in 30 minutes" | **Yes** |
-| Instant payout of held funds | From "day 14" to "day 0" | No — abandons refund protection |
+A narrower version — instant payout only of funds that have *already* cleared the
+14 days, accelerating "next Friday" to "in 30 minutes" — keeps the hold intact and
+would be safe. It is a reasonable later feature. It is not worth building now:
+it adds a payout path, per-country eligibility gating, a debit-card requirement in
+Canada and several other countries, daily volume limits, and its own failure modes
+in support — all to compress a wait of at most six days for creators who have
+already waited fourteen.
 
-**The decided version still has a real product in it.** A creator whose funds
-release on a Tuesday would otherwise wait until Friday's run. Paying a fee to have
-it in 30 minutes is a genuine offer, and it is the common case — most creators
-asking for instant payout are asking about money they have already earned and
-waited for, not about bypassing a protection they have not thought about.
-
-**Requirements and limits** worth knowing before this is scoped:
-
-- Availability is narrower than Connect generally — Canada, US, UK, EU, AU, NZ, SG,
-  HK, MY, NO, SE, DK, AE. It cannot be offered everywhere we onboard.
-- **In Canada the payout destination must be a debit card**, not a bank account.
-  Several other countries are the same. Onboarding has to collect one, and a
-  creator with only a bank account simply cannot use this.
-- The connected account must be onboarded under full terms of service, and new
-  accounts are not immediately eligible — Stripe gates it on account standing.
-- Instant payouts cannot use multi-currency settlement, and there are daily volume
-  limits with region-specific reset times.
-
-**Pricing.** Stripe charges a percentage of the payout and we may add a margin. The
-exact rate per country is a Stripe portal checklist item — it is not on the public
-docs pages and should be read off the account rather than assumed.
-
-**Recommendation on our margin: pass Stripe's fee through at cost, at least at
-first.** Marking up a creator's access to money they have already earned and waited
-two weeks for is the kind of fee that gets screenshotted. The competitive position
-in §3.1 is already tight; this is not where to find margin.
-
+**Revisit when** the refund engine has run long enough to show what the real refund
+rate is. If it is low, the hold itself can shorten, which is a better answer for
+creators than paying a fee to escape it.
 ### 6.5 When the balance is still short — platform-funded refunds
 
 **Decision: Made for Stream funds the buyer refund immediately, then recovers it
@@ -958,7 +995,6 @@ and its processing locations, on the same footing as the other legal pages.
 | EU/UK express consent to immediate start (§1.5) | ● | | |
 | Cancellation (§5) | ● | | |
 | 14-day payout hold, weekly schedule (§6.3) | ● | | |
-| Paid instant payouts on released funds (§6.4) | ● | | |
 | Admin refunds, full and partial (§6) | ● | | |
 | Platform-funded refunds and creator recovery balances (§6.5) | ● | | |
 | Monthly fee minimum (§3.1) | ● | | |
@@ -978,9 +1014,10 @@ and its processing locations, on the same footing as the other legal pages.
 | Buyer self-service refund requests | | ● | |
 | Local payment methods per market (§1.6) | | ● | |
 | Shorter payout hold for established creators (§6.3) | | ● | |
+| Instant payouts of already-released funds (§6.4) | | | ● |
 | Buyer-currency price display / FX (§1.4) | | | ● |
 | Paid instant-download sales (`one_time`) | | | ● |
-| Creator subscriptions for premium features (§3.3) | | | ● |
+| Creator subscriptions for premium features (§3.4) | | | ● |
 | Ads | | | ● |
 | Listing boosts | | | ● |
 | YouTube and other platform linking | | | ● |
@@ -1010,7 +1047,7 @@ in profile settings, which is the correct treatment.
 | Buyer fee minimum | **None.** Flat 5%, every payment (§3.1) |
 | Splitting Stripe's 2.9% onto buyers | **No** — it worsens the buyer-facing price and reads as a card surcharge, which the EU and UK prohibit (§3.2) |
 | Payout schedule | **Weekly**, not daily — daily costs up to CA$7.50/creator/month in per-payout fees (§3.1, §6.3) |
-| Instant payouts | **Offered, priced, and limited to funds that have cleared the 14-day hold** (§6.4) |
+| Instant payouts | **Not offered.** The hold is the protection; an instant payout sells a way around it (§6.4) |
 | Tips and platform contributions | **Built for launch**, shipping alongside refunds (§4) |
 | Transactional email | **Ships at launch**, on Cloudflare Email Service (§7.1) |
 | Supabase auth mail | Moves to the **same provider and sending domain** (§7.1) |
