@@ -190,10 +190,17 @@ conversation between buyer and creator — not something to patch in the databas
 
 **Money impact.** None charged. The project is blocked at this payment.
 
-**Note for non-USD work.** These minimums are dollar-denominated integers. They
-have not been validated against other currencies, where both the minor-unit
-convention and Stripe's own minimum charge differ. Do not extend to a new
-currency without working through that.
+**Note for non-CAD/USD work.** These minimums are **minor-unit** integers — `100`
+and `150` — applied to whatever currency the payment carries. That is correct for
+CAD and USD, which is why both work today and why the fee schedule can name each
+separately. It is wrong for any currency with a different minor-unit convention: in
+JPY those are ¥100 and ¥150, and the bridge's `round(amount * 100)` conversion
+overstates a JPY amount by a hundredfold. Stripe's own minimum charge also differs
+per currency.
+
+Do not enable another currency without working through that. The plan for doing so
+is the currency registry in
+[`../../launch-scope.md`](../../launch-scope.md) §1.1.
 
 ---
 

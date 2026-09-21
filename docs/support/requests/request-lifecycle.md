@@ -132,7 +132,7 @@ signals:
   - source: db
     match: "request has not advanced in 14+ days with a pending action on one side"
 auto_fix: none
-reason_not_automatable: "no policy exists; resolution affects money"
+reason_not_automatable: "policy decided, not yet implemented; resolution affects money"
 escalate_with:
   - "which side is unresponsive and for how long"
   - "money already paid and its current state"
@@ -145,14 +145,25 @@ deposit and went quiet.
 **What the user sees.** A project frozen indefinitely, often with money already
 paid into it, and no way to end it.
 
-**Fix.** There is no automated path and **no policy for this yet**. Each case is
-handled by hand.
+**Fix.** Handled by hand. **There is no automated path yet — but there is now a
+policy**, so cases should be resolved consistently with it rather than ad hoc:
 
-**This is a launch gap, not just a support case.** A marketplace that takes
-deposits needs defined rules for abandonment: how long before a request can be
-closed, who keeps the deposit, what the other party can do unilaterally. Without
-them, every occurrence is an ad-hoc judgement, and the parties have no stated
-expectations to rely on.
+- The waiting party sends a clear project message stating what is needed.
+- **7 calendar days** without a substantive reply, then a **final notice** granting
+  **7 more**. An automated acknowledgement is not a reply.
+- After expiry, the waiting party may request **administrative closure**; an admin
+  executes it. Neither party may close unilaterally.
+- Unearned prepaid amounts stay refundable. Silence forfeits no deposit, completes
+  no milestone, authorises no charge and transfers no rights.
+- Earlier review without waiting where a promised essential deadline is missed,
+  there is credible fraud, or the creator says they cannot complete.
+
+Sources: Refund Policy §7, and [`../../launch-scope.md`](../../launch-scope.md) §7
+for how it becomes operational.
+
+**Still a launch gap on the product side.** The notice records, the clock, and the
+closure RPC do not exist. Until they do, the dates have to be tracked by hand and a
+closure is a manual admin action.
 
 **Money impact.** Potentially significant. Deposits can sit indefinitely with no
 delivery and no refund route — and no refund route exists at all, see
@@ -190,11 +201,15 @@ treat it as an integrity problem rather than a series of one-offs.
 
 ## Known gaps
 
-- **No abandonment policy.** `REQ-003` is the biggest one. It needs product
-  rules before launch, not a support workaround.
-- **No cancellation workflow.** The brief calls for explicit cancellation rules;
-  there is no implementation and therefore nothing here to document beyond
-  "handle by hand".
+- **No abandonment *implementation*.** The policy is now decided — 7 + 7 day
+  notices and admin closure, `REQ-003` — but the notice records, the clock and the
+  closure RPC do not exist. Tracked as Sprint 6 in
+  [`../../launch-implementation-checklist.md`](../../launch-implementation-checklist.md).
+- **No cancellation workflow.** The rules are specified in
+  [`../../launch-scope.md`](../../launch-scope.md) §5 and there is still no
+  implementation: `cancelled` is a valid status on agreements, schedule items,
+  milestones, change orders and final deliveries, and **no RPC writes it on any of
+  them**. `listing_requests` has no such status at all. Sprint 4.
 - **No staleness alerting.** Nothing surfaces requests that have not moved.
 - **UI/database state disagreement** is the likely cause of most `REQ-001`
   reports and is not instrumented.
