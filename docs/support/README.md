@@ -137,6 +137,13 @@ how it fails.
 | Payments | [`payments/refunds-and-disputes.md`](payments/refunds-and-disputes.md) |
 | Discovery | [`discovery/twitch-live.md`](discovery/twitch-live.md) |
 
+Several playbooks record gaps that are product decisions rather than support
+problems — no cancellation workflow, no refund path, no abandonment policy. Those
+are specified in [`../launch-scope.md`](../launch-scope.md) and sequenced in
+[`../launch-implementation-checklist.md`](../launch-implementation-checklist.md).
+When one of them is built, the playbook entry describing it as a gap is rewritten in
+the same branch.
+
 ---
 
 ## Status of the agent
