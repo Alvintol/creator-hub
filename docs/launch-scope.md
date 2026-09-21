@@ -280,26 +280,27 @@ CA$2.50 covers a CA$2.00 account fee with a small margin.
 **The 0.25% payout volume fee.** It applies to every payout and is unavoidable. At a
 5% creator fee it consumes 5% of gross revenue on its own.
 
-**The per-payout CA$0.25 is a function of payout frequency, and §6.3 currently
-chooses the most expensive option.** The payout hold specifies `interval: "daily"`
-with `delay_days: 14`, which means a payout on every day a creator has funds
-released. A creator with steady work could trigger 20–30 payouts a month:
+**The per-payout CA$0.25 is a function of payout frequency**, and the obvious
+configuration for a 14-day hold — `interval: "daily"` with `delay_days: 14` — is
+the most expensive one available. It means a payout on every day a creator has
+funds released, so a creator with steady work could trigger 20–30 a month:
 
 | Payout schedule | Payouts/month | Fixed payout fees |
 | --- | --- | --- |
-| `daily` (as specified in §6.3) | up to ~30 | up to **CA$7.50** |
-| `weekly` | ~4 | **CA$1.00** |
+| `daily` | up to ~30 | up to **CA$7.50** |
+| **`weekly`** *(decided, §6.3)* | ~4 | **CA$1.00** |
 | `monthly` | 1 | **CA$0.25** |
 
 At up to CA$7.50 the payout fees would dwarf the CA$2 account fee the monthly
-minimum was sized to cover, and the whole minimum would be swallowed by a mechanism
-we chose for unrelated reasons.
+minimum is sized to cover, and the whole minimum would be swallowed by a mechanism
+chosen for unrelated reasons. Weekly avoids that while still paying creators on a
+schedule they would consider normal.
 
-**Recommendation: `weekly` rather than `daily`.** It preserves the 14-day hold's
-purpose, costs about CA$1 a month instead of up to CA$7.50, and a weekly payout is
-a normal creator expectation. The exact interaction of `delay_days` with a weekly
-interval needs checking against Stripe at implementation — `delay_days` is a `daily`
-schedule parameter, so a weekly schedule may express the hold differently.
+**Decided: `weekly`.** It preserves the 14-day hold's purpose, costs about CA$1 a
+month instead of up to CA$7.50, and a weekly payout is a normal creator
+expectation. The exact interaction of `delay_days` with a weekly interval needs
+checking against Stripe at implementation — `delay_days` is a `daily` schedule
+parameter, so a weekly schedule may express the hold differently.
 
 #### The question that decides the unit economics
 
@@ -325,25 +326,27 @@ the Stripe dashboard before pricing is published** — it is the first item of t
 Stripe portal checklist in
 [`launch-implementation-checklist.md`](launch-implementation-checklist.md).
 
-#### Apply it to the creator fee, not the buyer fee
+#### Decided: creator side only. Buyers have no minimum at all.
 
-**Recommendation: make the 1.50 creator platform fee minimum monthly, and leave the
-1.00 buyer service fee minimum per-payment.**
+**The 1.50 creator platform fee minimum becomes monthly. The buyer service fee has
+no minimum — it is a flat 5%, every time.**
 
-A monthly buyer minimum means **two buyers pay different fees for the same purchase**
-depending on how busy that creator happened to be that month. A 10.00 commission
-costs one buyer 11.00 on the 1st and another 10.50 on the 15th, for reasons invisible
-to both. That is difficult to display honestly, and the fee schedule requires fees to
-be disclosed before payment.
+Two reasons this is the right split. First, the CA$2 cost it offsets is a
+*per-creator* cost; there is no equivalent buyer-side cost to recover. Second, a
+monthly buyer minimum would mean **two buyers paying different fees for the same
+purchase** depending on how busy that creator happened to be that month — 11.00 on
+the 1st and 10.50 on the 15th, for reasons invisible to both. The fee schedule
+requires fees to be disclosed before payment, and that is not honestly disclosable.
 
-The creator fee is a relationship between us and the creator, consistent across their
-month, and it is the larger of the two. Making that one monthly delivers most of the
-benefit with none of the fairness problem. Under this split a second 10.00 payment
-costs the buyer 11.00 as always, the creator receives 9.50 instead of 8.50, and the
-platform takes 1.50 instead of 2.50.
+Removing the buyer minimum outright goes further than making it monthly, and it goes
+in the direction the competitive position needs (§3.2): the buyer-facing number is
+where we are weakest, and 5% flat is a number that can be stated in four words.
 
-If you would rather both be monthly, it is the same build — the buyer-facing
-disclosure is the only thing that gets harder.
+| 10.00 payment | Buyer pays | Creator receives | Platform |
+| --- | --- | --- | --- |
+| Before | 11.00 | 8.50 | 2.50 |
+| First of the month | 10.50 | 8.50 | 2.00 |
+| Later that month | 10.50 | 9.50 | 1.00 |
 
 #### Rules the monthly minimum needs
 
@@ -379,6 +382,94 @@ creator still receives nothing, and no pricing rule should permit that.
 a real message naming the applicable floor, and leave the `PAY-004` guard as a
 backstop. Per-currency values come from the registry (§1.1), set at roughly
 equivalent purchasing power rather than converted at spot.
+
+---
+
+### 3.2 Can the 2.9% be split between buyer and creator?
+
+**What it is.** Stripe's payment processing fee: **2.9% + CA$0.30 per successful
+domestic card transaction**, charged on the *whole amount charged* — base plus buyer
+fee plus any tip — not on the base alone. International cards and currency
+conversion add more. Today the creator bears all of it, because with direct charges
+Stripe deducts from the connected account.
+
+On a CAD 100 commission that is 2.9% × 105.00 + 0.30 = **3.35**, so the creator's
+total cost is 8.35 (5.00 to us, 3.35 to Stripe) while the buyer's is 5.00.
+
+**Yes, it can be split — but not by raising the buyer service fee.** Raising that
+fee sends the extra to *us*, because the buyer fee is part of the application fee.
+The creator would be no better off.
+
+The mechanism that works is a buyer-paid amount that is added to the total and
+**excluded from the application fee**, so it lands in the creator's balance and
+offsets their Stripe deduction. That is structurally identical to how a tip already
+works, and the schema already supports the shape.
+
+Solving for an even split on a CAD 100 base — the amount is self-referential,
+because adding to the total also raises Stripe's 2.9%:
+
+| | Today | Even split |
+| --- | --- | --- |
+| Buyer pays | 105.00 | **106.70** |
+| Creator receives | 91.65 | **93.31** |
+| Creator's total cost | 8.35 | 6.69 |
+| Buyer's total cost | 5.00 | 6.70 |
+| Made for Stream | 10.00 | 10.00 |
+
+**Recommendation: do not do this.** Three reasons.
+
+**It pushes on the number that is already losing.** §3.1's competitive problem is
+the buyer-facing total — 105.00 against VGen's 100.00 for the same commission. This
+widens that to 106.70. The creator's take-home is already within pennies of VGen's;
+the buyer's total is not.
+
+**It is a card surcharge in most legal readings, and surcharging is restricted.**
+The EU and UK **prohibit** surcharging consumer cards outright. Canada permits it
+but caps it at 2.4% and requires card-network notification and disclosure.
+Several US states restrict it. Australia caps it at actual cost. For a platform
+whose stated target is global, this is a live hazard.
+
+There is a distinction that matters here: a **platform service fee** applied
+regardless of payment method is not a card surcharge, whereas a fee explicitly
+tied to card processing is. So if any of this cost is ever moved to the buyer, it
+must be folded into the buyer service fee as a single undifferentiated platform
+fee — **never labelled as a processing fee or a card fee**, and never varying by
+payment method. Labelling decides the legal analysis.
+
+**And there may be nothing to split.** Under "you handle pricing", Stripe's own
+wording is that the platform is responsible for processing fees. If that applies
+to us, the 3.35 is already coming out of our 10.00, not out of the creator — and
+the question is whether to pass any of it on, which is a different question with a
+different answer. That is Sprint 0.5's second item and it is unresolved.
+
+**If creators need a better deal, the lever is the creator fee, not a new buyer
+charge.** One number the creator can understand beats two, and it does not touch
+the buyer-facing price or the surcharging rules.
+
+### 3.3 Leaving room for creator subscriptions
+
+Subscriptions for premium creator features stay **Later** (§8). But the monthly
+minimum lands first and shares their shape, so two small choices now keep the door
+open without building anything.
+
+**A creator's monthly billing period should be one concept, not two.** The
+`creator_fee_minimum_consumption` record is per creator, per currency, per calendar
+month. A subscription is also per creator per month. If the minimum invents its own
+private notion of "this creator's month", a subscription later has to either
+duplicate it or fight it. Model the period once and let both read it.
+
+**The minimum needs to be waivable, with a recorded reason.** The most obvious
+premium perk is "no monthly platform minimum", and the most obvious way to get that
+wrong is to special-case it in the fee bridge later. Give the consumption record a
+reason field from the start, so a waived month is a row that says why rather than an
+absence of a row that nobody can explain. It also covers the non-subscription cases
+— a support credit, a goodwill waiver — which will arrive before subscriptions do.
+
+Nothing else is needed now. Fee Schedule §8 already reserves the ground: "This
+schedule contains no active creator subscription or subscription discount. Any
+future subscription requires separately disclosed pricing, billing frequency,
+renewal, cancellation and fee effects before enrolment." That stays true and does
+not need editing to accommodate this.
 
 ---
 
@@ -589,10 +680,13 @@ accidental hold with a defined 14-day one that then pays out automatically. That
 strictly better for creators than what ships today, and it needs saying that way
 when it is announced.
 
-**Implementation:** change the schedule to `interval: "daily"` with
-`delay_days: 14`. Stripe then makes funds available 14 days after settlement and
-pays out on its own. 14 exceeds every country's minimum `delay_days`, so one value
-works globally. No payout code of our own, and no escrow.
+**Implementation:** change the schedule from `manual` to **`weekly`**, with the
+14-day hold expressed against it. Stripe then pays out on its own and we write no
+payout code. `daily` with `delay_days: 14` is the obvious-looking configuration and
+it is the wrong one — see §3.1, where the per-payout fee makes it cost up to
+CA$7.50 a month against about CA$1.00 for weekly. `delay_days` is a `daily`
+schedule parameter, so confirm how a weekly schedule expresses the hold before
+implementing.
 
 **This is not escrow, and the policy stays accurate.** The funds sit in the
 creator's own Stripe balance and belong to them; only the transfer to their bank is
@@ -632,7 +726,56 @@ first payment. Worth revisiting later with a shorter hold for creators with a cl
 history — Stripe supports per-account schedules, so that is a later tuning knob, not
 a redesign.
 
-### 6.4 When the balance is still short — platform-funded refunds
+### 6.4 Instant payouts — and the tension with the hold
+
+**Decision: offer creators a paid instant payout — but only on funds that have
+already cleared the 14-day hold.**
+
+Stripe supports Instant Payouts for Connect, it settles in about 30 minutes
+including weekends, and platforms are explicitly invited to "realize additional
+revenue by assessing a fee". It is a good creator feature and a clean revenue line.
+
+**But read plainly, it undoes §6.3.** Stripe's own description is that funds from
+card payments are available for instant payout *as soon as the charge completes*.
+If a creator can pull money on day 0, the hold protects nothing, every refund goes
+back to being platform-funded, and we have paid for a mechanism we then bypass for
+the creators most likely to need it.
+
+So the two have to be reconciled deliberately rather than shipped side by side:
+
+| | What it accelerates | Hold intact? |
+| --- | --- | --- |
+| **Instant payout of released funds** *(decided)* | From "next Friday" to "in 30 minutes" | **Yes** |
+| Instant payout of held funds | From "day 14" to "day 0" | No — abandons refund protection |
+
+**The decided version still has a real product in it.** A creator whose funds
+release on a Tuesday would otherwise wait until Friday's run. Paying a fee to have
+it in 30 minutes is a genuine offer, and it is the common case — most creators
+asking for instant payout are asking about money they have already earned and
+waited for, not about bypassing a protection they have not thought about.
+
+**Requirements and limits** worth knowing before this is scoped:
+
+- Availability is narrower than Connect generally — Canada, US, UK, EU, AU, NZ, SG,
+  HK, MY, NO, SE, DK, AE. It cannot be offered everywhere we onboard.
+- **In Canada the payout destination must be a debit card**, not a bank account.
+  Several other countries are the same. Onboarding has to collect one, and a
+  creator with only a bank account simply cannot use this.
+- The connected account must be onboarded under full terms of service, and new
+  accounts are not immediately eligible — Stripe gates it on account standing.
+- Instant payouts cannot use multi-currency settlement, and there are daily volume
+  limits with region-specific reset times.
+
+**Pricing.** Stripe charges a percentage of the payout and we may add a margin. The
+exact rate per country is a Stripe portal checklist item — it is not on the public
+docs pages and should be read off the account rather than assumed.
+
+**Recommendation on our margin: pass Stripe's fee through at cost, at least at
+first.** Marking up a creator's access to money they have already earned and waited
+two weeks for is the kind of fee that gets screenshotted. The competitive position
+in §3.1 is already tight; this is not where to find margin.
+
+### 6.5 When the balance is still short — platform-funded refunds
 
 **Decision: Made for Stream funds the buyer refund immediately, then recovers it
 from the creator through the app.**
@@ -672,7 +815,7 @@ instalment, so the extra comes off the top of the same direct charge and lands w
 the platform. This is already the exact mechanism the platform fee uses, and it
 respects the existing `application_fee_cents < total_checkout_cents` constraint.
 
-### 6.5 Recovery rate
+### 6.6 Recovery rate
 
 **Decided: recover at most 50% of each base payment.**
 
@@ -683,7 +826,7 @@ still clears quickly, the creator keeps a reason to finish the work, and the buy
 of that project gets what they paid for. A creator who wants it over with can settle
 directly at any time.
 
-### 6.6 What a refund does to the project
+### 6.7 What a refund does to the project
 
 | Refund | Effect |
 | --- | --- |
@@ -814,9 +957,10 @@ and its processing locations, on the same footing as the other legal pages.
 | Free listings — download and external link | ● | | |
 | EU/UK express consent to immediate start (§1.5) | ● | | |
 | Cancellation (§5) | ● | | |
-| 14-day payout hold (§6.3) | ● | | |
+| 14-day payout hold, weekly schedule (§6.3) | ● | | |
+| Paid instant payouts on released funds (§6.4) | ● | | |
 | Admin refunds, full and partial (§6) | ● | | |
-| Platform-funded refunds and creator recovery balances (§6.4) | ● | | |
+| Platform-funded refunds and creator recovery balances (§6.5) | ● | | |
 | Monthly fee minimum (§3.1) | ● | | |
 | Tips and optional platform contributions (§4) | ● | | |
 | Tax collection for CA/US (§12) | ● | | |
@@ -836,7 +980,7 @@ and its processing locations, on the same footing as the other legal pages.
 | Shorter payout hold for established creators (§6.3) | | ● | |
 | Buyer-currency price display / FX (§1.4) | | | ● |
 | Paid instant-download sales (`one_time`) | | | ● |
-| Subscriptions | | | ● |
+| Creator subscriptions for premium features (§3.3) | | | ● |
 | Ads | | | ● |
 | Listing boosts | | | ● |
 | YouTube and other platform linking | | | ● |
@@ -858,11 +1002,15 @@ in profile settings, which is the correct treatment.
 | Geographic scope | **Global** — every country Stripe Connect supports for creators, unrestricted for buyers (§1) |
 | Currency scope | **Any major currency**, through the registry, enabled in waves (§1.1, §1.3) |
 | Creator payouts | **Held 14 days** after the charge, replacing today's accidental indefinite hold (§6.3) |
-| Refund funding | **Made for Stream funds the refund**, then recovers from the creator in-app (§6.4) |
-| Creator with an outstanding balance | Listings **blocked from new requests**; existing projects continue and their payments are diverted to the balance (§6.4) |
-| Recovery rate | **50% of each base payment** (§6.5) |
+| Refund funding | **Made for Stream funds the refund**, then recovers from the creator in-app (§6.5) |
+| Creator with an outstanding balance | Listings **blocked from new requests**; existing projects continue and their payments are diverted to the balance (§6.5) |
+| Recovery rate | **50% of each base payment** (§6.6) |
 | Fee rates | **5% buyer and 5% creator**, both retained (§3) |
-| Fee minimums | **Once per creator per calendar month**, not per payment — offsetting Stripe's CA$2 monthly active account fee (§3.1) |
+| Creator fee minimum | **Once per creator per calendar month**, not per payment — offsetting Stripe's CA$2 monthly active account fee (§3.1) |
+| Buyer fee minimum | **None.** Flat 5%, every payment (§3.1) |
+| Splitting Stripe's 2.9% onto buyers | **No** — it worsens the buyer-facing price and reads as a card surcharge, which the EU and UK prohibit (§3.2) |
+| Payout schedule | **Weekly**, not daily — daily costs up to CA$7.50/creator/month in per-payout fees (§3.1, §6.3) |
+| Instant payouts | **Offered, priced, and limited to funds that have cleared the 14-day hold** (§6.4) |
 | Tips and platform contributions | **Built for launch**, shipping alongside refunds (§4) |
 | Transactional email | **Ships at launch**, on Cloudflare Email Service (§7.1) |
 | Supabase auth mail | Moves to the **same provider and sending domain** (§7.1) |
@@ -886,16 +1034,15 @@ decisions:
 
 ### 9.2 Still open
 
-1. **Whether the monthly fee minimum applies to the buyer fee as well as the creator
-   fee** — §3.1. Recommended: creator fee only, because a monthly buyer minimum
-   means two buyers pay different amounts for the same purchase. Same build either
-   way; the difference is what has to be disclosed.
-
-2. **Tax registration strategy and advice** — §12.3. Not an engineering decision.
+1. **Tax registration strategy and advice** — §12.3. Not an engineering decision.
    Which jurisdictions to register in and when, and whether to take
    jurisdiction-specific advice before selling into the EU and UK. Recommended: yes,
    before the first EU sale, since EU VAT applies from the first euro with no
    small-seller threshold.
+
+2. **Whether the platform or the connected account bears Stripe's 2.9% + CA$0.30**
+   — Sprint 0.5, item 2. Not a preference but a fact to look up; it decides a 33%
+   swing in net revenue and whether Fee Schedule §5 is true as published (§3.1).
 
 ---
 
@@ -906,8 +1053,11 @@ decisions:
 | All policies | Replace `[SUPPORT_EMAIL]`, `[PRIVACY_EMAIL]` and `[DMCA_AGENT_EMAIL]` with `inbox@madeforstream.com`; name **Made for Stream** as the entity; remove every `// REVIEW DRAFT` marker and cut non-draft versions. |
 | Fee Schedule §1 | Keep the CAD/USD minimums exactly as written — they are correct. Publish the currently enabled currency list with each one's minimums, which §1 already requires before a currency may be enabled. |
 | Fee Schedule §1, §3, §4 | Keep the tip and contribution rows — they are being built (§4). Update the examples to show the monthly minimum. |
+| Fee Schedule §1 | Remove the buyer service fee minimum — it is now a flat 5% with no minimum (§3.1). The "Minimum per successful base payment: CAD 1.00 / USD 1.00" row on the buyer fee goes. |
 | Fee Schedule §2 | Rewrite for the monthly minimum (§3.1). The current text — "Each separately collected instalment can incur a minimum, so splitting a project can cost more than one payment" — becomes wrong and has to change. Add the per-instalment floor and state that the agreement's fee estimate is a maximum. |
-| Fee Schedule §5 | Disclose the 14-day payout hold explicitly (§6.3); the existing "payout timing depends on..." language is not enough to cover a delay we impose. Add that where a refund exceeds the creator's available balance, Made for Stream funds it and recovers the amount from the creator, including by applying it to subsequent payments (§6.4). Both are new creator obligations and must be disclosed before they can be incurred. |
+| Fee Schedule §3 | Rework every worked example. All six currently apply a buyer minimum that no longer exists and a per-payment creator minimum that is now monthly — the two-instalment example is wrong in both directions. |
+| Fee Schedule §5 | Also disclose the **weekly** payout schedule and the paid instant payout option, including that instant payout applies only to funds already released (§6.3, §6.4). |
+| Fee Schedule §5 | Disclose the 14-day payout hold explicitly (§6.3); the existing "payout timing depends on..." language is not enough to cover a delay we impose. Add that where a refund exceeds the creator's available balance, Made for Stream funds it and recovers the amount from the creator, including by applying it to subsequent payments (§6.5). Both are new creator obligations and must be disclosed before they can be incurred. |
 | Fee Schedule §6 | Rewrite for §12. The current "does not claim that all taxes are automatically collected" becomes a statement that Made for Stream calculates, collects and remits where obliged, and identifies tax separately on the payment record — which also requires the missing `tax_cents` column. |
 | Creator Terms | Add the recovery balance: what creates one, that new requests are blocked while it is outstanding, how it is recovered at 50% of each payment, and how it is settled directly. Add the payout hold. |
 | Privacy Policy §4 | Name Cloudflare as the email and routing provider alongside Supabase and Stripe, and **publish the Service Provider Register** the policy already says the published version must include (§7.2). |
@@ -973,7 +1123,7 @@ because the webhook is what makes payments work at all.
 **Decision: the rules are updated to collect and remit indirect tax wherever selling
 globally obliges us to, rather than leaving it to the creator.**
 
-### 11.1 Why the current framing will not survive
+### 12.1 Why the current framing will not survive
 
 Fee Schedule §6 says taxes "must be identified before payment," that creators are
 responsible for tax on their own supplies "except where applicable law assigns
@@ -1002,7 +1152,7 @@ In scope once we sell globally, at minimum:
 **EU VAT has no small-seller threshold for a non-established supplier.** It applies
 from the first sale. That makes it the first one to solve, not a later one.
 
-### 11.2 What this requires in the product
+### 12.2 What this requires in the product
 
 - **A tax engine.** Recommend **Stripe Tax** — it calculates at checkout, handles
   location evidence and produces the filing exports. It charges per transaction and
@@ -1028,7 +1178,7 @@ from the first sale. That makes it the first one to solve, not a later one.
   jurisdictions they are separately taxable. This is not the same question as tax on
   the commission.
 
-### 11.3 The part that is not an engineering decision
+### 12.3 The part that is not an engineering decision
 
 Registration and remittance are obligations with penalties, and the thresholds,
 treatment of custom creative work, and platform-versus-creator liability differ
@@ -1062,7 +1212,7 @@ proposed change does not leave money and work disagreeing.
 | Payout hold expires | No ledger change | No project change | Funds become available and pay out automatically (§6.3); creator notified |
 | Partial refund | Immutable refund ledger row with its amount and the fees reversed; `partially_refunded` **derived** from cumulative settled refunds. `paid_at` and the original charge are preserved | The affected milestone → `cancelled`; earlier approved milestones stand; only the affected next step freezes | Record decision, fee reversal, who funded it and the evidence; notify both parties |
 | Full refund | Derived `refunded` once the full refundable charge is returned | Outstanding instalments cancelled and the unfinished agreement closed through an explicit cancellation record — **never `archived`** | Correct the rights attaching to fully refunded work (§5.3) |
-| Refund exceeds available balance | Refund still issued; shortfall opens a recovery balance | Creator blocked from **new** requests; existing projects continue | Up to 50% of each later base payment is diverted via a raised application fee until clear (§6.4, §6.5) |
+| Refund exceeds available balance | Refund still issued; shortfall opens a recovery balance | Creator blocked from **new** requests; existing projects continue | Up to 50% of each later base payment is diverted via a raised application fee until clear (§6.5, §6.6) |
 | Pre-payment cancellation | Every `requires_checkout` / `checkout_opened` row → `cancelled`; any open Stripe session expired | Agreement, schedule items, milestones, change orders and final delivery → `cancelled`; request → `cancelled` | Distinguish a cancelled **unpaid checkout** from a refunded **paid charge** — they are not the same record |
 | Dispute opened | Tracked as a separate case over the charge, preserving paid and refunded history; visible `disputed` while open | The affected work and further collection go on hold pending review — the whole project is not silently cancelled and paid delivery rights are not erased | Tier 3. Capture the evidence deadline immediately and tell the creator; it is their account and their money |
 | Dispute closed | Reconcile won/lost, final amount, and any refund already issued, avoiding duplicate recovery | Outcome decides whether the project completes or cancels | Record the outcome and the reasoning |

@@ -41,11 +41,14 @@ several are invisible from the codebase and will otherwise be re-derived wrongly
 
 **Payouts**
 
-- [ ] Decide the payout interval. §6.3 currently specifies `daily`, which at up to
-      ~30 payouts a month costs up to CA$7.50 in fixed payout fees and would swallow
-      the monthly minimum whole. **`weekly` is recommended** at about CA$1.00.
-- [ ] Verify how `delay_days` interacts with a non-`daily` interval before
+- [ ] Verify how `delay_days` interacts with a **weekly** interval before
       implementing the 14-day hold — `delay_days` is a `daily` schedule parameter.
+      The interval itself is decided (§6.3): weekly, not daily.
+- [ ] **Read Stripe's Instant Payout fee for each country we onboard in** (§6.4).
+      It is not on the public docs pages. Confirm on the account.
+- [ ] Confirm Instant Payout eligibility requirements per country — in Canada the
+      destination must be a **debit card**, not a bank account, which changes what
+      onboarding has to collect.
 - [ ] Confirm the per-payout 0.25% volume fee is understood as a standing cost: at a
       5% creator fee it consumes about 5% of gross revenue.
 
@@ -81,9 +84,14 @@ new currency ships wrong money rather than a new market.
       and UTC calendar month, recording which payment consumed that month's minimum
       (§3.1). The fee calculation consults it; only a successful payment consumes it;
       a full refund of the consuming payment releases it for the next one.
+- [ ] **Creator fee minimum only.** The buyer service fee is a flat 5% with no
+      minimum — do not carry a buyer minimum through the new code path.
+- [ ] Model the creator's monthly period as one shared concept, and give the
+      consumption record a **waiver reason** field (§3.3). Both are small now and
+      both are what a future subscription reads.
 - [ ] Tests: second payment in a month pays percentage only; refund of the consuming
       payment re-arms the minimum; two currencies in one month consume separately;
-      a month boundary in UTC.
+      a month boundary in UTC; a waived month is recorded with its reason.
 - [ ] Apply `amount_multiple` rounding for three-decimal currencies.
 - [ ] Enforce the instalment floor before a payment row is created — the registry's
       `minimum_instalment` for a month's first payment, `stripe_minimum_charge` after
@@ -155,16 +163,37 @@ these hold, and two of them were verified directly against the code.
       endpoint at all.
 - [ ] Idempotently reserve a schedule item against concurrent checkout attempts.
 
-**Payout hold (§6.3)**
-
 Two prerequisites for refunds. The hold keeps the money available so most refunds
 never need platform funding; the charge handle is what a refund is issued against.
 
 **Payout hold (§6.3)**
 
 - [ ] Change `createStripeConnectAccount` from
-      `settings.payouts.schedule.interval = "manual"` to `interval: "daily"` with
-      `delay_days: 14`.
+      `settings.payouts.schedule.interval = "manual"` to **`weekly`**, with the
+      14-day hold expressed against it. **Not `daily`** — see §3.1, where the
+      per-payout fee makes daily cost up to CA$7.50 a month against about CA$1.00.
+- [ ] Confirm how a weekly schedule expresses the hold before implementing.
+      `delay_days` is a `daily` schedule parameter.
+
+**Instant payouts (§6.4)**
+
+- [ ] Offer instant payout **only against funds that have already cleared the 14-day
+      hold**. Stripe makes card funds instantly available on day 0; exposing that
+      directly would undo §6.3 for exactly the creators most likely to need a refund
+      funded. This constraint is the feature, not a limitation of it.
+- [ ] Gate on eligibility: supported country, full terms of service onboarding,
+      eligible external account, and Stripe's own account-standing check. Surface
+      why it is unavailable rather than hiding the option.
+- [ ] Collect a **debit card** as the payout destination where the country requires
+      one — Canada does, and a creator with only a bank account cannot use this.
+      Onboarding has to ask for it.
+- [ ] Price it. **Pass Stripe's fee through at cost initially** (§6.4) and show the
+      exact amount before the creator confirms.
+- [ ] Respect daily volume limits and region-specific reset times; fail with a clear
+      message rather than a Stripe error.
+- [ ] Playbook: instant payout failures in `payments/connect-onboarding.md` —
+      ineligible account, missing debit card, daily limit reached, and the
+      distinction between "not eligible yet" and "not available in your country".
 - [ ] Apply the same schedule to every existing connected account. **They are all on
       `manual` today and nothing has ever created a payout** — so this is the change
       that starts paying creators at all, not just the change that delays them.
@@ -246,7 +275,7 @@ contribution at all.
       tests covering repeated partial refunds and the final rounding remainder.
 - [ ] Admin-only refund route: `stripe.refunds.create` on the connected account with
       `refund_application_fee: true`.
-- [ ] Cascade the request per §6.5.
+- [ ] Cascade the request per §6.7.
 - [ ] `charge.refunded` webhook branch now writes status, so a refund issued directly
       in Stripe reconciles instead of diverging.
 
@@ -268,7 +297,7 @@ contribution at all.
       outside that window when mistaken, duplicate or unauthorised. This is a
       separate path with its own clock; give it its own tests.
 
-**Platform-funded refunds (§6.4)**
+**Platform-funded refunds (§6.5)**
 
 - [ ] Migration: `creator_recovery_balances` and a `creator_recovery_entries` ledger
       — one debit when the platform funds a refund, one credit per recovery.
@@ -281,7 +310,7 @@ contribution at all.
 - [ ] Listing and creator-profile UI explain why a request cannot be sent, without
       exposing the creator's financial detail to buyers.
 - [ ] Recovery on subsequent payments: raise `application_fee_amount` by the recovery
-      instalment, **capped at 50% of the base payment** (§6.5), respecting
+      instalment, **capped at 50% of the base payment** (§6.6), respecting
       `application_fee_cents < total_checkout_cents`.
 - [ ] Creator settings: balance visible, entry history, and a direct settlement path
       (a platform charge on their card, not on the connected account).
