@@ -81,15 +81,25 @@ escalate_with:
 direct charges, the refund comes out of the creator's balance — this is a
 conversation with the creator, not a unilateral platform action.
 
-Decide explicitly, and record the decision:
+**These now have a policy** — Refund Policy §8, with the arithmetic in
+[`../../launch-scope.md`](../../launch-scope.md) §6.2. Apply it rather than deciding
+case by case:
 
-- Is the **buyer service fee** refunded? It was charged on top of the base.
-- Is the **creator platform fee** returned? It was taken as an application fee
-  and does not come back automatically.
-- For partial delivery, what portion is fair?
+- **Buyer service fee** — refunded in the same proportion as the base.
+- **Creator platform fee** — reversed in the same proportion. Made for Stream
+  absorbs this; it does not come back automatically and has to be reversed
+  deliberately.
+- **Partial delivery** — earned value per Refund Policy §4: a completed conforming
+  milestone keeps its price, a partial one keeps only the documented value of
+  conforming work actually made available.
+- Minimums are **not** recalculated on the remaining balance, and there is no refund
+  administration fee.
+- For repeated partial refunds, compute the **cumulative** proportional fee refund
+  and subtract what has already been returned, so rounding cannot exceed the
+  original fee.
 
-None of these have a policy yet. **That policy is a prerequisite for building
-the feature**, not a detail to settle during the first refund.
+**What is still missing is the implementation**, not the policy. Record every manual
+refund durably outside the app until it exists.
 
 **Money impact.** Direct. And the Made for Stream record will be wrong afterwards
 until this feature exists.
@@ -209,9 +219,9 @@ Recorded here so the work is specified before it starts:
    `stripe_event_ids` idempotency pattern.
 3. **Add `security definer` RPCs** following the `apply_paid_listing_request_*`
    shape, to write refund and dispute state and cascade the request.
-4. **Decide the fee policy** in `REF-001` — buyer service fee and creator
-   platform fee on full and partial refunds. This is a product decision and it
-   blocks the rest.
+4. **Implement the fee policy** in `REF-001` — proportional, cumulative, rounded
+   once, minimums never recalculated. Decided in Refund Policy §8 and
+   [`../../launch-scope.md`](../../launch-scope.md) §6.2; no longer a blocker.
 5. **Decide what a refund does to the request.** Cancelled? Reverted to an
    earlier stage? Milestone-specific refunds need this answered per stage.
 6. **Add the first server-side tests.** `api/server.js` has none, and refund
@@ -230,6 +240,13 @@ This entire playbook is a known gap. In priority order:
   ever knowing.
 - `stripe_charge_id` / `stripe_application_fee_id` never populated, which blocks
   the rest.
-- No fee-refund policy decided.
+- **The ledger cannot represent a partial refund.** One nullable `stripe_refund_id`,
+  one `refunded_at`, no refunded amount and no history — so two partial refunds
+  against one payment have nowhere to go. An immutable refund ledger has to land
+  with the feature.
 - Nothing alerts on the `ignored` refund and dispute events, so the detection
   query above has to be run by hand.
+
+The **fee-refund policy is decided** — Refund Policy §8 and
+[`../../launch-scope.md`](../../launch-scope.md) §6 — so "what this feature
+requires" below is now a build specification rather than an open question.
