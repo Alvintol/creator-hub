@@ -1,0 +1,865 @@
+# Launch Scope — Made for Stream
+
+> **Status:** proposed for approval. This document is the specification the first
+> paid launch is built against. Where it disagrees with a published policy or with
+> the code, the disagreement is named explicitly and a resolution is recommended.
+>
+> Decisions marked **NEEDS YOUR CALL** are not resolved here.
+
+The goal of the first launch is one thing working end to end: a buyer in a
+supported currency commissions a creator, pays through Stripe Connect, the work is
+delivered, and — if it goes wrong — there is a defined way to cancel and get money
+back. Everything not required for that sentence is out of scope.
+
+---
+
+## 1. Supported countries, currencies and payment methods
+
+**Target: global availability, buying and selling in any major currency.**
+
+That is achievable, and it is not a configuration flip. Three places in the product
+hardcode the assumption that a currency has exactly 100 minor units, and the fee
+minimums are fixed integers applied to whatever currency arrives. Shipping global on
+top of that produces wrong money, silently. This section describes what "global"
+means concretely and what has to be built to get there honestly.
+
+### 1.1 The currency registry
+
+**Decision: replace every hardcoded currency constant with a `supported_currencies`
+registry table.** This is the foundation for everything else in this section.
+
+| Column | Purpose |
+| --- | --- |
+| `code` | ISO 4217, lowercase |
+| `minor_unit_exponent` | 2 for USD/EUR, **0** for JPY/KRW, **3** for KWD/BHD/JOD/OMR/TND |
+| `amount_multiple` | Stripe requires three-decimal currency amounts to be a multiple of 10 |
+| `buyer_fee_minimum` | In minor units, per currency |
+| `creator_fee_minimum` | In minor units, per currency |
+| `minimum_instalment` | §3.1, per currency |
+| `stripe_minimum_charge` | Stripe's own per-currency floor |
+| `enabled` | Enabled only once validated end to end |
+
+**What this fixes.** Three live defects, all of which reach production the moment a
+non-two-decimal currency is used:
+
+1. `ensure_listing_request_payment_for_schedule_item` computes
+   `round(schedule_row.amount * 100)` to convert a major-unit agreement amount into
+   minor units. For JPY that turns ¥100 into a charge of ¥10,000. For KWD it
+   under-states by a factor of ten and produces an amount Stripe rejects.
+2. `formatPaymentCents` in `src/domain/payments/listingRequestPaymentDisplay.ts` is
+   `formatMoney(cents / 100, currency)` — the same bug in the display layer, so a
+   buyer would be shown a figure that is not what they are charged.
+3. The fee minimums (`100` and `150`) are applied regardless of currency. In JPY
+   those are ¥100 and ¥150 — roughly a dollar total, so the floor effectively
+   disappears. In a strong currency they are too high.
+
+The registry makes the exponent explicit at every conversion, so each of these
+becomes a lookup rather than an assumption.
+
+**Note on `AGENTS.md`.** It states "Fee minimums are USD-denominated." They are
+*minor-unit*-denominated, which is why CAD and USD both work unchanged today and why
+nothing else does. (`AGENTS.md` is gitignored, so that correction is not in this PR.)
+
+### 1.2 Creators
+
+| | Rule |
+| --- | --- |
+| Creator countries | **Every country where Stripe Connect supports a direct-charge account with `card_payments` and `transfers`** — currently around 46. |
+| Creator currencies | Any enabled registry currency their connected account can settle. |
+| Default currency | Their connected account's `default_currency`, changeable to any enabled currency their account supports. |
+
+We do not invent a country list. Stripe's Connect availability *is* the list, and
+attempting to ship a wider one just produces onboarding that fails at the end. A
+creator in a country Stripe does not support cannot be paid, whatever we write in a
+table.
+
+**Gap this closes.** `src/components/settings/CreatorPayoutSettings.tsx` ships
+free-text `maxLength={2}` country and `maxLength={3}` currency inputs, and
+`POST /api/stripe/connect/start` accepts whatever they contain against a regex only.
+Today that lets a creator onboard in a currency whose fee arithmetic is wrong.
+Global does not mean unvalidated: the inputs still become pickers, and the server
+and database still enforce the enabled set. They are just a much longer list.
+
+### 1.3 Staged enablement
+
+**Recommendation: build the registry once, then enable currencies in waves as each
+is validated end to end.** The checkout playbook is explicit that non-USD has never
+been validated; going from one unvalidated currency to fifty at once multiplies an
+untested path rather than testing it.
+
+| Wave | Currencies | Blocked on |
+| --- | --- | --- |
+| 1 | CAD, USD | Nothing. Already works. |
+| 2 | Two-decimal majors — EUR, GBP, AUD, NZD, CHF, SGD, SEK, NOK, DKK, PLN, MXN, BRL, HKD | The registry, per-currency minimums, and one real end-to-end run each. |
+| 3 | Zero-decimal — JPY, KRW | The exponent work in §1.1. |
+| 4 | Three-decimal — KWD, BHD, JOD, OMR, TND | The exponent work plus the multiple-of-10 rule. |
+
+Creator onboarding can open globally at wave 2 — a creator in Japan can onboard and
+sell in USD before JPY is enabled. Country availability and currency availability
+are separate switches, and that is what makes "global at launch" honest rather than
+aspirational.
+
+### 1.4 Buyers
+
+| | Rule |
+| --- | --- |
+| Buyer countries | **Unrestricted** |
+| Buyer currency | The creator's listing currency. The buyer's bank converts. |
+
+These are direct charges on the creator's connected account. Stripe already decides
+which cards that account can accept, so a buyer geo-gate costs sales and prevents
+nothing. Fee Schedule §6 already states that a bank may convert and apply its own
+rate, and that a converted refund can differ from the converted debit — the correct
+and honest description of this design.
+
+**Presenting prices in the buyer's own currency is a later feature,** not a launch
+one. It requires either Stripe Adaptive Pricing or our own FX handling, and it
+changes what "the agreed amount" means mid-project. One currency per agreement,
+named on the agreement, is the launch rule.
+
+### 1.5 Consumer law — now required, not recommended
+
+Refund Policy §1 already grants EU/UK consumers a 14-day distance-contract
+withdrawal right and states that losing it for a commissioned service "requires the
+applicable express consent, acknowledgement and confirmation." The product never
+captures that consent.
+
+At CA/US scope that was a recommendation. **Selling globally makes it a launch
+requirement**, because the policy grants the right and the product cannot rely on
+its own earned-value rules without the consent that qualifies it.
+
+**Build:** at buyer acceptance of the project agreement, record an express request
+to begin work before the withdrawal period expires, through the existing
+`policy_acceptances` table (`20260917_113`, hardened by `20260919_114`). A checkbox
+and one recorded row.
+
+### 1.6 Payment methods
+
+| | Launch |
+| --- | --- |
+| Accepted | **Cards only**, explicitly. Apple Pay and Google Pay ride the same rail and stay on. |
+| Not accepted | Bank debits, bank transfers, BNPL, vouchers, and every other delayed-notification method. |
+
+**Why.** Checkout currently passes no `payment_method_types`, so the session offers
+whatever is enabled on each creator's connected account. Anything asynchronous lands
+the payment in `processing`, and `processing` is a state the product handles badly
+on purpose: `PAY-005` in the checkout playbook explicitly excludes it from the
+`reconcile_checkout_session` auto-fix because those payments "legitimately take
+days," and there is no buyer-facing copy, no creator-facing SLA, and no reminder for
+a project frozen in it. Until there is, do not sell a payment method that produces
+it.
+
+**This costs more now that the target is global.** In several European markets a
+local method is the dominant one — iDEAL in the Netherlands, Bancontact in Belgium,
+BLIK in Poland — and cards-only measurably suppresses conversion there. The answer
+is to fix `processing` (buyer copy, creator SLA, a reminder, and reconciliation that
+understands a legitimately slow payment) and then enable local methods per market,
+rather than to enable them now and discover the gap through stuck projects.
+
+**Recommendation:** set `payment_method_types: ["card"]` on the checkout session
+rather than inheriting each creator's dashboard configuration, and treat local
+payment methods as the first post-launch market expansion.
+
+---
+
+## 2. Paid and free listing scope
+
+| Offering | Launch state | Notes |
+| --- | --- | --- |
+| Commission request → agreement → payment → delivery | **Launch** | The whole product. Full prepayment, deposit + balance, and milestone schedules all ship. |
+| Free listing — file download | **Launch** | `is_free` + `free_delivery_type = 'download'`, `free-assets` public bucket. Never touches Stripe. |
+| Free listing — external link | **Launch** | `free_delivery_type = 'external_link'`. |
+| Paid instant-download sale | **Later** | The `one_time` `payment_type` exists in the schema with no workflow behind it (checkout playbook, Known gaps). It stays unreachable. |
+
+**Free listings stay limited to the `digital` offering type** (`allowsFreeListing`,
+`src/domain/listings/listings.ts`).
+
+**Blocking inconsistency.** `enforce_listing_payment_account_readiness`
+(`20260622_107`) refuses to publish *any* active listing without a ready Stripe
+connected account, and `20260919_115_add_free_listings.sql` did not exempt
+`is_free`. A creator who only wants to give a file away must today complete full
+Stripe identity onboarding — bank details, tax information — to publish something
+that will never take a payment. That is a bad first experience with no
+justification.
+
+**Recommendation:** add `and new.is_free = false` to the readiness trigger's
+condition. Free listings publish with no connected account; readiness continues to
+apply the moment a listing is not free.
+
+---
+
+## 3. Fee calculation
+
+Unchanged from the approved schedule. Written out here as the normative statement,
+because the arithmetic currently exists only in PL/pgSQL.
+
+For each **separately collected base payment** (starting payment, milestone, change
+order, final balance), in minor units of the payment currency:
+
+```
+buyer_service_fee    = max( ceil(base * 5 / 100), buyer_minimum )
+creator_platform_fee = max( ceil(base * 5 / 100), creator_minimum_if_unconsumed )
+application_fee      = buyer_service_fee + creator_platform_fee + platform_support
+total_charged        = base + creator_tip + buyer_service_fee + platform_support
+creator_receives     = base + creator_tip     (before Stripe's own costs)
+```
+
+where `buyer_minimum` and the creator minimum come from the currency registry
+(§1.1), and the creator minimum applies only to that creator's first successful
+payment of the calendar month in that currency (§3.1).
+
+- Tips carry no Made for Stream percentage and no minimum. They are added to the
+  charge and excluded from the application fee, so they reach the creator.
+- Optional platform support is added to the charge **and** to the application fee,
+  so it reaches Made for Stream.
+- Failed attempts and retries of the same unpaid obligation create no additional
+  fee. This holds today because the fee is computed once, when the ledger row is
+  created, not per checkout attempt.
+- Minimums are per successful base payment, so splitting a project costs more. The
+  fee schedule says this and gives the worked example.
+
+This matches `ensure_listing_request_payment_for_schedule_item` exactly. The
+calculation itself needs no code change.
+
+### 3.1 Fee minimums apply once per creator per month
+
+**Decision: the flat fee minimums apply to a creator's first successful payment in a
+calendar month. Every later payment that month is charged the percentage only, with
+no minimum.**
+
+**Why this is an improvement.** The flat minimum is what makes small payments look
+bad. It currently applies to every instalment, so a creator taking many small
+payments is charged it over and over:
+
+| Base | Buyer pays | Creator receives | Made for Stream | Platform share |
+| --- | --- | --- | --- | --- |
+| 2.50 | 3.50 | 0.00 | 2.50 | **100%** |
+| 5.00 | 6.00 | 3.50 | 2.50 | 50% |
+| 10.00 | 11.00 | 8.50 | 2.50 | 25% |
+| 30.00 | 31.50 | 28.50 | 3.00 | 10% |
+| 100.00 | 105.00 | 95.00 | 10.00 | 10% |
+
+Charging it once a month keeps the protection on a creator's first transaction and
+stops penalising volume. On a second 10.00 payment in the same month the fees become
+0.50 and 0.50 — the buyer pays 10.50, the creator receives 9.50, and the platform
+share drops from 25% to 10%, matching what a large payment already pays.
+
+#### One correction to the reasoning
+
+The minimum does **not** cover Stripe's per-transaction fee, and it never has. These
+are direct charges, so Stripe's own fee is deducted from the **creator's** connected
+account on every charge — not from our application fee. Payment Terms §5 already
+says this: "The creator is responsible for those transaction-related charges to the
+extent charged to their connected account."
+
+So the flat minimum is platform margin on small transactions, not cost recovery, and
+Stripe's per-charge cost continues to apply to every payment regardless of what we
+do here. That does not make the decision wrong — being generous on small repeat
+transactions is a perfectly good pricing choice — but it should be made knowing the
+cost it does not offset.
+
+#### Apply it to the creator fee, not the buyer fee
+
+**Recommendation: make the 1.50 creator platform fee minimum monthly, and leave the
+1.00 buyer service fee minimum per-payment.**
+
+A monthly buyer minimum means **two buyers pay different fees for the same purchase**
+depending on how busy that creator happened to be that month. A 10.00 commission
+costs one buyer 11.00 on the 1st and another 10.50 on the 15th, for reasons invisible
+to both. That is difficult to display honestly, and the fee schedule requires fees to
+be disclosed before payment.
+
+The creator fee is a relationship between us and the creator, consistent across their
+month, and it is the larger of the two. Making that one monthly delivers most of the
+benefit with none of the fairness problem. Under this split a second 10.00 payment
+costs the buyer 11.00 as always, the creator receives 9.50 instead of 8.50, and the
+platform takes 1.50 instead of 2.50.
+
+If you would rather both be monthly, it is the same build — the buyer-facing
+disclosure is the only thing that gets harder.
+
+#### Rules the monthly minimum needs
+
+- **Per creator, per currency, per calendar month, UTC.** Per currency because
+  minimums are denominated per currency and converting invites FX drift. UTC because
+  it has to be stated somewhere and a creator's local month is not knowable at the
+  point the fee is computed.
+- **Only a successful payment consumes it.** Failed and abandoned checkouts do not.
+- **A refund releases it.** If the payment that consumed the month's minimum is
+  fully refunded, the next payment that month consumes it instead. Otherwise a
+  creator refunds a small first payment and gets a free month.
+- **Tips and platform support neither consume nor count toward it** — they are
+  outside the fee calculation entirely (§4).
+- **The agreement estimate becomes an upper bound.** Fee Schedule §2 requires the
+  agreement to show "estimated aggregate Made for Stream fees before acceptance."
+  Whether a March milestone is that month's first payment is unknowable in January,
+  so the estimate must be quoted as a maximum with the monthly rule explained. That
+  is a policy wording change, not a caveat to bury.
+
+#### The instalment floor follows from it
+
+The 10.00 per-instalment floor existed to stop the flat minimum eating a payment.
+Where there is no minimum, that reason disappears.
+
+**Decision: the floor is 10.00 for a month's first payment, and for every later
+payment it drops to that currency's `stripe_minimum_charge` from the registry.**
+
+A creator can then take a 3.00 follow-up payment — fees 0.15 and 0.15 — which was
+the point of the change. The 10.00 first-payment floor stays because at 2.50 the
+creator still receives nothing, and no pricing rule should permit that.
+
+**Build:** validate at agreement send time and again at schedule item creation, with
+a real message naming the applicable floor, and leave the `PAY-004` guard as a
+backstop. Per-currency values come from the registry (§1.1), set at roughly
+equivalent purchasing power rather than converted at spot.
+
+---
+
+## 4. Tips and optional platform support
+
+**The conflict.** Fee Schedule §1 and §4 describe a buyer-chosen creator tip and a
+buyer-chosen Made for Stream support contribution, with rules for how each is
+refunded (Refund Policy §8: contributions are not auto-prorated on partial refunds
+and are requestable back within 14 days). The columns exist (`creator_tip_cents`,
+`platform_support_cents`), are read in `api/server.js`, and are displayed
+conditionally on the checkout page. **Nothing writes them.** There is no input
+control anywhere in the product, and the schedule-to-payment bridge hardcodes both
+to `0`. Those two display branches can never render.
+
+**Decision: build them. Tips and optional platform support ship at launch.**
+
+The database side is already correct and nothing has to be torn out — the columns,
+the constraints and the display branches all exist and behave properly. What is
+missing is the input and the write path.
+
+**What has to be built:**
+
+- A tip and contribution control on the checkout page. Both default to zero and must
+  be affirmatively chosen, per Fee Schedule §4.
+- An API route that recomputes `total_checkout_cents` and `application_fee_cents`
+  and reissues the Stripe session. The existing idempotency key is keyed on
+  `updated_at`, so it rotates correctly when the amount changes.
+- The arithmetic is already right in the schema's check constraints: a tip is added
+  to the total but excluded from the application fee, so it reaches the creator;
+  support is added to both, so it reaches Made for Stream.
+
+**The part that is bigger than the input.** Tips bring Refund Policy §8's
+contribution rules into the refund engine's first release, and they do not follow
+the base refund's rules:
+
+- A **full** project cancellation returns tips and contributions.
+- A **partial** refund does **not** prorate them automatically. The buyer requests
+  them back, within 14 days of the contribution or of the project's cancellation,
+  whichever is later.
+- Mistaken, duplicate or unauthorised contributions are reviewable outside that
+  window entirely.
+
+So a contribution refund is a separate path with its own clock, sitting inside the
+first refund feature. That is the real cost of this decision and it is sequenced in
+the checklist accordingly — tips land **with** refunds, not before them, because a
+tip we cannot refund correctly is worse than no tip.
+
+**Two interactions to keep straight:**
+
+- Tips and contributions neither consume nor count toward the monthly fee minimum
+  (§3.1). They are outside the fee calculation entirely.
+- A tip is the creator's money, so it sits under the same 14-day payout hold as the
+  base (§6.3). A contribution is ours and is not held.
+
+---
+
+## 5. Cancellation
+
+Nothing in the product can cancel anything. `cancelled` is a valid status on
+agreements, payment schedule items, milestones, change orders and final deliveries,
+and **no RPC writes it on any of them**. `listing_requests.status` does not even
+have the value — it is `submitted | accepted | completed | declined | archived`
+(`20260611_093`). `archive_my_listing_request` only works on a `submitted` request
+that was never accepted.
+
+### 5.1 Before any payment has been collected
+
+Either party may cancel unilaterally. No settlement, no review.
+
+| Object | Result |
+| --- | --- |
+| `listing_requests` | `cancelled` (new status value) with `cancelled_at`, `cancelled_by_user_id`, `cancellation_reason` |
+| `listing_request_agreements` | `cancelled`, `cancelled_at` set |
+| Payment schedule items | every `pending` / `payment_required` item → `cancelled` |
+| `listing_request_payments` | every `requires_checkout` / `checkout_opened` row → `cancelled`; any open Stripe session expired through the API |
+| Milestones, change orders, final delivery | `cancelled` |
+| Conversation | stays open and readable; closed on the same rule as completion (`20260611_094`) |
+| Delivered rights | none granted; nothing was paid for |
+
+### 5.2 After any payment has been collected
+
+Cancellation becomes a **proposal with a settlement**, never a unilateral act.
+
+1. Either party opens a cancellation stating, per milestone, the earned value
+   claimed, per Refund Policy §4 — completed conforming milestones may retain their
+   agreed price; a partially completed one retains only the documented value of
+   conforming work actually made available to the buyer.
+2. The creator must stop avoidable new work on receipt and provide the itemised
+   cancellation statement **within three business days** (Refund Policy §3).
+3. The other party accepts or disputes.
+4. **On acceptance:** unpaid schedule items are cancelled, refunds are issued for
+   prepaid unearned amounts, the request moves to `cancelled`.
+5. **On dispute:** it enters the support queue as Tier 2 with the evidence package
+   already defined in `REF-001`. Made for Stream decides under Refund Policy §9.
+
+**Cancellation never creates a new charge.** Any earned-but-unpaid amount is settled
+outside the automatic flow, by agreement — Refund Policy §4 already says
+"cancellation does not authorise a surprise charge."
+
+### 5.3 Delivered rights on cancellation
+
+- The buyer keeps the licence to each milestone whose payment is **retained** as
+  earned value, on the usage terms stated in the agreement.
+- The buyer must stop using and delete anything whose payment was **refunded**,
+  except copies needed as evidence (Refund Policy §11).
+- The creator gains no right to publish, reuse or resell the commissioned work
+  unless the agreement grants it.
+
+**Gap.** The agreement has no structured usage-rights field. `scope_summary`,
+`included_deliverables` and `additional_cost_policy` are all free text
+(`20260524_069`), and a search for `usage_rights` or `licen` across the migrations
+returns nothing. The rights half of "what the buyer keeps" is therefore
+unenforceable and uncitable in a dispute, while Refund Policy §4 repeatedly turns on
+"the agreed usage rights."
+
+**Recommendation:** add a required `usage_rights` field to the agreement with a
+small enumerated set (personal use / creator's own channel use / commercial use /
+exclusive with the buyer named as owner) plus a free-text qualifier, snapshotted
+into the agreement version at acceptance.
+
+### 5.4 A related inconsistency worth fixing in the same pass
+
+`listing_request_agreements.included_revision_count` defaults to `0`, while Refund
+Policy §5 says that if the agreement does not state a number, **two** rounds are
+included per separately priced deliverable. A stored `0` is indistinguishable from
+"not stated," so the policy's fallback can never be applied correctly.
+
+**Recommendation:** make the column nullable with `null` meaning "not stated," and
+have the product apply the two-round fallback when it is null.
+
+---
+
+## 6. Partial milestone refunds
+
+The policy is written and it is good. The product cannot do any of it. From
+`refunds-and-disputes.md`: no RPC, no API route, no webhook branch;
+`charge.refunded`, `charge.dispute.created` and `charge.dispute.closed` all fall
+through `processStripeWebhookEvent` and are stored as `ignored`. `stripe_charge_id`
+and `stripe_application_fee_id` are declared and never populated.
+
+**A refund issued by hand in Stripe today leaves the Made for Stream record saying
+`paid`.** That divergence, not the missing button, is the launch blocker.
+
+### 6.1 Launch scope for refunds
+
+| | Launch |
+| --- | --- |
+| Who can initiate | **Admin only** |
+| Scope | Full and partial refunds of any `paid` payment |
+| Fee treatment | Proportional, per Refund Policy §8 |
+| Dispute handling | Webhook branches and visibility. No automated response. |
+| Creator-initiated refunds | Later |
+| Buyer self-service refund requests | Later — the request arrives by message and support acts |
+
+Admin-only is the right first cut: the reversal of the application fee must happen
+atomically with the base refund, and the money sits on the creator's account. One
+correct path beats three.
+
+### 6.2 Refund arithmetic
+
+For a base refund of `r` against a payment with base `b`, where `cumulative_r` is
+all base refunded on that payment including this one:
+
+```
+buyer_fee_refund     = round( buyer_service_fee    * cumulative_r / b ) - already_refunded_buyer_fee
+creator_fee_reversal = round( creator_platform_fee * cumulative_r / b ) - already_reversed_creator_fee
+```
+
+Computed cumulatively against the original payment and rounded once, per Refund
+Policy §8 — which is what prevents repeated partial rounding from exceeding the
+original fee. Minimums are never recalculated against the remaining balance. A final
+full refund returns any rounding remainder.
+
+Mechanically: `stripe.refunds.create` on the connected account with
+`refund_application_fee: true`, against `stripe_charge_id`.
+
+### 6.3 Payout hold — keeping the money available in the first place
+
+**Decision: hold creator payouts for 14 days after the charge, so a refund can be
+taken from funds that are still there.**
+
+This is the right first move and it is cheaper than it looks, because **we are
+already holding funds — by accident and indefinitely.**
+
+`createStripeConnectAccount` in `api/server.js` sets
+`settings.payouts.schedule.interval = "manual"` on every connected account, and
+**nothing anywhere in the codebase ever creates a payout.** There is no payout API
+call, no scheduled job and no UI. Today a creator's money accrues in their Stripe
+balance and leaves only if they trigger it themselves from the Express dashboard.
+
+So this decision does not introduce a hold. It replaces an unbounded, undocumented,
+accidental hold with a defined 14-day one that then pays out automatically. That is
+strictly better for creators than what ships today, and it needs saying that way
+when it is announced.
+
+**Implementation:** change the schedule to `interval: "daily"` with
+`delay_days: 14`. Stripe then makes funds available 14 days after settlement and
+pays out on its own. 14 exceeds every country's minimum `delay_days`, so one value
+works globally. No payout code of our own, and no escrow.
+
+**This is not escrow, and the policy stays accurate.** The funds sit in the
+creator's own Stripe balance and belong to them; only the transfer to their bank is
+delayed. Payment Terms §5 can keep "Made for Stream does not provide escrow, a trust
+account or a promise that all funds are held pending acceptance" — but the delay
+must be disclosed explicitly rather than left to §5's general "payout timing
+depends on..." language.
+
+#### What the hold does and does not cover
+
+It covers the **most common refund by far**: a buyer cancels before substantive work
+starts and gets a full refund under Refund Policy §3. Those happen within days.
+
+It does **not** cover several real cases, and it is worth being precise about them
+rather than assuming the risk is gone:
+
+| Case | Typical timing | Covered by a 14-day hold? |
+| --- | --- | --- |
+| Cancellation before work starts | Days | **Yes** |
+| Dissatisfaction reported after delivery | Within 14 days of delivery (Refund Policy §6) | Only if the delivery is within ~14 days of the payment |
+| Milestone project cancelled mid-way | Weeks to months after the starting payment | **No** — that payment released long ago |
+| Final balance refunded after approval | After the hold | **No** |
+| Chargeback | **Up to 120 days**, longer for some reason codes | **No**, and nothing will |
+| Fraud, duplicate charge, hidden defect, infringement | No deadline (Refund Policy §6) | **No** |
+
+A deposit taken in January on a three-month commission is paid out in January. If
+that project is cancelled in March under the earned-value rules, the hold is
+irrelevant.
+
+**So the hold reduces how often we front money; it does not remove the need to be
+able to.** The recovery mechanism below stays — it just becomes the exception rather
+than the routine path.
+
+**One creator-experience note.** 14 days is in line with the market, so it is not a
+competitive problem. But it lands hardest on a brand-new creator waiting on their
+first payment. Worth revisiting later with a shorter hold for creators with a clean
+history — Stripe supports per-account schedules, so that is a later tuning knob, not
+a redesign.
+
+### 6.4 When the balance is still short — platform-funded refunds
+
+**Decision: Made for Stream funds the buyer refund immediately, then recovers it
+from the creator through the app.**
+
+With direct charges the base amount lands in the creator's Stripe balance. Once the
+hold expires and they have paid it out and spent it, Stripe cannot claw it back, and
+the buyer is still owed. Refund Policy §10 already commits us: "An insufficient
+Stripe balance does not extinguish a refund obligation." This is how that commitment
+is honoured in the cases §6.3 does not reach.
+
+**The buyer is never made to wait on a creator's balance.** The refund is issued
+from the platform, and whatever could not be taken from the creator's balance
+becomes a **recovery balance** owed by the creator to Made for Stream.
+
+While a recovery balance is outstanding:
+
+| | Rule |
+| --- | --- |
+| New requests | **Blocked.** The creator's listings stay visible but cannot receive a new request. |
+| Existing projects | Continue. Work already agreed is not interrupted. |
+| Payments on existing projects | **Diverted to the recovery balance** until it clears. |
+| Paying it off directly | The creator can settle the balance in the app at any time, by card, which lifts the block immediately. |
+| Clearing | Automatic. When the balance reaches zero the block lifts with no admin action. |
+
+**Blocking new requests, not hiding listings.** A hidden listing loses its search
+position, its link history and its reviews, and punishes the creator's future for a
+past debt. Blocking at the point of request is the narrower action that achieves the
+same thing: no new obligation can be created while an old one is unpaid. The
+enforcement point is the `listing requests buyer insert` RLS policy on
+`public.listing_requests`, which already gates on listing state — it gains a check
+that the creator has no outstanding recovery balance. That is a database boundary,
+which is where it belongs.
+
+**How the diversion works mechanically.** Not a new money-movement primitive: on the
+creator's subsequent payments, `application_fee_amount` is raised by the recovery
+instalment, so the extra comes off the top of the same direct charge and lands with
+the platform. This is already the exact mechanism the platform fee uses, and it
+respects the existing `application_fee_cents < total_checkout_cents` constraint.
+
+### 6.5 Recovery rate
+
+**Decided: recover at most 50% of each base payment.**
+
+Diverting a payment in full would leave the creator working the next project for
+nothing, and the predictable result is that they abandon it — producing a second
+unhappy buyer, a second refund and a second recovery balance. At 50% the balance
+still clears quickly, the creator keeps a reason to finish the work, and the buyer
+of that project gets what they paid for. A creator who wants it over with can settle
+directly at any time.
+
+### 6.6 What a refund does to the project
+
+| Refund | Effect |
+| --- | --- |
+| Full refund of the starting payment, before work | Agreement and request → `cancelled` |
+| Partial refund of a milestone | That milestone → `cancelled`; earlier approved milestones stand; the request continues only if both parties want it to, otherwise §5.2 applies |
+| Full refund of every collected payment | Request → `cancelled`; all licences revoked |
+| Refund after final delivery approval | Request stays `completed` and carries a refund record. There is no un-approval path, and inventing one would corrupt the delivery history. |
+
+---
+
+## 7. Unresponsive buyers and creators
+
+Refund Policy §7 already sets the clock: a clear project message stating what is
+needed, **seven days** without a substantive reply, then a **final notice** granting
+**seven more**. That is the rule. What follows is how it becomes operational, since
+`REQ-003` currently reads "There is no automated path and no policy for this yet."
+
+| | Rule |
+| --- | --- |
+| First notice | A project message from the waiting party stating what is needed and why. Logged against the request. |
+| Waiting period | 7 calendar days without a substantive reply. An automated acknowledgement is not a reply. |
+| Final notice | 7 further calendar days. Recorded as a distinct event, not an ordinary message. |
+| After expiry, **buyer unresponsive** | The creator may pause work, propose a revised schedule, and request administrative closure with cancellation of unfinished work. Unearned prepaid amounts remain refundable. Silence forfeits no deposit, completes no milestone, authorises no charge and transfers no rights. |
+| After expiry, **creator unresponsive** | The buyer may request cancellation and refund of unearned amounts. A creator who retains payment must evidence earned value. |
+| Early review | Immediately, without waiting, where a promised essential deadline is missed, there is credible fraud, or the creator states they cannot complete. |
+| Who closes | **An administrator**, on request from the waiting party. Not unilateral. |
+
+**Why admin closure and not unilateral.** Unilateral closure with money in the
+project requires the refund engine *and* a dispute path to both exist and be
+trusted. At launch volume, a human deciding is cheaper and safer than a wrong
+automatic transfer. Revisit once refunds have run for a quarter.
+
+**Administrative closure is not a finding that the work was satisfactory** (Refund
+Policy §6). The request records the closure reason and preserves the full history.
+
+### 7.1 NEEDS YOUR CALL — notices have no delivery channel
+
+There is **no outbound email in the product**. Supabase sends auth emails; nothing
+else sends anything. The only way a notice reaches anyone is an in-app project
+message and an unread badge they have to come back to see.
+
+A final notice a party never sees is not a notice, and closing a project against it
+is hard to defend to that party, to a bank in a chargeback, or to a regulator.
+
+Two options:
+
+- **Add minimal transactional email before launch** — three templates: payment
+  receipt, first notice, final notice. *(Recommended.)* It is the difference between
+  a defensible closure and a silent one, and buyers separately expect payment
+  receipts.
+- **Launch without it**, and accept that the non-response rules run on in-app
+  delivery only. Cheaper now; every closure is contestable.
+
+---
+
+## 8. Feature classification
+
+| Feature | Launch | Limited beta | Later |
+| --- | --- | --- | --- |
+| Commission requests, agreements, milestones, change orders, final delivery | ● | | |
+| Currency registry replacing the hardcoded constants (§1.1) | ● | | |
+| Stripe Connect onboarding — global country coverage | ● | | |
+| Currency waves 1 and 2 (§1.3) | ● | | |
+| Card checkout, direct charges, application fee | ● | | |
+| Free listings — download and external link | ● | | |
+| EU/UK express consent to immediate start (§1.5) | ● | | |
+| Cancellation (§5) | ● | | |
+| 14-day payout hold (§6.3) | ● | | |
+| Admin refunds, full and partial (§6) | ● | | |
+| Platform-funded refunds and creator recovery balances (§6.4) | ● | | |
+| Monthly fee minimum (§3.1) | ● | | |
+| Tips and optional platform contributions (§4) | ● | | |
+| Tax collection for CA/US (§11) | ● | | |
+| Dispute webhook visibility | ● | | |
+| Non-response notices and administrative closure (§7) | ● | | |
+| Messaging, moderation, reporting | ● | | |
+| Twitch linking and live discovery | ● | | |
+| Structured usage rights on agreements | ● | | |
+| Transactional email | ● *(if §9.2.1 is approved)* | | |
+| Tax registration for EU/UK and the rest of wave 2 (§11) | | ● | |
+| Currency waves 3 and 4 — zero- and three-decimal (§1.3) | | ● | |
+| Creator-initiated refunds | | ● | |
+| Buyer self-service refund requests | | ● | |
+| Local payment methods per market (§1.6) | | ● | |
+| Shorter payout hold for established creators (§6.3) | | ● | |
+| Buyer-currency price display / FX (§1.4) | | | ● |
+| Paid instant-download sales (`one_time`) | | | ● |
+| Subscriptions | | | ● |
+| Ads | | | ● |
+| Listing boosts | | | ● |
+| YouTube and other platform linking | | | ● |
+
+Nothing in the **Later** column is required for a buyer to pay a creator and receive
+work, which is the launch test. YouTube linking already ships as a "Coming soon" row
+in profile settings, which is the correct treatment.
+
+---
+
+## 9. Decisions
+
+### 9.1 Settled
+
+| Question | Decision |
+| --- | --- |
+| Legal entity | **Made for Stream** |
+| `[SUPPORT_EMAIL]`, `[PRIVACY_EMAIL]`, `[DMCA_AGENT_EMAIL]` | **inbox@madeforstream.com** for all three |
+| Geographic scope | **Global** — every country Stripe Connect supports for creators, unrestricted for buyers (§1) |
+| Currency scope | **Any major currency**, through the registry, enabled in waves (§1.1, §1.3) |
+| Creator payouts | **Held 14 days** after the charge, replacing today's accidental indefinite hold (§6.3) |
+| Refund funding | **Made for Stream funds the refund**, then recovers from the creator in-app (§6.4) |
+| Creator with an outstanding balance | Listings **blocked from new requests**; existing projects continue and their payments are diverted to the balance (§6.4) |
+| Recovery rate | **50% of each base payment** (§6.5) |
+| Fee minimums | **Once per creator per calendar month**, not per payment (§3.1) |
+| Tips and platform contributions | **Built for launch**, shipping alongside refunds (§4) |
+| Regional sales tax | **Collected and remitted by Made for Stream** wherever obliged (§11) |
+
+Two follow-ups that come with the entity details rather than being separate
+decisions:
+
+- **A single inbox for all three roles is fine to launch with** and can be split
+  later without a policy version bump, since the policies name an address rather
+  than a department.
+- **US DMCA safe harbour requires a designated agent registered with the US
+  Copyright Office**, not just an address in a policy. With US buyers in scope, that
+  registration is worth doing — it is a form and a small fee, and without it the
+  safe harbour the copyright policy assumes does not apply. Not a launch blocker;
+  do not let it fall off.
+- **Governing law stays Alberta, Canada.** Refund Policy §1 already defines business
+  days there. Global selling does not change that, because the policy already states
+  that mandatory local consumer rights apply regardless — which is the correct and
+  enforceable position.
+
+### 9.2 Still open
+
+1. **Transactional email at launch — yes or no.** §7.1. There is no outbound email
+   in the product at all; `inbox@madeforstream.com` is where mail arrives, not a way
+   to send it. Going global sharpens this: parties are now spread across every
+   timezone, so "they will see it next time they open the app" is a longer and less
+   predictable wait, and a 7-day notice clock runs regardless.
+
+   The 14-day payout hold (§6.3) adds a second reason. A creator whose money is held
+   and who is never told why will read it as the platform sitting on their earnings.
+   A payout-released notice is the cheapest possible answer to that.
+
+2. **Whether the monthly fee minimum applies to the buyer fee as well as the creator
+   fee** — §3.1. Recommended: creator fee only, because a monthly buyer minimum
+   means two buyers pay different amounts for the same purchase. Same build either
+   way; the difference is what has to be disclosed.
+
+3. **Tax registration strategy and advice** — §11.3. Not an engineering decision.
+   Which jurisdictions to register in and when, and whether to take
+   jurisdiction-specific advice before selling into the EU and UK. Recommended: yes,
+   before the first EU sale, since EU VAT applies from the first euro with no
+   small-seller threshold.
+
+---
+
+## 10. What this document changes about the published policies
+
+| Policy | Change |
+| --- | --- |
+| All policies | Replace `[SUPPORT_EMAIL]`, `[PRIVACY_EMAIL]` and `[DMCA_AGENT_EMAIL]` with `inbox@madeforstream.com`; name **Made for Stream** as the entity; remove every `// REVIEW DRAFT` marker and cut non-draft versions. |
+| Fee Schedule §1 | Keep the CAD/USD minimums exactly as written — they are correct. Publish the currently enabled currency list with each one's minimums, which §1 already requires before a currency may be enabled. |
+| Fee Schedule §1, §3, §4 | Keep the tip and contribution rows — they are being built (§4). Update the examples to show the monthly minimum. |
+| Fee Schedule §2 | Rewrite for the monthly minimum (§3.1). The current text — "Each separately collected instalment can incur a minimum, so splitting a project can cost more than one payment" — becomes wrong and has to change. Add the per-instalment floor and state that the agreement's fee estimate is a maximum. |
+| Fee Schedule §5 | Disclose the 14-day payout hold explicitly (§6.3); the existing "payout timing depends on..." language is not enough to cover a delay we impose. Add that where a refund exceeds the creator's available balance, Made for Stream funds it and recovers the amount from the creator, including by applying it to subsequent payments (§6.4). Both are new creator obligations and must be disclosed before they can be incurred. |
+| Fee Schedule §6 | Rewrite for §11. The current "does not claim that all taxes are automatically collected" becomes a statement that Made for Stream calculates, collects and remits where obliged, and identifies tax separately on the payment record — which also requires the missing `tax_cents` column. |
+| Creator Terms | Add the recovery balance: what creates one, that new requests are blocked while it is outstanding, how it is recovered at 50% of each payment, and how it is settled directly. Add the payout hold. |
+| Refund Policy §1 | Keep the EU/UK withdrawal paragraph, and build the express-consent capture it depends on (§1.5). |
+| Refund Policy §5 | No wording change; make `included_revision_count` nullable so the two-round fallback can actually apply (§5.4). |
+| Refund Policy §7 | No change. It is already the rule; §7 above makes it operational. |
+| Refund Policy §8 | Keep the contribution-refund paragraph — it now describes a feature that exists (§4). |
+| Refund Policy §10 | No change. "An insufficient Stripe balance does not extinguish a refund obligation" is now backed by two actual mechanisms: the payout hold and, behind it, platform funding with recovery. |
+
+---
+
+## 11. Regional sales tax obligations
+
+**Decision: the rules are updated to collect and remit indirect tax wherever selling
+globally obliges us to, rather than leaving it to the creator.**
+
+### 11.1 Why the current framing will not survive
+
+Fee Schedule §6 says taxes "must be identified before payment," that creators are
+responsible for tax on their own supplies "except where applicable law assigns
+collection or remittance to Made for Stream," and — carefully — that the policy
+"does not claim that all taxes are automatically collected."
+
+That was written as a holding position and it worked at CA/US scope. It does not
+survive global sale, because **marketplace facilitator rules in many jurisdictions
+assign the collection and remittance obligation to the platform by operation of law,
+regardless of what our contract says about who supplies the work.** Payment Terms §5
+naming the creator as the supplier does not move that obligation. The exception
+clause in §6 is doing the work, and the answer to it is now "yes, frequently."
+
+In scope once we sell globally, at minimum:
+
+| Regime | Applies to |
+| --- | --- |
+| EU VAT (OSS/IOSS) | Digital services to EU consumers, from the first euro — no threshold for non-established suppliers |
+| UK VAT | Digital services to UK consumers |
+| Australian GST | Inbound digital services, threshold-based |
+| New Zealand GST | Remote services |
+| Canadian GST/HST + provincial | Already applicable and already ours as an Alberta entity |
+| US state sales tax | Digital goods and services, per state, with economic nexus thresholds |
+| Norway, Switzerland, Japan, Korea, Singapore, India and others | Each with its own registration rules |
+
+**EU VAT has no small-seller threshold for a non-established supplier.** It applies
+from the first sale. That makes it the first one to solve, not a later one.
+
+### 11.2 What this requires in the product
+
+- **A tax engine.** Recommend **Stripe Tax** — it calculates at checkout, handles
+  location evidence and produces the filing exports. It charges per transaction and
+  it does not file for you.
+- **A tax column on the payment ledger.** `listing_request_payments` has
+  `base_amount_cents`, `creator_tip_cents`, `buyer_service_fee_cents`,
+  `creator_platform_fee_cents`, `platform_support_cents`, `application_fee_cents`
+  and `total_checkout_cents` — and **no tax field at all**. Meanwhile Fee Schedule §6
+  already promises "The payment record must separately identify base price, buyer
+  fee, creator tip, support contribution, **tax** and total." The product cannot keep
+  that promise today. Add `tax_cents` and the jurisdiction, and include tax in the
+  total.
+- **Buyer location evidence** captured and stored — EU VAT rules require two
+  non-contradictory pieces.
+- **Tax shown separately at checkout before payment**, which §6 already requires.
+- **Refunds adjust tax proportionally.** Refund Policy §8 already says "Taxes
+  attributable to refunded items are adjusted as required."
+- **Creator tax status.** Whether a creator is registered and in which country
+  changes the treatment, including reverse charge on B2B supplies within the EU.
+  Stripe Connect collects some of this at onboarding; it has to be stored and used.
+- **Whether tax applies to our fees as well as to the base.** The buyer service fee
+  and the platform contribution are our supply to the buyer, and in several
+  jurisdictions they are separately taxable. This is not the same question as tax on
+  the commission.
+
+### 11.3 The part that is not an engineering decision
+
+Registration and remittance are obligations with penalties, and the thresholds,
+treatment of custom creative work, and platform-versus-creator liability differ
+meaningfully by jurisdiction. Stripe Tax calculates; it does not decide where we
+must register, and it does not file.
+
+**Recommendation: get jurisdiction-specific advice before the first sale into the
+EU and UK**, and stage registrations rather than attempting all of them at once.
+This is the one item in this document where the right next step is a professional
+opinion rather than a migration, and it should not be quietly absorbed into an
+engineering sprint. It is sequenced as its own sprint for that reason.
+
+**This does not block launching in CA/US**, where we are established and the
+position is already understood. It blocks the wave 2 currencies and the markets they
+represent — which is the same gate §1.3 already staged them behind.
+
+---
+
+## Related
+
+- [`launch-implementation-checklist.md`](launch-implementation-checklist.md) — the
+  ordered build sequence for the sprints that follow.
+- [`support/README.md`](support/README.md) — the support playbooks, several of which
+  record the gaps this document closes.
