@@ -13,6 +13,54 @@ errors, tsc 19 lines. Do not let them grow.
 
 ---
 
+## Sprint 0.5 — Stripe portal configuration
+
+**Dashboard settings, not code.** These are quick, they cost nothing, and three of
+them decide numbers that get published — so they come before the fee work rather
+than during it. Record the answer to each one in this file as it is confirmed;
+several are invisible from the codebase and will otherwise be re-derived wrongly.
+
+**Pricing model and fee liability**
+
+- [ ] Confirm which Connect pricing model the platform is on: **"Stripe handles
+      pricing"** (no platform fees) or **"you handle pricing"** (CA$2 per monthly
+      active account, 0.25% + CA$0.25 per payout, platform responsible for
+      processing). Assumed to be **"you handle pricing"**.
+- [ ] **Confirm who bears the 2.9% + CA$0.30 processing fee** on a direct charge —
+      the connected account or the platform. This is the single largest input to
+      unit economics: it is the difference between netting 10.00 and 6.65 on a
+      CAD 100 commission (§3.1).
+- [ ] If the platform bears processing, **Fee Schedule §5 is wrong** — "The creator
+      is responsible for those transaction-related charges to the extent charged to
+      their connected account" — and must be rewritten before publication.
+- [ ] Verify the CA$2 monthly active account line actually appears on a Stripe
+      invoice, and capture one invoice as the reference for what we are charged.
+- [ ] Check whether the platform qualifies for Stripe's revenue share under "Stripe
+      handles pricing", and whether that model would net more than the current one
+      once the account and payout fees are counted.
+
+**Payouts**
+
+- [ ] Decide the payout interval. §6.3 currently specifies `daily`, which at up to
+      ~30 payouts a month costs up to CA$7.50 in fixed payout fees and would swallow
+      the monthly minimum whole. **`weekly` is recommended** at about CA$1.00.
+- [ ] Verify how `delay_days` interacts with a non-`daily` interval before
+      implementing the 14-day hold — `delay_days` is a `daily` schedule parameter.
+- [ ] Confirm the per-payout 0.25% volume fee is understood as a standing cost: at a
+      5% creator fee it consumes about 5% of gross revenue.
+
+**Other settings that affect published numbers**
+
+- [ ] Record Stripe's minimum charge amount per currency we intend to enable, for
+      the registry's `stripe_minimum_charge` column (Sprint 1).
+- [ ] Confirm international card and currency conversion surcharges, and who bears
+      them, before enabling a currency outside CAD/USD.
+- [ ] Register the Connect **webhook endpoint** against the production API origin
+      once §11.1 is decided, and confirm the raw body reaches signature
+      verification intact.
+
+---
+
 ## Sprint 1 — The currency registry
 
 Global availability rests entirely on this. Three places in the product assume a

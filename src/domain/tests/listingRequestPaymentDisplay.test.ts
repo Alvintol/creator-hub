@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  describeBuyerServiceFee,
   canOpenListingRequestPaymentCheckout,
   formatPaymentCents,
   getListingRequestPaymentActionLabel,
@@ -69,5 +70,61 @@ describe("listing request payment display", () => {
     expect(
       getListingRequestPaymentStatusLabel("processing"),
     ).toBe("Processing");
+  });
+});
+
+describe("describeBuyerServiceFee", () => {
+  const payment = (overrides: Partial<Parameters<typeof describeBuyerServiceFee>[0]> = {}) => ({
+    base_amount_cents: 10000,
+    buyer_service_fee_cents: 500,
+    buyer_service_fee_bps: 500,
+    buyer_service_fee_minimum_cents: 100,
+    currency: "cad",
+    ...overrides,
+  });
+
+  it("states the rate alone when the percentage is the binding figure", () => {
+    expect(describeBuyerServiceFee(payment())).toBe(
+      "5% of the project payment.",
+    );
+  });
+
+  it("explains the minimum when it is the binding figure", () => {
+    // 5% of 10.00 is 0.50, so the 1.00 minimum is what the buyer actually pays.
+    const result = describeBuyerServiceFee(
+      payment({ base_amount_cents: 1000, buyer_service_fee_cents: 100 }),
+    );
+
+    expect(result).toContain("5% of the project payment");
+    expect(result).toContain("$1.00 minimum");
+  });
+
+  it("reads the rate from the payment rather than assuming 5%", () => {
+    const result = describeBuyerServiceFee(
+      payment({ buyer_service_fee_bps: 250, buyer_service_fee_cents: 250 }),
+    );
+
+    expect(result).toBe("2.5% of the project payment.");
+  });
+
+  it("does not claim a minimum applied when the fee exactly equals the percentage", () => {
+    // Boundary: 5% of 20.00 is exactly the 1.00 minimum, so neither is "binding".
+    const result = describeBuyerServiceFee(
+      payment({ base_amount_cents: 2000, buyer_service_fee_cents: 100 }),
+    );
+
+    expect(result).toBe("5% of the project payment.");
+  });
+
+  it("formats the minimum in the payment's own currency", () => {
+    const result = describeBuyerServiceFee(
+      payment({
+        base_amount_cents: 1000,
+        buyer_service_fee_cents: 100,
+        currency: "usd",
+      }),
+    );
+
+    expect(result).toContain("US$1.00");
   });
 });

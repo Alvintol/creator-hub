@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import CheckoutPolicyAcceptance from "../../components/legal/CheckoutPolicyAcceptance";
 import {
+  describeBuyerServiceFee,
   formatPaymentCents,
   getListingRequestPaymentTitle,
 } from "../../domain/payments/listingRequestPaymentDisplay";
@@ -30,6 +31,8 @@ const classes = {
   amounts: "mt-3 space-y-1 text-sm text-zinc-700",
   amountRow: "flex justify-between gap-4",
   totalRow: "flex justify-between gap-4 border-t border-zinc-200 pt-2 font-bold text-zinc-950",
+  feeNote: "mt-4 border-t border-zinc-200 pt-3 text-xs leading-5 text-zinc-500",
+  feeLink: "font-semibold text-zinc-700 underline underline-offset-2 hover:text-zinc-950",
 } as const;
 
 const getErrorMessage = (error: unknown): string =>
@@ -150,6 +153,16 @@ const ListingRequestPaymentCheckout = () => {
               <dd>{formatPaymentCents(payment.total_checkout_cents, payment.currency)}</dd>
             </div>
           </dl>
+
+          <p className={classes.feeNote}>
+            The buyer service fee is {describeBuyerServiceFee(payment)} It is the
+            only fee added to what you pay. The creator pays a separate platform
+            fee out of their own proceeds, along with the payment processor&rsquo;s
+            charges, so it does not increase this total.{" "}
+            <Link className={classes.feeLink} to="/policies/fees">
+              Fee Schedule and Payment Terms
+            </Link>
+          </p>
         </section>
       )}
 

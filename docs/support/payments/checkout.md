@@ -7,6 +7,8 @@ surfaces:
   - api/server.js:1153     # assertCheckoutPaymentCanBeOpened
   - api/server.js:1062     # CHECKOUT_OPENABLE_PAYMENT_STATUSES
   - public.listing_request_payments
+  - src/pages/payments/ListingRequestPaymentCheckout.tsx   # fee disclosure
+  - src/domain/payments/listingRequestPaymentDisplay.ts    # describeBuyerServiceFee
 unmatched_tier: 2
 ---
 
@@ -33,6 +35,7 @@ Two consequences that shape everything in this playbook:
 | "The pay button does nothing / errors" | [`PAY-002`](#pay-002--payment-is-not-in-an-openable-state), [`PAY-003`](#pay-003--creator-cannot-accept-payments-yet) |
 | "I paid, it's still asking me to pay" | [`PAY-005`](#pay-005--payment-stuck-in-checkout_opened-or-processing) |
 | "I was charged twice" | [`PAY-006`](#pay-006--buyer-reports-a-duplicate-charge) |
+| "The fee is more than 5%" | [`PAY-008`](#pay-008--buyer-questions-the-service-fee) |
 | "It says I'm not the buyer" | [`PAY-001`](#pay-001--wrong-user-attempting-checkout) |
 
 ---
@@ -310,6 +313,41 @@ open a long time.
 **Fix.** Sign out and back in. See [`auth/sign-in.md`](../auth/sign-in.md).
 
 **Money impact.** None.
+
+---
+
+## `PAY-008` — Buyer questions the service fee
+
+```yaml
+id: PAY-008
+tier: 2
+signals:
+  - source: user_report
+    match: "buyer asks why the fee is more than 5%"
+  - source: user_report
+    match: "buyer says the total does not match the agreed price"
+auto_fix: none
+reason_not_automatable: "explanation, not a fault; a genuine mismatch is PAY-004"
+escalate_with:
+  - "base_amount_cents, buyer_service_fee_cents, buyer_service_fee_bps and buyer_service_fee_minimum_cents on the payment"
+```
+
+**Cause.** Almost always the minimum, not a bug. On a small payment the flat
+minimum is larger than the percentage, so a buyer who expects 5% sees more. On a
+10.00 payment the fee is the 1.00 minimum, which reads as 10%.
+
+The checkout page explains this in place — `describeBuyerServiceFee` says which
+of the two applied and why — so a buyer reaching support usually did not read it,
+or is looking at an older payment created before that text existed.
+
+**Check the arithmetic against the payment's own stored rate and minimum**, not
+against 5% and 1.00. Those columns are per-payment snapshots and are what the fee
+was actually calculated from.
+
+**If the figures do not reconcile**, it is not this issue — see
+[`PAY-004`](#pay-004--payment-amount-or-fee-setup-is-invalid).
+
+**Money impact.** None. The charge is correct; the expectation was not set.
 
 ---
 

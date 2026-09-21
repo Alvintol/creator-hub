@@ -33,6 +33,8 @@ export type ListingRequestPaymentRow = {
   base_amount_cents: number;
   creator_tip_cents: number;
   buyer_service_fee_cents: number;
+  buyer_service_fee_bps: number;
+  buyer_service_fee_minimum_cents: number;
   creator_platform_fee_cents: number;
   platform_support_cents: number;
   application_fee_cents: number;
@@ -115,6 +117,8 @@ export type ListingRequestPaymentSummary = Pick<
   | "base_amount_cents"
   | "creator_tip_cents"
   | "buyer_service_fee_cents"
+  | "buyer_service_fee_bps"
+  | "buyer_service_fee_minimum_cents"
   | "platform_support_cents"
   | "total_checkout_cents"
   | "metadata"
@@ -136,7 +140,7 @@ export const useListingRequestPayment = (paymentId?: string | null) => {
       const { data, error } = await supabase
         .from("listing_request_payments")
         .select(
-          "id, listing_request_id, payment_type, status, currency, base_amount_cents, creator_tip_cents, buyer_service_fee_cents, platform_support_cents, total_checkout_cents, metadata",
+          "id, listing_request_id, payment_type, status, currency, base_amount_cents, creator_tip_cents, buyer_service_fee_cents, buyer_service_fee_bps, buyer_service_fee_minimum_cents, platform_support_cents, total_checkout_cents, metadata",
         )
         .eq("id", paymentId)
         .maybeSingle();
