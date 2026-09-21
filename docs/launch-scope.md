@@ -252,19 +252,78 @@ stops penalising volume. On a second 10.00 payment in the same month the fees be
 0.50 and 0.50 — the buyer pays 10.50, the creator receives 9.50, and the platform
 share drops from 25% to 10%, matching what a large payment already pays.
 
-#### One correction to the reasoning
+#### What the minimum actually offsets
 
-The minimum does **not** cover Stripe's per-transaction fee, and it never has. These
-are direct charges, so Stripe's own fee is deducted from the **creator's** connected
-account on every charge — not from our application fee. Payment Terms §5 already
-says this: "The creator is responsible for those transaction-related charges to the
-extent charged to their connected account."
+**Correction to an earlier draft of this section,** which said the minimum was
+margin rather than cost recovery. That was only true under one of Stripe's two
+Connect pricing models, and it is not the one we are on.
 
-So the flat minimum is platform margin on small transactions, not cost recovery, and
-Stripe's per-charge cost continues to apply to every payment regardless of what we
-do here. That does not make the decision wrong — being generous on small repeat
-transactions is a perfectly good pricing choice — but it should be made knowing the
-cost it does not offset.
+Stripe Connect bills a platform one of two ways:
+
+| | Stripe handles pricing | **You handle pricing** |
+| --- | --- | --- |
+| Monthly active account | $0 | **CA$2** per account that receives a payout that month |
+| Per payout sent | $0 | **0.25% + CA$0.25** |
+| Processing (2.9% + CA$0.30 domestic card) | Billed to the connected account | **Billed to the platform** |
+
+Under "you handle pricing", **CA$2 per active creator per month is a real platform
+cost**, and it is a *per creator per month* cost — which is exactly the shape of a
+per creator per month fee minimum. The monthly minimum is therefore the correct
+structure for it, and a per-payment minimum would over-recover from any creator
+taking more than one payment.
+
+That makes the reasoning behind the monthly minimum sound. It is cost recovery, and
+CA$2.50 covers a CA$2.00 account fee with a small margin.
+
+#### Two costs this exposes that nothing has accounted for
+
+**The 0.25% payout volume fee.** It applies to every payout and is unavoidable. At a
+5% creator fee it consumes 5% of gross revenue on its own.
+
+**The per-payout CA$0.25 is a function of payout frequency, and §6.3 currently
+chooses the most expensive option.** The payout hold specifies `interval: "daily"`
+with `delay_days: 14`, which means a payout on every day a creator has funds
+released. A creator with steady work could trigger 20–30 payouts a month:
+
+| Payout schedule | Payouts/month | Fixed payout fees |
+| --- | --- | --- |
+| `daily` (as specified in §6.3) | up to ~30 | up to **CA$7.50** |
+| `weekly` | ~4 | **CA$1.00** |
+| `monthly` | 1 | **CA$0.25** |
+
+At up to CA$7.50 the payout fees would dwarf the CA$2 account fee the monthly
+minimum was sized to cover, and the whole minimum would be swallowed by a mechanism
+we chose for unrelated reasons.
+
+**Recommendation: `weekly` rather than `daily`.** It preserves the 14-day hold's
+purpose, costs about CA$1 a month instead of up to CA$7.50, and a weekly payout is
+a normal creator expectation. The exact interaction of `delay_days` with a weekly
+interval needs checking against Stripe at implementation — `delay_days` is a `daily`
+schedule parameter, so a weekly schedule may express the hold differently.
+
+#### The question that decides the unit economics
+
+**Under "you handle pricing", the platform is responsible for processing fees** —
+Stripe's own wording. If that applies to our charges, then on a CAD 100 commission:
+
+| | Creator bears Stripe | Platform bears Stripe |
+| --- | --- | --- |
+| Buyer pays | 105.00 | 105.00 |
+| Creator receives | 91.65 | **95.00** |
+| Made for Stream gross | 10.00 | 10.00 |
+| Made for Stream net of Stripe | **10.00** | **6.65** |
+
+That is a 33% difference in our net revenue, and it also decides whether a published
+sentence is true: Fee Schedule §5 states "The creator is responsible for those
+transaction-related charges to the extent charged to their connected account." If
+the platform bears processing, that sentence is wrong and has to change before
+publication.
+
+With direct charges the default is that the connected account pays Stripe's fee, but
+this is account configuration and cannot be determined from the code. **Resolve it in
+the Stripe dashboard before pricing is published** — it is the first item of the
+Stripe portal checklist in
+[`launch-implementation-checklist.md`](launch-implementation-checklist.md).
 
 #### Apply it to the creator fee, not the buyer fee
 
@@ -802,7 +861,8 @@ in profile settings, which is the correct treatment.
 | Refund funding | **Made for Stream funds the refund**, then recovers from the creator in-app (§6.4) |
 | Creator with an outstanding balance | Listings **blocked from new requests**; existing projects continue and their payments are diverted to the balance (§6.4) |
 | Recovery rate | **50% of each base payment** (§6.5) |
-| Fee minimums | **Once per creator per calendar month**, not per payment (§3.1) |
+| Fee rates | **5% buyer and 5% creator**, both retained (§3) |
+| Fee minimums | **Once per creator per calendar month**, not per payment — offsetting Stripe's CA$2 monthly active account fee (§3.1) |
 | Tips and platform contributions | **Built for launch**, shipping alongside refunds (§4) |
 | Transactional email | **Ships at launch**, on Cloudflare Email Service (§7.1) |
 | Supabase auth mail | Moves to the **same provider and sending domain** (§7.1) |

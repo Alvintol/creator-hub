@@ -69,3 +69,38 @@ export const getListingRequestPaymentTitle = (
 // currency, which holds for the CAD and USD amounts supported today.
 export const formatPaymentCents = (cents: number, currency: string): string =>
   formatMoney(cents / 100, currency);
+
+// 500 -> "5%", 250 -> "2.5%", 125 -> "1.25%". Trailing zeros are dropped so a
+// whole-number rate does not read as "5.00%".
+export const formatFeeRateBps = (bps: number): string =>
+  `${Number((bps / 100).toFixed(2))}%`;
+
+// Explains the buyer service fee on a payment the buyer is about to make.
+//
+// Derived from the rate and minimum recorded on the payment row, not from a
+// hardcoded 5% / 1.00 -- those are per-payment snapshots and they will vary once
+// the currency registry lands. A fee larger than the percentage means the
+// minimum was the binding figure.
+export const describeBuyerServiceFee = (payment: {
+  base_amount_cents: number;
+  buyer_service_fee_cents: number;
+  buyer_service_fee_bps: number;
+  buyer_service_fee_minimum_cents: number;
+  currency: string;
+}): string => {
+  const rate = formatFeeRateBps(payment.buyer_service_fee_bps);
+  const percentageFeeCents = Math.ceil(
+    (payment.base_amount_cents * payment.buyer_service_fee_bps) / 10000,
+  );
+
+  if (payment.buyer_service_fee_cents > percentageFeeCents) {
+    const minimum = formatPaymentCents(
+      payment.buyer_service_fee_minimum_cents,
+      payment.currency,
+    );
+
+    return `${rate} of the project payment, with a ${minimum} minimum. The minimum applies here because ${rate} of this payment is less than ${minimum}.`;
+  }
+
+  return `${rate} of the project payment.`;
+};
