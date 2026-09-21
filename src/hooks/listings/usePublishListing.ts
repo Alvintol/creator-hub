@@ -13,7 +13,7 @@ export const usePublishListing = () => {
         throw new Error("You must be signed in to publish a listing.");
       }
 
-      await requireCreatorPaymentAccountReadyForPublishing(user.id);
+      await requireCreatorPaymentAccountReadyForPublishing(user.id, listingId);
 
       const { data, error } = await supabase
         .from("listings")

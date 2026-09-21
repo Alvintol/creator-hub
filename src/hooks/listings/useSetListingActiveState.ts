@@ -21,7 +21,7 @@ export const useSetListingActiveState = () => {
       const { listingId, isActive } = input;
 
       if (isActive) {
-        await requireCreatorPaymentAccountReadyForPublishing(user.id);
+        await requireCreatorPaymentAccountReadyForPublishing(user.id, listingId);
       }
 
       const { data, error } = await supabase
