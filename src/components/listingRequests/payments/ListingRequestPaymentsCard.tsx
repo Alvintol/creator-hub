@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 import {
   canOpenListingRequestPaymentCheckout,
+  formatPaymentCents,
   getListingRequestPaymentActionLabel,
   getListingRequestPaymentStatusLabel,
   getListingRequestPaymentTitle,
@@ -44,15 +45,6 @@ const classes = {
   error:
     "notice noticeError",
 } as const;
-
-const formatMoney = (
-  amountCents: number,
-  currency: string,
-): string =>
-  new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amountCents / 100);
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error
@@ -131,7 +123,7 @@ const ListingRequestPaymentsCard = ({
                       Project amount
                     </div>
                     <div className={classes.metaValue}>
-                      {formatMoney(
+                      {formatPaymentCents(
                         payment.base_amount_cents,
                         payment.currency,
                       )}
@@ -143,7 +135,7 @@ const ListingRequestPaymentsCard = ({
                       Service fee
                     </div>
                     <div className={classes.metaValue}>
-                      {formatMoney(
+                      {formatPaymentCents(
                         payment.buyer_service_fee_cents,
                         payment.currency,
                       )}
@@ -155,7 +147,7 @@ const ListingRequestPaymentsCard = ({
                       Total
                     </div>
                     <div className={classes.metaValue}>
-                      {formatMoney(
+                      {formatPaymentCents(
                         payment.total_checkout_cents,
                         payment.currency,
                       )}
@@ -166,7 +158,7 @@ const ListingRequestPaymentsCard = ({
                 {payment.creator_tip_cents > 0 && (
                   <p className={classes.feeText}>
                     Includes{" "}
-                    {formatMoney(
+                    {formatPaymentCents(
                       payment.creator_tip_cents,
                       payment.currency,
                     )}{" "}
@@ -177,7 +169,7 @@ const ListingRequestPaymentsCard = ({
                 {payment.platform_support_cents > 0 && (
                   <p className={classes.feeText}>
                     Includes{" "}
-                    {formatMoney(
+                    {formatPaymentCents(
                       payment.platform_support_cents,
                       payment.currency,
                     )}{" "}

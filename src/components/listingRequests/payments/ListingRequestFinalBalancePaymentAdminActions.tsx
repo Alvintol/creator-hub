@@ -1,7 +1,8 @@
+import { formatMoney } from "../../../lib/formatMoney";
 import type {
   ListingRequestAgreementRow,
   ListingRequestPaymentScheduleItemRow,
-} from "../hooks/creatorRequests/useListingRequestAgreement";
+} from "../../../hooks/creatorRequests/useListingRequestAgreement";
 
 type ListingRequestFinalBalancePaymentAdminActionsProps = {
   agreement: Pick<
@@ -37,15 +38,6 @@ const classes = {
   btnPrimary:
     "btnPrimary",
 } as const;
-
-const formatMoney = (
-  amount: number,
-  currency: string
-): string =>
-  new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount);
 
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error

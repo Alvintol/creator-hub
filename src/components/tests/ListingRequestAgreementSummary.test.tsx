@@ -25,6 +25,9 @@ const agreement: ListingRequestAgreementRow = {
   minimum_update_rule: "weekly_updates",
   first_update_due_days: 5,
   update_frequency_days: 7,
+  last_progress_update_at: null,
+  next_progress_update_due_at: null,
+  progress_update_requirement_satisfied_at: null,
   scope_summary: "Create a custom overlay package for the buyer.",
   included_deliverables: ["Starting soon screen", "BRB screen"],
   additional_cost_policy:
@@ -70,6 +73,8 @@ const agreement: ListingRequestAgreementRow = {
     {
       id: "payment-1",
       agreement_id: "agreement-1",
+      agreement_item_id: null,
+      change_order_id: null,
       title: "Deposit",
       description: "Required before work starts.",
       amount: 100,

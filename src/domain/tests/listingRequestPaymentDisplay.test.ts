@@ -2,12 +2,23 @@ import { describe, expect, it } from "vitest";
 
 import {
   canOpenListingRequestPaymentCheckout,
+  formatPaymentCents,
   getListingRequestPaymentActionLabel,
   getListingRequestPaymentStatusLabel,
   getListingRequestPaymentTypeLabel,
 } from "../payments/listingRequestPaymentDisplay";
 
 describe("listing request payment display", () => {
+  it.each([
+    [12345, "cad", "$123.45"],
+    [12345, "USD", "US$123.45"],
+    [0, "cad", "$0.00"],
+    [-1050, "cad", "-$10.50"],
+    [1, "cad", "$0.01"],
+  ])("formats %s minor units in %s as %s", (cents, currency, expected) => {
+    expect(formatPaymentCents(cents, currency)).toBe(expected);
+  });
+
   it("labels milestone payments", () => {
     expect(
       getListingRequestPaymentTypeLabel(

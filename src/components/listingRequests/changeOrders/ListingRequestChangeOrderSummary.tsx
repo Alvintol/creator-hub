@@ -1,3 +1,4 @@
+import { formatMoney as formatCurrencyAmount } from "../../../lib/formatMoney";
 import {
   getListingRequestChangeOrderImpactLabels,
   getListingRequestChangeOrderStatusLabel,
@@ -103,10 +104,7 @@ const formatMoney = (
   currency: string,
   showSign = false
 ): string => {
-  const formattedAmount = new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(Math.abs(amount));
+  const formattedAmount = formatCurrencyAmount(Math.abs(amount), currency);
 
   if (!showSign || amount === 0) {
     return amount < 0
