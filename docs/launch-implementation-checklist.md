@@ -217,7 +217,10 @@ contribution at all.
 
 ---
 
-## Sprint 6 — Non-response and closure
+## Sprint 6 — Non-response, closure and transactional email
+
+Email ships here because the notices are its first real use, but the Supabase SMTP
+item is a live production gap and can be pulled forward on its own at any point.
 
 - [ ] Migration: notice records against a request — type (first / final), sender,
       what was requested, sent and expiry timestamps.
@@ -227,8 +230,30 @@ contribution at all.
       notice, recording the reason and cascading per §5.
 - [ ] Workspace UI: notice state, countdown, and the request-closure action for the
       waiting party.
-- [ ] Transactional email for payment receipt, first notice and final notice — **only
-      if §9.2.1 is approved.**
+**Transactional email (§7.1)**
+
+- [ ] Enable Cloudflare Workers Paid and onboard `send.madeforstream.com` as the
+      sending domain. Until a domain is onboarded, sending is limited to addresses
+      verified on the account.
+- [ ] Confirm Email Routing for `inbox@madeforstream.com` on the root domain, and
+      that Cloudflare manages the SPF and DKIM records for both directions.
+- [ ] Send from the Express API over the REST API or SMTP. **No Workers code
+      required** — do not introduce a Workers deployment just to send mail.
+- [ ] Templates: payment receipt, first notice, final notice, payout released. The
+      last is not optional once the payout hold ships (§6.3).
+- [ ] Point **Supabase custom SMTP** at the same provider and sending domain. Auth
+      mail currently goes through Supabase's built-in service, which is rate-limited
+      to a handful per hour and is not for production — this is a live gap
+      independent of the rest of this sprint.
+- [ ] Warm the sending domain before launch. New accounts start on a conservative
+      daily quota that scales with sending behaviour; launch day is the wrong time
+      to discover the ceiling.
+- [ ] Record delivery outcomes against the notice records, so a disputed closure can
+      show the notice was accepted for delivery.
+- [ ] Suppression-list handling, so a hard bounce does not silently restart a notice
+      clock that nobody received.
+- [ ] Playbook: new `messaging/transactional-email.md` — bounced notice, unverified
+      domain, quota exceeded, and what a failed notice means for the 7 + 7 clock.
 - [ ] Staleness query surfaced in admin: requests not advanced in 14+ days with a
       pending action on one side.
 - [ ] Playbook: `REQ-003` in `requests/request-lifecycle.md` is rewritten from "no
@@ -287,6 +312,11 @@ and burying that inside an engineering sprint is how it gets skipped (§11).
 - [ ] Enforce the instalment floors at agreement send and schedule item creation,
       with the plain-language message, and quote the agreement's fee estimate as a
       maximum (§3.1).
+- [ ] **Publish the Service Provider Register** (§7.2) — Supabase, Stripe,
+      Cloudflare and Google Fonts, each with its function and processing locations,
+      routed and styled like the other legal pages. The privacy policy references it
+      three times and says the published version must include it; it does not exist.
+- [ ] Name Cloudflare in Privacy Policy §4 alongside Supabase and Stripe.
 - [ ] Register a DMCA designated agent with the US Copyright Office (§9.1).
 - [ ] Full end-to-end rehearsal in test mode, in at least three currencies including
       one non-CAD/USD: request → agreement → starting payment → milestone → change

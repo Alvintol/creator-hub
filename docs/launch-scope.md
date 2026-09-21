@@ -4,7 +4,7 @@
 > paid launch is built against. Where it disagrees with a published policy or with
 > the code, the disagreement is named explicitly and a resolution is recommended.
 >
-> Decisions marked **NEEDS YOUR CALL** are not resolved here.
+> §9.1 records what is settled. §9.2 records the two questions still open.
 
 The goal of the first launch is one thing working end to end: a buyer in a
 supported currency commissions a creator, pays through Stripe Connect, the work is
@@ -637,23 +637,85 @@ automatic transfer. Revisit once refunds have run for a quarter.
 **Administrative closure is not a finding that the work was satisfactory** (Refund
 Policy §6). The request records the closure reason and preserves the full history.
 
-### 7.1 NEEDS YOUR CALL — notices have no delivery channel
+### 7.1 Notice delivery — transactional email ships at launch
 
-There is **no outbound email in the product**. Supabase sends auth emails; nothing
-else sends anything. The only way a notice reaches anyone is an in-app project
-message and an unread badge they have to come back to see.
+**Decision: transactional email is a launch feature, sent through Cloudflare Email
+Service.**
 
-A final notice a party never sees is not a notice, and closing a project against it
-is hard to defend to that party, to a bank in a chargeback, or to a regulator.
+Without it there is no outbound email in the product at all. Supabase sends auth
+mail; nothing else sends anything. A notice would reach someone only through an
+in-app message and an unread badge they have to come back to see — and a final
+notice a party never sees is not a notice. Closing a project against one would be
+hard to defend to that party, to a bank in a chargeback, or to a regulator.
 
-Two options:
+#### Why Cloudflare
 
-- **Add minimal transactional email before launch** — three templates: payment
-  receipt, first notice, final notice. *(Recommended.)* It is the difference between
-  a defensible closure and a silent one, and buyers separately expect payment
-  receipts.
-- **Launch without it**, and accept that the non-response rules run on in-app
-  delivery only. Cheaper now; every closure is contestable.
+Cloudflare Email Service now covers both directions, which it did not when this
+document was first drafted:
+
+| | Workers Free | Workers Paid |
+| --- | --- | --- |
+| Email Routing (inbound) | Unlimited | Unlimited |
+| Email Sending (outbound) | Not available | 3,000/month included, then $0.35 per 1,000 |
+
+Sending to arbitrary recipients requires the **Workers Paid plan** and an onboarded
+sending domain; before a domain is onboarded, sending is limited to addresses
+verified on the account. Delivery is available over the REST API and authenticated
+SMTP as well as a Workers binding, so **no Workers code is required** — the Express
+API calls the REST endpoint directly.
+
+It wins here for reasons specific to this project rather than on features:
+
+- The domain is already on Cloudflare, and Email Routing is needed for
+  `inbox@madeforstream.com` regardless. That part is free.
+- **It avoids an SPF collision before we have one.** Only one SPF TXT record is
+  permitted per domain. Splitting inbound and outbound across two vendors means
+  hand-merging `include:` directives and re-merging whenever either changes. One
+  vendor manages both records.
+- 3,000/month is well clear of launch volume — receipts, two notice types and
+  Supabase auth mail come to roughly 600–1,000 a month at 200 transactions.
+
+**Two caveats, neither disqualifying.** Email Sending is **Beta**, and Cloudflare's
+sending reputation is newer than a specialist's. If receipt deliverability turns out
+to be the constraint, Postmark or Resend is a swap of SMTP credentials rather than a
+rewrite — this is not a one-way door. New accounts also start on a conservative
+daily quota that scales with sending behaviour, so the domain needs warming before
+launch rather than on the day.
+
+#### Launch templates
+
+Payment receipt, first notice, final notice, and payout released. The last one is
+not optional once the 14-day hold (§6.3) ships: a creator whose money is held and
+who is told nothing will read it as the platform sitting on their earnings.
+
+#### Two things that come with this decision
+
+**Supabase auth mail moves to the same provider.** There is no `supabase/config.toml`
+and no SMTP variables in the environment, so auth email is going out on Supabase's
+built-in service — which is rate-limited to a handful per hour and documented as not
+for production. Sign-up confirmations and password resets are already exposed, ahead
+of any of this. Point Supabase's custom SMTP at Cloudflare and the same sending
+domain: one provider, one reputation to warm, one place to look when mail goes
+missing.
+
+**Send from a subdomain** — `send.madeforstream.com` — so a deliverability problem
+with automated mail does not damage the root domain's reputation for the inbox
+humans actually use.
+
+### 7.2 A privacy gap this exposes
+
+Adding an email processor is exactly what the privacy policy's **Service Provider
+Register** is for. That register **does not exist**. The privacy policy references
+it three times — including "The published version must include the verified Service
+Provider Register and a working privacy contact" — and there is no such page, no
+route and no domain module.
+
+It was already a gap for Supabase, Stripe and Google Fonts. Adding Cloudflare for
+email, and selling into the EU and UK where sub-processor disclosure is a GDPR
+requirement rather than a courtesy, makes it a launch item rather than a tidy-up.
+
+**Build:** a published Service Provider Register listing each provider, its function
+and its processing locations, on the same footing as the other legal pages.
 
 ---
 
@@ -680,7 +742,9 @@ Two options:
 | Messaging, moderation, reporting | ● | | |
 | Twitch linking and live discovery | ● | | |
 | Structured usage rights on agreements | ● | | |
-| Transactional email | ● *(if §9.2.1 is approved)* | | |
+| Transactional email on Cloudflare (§7.1) | ● | | |
+| Supabase auth mail moved to the same provider (§7.1) | ● | | |
+| Published Service Provider Register (§7.2) | ● | | |
 | Tax registration for EU/UK and the rest of wave 2 (§11) | | ● | |
 | Currency waves 3 and 4 — zero- and three-decimal (§1.3) | | ● | |
 | Creator-initiated refunds | | ● | |
@@ -716,6 +780,8 @@ in profile settings, which is the correct treatment.
 | Recovery rate | **50% of each base payment** (§6.5) |
 | Fee minimums | **Once per creator per calendar month**, not per payment (§3.1) |
 | Tips and platform contributions | **Built for launch**, shipping alongside refunds (§4) |
+| Transactional email | **Ships at launch**, on Cloudflare Email Service (§7.1) |
+| Supabase auth mail | Moves to the **same provider and sending domain** (§7.1) |
 | Regional sales tax | **Collected and remitted by Made for Stream** wherever obliged (§11) |
 
 Two follow-ups that come with the entity details rather than being separate
@@ -736,22 +802,12 @@ decisions:
 
 ### 9.2 Still open
 
-1. **Transactional email at launch — yes or no.** §7.1. There is no outbound email
-   in the product at all; `inbox@madeforstream.com` is where mail arrives, not a way
-   to send it. Going global sharpens this: parties are now spread across every
-   timezone, so "they will see it next time they open the app" is a longer and less
-   predictable wait, and a 7-day notice clock runs regardless.
-
-   The 14-day payout hold (§6.3) adds a second reason. A creator whose money is held
-   and who is never told why will read it as the platform sitting on their earnings.
-   A payout-released notice is the cheapest possible answer to that.
-
-2. **Whether the monthly fee minimum applies to the buyer fee as well as the creator
+1. **Whether the monthly fee minimum applies to the buyer fee as well as the creator
    fee** — §3.1. Recommended: creator fee only, because a monthly buyer minimum
    means two buyers pay different amounts for the same purchase. Same build either
    way; the difference is what has to be disclosed.
 
-3. **Tax registration strategy and advice** — §11.3. Not an engineering decision.
+2. **Tax registration strategy and advice** — §11.3. Not an engineering decision.
    Which jurisdictions to register in and when, and whether to take
    jurisdiction-specific advice before selling into the EU and UK. Recommended: yes,
    before the first EU sale, since EU VAT applies from the first euro with no
@@ -770,6 +826,7 @@ decisions:
 | Fee Schedule §5 | Disclose the 14-day payout hold explicitly (§6.3); the existing "payout timing depends on..." language is not enough to cover a delay we impose. Add that where a refund exceeds the creator's available balance, Made for Stream funds it and recovers the amount from the creator, including by applying it to subsequent payments (§6.4). Both are new creator obligations and must be disclosed before they can be incurred. |
 | Fee Schedule §6 | Rewrite for §11. The current "does not claim that all taxes are automatically collected" becomes a statement that Made for Stream calculates, collects and remits where obliged, and identifies tax separately on the payment record — which also requires the missing `tax_cents` column. |
 | Creator Terms | Add the recovery balance: what creates one, that new requests are blocked while it is outstanding, how it is recovered at 50% of each payment, and how it is settled directly. Add the payout hold. |
+| Privacy Policy §4 | Name Cloudflare as the email and routing provider alongside Supabase and Stripe, and **publish the Service Provider Register** the policy already says the published version must include (§7.2). |
 | Refund Policy §1 | Keep the EU/UK withdrawal paragraph, and build the express-consent capture it depends on (§1.5). |
 | Refund Policy §5 | No wording change; make `included_revision_count` nullable so the two-round fallback can actually apply (§5.4). |
 | Refund Policy §7 | No change. It is already the rule; §7 above makes it operational. |
