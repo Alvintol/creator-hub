@@ -3,7 +3,8 @@ feature: listings
 status: active
 surfaces:
   - public.listings
-  - supabase/migrations/20260622_107_require_payment_account_for_active_listings.sql
+  - supabase/migrations/20260921_116_exempt_free_listings_from_payout_readiness.sql
+  - src/hooks/listings/listingPaymentAccountGuards.ts
   - src/hooks/listings/
   - src/pages/listings/
 unmatched_tier: 2
@@ -12,8 +13,9 @@ unmatched_tier: 2
 # Listings — Support Playbook
 
 Listings are what creators sell. They carry drafts, publication controls, and
-revision history, and a database trigger blocks publishing an active listing
-unless the creator's payout account is ready.
+revision history, and a database trigger blocks publishing an active **paid**
+listing unless the creator's payout account is ready. Free listings are exempt —
+they never touch Stripe.
 
 That trigger is the most common source of confusion in this feature: a creator
 who believes their Stripe setup is done gets a publish error that says nothing
@@ -38,7 +40,7 @@ tier: 1
 signals:
   - source: db
     match: "Creator payout account must be ready before publishing active listings."
-    where: supabase/migrations/20260622_107_require_payment_account_for_active_listings.sql
+    where: supabase/migrations/20260921_116_exempt_free_listings_from_payout_readiness.sql
 auto_fix: resync_connect_account
 params:
   user_id: "$.listing.user_id"
@@ -48,12 +50,20 @@ retry_limit: 1
 escalate_if:
   - "Stripe confirms the account is genuinely not ready"   # -> connect CON-004
   - "no Stripe account exists for this creator"            # -> connect CON-002
+  - "the listing is free (is_free = true)"                 # -> should be exempt; see below
 ```
 
 **Cause.** The trigger checks `has_ready_creator_payment_account`, which reads
 our mirror of Stripe. Since nothing refreshes that mirror automatically, a
 creator who finished onboarding and did not revisit their settings page is still
 recorded as not ready.
+
+**Free listings are exempt** and must never produce this signal. A free listing
+serves an uploaded file or an external link and never touches Stripe, so it
+publishes with no connected account at all. If this error appears for a listing
+with `is_free = true`, the exemption is not working — that is a regression, not a
+stale mirror, and it blocks a creator who may have no reason to onboard with
+Stripe ever.
 
 **What the user sees.** A publish failure telling them their payout account is
 not ready, when as far as they are concerned it is. This is the single most
@@ -147,6 +157,9 @@ that nobody hears about.
   update of `listings`. A creator who becomes unready afterwards keeps their
   listings live, and nothing re-checks. See
   [`connect-onboarding.md`](../payments/connect-onboarding.md) `CON-003`.
+- **A free listing flipped to paid is only checked at that write.** The trigger
+  now watches `is_free`, so the flip is caught — but the same write-time
+  limitation above still applies afterwards.
 - **Revision-history failure modes are undocumented.** The feature exists; its
   failures fall through to unmatched Tier 2.
 - **Listing media/upload failures are undocumented.**
