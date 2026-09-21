@@ -137,12 +137,16 @@ how it fails.
 | Payments | [`payments/refunds-and-disputes.md`](payments/refunds-and-disputes.md) |
 | Discovery | [`discovery/twitch-live.md`](discovery/twitch-live.md) |
 
-Several playbooks record gaps that are product decisions rather than support
-problems — no cancellation workflow, no refund path, no abandonment policy. Those
-are specified in [`../launch-scope.md`](../launch-scope.md) and sequenced in
+Several playbooks record gaps that were product decisions rather than support
+problems — cancellation, refunds, abandonment, currency scope. **Those decisions are
+now made**, in [`../launch-scope.md`](../launch-scope.md), and sequenced in
 [`../launch-implementation-checklist.md`](../launch-implementation-checklist.md).
-When one of them is built, the playbook entry describing it as a gap is rewritten in
-the same branch.
+
+What remains in those playbooks is the **implementation** gap, which is different
+and worth keeping straight: a playbook describes the product as it behaves today, so
+an entry still saying "handle by hand" is correct until the sprint lands. Where a
+rule now exists to handle it by hand *consistently*, the entry says so and cites it.
+When one is built, the playbook entry is rewritten in the same branch.
 
 ---
 

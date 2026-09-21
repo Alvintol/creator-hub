@@ -1,10 +1,18 @@
 # Launch Scope — Made for Stream
 
-> **Status:** proposed for approval. This document is the specification the first
-> paid launch is built against. Where it disagrees with a published policy or with
-> the code, the disagreement is named explicitly and a resolution is recommended.
+> **Status:** proposed for approval. This is **the** launch specification — the
+> single document the first paid launch is built against. Where it disagrees with a
+> published policy or with the code, the disagreement is named explicitly and a
+> resolution is given.
 >
-> §9.1 records what is settled. §9.2 records the two questions still open.
+> §9.1 records what is settled. §9.2 records the two questions still open. §10 lists
+> the policy edits this implies, which are **scheduled, not yet applied** — the text
+> in `src/domain/legal/` still describes the pre-decision rules until Sprint 8.
+>
+> An earlier parallel draft, `launch-payment-scope.md`, was merged in #101 and has
+> been folded into this document — its per-event state table is now §13 and its
+> integrity findings are §11. It recommended a Canada-only, CAD-only pilot and
+> deferring tips, none of which survived the decisions in §9.1.
 
 The goal of the first launch is one thing working end to end: a buyer in a
 supported currency commissions a creator, pays through Stripe Connect, the work is
@@ -631,8 +639,9 @@ directly at any time.
 
 Refund Policy §7 already sets the clock: a clear project message stating what is
 needed, **seven days** without a substantive reply, then a **final notice** granting
-**seven more**. That is the rule. What follows is how it becomes operational, since
-`REQ-003` currently reads "There is no automated path and no policy for this yet."
+**seven more**. That is the rule, and it was already written before this document —
+what `REQ-003` was missing was not a policy but a way to run it. What follows is how
+it becomes operational.
 
 | | Rule |
 | --- | --- |
@@ -887,7 +896,7 @@ cascades assume events arrive in order. A `charge.refunded` that lands before it
 Handle out-of-order and duplicate delivery explicitly, and reconcile against current
 Stripe object state rather than trusting the event payload alone.
 
-### 11.1 A deployment boundary worth stating
+### 11.1 Where the API runs
 
 Hosting the Vite site on Cloudflare does not move `api/server.js`. Static hosting
 does not run Express, and Stripe's Connect webhook endpoint needs a real HTTPS
@@ -975,6 +984,38 @@ engineering sprint. It is sequenced as its own sprint for that reason.
 **This does not block launching in CA/US**, where we are established and the
 position is already understood. It blocks the wave 2 currencies and the markets they
 represent — which is the same gate §1.3 already staged them behind.
+
+---
+
+## 13. State effects reference
+
+One table for what each event does to the payment ledger, the project, and the
+operator. It spans §5, §6 and §11, and it is the quickest way to check that a
+proposed change does not leave money and work disagreeing.
+
+| Event | Payment ledger | Schedule and project | Operational |
+| --- | --- | --- | --- |
+| Checkout opened | `requires_checkout` → `checkout_opened`, session id stored | Schedule item stays `payment_required`; work stays blocked where payment is a prerequisite | Reconcile from Stripe before creating another session; reuse a still-open one |
+| Checkout abandoned or expired | Returns to a retryable state when no successful charge exists. `processing` is reserved for a genuinely pending asynchronous payment and is **not** treated as stuck | Unchanged | `PAY-005`; do not reconcile a `processing` payment as abandoned |
+| Charge succeeded and verified | `paid`, with account, session, PaymentIntent, **charge**, **application fee**, amounts and event ids persisted together | Schedule item `paid` **once**, then its milestone / start / final workflow runs exactly once | Never let the browser return page declare success — the webhook is the production path |
+| Tip or contribution included | Tip raises the total and not the application fee; contribution raises both | No effect on schedule state | Tip is creator money and falls under the payout hold; contribution does not |
+| Payout hold expires | No ledger change | No project change | Funds become available and pay out automatically (§6.3); creator notified |
+| Partial refund | Immutable refund ledger row with its amount and the fees reversed; `partially_refunded` **derived** from cumulative settled refunds. `paid_at` and the original charge are preserved | The affected milestone → `cancelled`; earlier approved milestones stand; only the affected next step freezes | Record decision, fee reversal, who funded it and the evidence; notify both parties |
+| Full refund | Derived `refunded` once the full refundable charge is returned | Outstanding instalments cancelled and the unfinished agreement closed through an explicit cancellation record — **never `archived`** | Correct the rights attaching to fully refunded work (§5.3) |
+| Refund exceeds available balance | Refund still issued; shortfall opens a recovery balance | Creator blocked from **new** requests; existing projects continue | Up to 50% of each later base payment is diverted via a raised application fee until clear (§6.4, §6.5) |
+| Pre-payment cancellation | Every `requires_checkout` / `checkout_opened` row → `cancelled`; any open Stripe session expired | Agreement, schedule items, milestones, change orders and final delivery → `cancelled`; request → `cancelled` | Distinguish a cancelled **unpaid checkout** from a refunded **paid charge** — they are not the same record |
+| Dispute opened | Tracked as a separate case over the charge, preserving paid and refunded history; visible `disputed` while open | The affected work and further collection go on hold pending review — the whole project is not silently cancelled and paid delivery rights are not erased | Tier 3. Capture the evidence deadline immediately and tell the creator; it is their account and their money |
+| Dispute closed | Reconcile won/lost, final amount, and any refund already issued, avoiding duplicate recovery | Outcome decides whether the project completes or cancels | Record the outcome and the reasoning |
+| Creator loses charge capability | No ledger change; new sessions denied | New paid publication paused and outstanding collection paused; existing obligations and free listings unaffected | Tell the creator which onboarding step is required and surface blocked projects to support |
+| Non-response final notice expires | No ledger change | Administrative closure available to an admin on request (§7) | Closure is not a finding that the work was satisfactory; unearned prepaid amounts stay refundable |
+
+Two rules that hold across every row:
+
+- **`archived` is an inbox state, not a financial outcome.** It exists for a buyer
+  tidying an unaccepted request. It must never stand for cancellation or settlement.
+- **Status is derived where money is involved.** `partially_refunded` and `refunded`
+  come from the sum of settled refunds, never from a direct write, so the record
+  cannot drift from Stripe.
 
 ---
 

@@ -226,8 +226,10 @@ a user error.
 **What the user sees.** Onboarding or sync fails with an opaque error.
 
 **Fix.** Manual investigation. Note that Made for Stream's fee minimums are
-USD-denominated, so a non-US creator raises a question well beyond this error —
-see the currency note in [`checkout.md`](checkout.md) `PAY-004`.
+**minor-unit**-denominated, so they are correct for CAD and USD and wrong for a
+currency with a different minor-unit convention. A creator onboarding outside
+CAD/USD raises a question well beyond this error — see the currency note in
+[`checkout.md`](checkout.md) `PAY-004`.
 
 **Money impact.** None yet, but a creator in an unvalidated currency who does get
 through is a genuine risk to fee correctness.

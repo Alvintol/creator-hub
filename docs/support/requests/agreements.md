@@ -182,6 +182,8 @@ belongs at Tier 3.
   [`change-orders.md`](change-orders.md).
 - **No agreement versioning documented** for support purposes — if terms change,
   which version a dispute is argued from is not written down anywhere.
-- **Fee minimums are USD-denominated**, so an agreement in another currency can
-  pass these checks and fail later at checkout — see
+- **Fee minimums are minor-unit-denominated** and applied to whatever currency the
+  agreement carries. Correct for CAD and USD; wrong for a currency with a different
+  minor-unit convention, so such an agreement can pass these checks and produce a
+  wrong or rejected charge later — see
   [`PAY-004`](../payments/checkout.md#pay-004--payment-amount-or-fee-setup-is-invalid).
