@@ -488,6 +488,21 @@ full refund returns any rounding remainder.
 Mechanically: `stripe.refunds.create` on the connected account with
 `refund_application_fee: true`, against `stripe_charge_id`.
 
+**The current ledger cannot store any of this.** `listing_request_payments` has a
+single nullable `stripe_refund_id`, a single `refunded_at`, and an aggregate status.
+There is **no refunded amount, and no history** — so two partial refunds against one
+payment have nowhere to go, and the cumulative arithmetic above cannot be computed
+from stored state.
+
+**Build:** an immutable refund ledger — one row per Stripe refund, carrying its
+amount, the buyer fee and creator fee reversed with it, the actor, the reason and
+the timestamp. `partially_refunded` and `refunded` are then **derived** from the sum
+of settled refunds rather than written directly, which also makes the status
+impossible to get out of step with Stripe. The same shape covers disputes.
+
+This has to land with §6.1, not after it. A partial refund feature on the current
+columns would write a status it cannot substantiate.
+
 ### 6.3 Payout hold — keeping the money available in the first place
 
 **Decision: hold creator payouts for 14 days after the charge, so a refund can be
@@ -736,7 +751,7 @@ and its processing locations, on the same footing as the other legal pages.
 | Platform-funded refunds and creator recovery balances (§6.4) | ● | | |
 | Monthly fee minimum (§3.1) | ● | | |
 | Tips and optional platform contributions (§4) | ● | | |
-| Tax collection for CA/US (§11) | ● | | |
+| Tax collection for CA/US (§12) | ● | | |
 | Dispute webhook visibility | ● | | |
 | Non-response notices and administrative closure (§7) | ● | | |
 | Messaging, moderation, reporting | ● | | |
@@ -745,7 +760,7 @@ and its processing locations, on the same footing as the other legal pages.
 | Transactional email on Cloudflare (§7.1) | ● | | |
 | Supabase auth mail moved to the same provider (§7.1) | ● | | |
 | Published Service Provider Register (§7.2) | ● | | |
-| Tax registration for EU/UK and the rest of wave 2 (§11) | | ● | |
+| Tax registration for EU/UK and the rest of wave 2 (§12) | | ● | |
 | Currency waves 3 and 4 — zero- and three-decimal (§1.3) | | ● | |
 | Creator-initiated refunds | | ● | |
 | Buyer self-service refund requests | | ● | |
@@ -782,7 +797,7 @@ in profile settings, which is the correct treatment.
 | Tips and platform contributions | **Built for launch**, shipping alongside refunds (§4) |
 | Transactional email | **Ships at launch**, on Cloudflare Email Service (§7.1) |
 | Supabase auth mail | Moves to the **same provider and sending domain** (§7.1) |
-| Regional sales tax | **Collected and remitted by Made for Stream** wherever obliged (§11) |
+| Regional sales tax | **Collected and remitted by Made for Stream** wherever obliged (§12) |
 
 Two follow-ups that come with the entity details rather than being separate
 decisions:
@@ -807,7 +822,7 @@ decisions:
    means two buyers pay different amounts for the same purchase. Same build either
    way; the difference is what has to be disclosed.
 
-2. **Tax registration strategy and advice** — §11.3. Not an engineering decision.
+2. **Tax registration strategy and advice** — §12.3. Not an engineering decision.
    Which jurisdictions to register in and when, and whether to take
    jurisdiction-specific advice before selling into the EU and UK. Recommended: yes,
    before the first EU sale, since EU VAT applies from the first euro with no
@@ -824,7 +839,7 @@ decisions:
 | Fee Schedule §1, §3, §4 | Keep the tip and contribution rows — they are being built (§4). Update the examples to show the monthly minimum. |
 | Fee Schedule §2 | Rewrite for the monthly minimum (§3.1). The current text — "Each separately collected instalment can incur a minimum, so splitting a project can cost more than one payment" — becomes wrong and has to change. Add the per-instalment floor and state that the agreement's fee estimate is a maximum. |
 | Fee Schedule §5 | Disclose the 14-day payout hold explicitly (§6.3); the existing "payout timing depends on..." language is not enough to cover a delay we impose. Add that where a refund exceeds the creator's available balance, Made for Stream funds it and recovers the amount from the creator, including by applying it to subsequent payments (§6.4). Both are new creator obligations and must be disclosed before they can be incurred. |
-| Fee Schedule §6 | Rewrite for §11. The current "does not claim that all taxes are automatically collected" becomes a statement that Made for Stream calculates, collects and remits where obliged, and identifies tax separately on the payment record — which also requires the missing `tax_cents` column. |
+| Fee Schedule §6 | Rewrite for §12. The current "does not claim that all taxes are automatically collected" becomes a statement that Made for Stream calculates, collects and remits where obliged, and identifies tax separately on the payment record — which also requires the missing `tax_cents` column. |
 | Creator Terms | Add the recovery balance: what creates one, that new requests are blocked while it is outstanding, how it is recovered at 50% of each payment, and how it is settled directly. Add the payout hold. |
 | Privacy Policy §4 | Name Cloudflare as the email and routing provider alongside Supabase and Stripe, and **publish the Service Provider Register** the policy already says the published version must include (§7.2). |
 | Refund Policy §1 | Keep the EU/UK withdrawal paragraph, and build the express-consent capture it depends on (§1.5). |
@@ -835,7 +850,56 @@ decisions:
 
 ---
 
-## 11. Regional sales tax obligations
+## 11. Payment integrity gaps that block live money
+
+Four findings that are not policy decisions but that no rule in this document is
+safe without. They came out of comparing the proposed rules against the code, and
+the first two were verified directly.
+
+**The API never checks policy acceptance.** `CheckoutPolicyAcceptance` gates the
+checkout page on the buyer accepting the current policy versions, and then
+`POST /api/stripe/checkout/session` creates the Stripe session without consulting
+`policy_acceptances` at all — the string does not appear anywhere in
+`api/server.js`. So the acceptance record that a dispute would be argued from is
+enforced only in the browser. Per `AGENTS.md`, that is not a boundary. The API must
+verify acceptance of the current versions before opening a session.
+
+**The checkout API trusts stored fee values.** It validates that the amount is
+positive and that the application fee is below the total, then passes the stored
+figures to Stripe. It does not recompute the fee from the base, the currency
+registry and the monthly-minimum state. Once fees vary by currency and by month
+(§1.1, §3.1), recomputing server-side from authoritative rows is what stops a stale
+or tampered ledger row becoming a real charge.
+
+**Manual payment confirmation is still reachable.** The `admin_confirm_*_payment`
+RPCs are break-glass fallbacks from before automated payments existed, they are
+exposed in the admin UI, and they are not labelled as such. They mark money as
+received without verifying it moved. That was tolerable while no real money flowed.
+It is not tolerable at launch, and it is worse once refunds exist — a manual
+confirmation can leave a schedule satisfied against a payment that was refunded.
+**Restrict them to an audited, named exception or remove them before live
+checkout.**
+
+**Stripe does not guarantee event order and may deliver duplicates.** The webhook
+handler uses `stripe_event_ids` for idempotency, which is right, but the workflow
+cascades assume events arrive in order. A `charge.refunded` that lands before its
+`checkout.session.completed` should not be possible to process into a wrong state.
+Handle out-of-order and duplicate delivery explicitly, and reconcile against current
+Stripe object state rather than trusting the event payload alone.
+
+### 11.1 A deployment boundary worth stating
+
+Hosting the Vite site on Cloudflare does not move `api/server.js`. Static hosting
+does not run Express, and Stripe's Connect webhook endpoint needs a real HTTPS
+origin that preserves the **raw request body** for signature verification. Either
+host the Express API separately and route `/api/*` to it, or port it to Workers and
+re-test. This changes deployment and integration tests, not any rule in this
+document — but it has to be decided before the webhook endpoint is registered,
+because the webhook is what makes payments work at all.
+
+---
+
+## 12. Regional sales tax obligations
 
 **Decision: the rules are updated to collect and remit indirect tax wherever selling
 globally obliges us to, rather than leaving it to the creator.**
