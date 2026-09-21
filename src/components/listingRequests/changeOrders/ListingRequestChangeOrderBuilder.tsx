@@ -1,3 +1,4 @@
+import { formatMoney } from "../../../lib/formatMoney";
 import {
   useState,
   type SubmitEventHandler,
@@ -97,15 +98,6 @@ const defaultFormState: BuilderFormState = {
   revisedCompletionDate: "",
   sendNow: true,
 };
-
-const formatMoney = (
-  amount: number,
-  currency: string
-): string =>
-  new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount);
 
 const formatDate = (value: string): string =>
   new Intl.DateTimeFormat("en-CA", {

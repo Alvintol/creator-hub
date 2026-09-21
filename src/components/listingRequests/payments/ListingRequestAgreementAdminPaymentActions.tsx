@@ -1,3 +1,4 @@
+import { formatMoney } from "../../../lib/formatMoney";
 import { getListingRequestPaymentStructureLabel } from "../../../domain/listings/listingRequestAgreements";
 import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
 
@@ -37,12 +38,6 @@ const classes = {
   btnPrimary:
     "btnPrimary",
 } as const;
-
-const formatMoney = (amount: number, currency: string): string =>
-  new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount);
 
 const getStartingPaymentAmount = (
   agreement: Pick<

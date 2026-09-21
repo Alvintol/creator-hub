@@ -1,3 +1,4 @@
+import { formatMoney } from "../../../lib/formatMoney";
 import { useId, useState } from "react";
 import {
   getActiveListingRequestMilestone,
@@ -70,12 +71,6 @@ const formatDate = (value?: string | null): string =>
   value
     ? new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" }).format(new Date(value))
     : "Not submitted";
-
-const formatMoney = (amount: number, currency: string): string =>
-  new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount);
 
 const getStatusClass = (milestone: ListingRequestMilestoneRow): string => {
   const tone = getListingRequestMilestoneStatusTone(milestone.status);

@@ -26,6 +26,7 @@ const createAgreement = (
     {
       id: "payment-3",
       agreement_id: "agreement-1",
+      agreement_item_id: null,
       change_order_id: null,
       title: "Final project balance",
       description:

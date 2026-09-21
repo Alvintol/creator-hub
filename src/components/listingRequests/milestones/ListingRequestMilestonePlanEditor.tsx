@@ -1,3 +1,4 @@
+import { formatMoney } from "../../../lib/formatMoney";
 import {
   allowsMilestonePayments,
 } from '../../../domain/listings/listingRequestAgreements';
@@ -73,15 +74,6 @@ const roundCurrencyAmount = (
 ): number =>
   Math.round((amount + Number.EPSILON) * 100) /
   100;
-
-const formatMoney = (
-  amount: number,
-  currency: string
-): string =>
-  new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount);
 
 const createEmptyMilestone = (
   sortOrder: number

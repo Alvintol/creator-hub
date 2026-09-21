@@ -1,3 +1,4 @@
+import { formatMoney as formatCurrencyAmount } from "../../../lib/formatMoney";
 import type { ReactNode } from "react";
 import {
   getListingRequestAgreementStatusLabel,
@@ -41,10 +42,7 @@ const classes = {
 const formatMoney = (amount: number | null, currency: string): string =>
   amount === null
     ? "Not set"
-    : new Intl.NumberFormat("en-CA", {
-      style: "currency",
-      currency: currency.toUpperCase(),
-    }).format(amount);
+    : formatCurrencyAmount(amount, currency);
 
 const formatDate = (value?: string | null): string =>
   value

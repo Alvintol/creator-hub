@@ -1,3 +1,4 @@
+import { formatMoney } from "../../lib/formatMoney";
 import type {
   ListingRequestPaymentRow,
   ListingRequestPaymentStatus,
@@ -67,7 +68,4 @@ export const getListingRequestPaymentTitle = (
 // Payment amounts are stored in minor units. This assumes a two-decimal
 // currency, which holds for the CAD and USD amounts supported today.
 export const formatPaymentCents = (cents: number, currency: string): string =>
-  new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(cents / 100);
+  formatMoney(cents / 100, currency);

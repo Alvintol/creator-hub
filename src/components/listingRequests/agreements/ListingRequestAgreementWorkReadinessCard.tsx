@@ -1,3 +1,4 @@
+import { formatMoney as formatCurrencyAmount } from "../../../lib/formatMoney";
 import {
   canStartWorkForAcceptedRequest,
   getListingRequestPaymentStructureLabel,
@@ -39,10 +40,7 @@ const formatMoney = (amount: number | null, currency: string): string => {
     return "Not set";
   }
 
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: currency.toUpperCase(),
-  }).format(amount);
+  return formatCurrencyAmount(amount, currency);
 };
 
 const formatDate = (value: string): string =>

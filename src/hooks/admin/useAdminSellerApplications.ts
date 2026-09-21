@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabaseClient";
-import type { SellerApplicationRow, SellerApplicationStatus } from "../useMySellerApplication";
+import type { SellerApplicationRow, SellerApplicationStatus } from "../creatorApplication/useMySellerApplication";
 
 type UseAdminSellerApplicationsOptions = {
   statuses?: SellerApplicationStatus[];

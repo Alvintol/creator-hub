@@ -8,6 +8,7 @@
     "start": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "test": "vitest",
     "test:watch": "vitest --watch",

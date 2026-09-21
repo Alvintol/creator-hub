@@ -19,6 +19,11 @@ const listing: PublicListingRow = {
   preview_url: "https://example.com/preview.png",
   status: "published",
   is_active: true,
+  is_free: false,
+  free_delivery_type: null,
+  free_external_url: null,
+  free_file_path: null,
+  free_file_name: null,
   updated_at: "2026-04-22T00:00:00.000Z",
 };
 
