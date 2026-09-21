@@ -82,7 +82,32 @@ new currency ships wrong money rather than a new market.
 
 ---
 
-## Sprint 3 — Payout hold and the charge handle
+## Sprint 3 — Payment integrity, payout hold and the charge handle
+
+**Integrity first (§11).** None of the rules in the scope document are safe until
+these hold, and two of them were verified directly against the code.
+
+- [ ] `POST /api/stripe/checkout/session` verifies acceptance of the current policy
+      versions before opening a session. The string `policy_accept` **does not appear
+      anywhere in `api/server.js`** — the gate is browser-only today, which per
+      `AGENTS.md` is not a boundary.
+- [ ] Recompute the base, fees and recipient server-side from authoritative rows,
+      the currency registry and the monthly-minimum state, rather than trusting the
+      stored ledger values. This matters more once fees vary by currency and month.
+- [ ] Restrict or remove the `admin_confirm_*_payment` RPCs and their admin UI
+      entry points. They mark money received without verifying it moved, and once
+      refunds exist they can leave a schedule satisfied against a refunded payment.
+      If they survive, they are an audited named exception, labelled as break-glass.
+- [ ] Handle out-of-order and duplicate webhook delivery explicitly. Stripe
+      guarantees neither. Reconcile against current Stripe object state rather than
+      trusting the event payload alone.
+- [ ] Decide where `api/server.js` runs in production (§11.1). Static hosting does
+      not run Express, and the Connect webhook needs a real HTTPS origin preserving
+      the **raw body** for signature verification. This gates registering the webhook
+      endpoint at all.
+- [ ] Idempotently reserve a schedule item against concurrent checkout attempts.
+
+**Payout hold (§6.3)**
 
 Two prerequisites for refunds. The hold keeps the money available so most refunds
 never need platform funding; the charge handle is what a refund is issued against.
@@ -158,9 +183,17 @@ contribution at all.
 
 **Refund execution**
 
+- [ ] Migration: an **immutable refund ledger** — one row per Stripe refund with its
+      amount, the buyer and creator fees reversed with it, actor, reason and
+      timestamp. The existing columns are a single nullable `stripe_refund_id` and a
+      single `refunded_at`, with **no amount and no history**, so two partial refunds
+      against one payment have nowhere to go (§6.2). This lands *with* the refund
+      feature, not after it.
+- [ ] Derive `partially_refunded` and `refunded` from the sum of settled refunds
+      rather than writing them directly, so the status cannot drift from Stripe.
 - [ ] `security definer` RPC `apply_refunded_listing_request_payment`, following the
-      `apply_paid_listing_request_*` shape, writing `refunded` /
-      `partially_refunded`, `stripe_refund_id` and `refunded_at`.
+      `apply_paid_listing_request_*` shape, writing the ledger row and deriving
+      status.
 - [ ] Proportional cumulative fee arithmetic per §6.2, using registry exponents, with
       tests covering repeated partial refunds and the final rounding remainder.
 - [ ] Admin-only refund route: `stripe.refunds.create` on the connected account with
@@ -217,7 +250,10 @@ contribution at all.
 
 ---
 
-## Sprint 6 — Non-response and closure
+## Sprint 6 — Non-response, closure and transactional email
+
+Email ships here because the notices are its first real use, but the Supabase SMTP
+item is a live production gap and can be pulled forward on its own at any point.
 
 - [ ] Migration: notice records against a request — type (first / final), sender,
       what was requested, sent and expiry timestamps.
@@ -227,8 +263,30 @@ contribution at all.
       notice, recording the reason and cascading per §5.
 - [ ] Workspace UI: notice state, countdown, and the request-closure action for the
       waiting party.
-- [ ] Transactional email for payment receipt, first notice and final notice — **only
-      if §9.2.1 is approved.**
+**Transactional email (§7.1)**
+
+- [ ] Enable Cloudflare Workers Paid and onboard `send.madeforstream.com` as the
+      sending domain. Until a domain is onboarded, sending is limited to addresses
+      verified on the account.
+- [ ] Confirm Email Routing for `inbox@madeforstream.com` on the root domain, and
+      that Cloudflare manages the SPF and DKIM records for both directions.
+- [ ] Send from the Express API over the REST API or SMTP. **No Workers code
+      required** — do not introduce a Workers deployment just to send mail.
+- [ ] Templates: payment receipt, first notice, final notice, payout released. The
+      last is not optional once the payout hold ships (§6.3).
+- [ ] Point **Supabase custom SMTP** at the same provider and sending domain. Auth
+      mail currently goes through Supabase's built-in service, which is rate-limited
+      to a handful per hour and is not for production — this is a live gap
+      independent of the rest of this sprint.
+- [ ] Warm the sending domain before launch. New accounts start on a conservative
+      daily quota that scales with sending behaviour; launch day is the wrong time
+      to discover the ceiling.
+- [ ] Record delivery outcomes against the notice records, so a disputed closure can
+      show the notice was accepted for delivery.
+- [ ] Suppression-list handling, so a hard bounce does not silently restart a notice
+      clock that nobody received.
+- [ ] Playbook: new `messaging/transactional-email.md` — bounced notice, unverified
+      domain, quota exceeded, and what a failed notice means for the 7 + 7 clock.
 - [ ] Staleness query surfaced in admin: requests not advanced in 14+ days with a
       pending action on one side.
 - [ ] Playbook: `REQ-003` in `requests/request-lifecycle.md` is rewritten from "no
@@ -241,7 +299,7 @@ contribution at all.
 ## Sprint 7 — Regional sales tax
 
 Its own sprint because the blocking work is a professional opinion, not a migration,
-and burying that inside an engineering sprint is how it gets skipped (§11).
+and burying that inside an engineering sprint is how it gets skipped (§12).
 
 **Do first, in parallel with everything above**
 
@@ -287,6 +345,11 @@ and burying that inside an engineering sprint is how it gets skipped (§11).
 - [ ] Enforce the instalment floors at agreement send and schedule item creation,
       with the plain-language message, and quote the agreement's fee estimate as a
       maximum (§3.1).
+- [ ] **Publish the Service Provider Register** (§7.2) — Supabase, Stripe,
+      Cloudflare and Google Fonts, each with its function and processing locations,
+      routed and styled like the other legal pages. The privacy policy references it
+      three times and says the published version must include it; it does not exist.
+- [ ] Name Cloudflare in Privacy Policy §4 alongside Supabase and Stripe.
 - [ ] Register a DMCA designated agent with the US Copyright Office (§9.1).
 - [ ] Full end-to-end rehearsal in test mode, in at least three currencies including
       one non-CAD/USD: request → agreement → starting payment → milestone → change
@@ -319,6 +382,4 @@ so none of them is in the eight sprints above — but they should not be lost.
       `AGR-001` totals checks may not reconcile afterwards (`change-orders.md`).
 - [ ] No versioned view of agreement terms over time, so which version applied when
       cannot be reconstructed for a dispute (`agreements.md`, `change-orders.md`).
-- [ ] Manual `admin_confirm_*_payment` RPCs are reachable in the admin UI and are not
-      labelled as break-glass (`milestones.md`).
 - [ ] `api/server.js` still has close to no test coverage.

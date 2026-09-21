@@ -1,5 +1,26 @@
 # Payment launch scope and implementation order
 
+> **Superseded on its decisions by [`launch-scope.md`](launch-scope.md).**
+>
+> This document was written in a parallel session against `main` at `9bdac91` and
+> merged as #101. Its "Owner decisions still needed" section asks the questions the
+> owner has since answered — and several of its recommendations were **not** the
+> answers given. Where the two documents disagree, `launch-scope.md` is current:
+>
+> | | This document | Decided |
+> | --- | --- | --- |
+> | Geography | Canada-only pilot | **Global** |
+> | Currency | CAD only | **Any major currency**, via a registry, enabled in waves |
+> | Tips and support | Defer both | **Built for launch** |
+> | Minimum instalment | CAD 5.00 per instalment | **10.00 for a month's first payment**, Stripe's floor after |
+> | Refund funding, payout hold, transactional email, tax collection | Not addressed | Decided — see `launch-scope.md` §6, §7, §12 |
+>
+> Its analysis of **payment integrity** — refund ledger shape, policy acceptance not
+> enforced at the API, manual confirmation RPCs, event ordering, and the API hosting
+> boundary — was accurate and has been folded into `launch-scope.md` §11. Keep this
+> document for that per-event state-effects table; do not build a launch plan from
+> the rows above.
+
 Status: **proposed launch specification, not an adopted policy**. Reviewed against `main` at `9bdac91` on 2026-09-21. Business choices in the last section must be settled before switching on live paid checkout. This document describes the intended behavior; it does not claim the current system already implements it.
 
 ## Cloudflare boundary
