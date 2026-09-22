@@ -471,7 +471,62 @@ the trigger-driven payment-creation flow is unaffected — every call path runs
 through `security definer` functions that execute as their owner regardless
 of who fired the triggering statement.
 
-**This is worth an audit beyond these three.** Any other `security definer`
-helper in this codebase that only does `revoke all ... from public` — without
-also revoking from or never granting to `anon`/`authenticated` — is likely
-exposed the same way. That audit has not been done.
+**Follow-up audit (2026-09-22).** Every `security definer` function across
+`supabase/migrations/*.sql` was checked against
+`information_schema.role_routine_grants` on the live project. Functions with
+an explicit `grant execute ... to authenticated` after their creation (the
+`has_ready_creator_payment_account` pattern) are intentionally client-callable
+and were left alone. Twenty-two internal helpers were confirmed to have
+`EXECUTE` live on `anon`/`authenticated` with no explicit grant-back and no
+client `.rpc()` call site anywhere in `src/`:
+
+`capture_listing_revision`, `close_conversation_when_listing_request_completed`,
+`close_conversation_when_listing_request_declined`,
+`complete_listing_request_after_final_delivery_approval`,
+`create_conversation_for_listing_request`,
+`create_listing_request_change_order_payment`,
+`create_listing_request_milestone_from_payment`,
+`create_listing_request_payments_when_agreement_accepted`,
+`enforce_final_delivery_approval_milestone_payments`,
+`enforce_final_delivery_milestone_payments`,
+`enforce_listing_payment_account_readiness`,
+`enforce_listing_request_milestone_buyer_response_sequence`,
+`enforce_listing_request_milestone_payment_sequence`,
+`enforce_listing_request_milestone_submission_sequence`,
+`handle_conversation_message_insert`,
+`log_listing_request_agreement_conversation_event`,
+`log_listing_request_status_change`,
+`refresh_listing_request_agreement_adjusted_completion`,
+`refresh_listing_request_agreement_progress_schedule`,
+`set_listing_request_archive_metadata`,
+`sync_listing_request_agreement_progress_schedule`, and
+`sync_listing_request_progress_update_schedule`.
+
+All but one are `returns trigger` functions bound to exactly one trigger, so a
+direct call is inert regardless of grants (Postgres refuses to run a trigger
+function outside real trigger context) — revoking them is hygiene, same as
+`lock_listing_request_agreement_fee_rates` in `118`. The exception,
+`refresh_listing_request_agreement_progress_schedule(uuid)`, is a real gap: an
+ordinary function that unconditionally overwrites the progress-update schedule
+columns for whatever `agreement_id` it's given. Left exposed, any caller could
+force-recompute (and in some branches null out) another buyer/creator's
+schedule. It's called only from two of the trigger functions above and a
+one-time backfill, never from a client.
+
+A 23rd function, `protect_listing_request_completion` (trigger
+`listing_requests_protect_completion` on `listing_requests`), was found live
+with the same gap but **has no corresponding migration file anywhere in this
+repo** — schema drift that predates this audit, not introduced by it. It was
+included in the fix since it matches the same exposed/internal-only pattern,
+but the drift itself is unresolved: something applied this function directly
+against the project outside the migration history and it should be
+reconciled (e.g. backfilled as its own migration) separately from this fix.
+
+Fixed in `20260922_119_lock_down_internal_trigger_execute_grants.sql`, which
+revokes `EXECUTE` from `anon` and `authenticated` (and, where still present,
+`public`) on all 23. Re-verified against `information_schema.role_routine_grants`
+that none of the three roles retain `EXECUTE`. Re-verified the payment-creation
+trigger chain still works end to end: inserting a `payment_required` schedule
+item on a real `buyer_accepted` agreement still produces a
+`listing_request_payments` row (`starting_payment`, `requires_checkout`,
+correct fee math), tested in a transaction that was rolled back.
