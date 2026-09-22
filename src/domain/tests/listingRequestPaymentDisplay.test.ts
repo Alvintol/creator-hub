@@ -128,3 +128,52 @@ describe("describeBuyerServiceFee", () => {
     expect(result).toContain("US$1.00");
   });
 });
+
+describe("describeBuyerServiceFee after the minimums were removed", () => {
+  const payment = (overrides = {}) => ({
+    base_amount_cents: 10000,
+    buyer_service_fee_cents: 500,
+    buyer_service_fee_bps: 500,
+    buyer_service_fee_minimum_cents: 0,
+    currency: "cad",
+    ...overrides,
+  });
+
+  it("states the plain rate when no minimum is recorded", () => {
+    // New payments carry a zero minimum, so the minimum branch never runs.
+    expect(describeBuyerServiceFee(payment())).toBe(
+      "5% of the project payment.",
+    );
+  });
+
+  it("still explains the minimum on a payment taken before they were removed", () => {
+    // Historical rows keep the minimum they were actually charged under.
+    const result = describeBuyerServiceFee(
+      payment({
+        base_amount_cents: 1000,
+        buyer_service_fee_cents: 100,
+        buyer_service_fee_minimum_cents: 100,
+      }),
+    );
+
+    expect(result).toContain("$1.00 minimum");
+  });
+
+  it("says a waived fee is waived rather than reporting 0%", () => {
+    const result = describeBuyerServiceFee(
+      payment({ buyer_service_fee_cents: 0, buyer_service_fee_bps: 0 }),
+    );
+
+    expect(result).toBe("waived on this payment.");
+    expect(result).not.toContain("0%");
+  });
+
+  it("treats a small payment at the standard rate without a minimum", () => {
+    // 5% of 5.00 is 0.25. Before, the 1.00 minimum would have quadrupled it.
+    const result = describeBuyerServiceFee(
+      payment({ base_amount_cents: 500, buyer_service_fee_cents: 25 }),
+    );
+
+    expect(result).toBe("5% of the project payment.");
+  });
+});

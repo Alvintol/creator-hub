@@ -7,6 +7,8 @@ surfaces:
   - api/server.js:1153     # assertCheckoutPaymentCanBeOpened
   - api/server.js:1062     # CHECKOUT_OPENABLE_PAYMENT_STATUSES
   - public.listing_request_payments
+  - supabase/migrations/20260921_117_per_user_fee_rates_and_no_minimums.sql
+  - public.resolve_listing_request_fee_rates                # where a rate is decided
   - src/pages/payments/ListingRequestPaymentCheckout.tsx   # fee disclosure
   - src/domain/payments/listingRequestPaymentDisplay.ts    # describeBuyerServiceFee
 unmatched_tier: 2
@@ -169,22 +171,38 @@ signals:
   - source: api
     match: "This payment fee setup is invalid."
   - source: db
-    match: "Payment amount % % is too small for the configured CreatorHub fee minimums."
+    match: "Each payment must be at least % %."
+  - source: db
+    match: "Payment amount % % is too small for the configured Made for Stream fees."
+  - source: db
+    match: "Payment amount % % is too small for the configured CreatorHub fee minimums."   # pre-117 wording
 auto_fix: none
 reason_not_automatable: "the record is wrong; correcting money figures is a human decision"
 escalate_with:
   - "base_amount_cents, total_checkout_cents, application_fee_cents, currency"
+  - "buyer_service_fee_bps and creator_platform_fee_bps, and their minimum_cents columns"
   - "the agreement or milestone amount this was derived from"
 ```
 
-**Cause.** The application fee is greater than or equal to the total charge,
-which Stripe rejects for direct charges. With a 5%/$1.00 buyer fee and a
-5%/$1.50 creator fee, the combined minimum is $2.50, so any base amount under
-roughly $2.50 cannot work.
+**Cause — almost always the instalment floor.** Every payment must be at least
+**5.00**, enforced when the payment row is created (`20260921_117`). Below that
+Stripe's flat 0.30 is most of what the creator would receive, so the floor
+protects them rather than us.
 
-The schedule-to-payment bridge already refuses to create such a payment, so
-seeing this at checkout means a payment was created before that guard existed,
-or by another path.
+The message names the amount, so "Each payment must be at least 5.00 CAD" needs
+no investigation: the agreement or milestone amount is too small and has to
+change, which is a conversation between buyer and creator.
+
+**The fee-setup variant is now near-impossible.** Fees are a flat 5% each side
+with no minimums, so the application fee is 10% of base against a total of 105%
+of base and cannot exceed it. That check survives as a backstop against a future
+rate change that forgets it — if it ever fires, a **rate** is wrong, not an
+amount.
+
+**Older payments read differently.** Anything created before `20260921_117`
+carries the fee minimums that applied then, and the older error wording. Check
+the payment's own `buyer_service_fee_minimum_cents` and
+`creator_platform_fee_minimum_cents` rather than assuming today's rules.
 
 **What the user sees.** A generic failure when opening checkout.
 
@@ -332,17 +350,25 @@ escalate_with:
   - "base_amount_cents, buyer_service_fee_cents, buyer_service_fee_bps and buyer_service_fee_minimum_cents on the payment"
 ```
 
-**Cause.** Almost always the minimum, not a bug. On a small payment the flat
-minimum is larger than the percentage, so a buyer who expects 5% sees more. On a
-10.00 payment the fee is the 1.00 minimum, which reads as 10%.
+**Cause.** Since `20260921_117` there are **no fee minimums** — the buyer fee is
+a flat 5% of the base, every time. A buyer seeing more than 5% is either looking
+at a payment created before that migration, or adding the creator's fee to their
+own. The creator's 5% comes out of the creator's proceeds and is **not** added to
+the buyer's total; the checkout note says so in place.
 
-The checkout page explains this in place — `describeBuyerServiceFee` says which
-of the two applied and why — so a buyer reaching support usually did not read it,
-or is looking at an older payment created before that text existed.
+**Check the payment's own stored `buyer_service_fee_bps`**, not an assumed 5%.
+The rate is a per-payment snapshot and will vary per buyer once subscriptions
+land (`launch-scope.md` §3.5). `buyer_service_fee_reason` records why that rate
+applied — `standard`, `subscription`, `promotional` or `goodwill`.
 
-**Check the arithmetic against the payment's own stored rate and minimum**, not
-against 5% and 1.00. Those columns are per-payment snapshots and are what the fee
-was actually calculated from.
+**A zero fee is not a bug** if the reason is anything other than `standard`. It
+is a waiver, and the checkout note renders it as "waived on this payment" rather
+than "0%".
+
+**Payments created before `20260921_117`** carry a non-zero
+`buyer_service_fee_minimum_cents`, and the minimum may be what they were charged.
+`describeBuyerServiceFee` still explains those correctly — it reads the row
+rather than assuming today's rules.
 
 **If the figures do not reconcile**, it is not this issue — see
 [`PAY-004`](#pay-004--payment-amount-or-fee-setup-is-invalid).

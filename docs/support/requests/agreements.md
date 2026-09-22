@@ -5,7 +5,8 @@ surfaces:
   - public.listing_request_agreements
   - public.listing_request_agreement_items
   - public.listing_request_payment_schedule_items
-  - supabase/migrations/20260905_110_bridge_payment_schedule_to_stripe_payments.sql
+  - supabase/migrations/20260921_117_per_user_fee_rates_and_no_minimums.sql
+  - public.resolve_listing_request_fee_rates
 unmatched_tier: 2
 ---
 
@@ -175,6 +176,29 @@ belongs at Tier 3.
 
 ---
 
+## Fee rates are locked when the buyer accepts
+
+`20260921_117` stamps the fee rates in force onto the agreement at the moment the
+buyer accepts it, in `buyer_service_fee_bps`, `creator_platform_fee_bps`, their
+`_reason` columns and `fee_rates_locked_at`.
+
+**Those rates are a ceiling, not a fixed price.** Every payment created from the
+agreement's schedule is charged the *lower* of the locked rate and the rate in
+force when the payment is created. So:
+
+- A waiver that has **lapsed** since acceptance does not raise what the buyer
+  pays. Repricing an accepted schedule is what Fee Schedule §8 forbids.
+- A waiver granted **after** acceptance does lower later instalments.
+
+**When diagnosing a fee a user disputes**, read the rate from the *payment*, not
+the agreement — the payment records what was actually charged and why. The
+agreement records only the ceiling.
+
+**Agreements accepted before `20260921_117`** have null rate columns. The bridge
+falls back to the current resolved rate for those, which is the standard 5%.
+
+---
+
 ## Known gaps
 
 - **Change orders modify agreed terms** but the interaction between an amended
@@ -182,8 +206,10 @@ belongs at Tier 3.
   [`change-orders.md`](change-orders.md).
 - **No agreement versioning documented** for support purposes — if terms change,
   which version a dispute is argued from is not written down anywhere.
-- **Fee minimums are minor-unit-denominated** and applied to whatever currency the
-  agreement carries. Correct for CAD and USD; wrong for a currency with a different
-  minor-unit convention, so such an agreement can pass these checks and produce a
-  wrong or rejected charge later — see
-  [`PAY-004`](../payments/checkout.md#pay-004--payment-amount-or-fee-setup-is-invalid).
+- **Amounts are converted with a hardcoded `* 100`**, which is correct for CAD and
+  USD and wrong for any currency with a different minor-unit convention. Such an
+  agreement passes these checks and produces a wrong or rejected charge later —
+  see [`PAY-004`](../payments/checkout.md#pay-004--payment-amount-or-fee-setup-is-invalid).
+  The fee *minimums* that used to compound this were removed in `20260921_117`.
+
+

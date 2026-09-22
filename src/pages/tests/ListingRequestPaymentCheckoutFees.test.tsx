@@ -140,3 +140,32 @@ describe("checkout fee disclosure", () => {
     expect(screen.queryByText(/of the project payment/)).not.toBeInTheDocument();
   });
 });
+
+describe("checkout fee disclosure when the fee is waived", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("reads correctly with no fee added", () => {
+    mocks.useListingRequestPayment.mockReturnValue({
+      data: createPayment({
+        buyer_service_fee_cents: 0,
+        buyer_service_fee_bps: 0,
+        total_checkout_cents: 10000,
+      }),
+      isLoading: false,
+      isError: false,
+    });
+
+    renderCheckout();
+
+    expect(screen.getByText(/waived on this payment/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Nothing is added to the project payment/),
+    ).toBeInTheDocument();
+    // The "only fee added" sentence would contradict a waived fee.
+    expect(
+      screen.queryByText(/only fee added to what you pay/),
+    ).not.toBeInTheDocument();
+  });
+});

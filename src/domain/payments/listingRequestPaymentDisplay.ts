@@ -78,9 +78,10 @@ export const formatFeeRateBps = (bps: number): string =>
 // Explains the buyer service fee on a payment the buyer is about to make.
 //
 // Derived from the rate and minimum recorded on the payment row, not from a
-// hardcoded 5% / 1.00 -- those are per-payment snapshots and they will vary once
-// the currency registry lands. A fee larger than the percentage means the
-// minimum was the binding figure.
+// hardcoded 5% / 1.00. Those are per-payment snapshots: the rate becomes
+// per-buyer when subscriptions land, and payments taken before the minimums were
+// removed still carry the minimum they were charged under. Reading the row keeps
+// this correct for both without a dated special case.
 export const describeBuyerServiceFee = (payment: {
   base_amount_cents: number;
   buyer_service_fee_cents: number;
@@ -88,11 +89,19 @@ export const describeBuyerServiceFee = (payment: {
   buyer_service_fee_minimum_cents: number;
   currency: string;
 }): string => {
+  // A waived fee. Reporting this as "0% of the project payment" is accurate and
+  // reads like a bug, so say what actually happened.
+  if (payment.buyer_service_fee_cents === 0) {
+    return "waived on this payment.";
+  }
+
   const rate = formatFeeRateBps(payment.buyer_service_fee_bps);
   const percentageFeeCents = Math.ceil(
     (payment.base_amount_cents * payment.buyer_service_fee_bps) / 10000,
   );
 
+  // Only possible on a payment taken before the minimums were removed; the
+  // minimum recorded on newer rows is zero.
   if (payment.buyer_service_fee_cents > percentageFeeCents) {
     const minimum = formatPaymentCents(
       payment.buyer_service_fee_minimum_cents,

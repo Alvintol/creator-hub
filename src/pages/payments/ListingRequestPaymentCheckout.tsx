@@ -155,10 +155,13 @@ const ListingRequestPaymentCheckout = () => {
           </dl>
 
           <p className={classes.feeNote}>
-            The buyer service fee is {describeBuyerServiceFee(payment)} It is the
-            only fee added to what you pay. The creator pays a separate platform
-            fee out of their own proceeds, along with the payment processor&rsquo;s
-            charges, so it does not increase this total.{" "}
+            The buyer service fee is {describeBuyerServiceFee(payment)}{" "}
+            {payment.buyer_service_fee_cents > 0
+              ? "It is the only fee added to what you pay."
+              : "Nothing is added to the project payment."}{" "}
+            The creator pays a separate platform fee out of their own proceeds,
+            along with the payment processor&rsquo;s charges, so it does not
+            increase this total.{" "}
             <Link className={classes.feeLink} to="/policies/fees">
               Fee Schedule and Payment Terms
             </Link>
