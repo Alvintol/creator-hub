@@ -201,26 +201,42 @@ these hold, and two of them were verified directly against the code.
       2026-09-22: Docker.** Static hosting does not run Express, and the
       Connect webhook needs a real HTTPS origin preserving the **raw body**
       for signature verification. This gates registering the webhook endpoint
-      at all. **Held, explicitly, per the user:** offered to build it this
-      session once it turned out to have no technical dependency on the
-      fee-payer item below (that turned out to be a business decision, not a
-      config step) — the user chose to hold Docker until that direction is
-      settled rather than build it now. Not started. Next session should
-      re-offer rather than assume the answer is still the same.
-- [x] **Resolved, and it's not a code fix.** `controller.fees.payer` on Express
-      accounts (§3.2): confirmed live against Stripe's real API (2026-09-22)
-      that Express accounts *require* `fees.payer: "application"` — the
-      platform is billed Stripe's 2.9%+0.30 per charge, and Stripe rejects
-      setting it to `"account"` outright ("your platform must collect fees
-      and be liable for negative balances or refunds and chargebacks"). A
-      code change was attempted (`controller: { fees: { payer: "account" } }`
-      on both `accounts.create()` calls), tested against Stripe's test API,
-      found to break account creation entirely, and **reverted** — both calls
-      in `api/server.js` are back to not setting `controller` at all, with a
-      comment explaining why. **This is now §9.1/§9.2's open item 2: a
-      business/architecture decision** (absorb the fee under Express, or scope
-      a move to Custom accounts), not an engineering task. §3.1/§3.3/§3.4 need
-      a real rework once that's decided — not touched in this session.
+      at all. **Held, explicitly, per the user**, and then the fee-payer item
+      it was waiting on resolved the same session (below) — re-offer building
+      Docker at the start of the next session rather than assuming the answer
+      is still "hold." Not started.
+- [x] **Resolved, and it required a real code migration, not a config
+      change.** `controller.fees.payer` on Express accounts (§3.2): confirmed
+      live against Stripe's real API (2026-09-22) that Express accounts
+      *require* `fees.payer: "application"` — no per-account override exists.
+      Root cause found: `api/server.js` was still creating **Accounts v1**
+      (`type: "express"`) accounts, while this platform's own Connect
+      settings were already configured for **Accounts v2**
+      (`fees_collector`/`losses_collector: "stripe"`, `dashboard: "none"`).
+      Migrated `getOrCreateStripeAccountForEmbeddedConnect` to
+      `stripeClient.v2.core.accounts.create()` matching those settings exactly,
+      added `getSupabaseUserEmail` (v2 requires `contact_email` once a
+      `recipient` configuration/payouts capability is requested),
+      `deriveCreatorPaymentAccountReadinessFromV2Account` (maps v2 capability
+      statuses onto the existing `charges_enabled`/`payouts_enabled`/
+      `details_submitted` booleans so the DB, the readiness trigger and the
+      frontend need zero changes), and updated `/api/stripe/connect/sync` to
+      retrieve via v2. Removed the dead v1-only `/api/stripe/connect/start`
+      route and its exclusively-used helpers (`createStripeConnectAccount`,
+      `getStripeConnectAccountLink`, plus now-unused
+      `STRIPE_CONNECT_RETURN_URL`/`STRIPE_CONNECT_REFRESH_URL`). Verified
+      live end to end against Stripe's test API before trusting any of it:
+      v2 account creation with the platform's exact config, capability-status
+      reads, and — the one that mattered most — that a **direct charge with
+      `application_fee_amount` still works unchanged** against a v2 account
+      via the same `Stripe-Account` header pattern already used everywhere
+      else. Also verified the existing embedded-components `accountSessions.create`
+      call (what the onboarding UI actually uses) works unmodified against a
+      v2 account, so **no frontend changes were needed**. 861 tests still
+      passing, tsc/eslint clean. See §3.2, §9.1, §9.2 for the account.
+      **One real cost, not free:** the 14-day payout hold (§6.3) does not
+      survive this migration at the guaranteed figure originally decided —
+      see that item below.
 - [x] Idempotently reserve a schedule item against concurrent checkout attempts.
       Already satisfied, not newly built: `20260905_110` created
       `listing_request_payments_payment_schedule_item_idx`, a unique index on
@@ -235,21 +251,33 @@ never need platform funding; the charge handle is what a refund is issued agains
 
 **Payout hold (§6.3)**
 
-- [x] Set an explicit `daily` / `delay_days: 14` payout schedule on **both**
-      account-creation paths in `api/server.js` — `createStripeConnectAccount`
-      (dead `/connect/start` route, previously `manual`) and
-      `getOrCreateStripeAccountForEmbeddedConnect` (the live embedded-onboarding
-      path the product actually uses, which previously set **no schedule at
-      all**). §6.3 has the full correction — the "accidental manual hold" this
-      item's original wording assumed was never true for real creators.
-- [ ] **Follow-up, not done here:** one existing connected account
-      (`creator_payment_accounts`, `charges_enabled = false`) was created before
-      this fix, with no explicit schedule. It needs a one-time
-      `stripe.accounts.update(id, { settings: { payouts: { schedule: { interval:
-      "daily", delay_days: 14 } } } })` once confirmed which Stripe mode
-      (test/live) it belongs to. Not run in this session — deliberately left for
-      the user to confirm mode and run, rather than an agent mutating a Stripe
-      account's live settings unprompted.
+- [x] **Superseded by the v1→v2 migration above — the mechanism changed
+      entirely, not just the account-creation path.** For v2 accounts, payout
+      scheduling is not part of account creation; it's a separate Balance
+      Settings resource (`stripeClient.balanceSettings.update(...)`, called
+      per-account via the `Stripe-Account` header). New helper
+      `setStripeConnectDailyPayoutSchedule` sets `interval: "daily"`
+      immediately after account creation in
+      `getOrCreateStripeAccountForEmbeddedConnect`. **`delay_days` is not set
+      to 14 and cannot be** — confirmed live that
+      `settlement_timing.delay_days_override` is rejected outright while
+      `losses_collector` is `"stripe"` (the platform doesn't own liability),
+      which is the configuration kept per the user's explicit 2026-09-22
+      decision (lower platform risk over payout-timing control). The delay
+      stays at whatever Stripe assigns — confirmed 7 days on a Canadian test
+      account, unconfirmed in live mode or for other countries. §6.3 has the
+      full account; §3.1/§3.3/§3.4's dollar figures are unaffected (this only
+      changes payout *timing*, not fee economics).
+- [ ] **Follow-up, still open:** confirm the real live-mode delay (Stripe's
+      default may differ from the 7-day test-mode figure observed), and decide
+      whether it's acceptable to publish in the fee schedule as-is or whether
+      it needs monitoring per country as currency waves expand (§1.3).
+- [ ] **Follow-up, still open:** one existing connected account
+      (`creator_payment_accounts`, `charges_enabled = false`) predates this
+      session's fixes entirely (created under the old v1 path with no
+      schedule at all) and was not migrated to a v2 account or re-synced. It
+      should be re-onboarded or explicitly retired once its Stripe mode
+      (test/live) is confirmed — not mutated automatically here.
 
 **Charge traceability**
 

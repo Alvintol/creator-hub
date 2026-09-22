@@ -2,16 +2,31 @@
 feature: payments/connect-onboarding
 status: active
 surfaces:
-  - api/server.js:1646     # POST /api/stripe/connect/start
-  - api/server.js:1714     # POST /api/stripe/connect/sync
-  - api/server.js:1973     # POST /api/stripe/connect/account-session
-  - src/hooks/payments/useStripeConnectOnboarding.ts:75
+  - api/server.js                                    # POST /api/stripe/connect/sync, POST /api/stripe/connect/account-session, getOrCreateStripeAccountForEmbeddedConnect, setStripeConnectDailyPayoutSchedule, deriveCreatorPaymentAccountReadinessFromV2Account
+  - src/hooks/payments/useStripeConnectAccountSession.ts
   - public.creator_payment_accounts
   - supabase/migrations/20260622_107_require_payment_account_for_active_listings.sql
 unmatched_tier: 2
 ---
 
 # Stripe Connect Onboarding — Support Playbook
+
+> **2026-09-22: migrated from Stripe Accounts v1 to v2.** `POST
+> /api/stripe/connect/start` (Stripe-hosted Account Link onboarding, v1
+> `type: "express"` accounts) was removed as dead code — nothing in `src/`
+> ever called it. The only live onboarding path was always
+> `POST /api/stripe/connect/account-session` (embedded components), which now
+> creates **Accounts v2** accounts matching the platform's own Connect
+> configuration (`fees_collector`/`losses_collector: "stripe"`, `dashboard:
+> "none"`). This is also why the creator, not the platform, now bears
+> Stripe's 2.9%+CA$0.30 processing fee — see `launch-scope.md` §3.2. The
+> readiness fields this playbook discusses (`charges_enabled`,
+> `payouts_enabled`, `details_submitted`) are unchanged in shape; they are
+> now derived from v2 capability statuses
+> (`deriveCreatorPaymentAccountReadinessFromV2Account`) instead of read
+> directly off a v1 Account object, but nothing downstream — the readiness
+> trigger, the frontend, this playbook's detection queries — needed to
+> change.
 
 Creators must connect a Stripe account before they can publish an active listing
 or receive a payment. Made for Stream keeps a mirror of each creator's account state
@@ -238,8 +253,17 @@ through is a genuine risk to fee correctness.
 
 ## Known gaps
 
-- **`account.updated` is not handled.** This is the single largest gap in this
-  feature. Everything in `CON-003` is currently detected by a human noticing.
+- **No account-requirement-change webhook is handled.** This is the single
+  largest gap in this feature. Everything in `CON-003` is currently detected
+  by a human noticing. For v2 accounts (since 2026-09-22) the equivalent is
+  not `account.updated` but a **thin event** —
+  `v2.core.account[requirements].updated` and
+  `v2.core.account[configuration.merchant].capability_status_updated` —
+  requiring a separate event destination in the Stripe Dashboard (Developers
+  → Webhooks → thin events) and `stripe.v2.core.events.retrieve(thinEvent.id)`
+  to fetch the full payload. Registering it is gated on §11.1 (where
+  `api/server.js` runs in production) the same as the main webhook — not
+  built in this session.
 - **No scheduled resync.** Nothing refreshes `creator_payment_accounts` on a
   timer, so a creator who never revisits settings has a mirror that is as old as
   their last visit.

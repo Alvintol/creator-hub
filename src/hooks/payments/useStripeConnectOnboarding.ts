@@ -1,22 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../../providers/AuthProvider";
 
-type StartStripeConnectInput = {
-  country: string;
-  defaultCurrency: string;
-};
-
 type StripeConnectAccountResponse = {
   chargesEnabled: boolean;
   payoutsEnabled: boolean;
   detailsSubmitted: boolean;
   country: string;
   defaultCurrency: string;
-};
-
-type StartStripeConnectResponse = {
-  url: string;
-  account: StripeConnectAccountResponse;
 };
 
 type SyncStripeConnectResponse = {
