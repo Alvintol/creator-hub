@@ -2,15 +2,20 @@
 feature: payments/checkout
 status: active
 surfaces:
-  - api/server.js:1755     # POST /api/stripe/checkout/session
-  - api/server.js:1870     # GET  /api/stripe/checkout/session-status
-  - api/server.js:1153     # assertCheckoutPaymentCanBeOpened
-  - api/server.js:1062     # CHECKOUT_OPENABLE_PAYMENT_STATUSES
+  - api/server.js:1791     # POST /api/stripe/checkout/session
+  - api/server.js:1907     # GET  /api/stripe/checkout/session-status
+  - api/server.js:1156     # assertCheckoutPaymentCanBeOpened
+  - api/server.js:1181     # assertCheckoutPoliciesAccepted
+  - api/server.js:1065     # CHECKOUT_OPENABLE_PAYMENT_STATUSES
+  - api/policyVersions.js                                  # required policy versions, mirrors the TS client
+  - api/policyAcceptanceGuard.js                            # pure missing-policy logic
   - public.listing_request_payments
+  - public.policy_acceptances
   - supabase/migrations/20260921_117_per_user_fee_rates_and_no_minimums.sql
   - public.resolve_listing_request_fee_rates                # where a rate is decided
   - src/pages/payments/ListingRequestPaymentCheckout.tsx   # fee disclosure
   - src/domain/payments/listingRequestPaymentDisplay.ts    # describeBuyerServiceFee
+  - src/domain/tests/checkoutPolicyVersionsSync.test.ts    # keeps api/policyVersions.js honest
 unmatched_tier: 2
 ---
 
@@ -38,6 +43,7 @@ Two consequences that shape everything in this playbook:
 | "I paid, it's still asking me to pay" | [`PAY-005`](#pay-005--payment-stuck-in-checkout_opened-or-processing) |
 | "I was charged twice" | [`PAY-006`](#pay-006--buyer-reports-a-duplicate-charge) |
 | "The fee is more than 5%" | [`PAY-008`](#pay-008--buyer-questions-the-service-fee) |
+| "Checkout won't open, says I need to accept something" | [`PAY-009`](#pay-009--checkout-refused-for-an-unaccepted-or-outdated-policy) |
 | "It says I'm not the buyer" | [`PAY-001`](#pay-001--wrong-user-attempting-checkout) |
 
 ---
@@ -374,6 +380,58 @@ rather than assuming today's rules.
 [`PAY-004`](#pay-004--payment-amount-or-fee-setup-is-invalid).
 
 **Money impact.** None. The charge is correct; the expectation was not set.
+
+---
+
+## `PAY-009` — Checkout refused for an unaccepted or outdated policy
+
+```yaml
+id: PAY-009
+tier: 2
+signals:
+  - source: api
+    match: "You must accept the current"
+    where: api/server.js, assertCheckoutPoliciesAccepted
+escalate_if:
+  - "the buyer reports having already ticked every box on the checkout page" # -> tier 3, client/server disagreement
+auto_fix: none
+reason_not_automatable: "the buyer must actually accept the named policy; nobody may accept on their behalf"
+escalate_with:
+  - "the payment id, listing_request_id and payer_user_id"
+  - "the policy types named in the error message"
+  - "the buyer's current rows in policy_acceptances for this listing request"
+```
+
+**Cause.** `assertCheckoutPoliciesAccepted` checks `policy_acceptances` for the
+buyer, scoped to this listing request, for every policy `api/policyVersions.js`
+requires — currently `refund`, `payment_terms` and `early_service_request` — at
+their exact current version. It runs on **every** call to
+`POST /api/stripe/checkout/session`, including a reused session, because an
+acceptance of an older version does not satisfy a newer one.
+
+**What the user sees.** Checkout fails to open, naming which policy is missing
+or outdated in the error message.
+
+**The ordinary case is not a bug.** `CheckoutPolicyAcceptance.tsx` records
+acceptance before ever calling this endpoint, so this should only fire for a
+client that is stale, out of sync, or was bypassed — the API is now the real
+boundary here, exactly as `AGENTS.md` requires, so a client that skips the
+checkbox no longer gets through.
+
+**If the buyer insists they already accepted**, check
+`policy_acceptances` directly for that `user_id` and
+`related_listing_request_id`: either the row is missing (client silently
+failed to record it — see `logPolicyAcceptanceFailure` in
+`usePolicyAcceptances.ts`), or a policy version was bumped after they accepted
+an earlier one and the client has not re-prompted them yet. The second case is
+a genuine client bug and should escalate.
+
+**Fix.** For a missing or stale acceptance, the buyer accepts again — nobody
+may record it on their behalf, for the same reason as `AGR-003`: the record is
+the evidence that the buyer agreed, and one they did not personally make is
+worse than no record at all.
+
+**Money impact.** None. This fires before Stripe is contacted.
 
 ---
 

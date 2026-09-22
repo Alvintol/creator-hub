@@ -128,10 +128,13 @@ new currency ships wrong money rather than a new market.
 **Integrity first (§11).** None of the rules in the scope document are safe until
 these hold, and two of them were verified directly against the code.
 
-- [ ] `POST /api/stripe/checkout/session` verifies acceptance of the current policy
-      versions before opening a session. The string `policy_accept` **does not appear
-      anywhere in `api/server.js`** — the gate is browser-only today, which per
-      `AGENTS.md` is not a boundary.
+- [x] `POST /api/stripe/checkout/session` verifies acceptance of the current policy
+      versions before opening a session, on every call including a reused session.
+      `api/policyVersions.js` mirrors `checkoutPolicyTypes` /
+      `currentPolicyVersions` by hand — the two packages share no build step — with
+      `src/domain/tests/checkoutPolicyVersionsSync.test.ts` failing loudly if they
+      drift. `api/policyAcceptanceGuard.js` holds the pure missing-policy logic and
+      is the first server-side test coverage in `api/`.
 - [ ] Recompute the base, fees and recipient server-side from authoritative rows,
       the currency registry and the monthly-minimum state, rather than trusting the
       stored ledger values. This matters more once fees vary by currency and month.

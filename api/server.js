@@ -8,6 +8,9 @@ import crypto from "crypto";
 import Stripe from "stripe";
 import { createClient } from "@supabase/supabase-js";
 
+import { CHECKOUT_POLICY_VERSIONS } from "./policyVersions.js";
+import { getMissingCheckoutPolicyTypes } from "./policyAcceptanceGuard.js";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -1168,6 +1171,39 @@ const assertCheckoutPaymentCanBeOpened = ({ payment, userId }) => {
   }
 };
 
+// The checkout page gates on the buyer having accepted the current refund,
+// payment-terms and early-service-request policies for this listing request
+// (CheckoutPolicyAcceptance.tsx). That gate is client-side only -- nothing on
+// the API re-checked it before this, so it was not a real boundary
+// (launch-scope.md section 11). Re-checked on every call, including a reused
+// session, because an acceptance of an older version does not count once a
+// policy has changed.
+const assertCheckoutPoliciesAccepted = async ({ payment, userId }) => {
+  const requiredPolicyTypes = Object.keys(CHECKOUT_POLICY_VERSIONS);
+
+  const { data, error } = await supabaseAdmin
+    .from("policy_acceptances")
+    .select("policy_type, policy_version")
+    .eq("user_id", userId)
+    .eq("related_listing_request_id", payment.listing_request_id)
+    .in("policy_type", requiredPolicyTypes);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const missingPolicyTypes = getMissingCheckoutPolicyTypes(
+    CHECKOUT_POLICY_VERSIONS,
+    data || [],
+  );
+
+  if (missingPolicyTypes.length > 0) {
+    throw new Error(
+      `You must accept the current ${missingPolicyTypes.join(", ")} policy before checkout can open.`,
+    );
+  }
+};
+
 const getPaymentCheckoutTitle = (payment) => {
   const labelByType = {
     one_time: "Made for Stream one-time payment",
@@ -1765,6 +1801,7 @@ app.post("/api/stripe/checkout/session", async (req, res) => {
     const payment = await getListingRequestPaymentForCheckout(paymentId);
 
     assertCheckoutPaymentCanBeOpened({ payment, userId });
+    await assertCheckoutPoliciesAccepted({ payment, userId });
 
     const creatorPaymentAccount = await getReadyCreatorPaymentAccount(
       payment.creator_user_id,
