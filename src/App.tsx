@@ -24,6 +24,7 @@ import AdminListingRevisions from "./pages/admin/AdminListingRevisions";
 import AdminListings from "./pages/admin/AdminListings";
 import AdminModerationReportDetails from "./pages/admin/AdminModerationReportDetails";
 import AdminModerationReports from "./pages/admin/AdminModerationReports";
+import AdminPaymentIssues from "./pages/admin/AdminPaymentIssues";
 import AdminRequestDetails from "./pages/admin/AdminRequestDetails";
 import AdminRequests from "./pages/admin/AdminRequests";
 import BuyerRequestDetails from "./pages/buyer/BuyerRequestDetails";
@@ -198,6 +199,10 @@ const App = () => {
             <Route
               path="/admin/reports/:id"
               element={<AdminModerationReportDetails />}
+            />
+            <Route
+              path="/admin/payment-issues"
+              element={<AdminPaymentIssues />}
             />
           </Route>
 

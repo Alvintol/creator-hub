@@ -162,7 +162,23 @@ const AdminDashboard = () => {
             </Link>
           </div>
         </div>
-        
+
+        <div className={classes.toolCard}>
+          <h2 className={classes.toolTitle}>Payment issues</h2>
+
+          <p className={classes.toolText}>
+            Payments Stripe has recorded a refund or dispute against. Status is
+            not derived from these yet, so check each one against what Stripe
+            actually shows.
+          </p>
+
+          <div className={classes.row}>
+            <Link className={classes.btnPrimary} to="/admin/payment-issues">
+              Review payment issues
+            </Link>
+          </div>
+        </div>
+
       </div>
     </div>
   );

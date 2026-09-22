@@ -289,8 +289,68 @@ as a backstop.
 **What it is.** Stripe's payment processing fee: **2.9% + CA$0.30 per successful
 domestic card transaction**, charged on the *whole amount charged* — base plus buyer
 fee plus any tip — not on the base alone. International cards and currency
-conversion add more. Today the creator bears all of it, because with direct charges
-Stripe deducts from the connected account.
+conversion add more.
+
+**Correction (2026-09-22), now confirmed rather than assumed — and the news is
+bad.** An earlier version of this section, and the brief this sprint started
+from, treated "direct charges on an Express account" as sufficient on its own
+to put this cost on the creator. It is not, and worse: **it cannot be made
+true while the platform uses Express accounts at all.**
+
+What was checked, in order:
+
+1. Retrieved the one existing connected account live from Stripe:
+   `controller.fees.payer` reads `"application_express"` — the platform is
+   billed, not the creator. Neither `accounts.create()` call in
+   `api/server.js` ever set `controller` or `fees_collector`, so every
+   account created so far got this by default, unconfigured.
+2. Attempted the fix Stripe support described — setting
+   `controller.fees.payer: "account"` explicitly at account creation — against
+   Stripe's real API in test mode. **Rejected**, because `type: "express"` and
+   `controller` cannot be passed together at all.
+3. Retried using `controller` alone (the account-creation shape Express
+   accounts actually resolve to underneath `type: "express"`, matching the
+   `controller` object read back in step 1) with `fees.payer: "account"`.
+   **Rejected again**, with Stripe's own validation message: *"When
+   `stripe_dashboard[type]=express`, your platform must collect fees and be
+   liable for negative balances or refunds and chargebacks."*
+4. Confirmed the platform-pays direction (`fees.payer: "application"`) is
+   accepted for an Express account, isolating the rejection to specifically
+   the creator-pays direction.
+
+**So this is not a missing setting. It is a hard constraint of the Express
+account type**: Stripe requires the platform to be the fee payer for every
+Express-dashboard connected account, with no per-account override. The
+platform is, right now, paying the 2.9%+CA$0.30 on every charge that goes
+through — the opposite of what this section, §3.1, §3.3 and §3.4 all assume,
+and there is no code fix available while account type stays Express.
+
+**What would change it:** moving off Express accounts — most plausibly to
+Custom accounts, which do allow `fees.payer: "account"`. That is not a
+configuration change; Custom accounts have no Stripe-hosted dashboard, so the
+platform would own building whatever onboarding, payout and tax-information UI
+Express currently gets for free. This is a real architectural decision, not a
+Sprint 3 fix, and it is not made here — see §9.1/§9.2.
+
+**What this means for the numbers below and in §3.3/§3.4:** every one of them
+currently overstates Made for Stream's net by roughly the 2.9%+CA$0.30 per
+charge the platform is actually absorbing. On the CAD 100 example two
+paragraphs down, that is closer to 6.65 net (10.00 minus the 3.35 Stripe
+takes) than the "clean 10%" §3.3 currently states. **These sections need a
+real rework once a direction is chosen, not a numbers patch** — deliberately
+left unrevised rather than guessed at here.
+
+**One thing this does *not* resolve, flagged rather than assumed:** how this
+interacts with the separate "Stripe handles pricing" vs "you handle pricing"
+Connect-level choice in §3.4 (which governs the platform-level CA$2
+monthly-account and per-payout fees, confirmed absent under "Stripe handles
+pricing" earlier this same session). `controller.fees.payer` and that
+platform-level pricing model read as two different Stripe mechanisms, and
+nothing tested here confirms whether they compose independently or whether
+Express's forced `fees.payer: "application"` changes what "Stripe handles
+pricing" actually bills the platform for. Worth a direct question to Stripe
+support before trusting a combined number, rather than assuming the two
+findings simply add together.
 
 On a CAD 100 commission that is 2.9% × 105.00 + 0.30 = **3.35**, so the creator's
 total cost is 8.35 (5.00 to us, 3.35 to Stripe) while the buyer's is 5.00.
@@ -687,23 +747,38 @@ columns would write a status it cannot substantiate.
 **Decision: hold creator payouts for 14 days after the charge, so a refund can be
 taken from funds that are still there.**
 
-This is the right first move and it is cheaper than it looks, because **we are
-already holding funds — by accident and indefinitely.**
+This is the right first move, and it is more urgent than an earlier draft of this
+section believed.
 
-`createStripeConnectAccount` in `api/server.js` sets
-`settings.payouts.schedule.interval = "manual"` on every connected account, and
-**nothing anywhere in the codebase ever creates a payout.** There is no payout API
-call, no scheduled job and no UI. Today a creator's money accrues in their Stripe
-balance and leaves only if they trigger it themselves from the Express dashboard.
+**Correction (2026-09-22): the "accidental manual hold" this section originally
+described does not cover the account-creation path the product actually uses.**
+There are two account-creation code paths in `api/server.js`:
 
-So this decision does not introduce a hold. It replaces an unbounded, undocumented,
-accidental hold with a defined 14-day one that then pays out automatically. That is
-strictly better for creators than what ships today, and it needs saying that way
-when it is announced.
+| Path | Route | Sets a payout schedule? | Reachable from the product? |
+| --- | --- | --- | --- |
+| `createStripeConnectAccount` | `POST /api/stripe/connect/start` | Was `manual` | **No.** Nothing in `src/` calls this route — `useStripeConnectOnboarding.ts` defines request/response types for it but never wires up a mutation that calls it. Documented in `connect-onboarding.md` as a live surface; it is not. |
+| `getOrCreateStripeAccountForEmbeddedConnect` | `POST /api/stripe/connect/account-session` | Was **unset** | **Yes.** This is what `useStripeConnectAccountSession.ts` calls, and it is what every creator who has onboarded through Profile Settings' embedded flow actually went through. |
 
-**Implementation:** change the schedule from `manual` to **`daily` with
-`delay_days: 14`**. Stripe then makes funds available 14 days after settlement and
-pays out on its own. 14 exceeds every country's minimum `delay_days`, so one value
+So the account every real creator has is one Stripe created with **no explicit
+payout schedule at all** — not the disclosed-as-safe `manual` hold this section
+described. Depending on the platform's own Connect payout defaults (Settings →
+Connect → Payouts in the Stripe Dashboard, not verified here), that account may
+already be paying out automatically on whatever cadence Stripe defaults to,
+with **no hold whatsoever**. That is a real gap, not a documentation error with
+no consequence: if any creator has already onboarded live, their payout timing
+today is whatever Stripe's platform default is, unconfirmed, not the safe
+"accidental indefinite hold" this section previously assumed.
+
+**Fixed alongside this decision**, both paths now set the same explicit
+schedule rather than one of them setting `manual` and the other setting nothing.
+The dead `/connect/start` path is left in place (documented, unreachable, now
+consistent) rather than removed in this pass — deleting it is a separate,
+smaller cleanup, tracked outside Sprint 3.
+
+**Implementation:** set the schedule explicitly to **`daily` with
+`delay_days: 14`** on both account-creation paths (§6.3 above), rather than
+leaving the live path unset. Stripe then makes funds available 14 days after
+settlement and pays out on its own. 14 exceeds every country's minimum `delay_days`, so one value
 works globally. No payout code of our own, and no escrow.
 
 **This reverses an earlier decision, and the reason is worth recording.** An
@@ -1013,11 +1088,11 @@ in profile settings, which is the correct treatment.
 | `[SUPPORT_EMAIL]`, `[PRIVACY_EMAIL]`, `[DMCA_AGENT_EMAIL]` | **inbox@madeforstream.com** for all three |
 | Geographic scope | **Global** — every country Stripe Connect supports for creators, unrestricted for buyers (§1) |
 | Currency scope | **Any major currency**, through the registry, enabled in waves (§1.1, §1.3) |
-| Creator payouts | **Held 14 days** after the charge, replacing today's accidental indefinite hold (§6.3) |
+| Creator payouts | **Held 14 days** after the charge — the live account-creation path set no schedule at all before this, so this is a new, explicit hold rather than a replacement for a safe accidental one (§6.3) |
 | Refund funding | **Made for Stream funds the refund**, then recovers from the creator in-app (§6.5) |
 | Creator with an outstanding balance | Listings **blocked from new requests**; existing projects continue and their payments are diverted to the balance (§6.5) |
 | Recovery rate | **50% of each base payment** (§6.6) |
-| Stripe Connect pricing model | **Model A — "Stripe handles pricing".** Stripe bills the creator's connected account; the platform pays no processing, no account fee, no payout fees (§3.4) |
+| Stripe Connect pricing model | **Model A — "Stripe handles pricing".** Confirmed: the platform pays no CA$2 monthly account fee and no per-payout fee. **Not confirmed, and now believed false:** "Stripe bills the creator's connected account" for processing — Express accounts structurally require `fees.payer: "application"`, so the platform currently pays the 2.9%+CA$0.30 per charge, not the creator. See §3.2's 2026-09-22 correction and §9.2 (§3.4) |
 | Fee rates | **5% buyer and 5% creator.** The buyer fee pays for agreements, milestones, change orders, delivery records and a defined refund path — what the competition does not have (§3, §3.5) |
 | Fee minimums | **None on either side** — Model A removed the cost they offset, and they only took from creators on small commissions (§3.1) |
 | Instalment floor | **5.00**, now protecting the creator from Stripe's flat 0.30 rather than the platform from a loss (§3.1) |
@@ -1054,9 +1129,48 @@ decisions:
    before the first EU sale, since EU VAT applies from the first euro with no
    small-seller threshold.
 
-2. **Whether the platform or the connected account bears Stripe's 2.9% + CA$0.30**
-   — Sprint 0.5, item 2. Not a preference but a fact to look up; it decides a 33%
-   swing in net revenue and whether Fee Schedule §5 is true as published (§3.1).
+2. **Now a business/architecture decision, not a fact-finding question —
+   resolved as "the platform pays," not fixable in place.** §3.2 was raised
+   and closed as "already correct" at the start of this sprint (creator
+   pays), reopened the same day by Stripe support, and then settled
+   conclusively against Stripe's real API (2026-09-22): Express accounts
+   **require** `fees.payer: "application"` — the platform is billed Stripe's
+   2.9%+CA$0.30 on every charge, and there is no per-account setting that
+   moves it to the creator while account type stays Express. The only lever
+   that changes this is moving off Express (most plausibly to Custom
+   accounts), which means the platform building its own onboarding, payout
+   and tax-info UI in place of Stripe's Express dashboard — a real project,
+   not a config change. **Open:** stay on Express and absorb the fee as a
+   platform cost (§3.3/§3.4 need reworking to that basis), or scope a move to
+   Custom accounts. Neither is decided here.
+
+3. **How `controller.fees.payer` and the "Stripe handles pricing" Connect
+   model interact** — flagged, not resolved, at the end of §3.2's correction.
+   Two different Stripe mechanisms were each confirmed independently this
+   session; nothing confirms whether they compose additively for a combined
+   cost figure. Ask Stripe support directly before publishing a number that
+   depends on both.
+
+**Resolved 2026-09-22.** Whether Connect's own platform-level fees ($2/month per
+active connected account, 0.25%+$0.25 per payout) are billed to the platform under
+"Stripe handles pricing." Confirmed directly with Stripe support rather than
+inferred from an empty invoice (no live payments have run yet, so the invoice would
+show nothing either way): "Because of that, your platform doesn't incur the
+account, payout volume, tax reporting, or per-payout fees that apply under the
+'you handle pricing' model... Since you've described Stripe handling pricing with
+Express and direct charges, those fees don't apply to your platform in that
+setup." §3.1, §3.3, §3.4 and §6.3's payout-schedule reasoning all stand as written
+against this confirmation — no figures change.
+
+One nuance Stripe support flagged, unrelated to the above and not yet verified:
+fee responsibility for direct charges also depends on the `fees_collector`
+(Accounts v2) / fee payer (Accounts v1) property set on each connected account,
+which decides whether Stripe or the connected account is billed for the charge
+itself. This account is on Accounts v1 (`stripe.accounts.create` with `type:
+"express"`, no `fees_collector`), and §3.1's own reasoning about Express + direct
+charges already covers that case. Worth a one-line confirmation with Stripe that
+no fee payer override is set on the platform's connected accounts, but it does not
+block Sprint 3.
 
 ---
 
