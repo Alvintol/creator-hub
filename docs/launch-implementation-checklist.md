@@ -16,40 +16,20 @@ cleaned up since and it is gitignored, so this file is the current reference.
 
 ## Sprint 0.5 — Stripe portal configuration
 
-**Dashboard settings, not code.** These are quick, they cost nothing, and three of
-them decide numbers that get published — so they come before the fee work rather
-than during it. Record the answer to each one in this file as it is confirmed;
-several are invisible from the codebase and will otherwise be re-derived wrongly.
+**Dashboard settings, not code.** Quick, free, and two of them decide numbers that
+get published. Record each answer here as it is confirmed.
 
-**Pricing model and fee liability**
-
-- [ ] Confirm which Connect pricing model the platform is on: **"Stripe handles
-      pricing"** (no platform fees) or **"you handle pricing"** (CA$2 per monthly
-      active account, 0.25% + CA$0.25 per payout, platform responsible for
-      processing). Assumed to be **"you handle pricing"**.
-- [ ] **Confirm who bears the 2.9% + CA$0.30 processing fee** on a direct charge —
-      the connected account or the platform. This is the single largest input to
-      unit economics: it is the difference between netting 10.00 and 6.65 on a
-      CAD 100 commission (§3.1).
-- [ ] If the platform bears processing, **Fee Schedule §5 is wrong** — "The creator
-      is responsible for those transaction-related charges to the extent charged to
-      their connected account" — and must be rewritten before publication.
-- [ ] Verify the CA$2 monthly active account line actually appears on a Stripe
-      invoice, and capture one invoice as the reference for what we are charged.
-- [ ] Check whether the platform qualifies for Stripe's revenue share under "Stripe
-      handles pricing", and whether that model would net more than the current one
-      once the account and payout fees are counted.
-
-**Payouts**
-
-- [ ] Verify how `delay_days` interacts with a **weekly** interval before
-      implementing the 14-day hold — `delay_days` is a `daily` schedule parameter.
-      The interval itself is decided (§6.3): weekly, not daily.
-- [ ] Confirm the per-payout 0.25% volume fee is understood as a standing cost: at a
-      5% creator fee it consumes about 5% of gross revenue.
-
-**Other settings that affect published numbers**
-
+- [ ] **Set the Connect pricing model to "Stripe handles pricing"** (§3.4). Stripe
+      bills the connected account for processing; the platform incurs no account
+      fee, no payout volume fee and no per-payout fee. This is the decision the fee
+      structure now rests on — confirm it is actually applied, not just intended.
+- [ ] Verify on a Stripe invoice that **no** CA$2 monthly active account line and
+      **no** per-payout fees are being charged. If they are, the model is not set
+      and §3.1, §3.3 and §6.3 all need revisiting.
+- [ ] Confirm the creator's connected account is being debited for the 2.9% +
+      CA$0.30, which is what makes Fee Schedule §5 true as published.
+- [ ] Check whether the platform qualifies for Stripe's **revenue share** under this
+      model — it exists only here, and nothing in the plan has counted it.
 - [ ] Record Stripe's minimum charge amount per currency we intend to enable, for
       the registry's `stripe_minimum_charge` column (Sprint 1).
 - [ ] Confirm international card and currency conversion surcharges, and who bears
@@ -67,33 +47,39 @@ currency has exactly 100 minor units, and until that assumption is gone, enablin
 new currency ships wrong money rather than a new market.
 
 - [ ] Migration: `supported_currencies` table per `launch-scope.md` §1.1 — code,
-      `minor_unit_exponent`, `amount_multiple`, per-currency fee minimums,
-      `minimum_instalment`, `stripe_minimum_charge`, `enabled`. Seeded with CAD and
-      USD enabled, wave 2 rows present and disabled.
+      `minor_unit_exponent`, `amount_multiple`, `minimum_instalment`,
+      `stripe_minimum_charge`, `enabled`. No fee-minimum columns (§3.1). Seeded
+      with CAD and USD enabled, wave 2 rows present and disabled.
 - [ ] Migration: `supported_countries`, seeded from Stripe's Connect availability
       list, recording which capabilities each supports.
 - [ ] Rewrite `ensure_listing_request_payment_for_schedule_item` to take the
-      exponent and the minimums from the registry instead of `* 100`, `100` and
-      `150`. For a month's first payment in CAD or USD the result must be
-      **byte-identical** to today — that is the regression test.
-- [ ] Migration: `creator_fee_minimum_consumption` — one row per creator, currency
-      and UTC calendar month, recording which payment consumed that month's minimum
-      (§3.1). The fee calculation consults it; only a successful payment consumes it;
-      a full refund of the consuming payment releases it for the next one.
-- [ ] **Creator fee minimum only.** The buyer service fee is a flat 5% with no
-      minimum — do not carry a buyer minimum through the new code path.
-- [ ] Model the creator's monthly period as one shared concept, and give the
-      consumption record a **waiver reason** field (§3.4). Both are small now and
-      both are what a future subscription reads.
-- [ ] Tests: second payment in a month pays percentage only; refund of the consuming
-      payment re-arms the minimum; two currencies in one month consume separately;
-      a month boundary in UTC; a waived month is recorded with its reason.
+      exponent from the registry instead of `* 100`, and the rates from the
+      resolver instead of `500`. In CAD and USD the result must be
+      **byte-identical** to today for any base at or above 30.00 — below that the
+      dropped minimums legitimately change it, and those cases get their own
+      expectations.
+- [ ] **Remove both fee minimums.** 5% flat on each side, no `max(...)` (§3.1).
+      Model A removed the cost they offset. No `creator_fee_minimum_consumption`
+      table, no monthly period, no first-of-month branch — this subsystem is gone
+      before it is built.
+- [ ] **Resolve both rates per user rather than as literals** (§3.5, §3.6). One
+      shared resolver, returning 500 bps for everyone today, so a future buyer or
+      creator subscription is a data change rather than a trigger rewrite.
+- [ ] Record the **reason** each rate applied — standard, subscription,
+      promotional, goodwill — on the payment alongside the rate. A `0` with no
+      explanation is indistinguishable from a bug.
+- [ ] **Lock the resolved rate at agreement acceptance as a ceiling**: a later
+      waiver may lower it, nothing may raise it (§3.5). This is what stops a lapsed
+      subscription silently repricing an accepted schedule, which Fee Schedule §8
+      forbids.
+- [ ] Tests: a waived buyer rate produces a zero fee and a recorded reason; a lapsed
+      waiver does not raise an accepted schedule's rate; a mid-project waiver lowers
+      later instalments only; refunds of a zero-fee payment return zero fee.
 - [ ] Apply `amount_multiple` rounding for three-decimal currencies.
-- [ ] Enforce the registry's `minimum_instalment` before a payment row is created —
-      **the same floor on every instalment**, not a lower one after the month's
-      first (§3.1). Below a base of about 4.31 the platform loses money on the
-      transaction (§3.3). Give it a clear message rather than `PAY-004`'s generic
-      failure.
+- [ ] Enforce the registry's `minimum_instalment` (5.00 in CAD/USD) before a
+      payment row is created. Under Model A this protects the **creator** from
+      Stripe's flat 0.30 rather than the platform from a loss (§3.1). Give it a
+      clear message rather than `PAY-004`'s generic failure.
 - [ ] Fix `formatPaymentCents` (`src/domain/payments/listingRequestPaymentDisplay.ts`)
       to divide by the registry exponent, not by 100. Extend
       `src/lib/formatMoney.ts` the same way.
@@ -168,11 +154,10 @@ never need platform funding; the charge handle is what a refund is issued agains
 **Payout hold (§6.3)**
 
 - [ ] Change `createStripeConnectAccount` from
-      `settings.payouts.schedule.interval = "manual"` to **`weekly`**, with the
-      14-day hold expressed against it. **Not `daily`** — see §3.1, where the
-      per-payout fee makes daily cost up to CA$7.50 a month against about CA$1.00.
-- [ ] Confirm how a weekly schedule expresses the hold before implementing.
-      `delay_days` is a `daily` schedule parameter.
+      `settings.payouts.schedule.interval = "manual"` to **`daily` with
+      `delay_days: 14`** (§6.3). Model A removes the per-payout fee that made
+      weekly cheaper, so `daily` wins on creator experience and is the
+      configuration `delay_days` is designed for.
 
 **Charge traceability**
 
@@ -379,9 +364,9 @@ and burying that inside an engineering sprint is how it gets skipped (§12).
 
 - [ ] Apply the §10 policy edits across `src/domain/legal/`: **Made for Stream** as
       the entity, `inbox@madeforstream.com` replacing all three email placeholders,
-      currencies stated, the monthly fee minimum and instalment floors added, the
-      payout hold and the recovery obligation disclosed, tips and contributions
-      described as the shipping feature they now are.
+      currencies stated, both fee minimums removed and the 5.00 instalment floor
+      added, the payout hold and the recovery obligation disclosed, tips and
+      contributions described as the shipping feature they now are.
 - [ ] Cut non-draft policy versions and remove every `// REVIEW DRAFT` marker.
       Version bumps re-trigger acceptance automatically, which is the intended
       behaviour.
