@@ -2,15 +2,20 @@
 feature: payments/checkout
 status: active
 surfaces:
-  - api/server.js:1755     # POST /api/stripe/checkout/session
-  - api/server.js:1870     # GET  /api/stripe/checkout/session-status
-  - api/server.js:1153     # assertCheckoutPaymentCanBeOpened
-  - api/server.js:1062     # CHECKOUT_OPENABLE_PAYMENT_STATUSES
+  - api/server.js:1791     # POST /api/stripe/checkout/session
+  - api/server.js:1907     # GET  /api/stripe/checkout/session-status
+  - api/server.js:1156     # assertCheckoutPaymentCanBeOpened
+  - api/server.js:1181     # assertCheckoutPoliciesAccepted
+  - api/server.js:1065     # CHECKOUT_OPENABLE_PAYMENT_STATUSES
+  - api/policyVersions.js                                  # required policy versions, mirrors the TS client
+  - api/policyAcceptanceGuard.js                            # pure missing-policy logic
   - public.listing_request_payments
+  - public.policy_acceptances
   - supabase/migrations/20260921_117_per_user_fee_rates_and_no_minimums.sql
   - public.resolve_listing_request_fee_rates                # where a rate is decided
   - src/pages/payments/ListingRequestPaymentCheckout.tsx   # fee disclosure
   - src/domain/payments/listingRequestPaymentDisplay.ts    # describeBuyerServiceFee
+  - src/domain/tests/checkoutPolicyVersionsSync.test.ts    # keeps api/policyVersions.js honest
 unmatched_tier: 2
 ---
 
@@ -38,6 +43,7 @@ Two consequences that shape everything in this playbook:
 | "I paid, it's still asking me to pay" | [`PAY-005`](#pay-005--payment-stuck-in-checkout_opened-or-processing) |
 | "I was charged twice" | [`PAY-006`](#pay-006--buyer-reports-a-duplicate-charge) |
 | "The fee is more than 5%" | [`PAY-008`](#pay-008--buyer-questions-the-service-fee) |
+| "Checkout won't open, says I need to accept something" | [`PAY-009`](#pay-009--checkout-refused-for-an-unaccepted-or-outdated-policy) |
 | "It says I'm not the buyer" | [`PAY-001`](#pay-001--wrong-user-attempting-checkout) |
 
 ---
@@ -377,6 +383,58 @@ rather than assuming today's rules.
 
 ---
 
+## `PAY-009` — Checkout refused for an unaccepted or outdated policy
+
+```yaml
+id: PAY-009
+tier: 2
+signals:
+  - source: api
+    match: "You must accept the current"
+    where: api/server.js, assertCheckoutPoliciesAccepted
+escalate_if:
+  - "the buyer reports having already ticked every box on the checkout page" # -> tier 3, client/server disagreement
+auto_fix: none
+reason_not_automatable: "the buyer must actually accept the named policy; nobody may accept on their behalf"
+escalate_with:
+  - "the payment id, listing_request_id and payer_user_id"
+  - "the policy types named in the error message"
+  - "the buyer's current rows in policy_acceptances for this listing request"
+```
+
+**Cause.** `assertCheckoutPoliciesAccepted` checks `policy_acceptances` for the
+buyer, scoped to this listing request, for every policy `api/policyVersions.js`
+requires — currently `refund`, `payment_terms` and `early_service_request` — at
+their exact current version. It runs on **every** call to
+`POST /api/stripe/checkout/session`, including a reused session, because an
+acceptance of an older version does not satisfy a newer one.
+
+**What the user sees.** Checkout fails to open, naming which policy is missing
+or outdated in the error message.
+
+**The ordinary case is not a bug.** `CheckoutPolicyAcceptance.tsx` records
+acceptance before ever calling this endpoint, so this should only fire for a
+client that is stale, out of sync, or was bypassed — the API is now the real
+boundary here, exactly as `AGENTS.md` requires, so a client that skips the
+checkbox no longer gets through.
+
+**If the buyer insists they already accepted**, check
+`policy_acceptances` directly for that `user_id` and
+`related_listing_request_id`: either the row is missing (client silently
+failed to record it — see `logPolicyAcceptanceFailure` in
+`usePolicyAcceptances.ts`), or a policy version was bumped after they accepted
+an earlier one and the client has not re-prompted them yet. The second case is
+a genuine client bug and should escalate.
+
+**Fix.** For a missing or stale acceptance, the buyer accepts again — nobody
+may record it on their behalf, for the same reason as `AGR-003`: the record is
+the evidence that the buyer agreed, and one they did not personally make is
+worse than no record at all.
+
+**Money impact.** None. This fires before Stripe is contacted.
+
+---
+
 ## Known gaps
 
 - **No refund path exists.** `PAY-006` has no clean resolution inside
@@ -413,7 +471,62 @@ the trigger-driven payment-creation flow is unaffected — every call path runs
 through `security definer` functions that execute as their owner regardless
 of who fired the triggering statement.
 
-**This is worth an audit beyond these three.** Any other `security definer`
-helper in this codebase that only does `revoke all ... from public` — without
-also revoking from or never granting to `anon`/`authenticated` — is likely
-exposed the same way. That audit has not been done.
+**Follow-up audit (2026-09-22).** Every `security definer` function across
+`supabase/migrations/*.sql` was checked against
+`information_schema.role_routine_grants` on the live project. Functions with
+an explicit `grant execute ... to authenticated` after their creation (the
+`has_ready_creator_payment_account` pattern) are intentionally client-callable
+and were left alone. Twenty-two internal helpers were confirmed to have
+`EXECUTE` live on `anon`/`authenticated` with no explicit grant-back and no
+client `.rpc()` call site anywhere in `src/`:
+
+`capture_listing_revision`, `close_conversation_when_listing_request_completed`,
+`close_conversation_when_listing_request_declined`,
+`complete_listing_request_after_final_delivery_approval`,
+`create_conversation_for_listing_request`,
+`create_listing_request_change_order_payment`,
+`create_listing_request_milestone_from_payment`,
+`create_listing_request_payments_when_agreement_accepted`,
+`enforce_final_delivery_approval_milestone_payments`,
+`enforce_final_delivery_milestone_payments`,
+`enforce_listing_payment_account_readiness`,
+`enforce_listing_request_milestone_buyer_response_sequence`,
+`enforce_listing_request_milestone_payment_sequence`,
+`enforce_listing_request_milestone_submission_sequence`,
+`handle_conversation_message_insert`,
+`log_listing_request_agreement_conversation_event`,
+`log_listing_request_status_change`,
+`refresh_listing_request_agreement_adjusted_completion`,
+`refresh_listing_request_agreement_progress_schedule`,
+`set_listing_request_archive_metadata`,
+`sync_listing_request_agreement_progress_schedule`, and
+`sync_listing_request_progress_update_schedule`.
+
+All but one are `returns trigger` functions bound to exactly one trigger, so a
+direct call is inert regardless of grants (Postgres refuses to run a trigger
+function outside real trigger context) — revoking them is hygiene, same as
+`lock_listing_request_agreement_fee_rates` in `118`. The exception,
+`refresh_listing_request_agreement_progress_schedule(uuid)`, is a real gap: an
+ordinary function that unconditionally overwrites the progress-update schedule
+columns for whatever `agreement_id` it's given. Left exposed, any caller could
+force-recompute (and in some branches null out) another buyer/creator's
+schedule. It's called only from two of the trigger functions above and a
+one-time backfill, never from a client.
+
+A 23rd function, `protect_listing_request_completion` (trigger
+`listing_requests_protect_completion` on `listing_requests`), was found live
+with the same gap but **has no corresponding migration file anywhere in this
+repo** — schema drift that predates this audit, not introduced by it. It was
+included in the fix since it matches the same exposed/internal-only pattern,
+but the drift itself is unresolved: something applied this function directly
+against the project outside the migration history and it should be
+reconciled (e.g. backfilled as its own migration) separately from this fix.
+
+Fixed in `20260922_119_lock_down_internal_trigger_execute_grants.sql`, which
+revokes `EXECUTE` from `anon` and `authenticated` (and, where still present,
+`public`) on all 23. Re-verified against `information_schema.role_routine_grants`
+that none of the three roles retain `EXECUTE`. Re-verified the payment-creation
+trigger chain still works end to end: inserting a `payment_required` schedule
+item on a real `buyer_accepted` agreement still produces a
+`listing_request_payments` row (`starting_payment`, `requires_checkout`,
+correct fee math), tested in a transaction that was rolled back.

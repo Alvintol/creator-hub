@@ -1087,13 +1087,18 @@ Four findings that are not policy decisions but that no rule in this document is
 safe without. They came out of comparing the proposed rules against the code, and
 the first two were verified directly.
 
-**The API never checks policy acceptance.** `CheckoutPolicyAcceptance` gates the
-checkout page on the buyer accepting the current policy versions, and then
-`POST /api/stripe/checkout/session` creates the Stripe session without consulting
-`policy_acceptances` at all — the string does not appear anywhere in
-`api/server.js`. So the acceptance record that a dispute would be argued from is
-enforced only in the browser. Per `AGENTS.md`, that is not a boundary. The API must
-verify acceptance of the current versions before opening a session.
+**Fixed.** `CheckoutPolicyAcceptance` gates the checkout page on the buyer
+accepting the current policy versions, and `POST /api/stripe/checkout/session`
+used to create the Stripe session without consulting `policy_acceptances` at
+all — the acceptance record that a dispute would be argued from was enforced
+only in the browser, which per `AGENTS.md` is not a boundary.
+`assertCheckoutPoliciesAccepted` now re-checks it server-side on every call,
+including a reused session, since an acceptance of an older version does not
+count once a policy has changed. The API has no build step connecting it to
+this TypeScript app, so `api/policyVersions.js` mirrors the client's required
+policy versions by hand, and
+`src/domain/tests/checkoutPolicyVersionsSync.test.ts` fails loudly if the two
+drift apart.
 
 **The checkout API trusts stored fee values.** It validates that the amount is
 positive and that the application fee is below the total, then passes the stored
