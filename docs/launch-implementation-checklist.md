@@ -8,9 +8,10 @@ Every item follows `AGENTS.md`: enforcement at the database and API rather than 
 UI alone, the next free migration number taken from `supabase/migrations/`, and a
 support playbook written or updated before the branch is ready.
 
-**Baselines to hold** (measured 2026-09-21): **837 tests passing, eslint clean, tsc
-clean.** `AGENTS.md` still records the older 740 / 21 errors / 19 lines — those were
-cleaned up since and it is gitignored, so this file is the current reference.
+**Baselines to hold** (measured 2026-09-22, end of Sprint 3): **861 tests
+passing, eslint clean, tsc clean, `npx vite build` clean.** `AGENTS.md` still
+records the older 740 / 21 errors / 19 lines — those were cleaned up since and
+it is gitignored, so this file is the current reference.
 
 ---
 
@@ -19,13 +20,18 @@ cleaned up since and it is gitignored, so this file is the current reference.
 **Dashboard settings, not code.** Quick, free, and two of them decide numbers that
 get published. Record each answer here as it is confirmed.
 
-- [ ] **Set the Connect pricing model to "Stripe handles pricing"** (§3.4). Stripe
+- [x] **Set the Connect pricing model to "Stripe handles pricing"** (§3.4). Stripe
       bills the connected account for processing; the platform incurs no account
       fee, no payout volume fee and no per-payout fee. This is the decision the fee
       structure now rests on — confirm it is actually applied, not just intended.
-- [ ] Verify on a Stripe invoice that **no** CA$2 monthly active account line and
-      **no** per-payout fees are being charged. If they are, the model is not set
-      and §3.1, §3.3 and §6.3 all need revisiting.
+      *Confirmed 2026-09-22 directly with Stripe support (launch-scope.md §9.2):
+      under Stripe-handles-pricing with Express + direct charges, the platform
+      incurs none of the account/payout/tax-reporting fees. No live payments have
+      run yet, so this was confirmed by asking support rather than reading an
+      invoice that would show nothing either way.*
+- [x] ~~Verify on a Stripe invoice that no CA$2 monthly active account line and no
+      per-payout fees are being charged.~~ Superseded by the direct support
+      confirmation above — there is no invoice data yet to read (no live traffic).
 - [ ] Confirm the creator's connected account is being debited for the 2.9% +
       CA$0.30, which is what makes Fee Schedule §5 true as published.
 - [ ] Check whether the platform qualifies for Stripe's **revenue share** under this
@@ -135,47 +141,156 @@ these hold, and two of them were verified directly against the code.
       `src/domain/tests/checkoutPolicyVersionsSync.test.ts` failing loudly if they
       drift. `api/policyAcceptanceGuard.js` holds the pure missing-policy logic and
       is the first server-side test coverage in `api/`.
-- [ ] Recompute the base, fees and recipient server-side from authoritative rows,
-      the currency registry and the monthly-minimum state, rather than trusting the
-      stored ledger values. This matters more once fees vary by currency and month.
-- [ ] Restrict or remove the `admin_confirm_*_payment` RPCs and their admin UI
-      entry points. They mark money received without verifying it moved, and once
-      refunds exist they can leave a schedule satisfied against a refunded payment.
-      If they survive, they are an audited named exception, labelled as break-glass.
-- [ ] Handle out-of-order and duplicate webhook delivery explicitly. Stripe
-      guarantees neither. Reconcile against current Stripe object state rather than
-      trusting the event payload alone.
-- [ ] Decide where `api/server.js` runs in production (§11.1). Static hosting does
-      not run Express, and the Connect webhook needs a real HTTPS origin preserving
-      the **raw body** for signature verification. This gates registering the webhook
-      endpoint at all.
-- [ ] Idempotently reserve a schedule item against concurrent checkout attempts.
+- [x] Recompute the base, fees and recipient server-side from authoritative rows,
+      rather than trusting the stored ledger values.
+      `recompute_listing_request_payment_amounts(payment_id)`
+      (`supabase/migrations/20260922_120_recompute_payment_amounts_at_checkout.sql`)
+      mirrors `ensure_listing_request_payment_for_schedule_item`'s arithmetic,
+      called from `POST /api/stripe/checkout/session` before Checkout opens.
+      Self-heals drift on a `requires_checkout`/`checkout_opened` payment
+      (clearing a stale open session's id if one existed), raises on a
+      recipient mismatch, no-ops for `one_time`/settled payments. Verified live
+      via `apply_migration` + `begin; ... rollback;`: corrupted amounts healed
+      back to the schedule item's true value, a stale `checkout_opened` session
+      was cleared, a payer/creator mismatch raised. The currency-registry and
+      monthly-minimum recomputation this item originally named doesn't apply
+      yet — neither exists (Sprint 1/2); this closes the gap that exists today.
+- [x] Restrict the `admin_confirm_*_payment` RPCs — kept, not removed (removing
+      would delete a working, tested admin UI built for a real reconciliation
+      need). All four now refuse if `listing_request_payments` already has a
+      `paid`/`refunded`/`partially_refunded`/`disputed` row for the schedule item
+      they'd confirm, closing the exact "leave a schedule satisfied against a
+      refunded payment" danger this item names. Each now also posts a system
+      message that explicitly says the confirmation was manual and bypassed
+      Stripe — the "labelled as break-glass" half — instead of reading like an
+      ordinary automated confirmation.
+      (`supabase/migrations/20260922_121_restrict_admin_confirm_payment_rpcs.sql`)
+      **Found and fixed in the same migration:** the milestone-payment RPC
+      (`admin_confirm_listing_request_milestone_payment`, 20260618_101) called
+      `public.is_admin()`, which has never existed in this database — confirmed
+      via `pg_proc`/`pg_namespace`. Every call to it has failed with "function
+      public.is_admin() does not exist" since it was created; it has never
+      worked. Fixed to call the real function, `public.is_admin_user(uuid)`
+      (20260429_032). Verified live in a `begin; ... rollback;` transaction:
+      the new guard correctly refuses against a `paid` row, and a clean
+      confirmation now runs end to end (it previously could not have, at all).
+- [x] Handle out-of-order and duplicate webhook delivery explicitly.
+      **Duplicate delivery** of the same Stripe event id was already handled
+      (`recordStripeWebhookEventStart`'s `stripe_event_ids` dedup) and remains so.
+      **Out-of-order delivery** across different event types: audited every
+      status-writing handler — `markListingRequestPaymentProcessingFromCheckoutSession`,
+      `markListingRequestPaymentPaidFromCheckoutSession`,
+      `markListingRequestPaymentCancelledFromCheckoutSession`,
+      `markListingRequestPaymentFailedFromPaymentIntent` — all already guard
+      `if (payment.status === "paid") return` (or an equivalent check) before
+      writing, so a late-arriving `checkout.session.expired` or
+      `payment_intent.payment_failed` cannot regress an already-paid payment
+      regardless of arrival order. The one real gap was `charge.refunded` /
+      `charge.dispute.*`, previously not handled at all; the new handlers
+      added for charge traceability (above) are themselves designed to be
+      order-safe — charge-id-first lookup with a metadata fallback specifically
+      so a refund event arriving *before* `checkout.session.completed` still
+      finds the right payment, and neither ever writes `status`. Live re-fetch
+      of the PaymentIntent for the charge/application-fee ids (rather than
+      trusting the webhook payload) is the "reconcile against current Stripe
+      object state" half for the one thing the payload doesn't carry; the
+      `payment_status` field itself is not re-fetched, since Stripe's own
+      guidance treats that field on `checkout.session.completed` as
+      authoritative as delivered.
+- [ ] Decide where `api/server.js` runs in production (§11.1). **Decided
+      2026-09-22: Docker.** Static hosting does not run Express, and the
+      Connect webhook needs a real HTTPS origin preserving the **raw body**
+      for signature verification. This gates registering the webhook endpoint
+      at all. **Held, explicitly, per the user:** offered to build it this
+      session once it turned out to have no technical dependency on the
+      fee-payer item below (that turned out to be a business decision, not a
+      config step) — the user chose to hold Docker until that direction is
+      settled rather than build it now. Not started. Next session should
+      re-offer rather than assume the answer is still the same.
+- [x] **Resolved, and it's not a code fix.** `controller.fees.payer` on Express
+      accounts (§3.2): confirmed live against Stripe's real API (2026-09-22)
+      that Express accounts *require* `fees.payer: "application"` — the
+      platform is billed Stripe's 2.9%+0.30 per charge, and Stripe rejects
+      setting it to `"account"` outright ("your platform must collect fees
+      and be liable for negative balances or refunds and chargebacks"). A
+      code change was attempted (`controller: { fees: { payer: "account" } }`
+      on both `accounts.create()` calls), tested against Stripe's test API,
+      found to break account creation entirely, and **reverted** — both calls
+      in `api/server.js` are back to not setting `controller` at all, with a
+      comment explaining why. **This is now §9.1/§9.2's open item 2: a
+      business/architecture decision** (absorb the fee under Express, or scope
+      a move to Custom accounts), not an engineering task. §3.1/§3.3/§3.4 need
+      a real rework once that's decided — not touched in this session.
+- [x] Idempotently reserve a schedule item against concurrent checkout attempts.
+      Already satisfied, not newly built: `20260905_110` created
+      `listing_request_payments_payment_schedule_item_idx`, a unique index on
+      `payment_schedule_item_id` where not null, specifically so
+      `ensure_listing_request_payment_for_schedule_item`'s `on conflict do
+      nothing` + re-select has a real conflict target. Confirmed live via
+      `pg_indexes` that the index still exists and is unique. No new migration
+      needed for this item.
 
 Two prerequisites for refunds. The hold keeps the money available so most refunds
 never need platform funding; the charge handle is what a refund is issued against.
 
 **Payout hold (§6.3)**
 
-- [ ] Change `createStripeConnectAccount` from
-      `settings.payouts.schedule.interval = "manual"` to **`daily` with
-      `delay_days: 14`** (§6.3). Model A removes the per-payout fee that made
-      weekly cheaper, so `daily` wins on creator experience and is the
-      configuration `delay_days` is designed for.
+- [x] Set an explicit `daily` / `delay_days: 14` payout schedule on **both**
+      account-creation paths in `api/server.js` — `createStripeConnectAccount`
+      (dead `/connect/start` route, previously `manual`) and
+      `getOrCreateStripeAccountForEmbeddedConnect` (the live embedded-onboarding
+      path the product actually uses, which previously set **no schedule at
+      all**). §6.3 has the full correction — the "accidental manual hold" this
+      item's original wording assumed was never true for real creators.
+- [ ] **Follow-up, not done here:** one existing connected account
+      (`creator_payment_accounts`, `charges_enabled = false`) was created before
+      this fix, with no explicit schedule. It needs a one-time
+      `stripe.accounts.update(id, { settings: { payouts: { schedule: { interval:
+      "daily", delay_days: 14 } } } })` once confirmed which Stripe mode
+      (test/live) it belongs to. Not run in this session — deliberately left for
+      the user to confirm mode and run, rather than an agent mutating a Stripe
+      account's live settings unprompted.
 
 **Charge traceability**
 
-- [ ] Populate `stripe_charge_id` and `stripe_application_fee_id` on the paid path in
+- [x] Populate `stripe_charge_id` and `stripe_application_fee_id` on the paid path in
       `markListingRequestPaymentPaidFromCheckoutSession`, through the same
-      cross-checks the webhook already runs.
-- [ ] Backfill both columns for existing `paid` rows from Stripe.
-- [ ] Handle `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed`
-      in `processStripeWebhookEvent` — at this stage recording them against the
-      payment and surfacing them, reusing the `stripe_event_ids` idempotency
-      pattern. No status writes yet.
-- [ ] Admin surface listing disputes and out-of-band refunds, replacing the manual
-      `ignored`-events query in `REF-002`.
-- [ ] Playbook: rewrite `payments/refunds-and-disputes.md` — `REF-002` and `REF-003`
-      lose their "no trace but an ignored row" framing.
+      cross-checks the webhook already runs. Fetched live from the PaymentIntent's
+      expanded `latest_charge` (`getChargeDetailsFromPaymentIntent`) since neither
+      id is present on the Checkout Session or PaymentIntent webhook payload
+      itself. Self-heals via `backfillChargeDetailsForPayment` when a `paid`
+      payment missing its charge id is retried through the "downstream workflow
+      failed" branch.
+- [ ] **Bulk-backfill both columns for existing `paid` rows from Stripe.** Not run
+      in this session — there are zero `paid` rows as of 2026-09-22 (no live
+      traffic), so there is nothing to backfill yet. Write and run this before the
+      first real payment lands under the pre-fix code, not after
+      (docs/support/payments/refunds-and-disputes.md Known gaps).
+- [x] Handle `charge.refunded`, `charge.dispute.created` and `charge.dispute.closed`
+      in `processStripeWebhookEvent` — recording them against the payment
+      (`stripe_refund_id`/`refunded_at`, `stripe_dispute_id`/`disputed_at`) and
+      reusing the `stripe_event_ids` idempotency pattern. No status writes, as
+      specified — `status` still requires the Sprint 5 refund ledger to derive
+      correctly. Lookup is charge-id-first with a metadata fallback specifically
+      so a `charge.refunded` arriving before `checkout.session.completed` (Stripe
+      does not guarantee order) still finds the right payment.
+- [x] Admin surface listing disputes and out-of-band refunds, replacing the manual
+      query in `REF-002`/`REF-003`. New page `/admin/payment-issues`
+      (`src/pages/admin/AdminPaymentIssues.tsx`, hook
+      `src/hooks/admin/useAdminPaymentIssues.ts`), linked from the admin
+      dashboard and routed in `App.tsx` inside the existing
+      `RequireAdminAccess` block — no new RLS needed, the existing "listing
+      request payments participants read" policy already grants admins
+      (`admin_roles` membership) `SELECT` on every row. Filters by
+      disputed/refunded/all, and explicitly calls out per-row when `status`
+      still reads `paid` despite a recorded refund or dispute, since that
+      divergence is the actual thing this page exists to surface. Tests added
+      (`src/pages/tests/AdminPaymentIssues.test.tsx`).
+- [x] Playbook: rewrite `payments/refunds-and-disputes.md` — `REF-002` and `REF-003`
+      lose their "no trace but an ignored row" framing; they now query the payment
+      row's own new columns. A new gap replaces it: `status` still says `paid`
+      after a recorded refund or dispute, and that divergence is what's now
+      documented as the operational risk.
 
 ---
 

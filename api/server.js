@@ -382,6 +382,40 @@ const getNextStripeEventIds = (payment, eventId) =>
     ]),
   );
 
+// The Checkout Session and PaymentIntent webhook payloads carry a payment
+// intent id but not the charge or application fee ids -- those live on the
+// Charge, which has to be fetched separately. Retrieved once per paid event,
+// on the connected account the charge actually belongs to.
+const getChargeDetailsFromPaymentIntent = async ({
+  stripeClient,
+  paymentIntentId,
+  stripeAccountId,
+}) => {
+  if (!paymentIntentId) {
+    return { chargeId: null, applicationFeeId: null };
+  }
+
+  const paymentIntent = await stripeClient.paymentIntents.retrieve(
+    paymentIntentId,
+    { expand: ["latest_charge"] },
+    stripeAccountId ? { stripeAccount: stripeAccountId } : undefined,
+  );
+
+  const charge = paymentIntent.latest_charge;
+
+  const chargeId =
+    typeof charge === "string" ? charge : charge?.id || null;
+
+  const applicationFeeId =
+    charge && typeof charge === "object"
+      ? typeof charge.application_fee === "string"
+        ? charge.application_fee
+        : charge.application_fee?.id || null
+      : null;
+
+  return { chargeId, applicationFeeId };
+};
+
 // Record every webhook before applying any business logic.
 // Failed events remain retryable if Stripe sends them again.
 const recordStripeWebhookEventStart = async (event) => {
@@ -536,6 +570,8 @@ const getPaymentWithStripeEventIds = async (paymentId) => {
       stripe_connected_account_id,
       stripe_checkout_session_id,
       stripe_payment_intent_id,
+      stripe_charge_id,
+      stripe_application_fee_id,
       paid_at
     `,
     )
@@ -698,8 +734,17 @@ const markListingRequestPaymentPaidFromCheckoutSession =
     }
 
     // The payment may already have been saved as paid while a
-    // downstream workflow RPC failed. Retry that workflow here.
+    // downstream workflow RPC failed. Retry that workflow, and backfill
+    // the charge handle if an earlier attempt landed before it was added.
     if (payment.status === "paid") {
+      if (!payment.stripe_charge_id) {
+        await backfillChargeDetailsForPayment({
+          payment,
+          connectedAccountId,
+          paymentIntentId,
+        });
+      }
+
       await applyPaidListingRequestPaymentWorkflow({
         paymentId: payment.id,
         paymentType: payment.payment_type,
@@ -708,20 +753,34 @@ const markListingRequestPaymentPaidFromCheckoutSession =
       return;
     }
 
+    const stripeAccountId =
+      payment.stripe_connected_account_id || connectedAccountId;
+
+    const { chargeId, applicationFeeId } =
+      await getChargeDetailsFromPaymentIntent({
+        stripeClient: requireStripe(),
+        paymentIntentId,
+        stripeAccountId,
+      });
+
     const { error } = await supabaseAdmin
       .from("listing_request_payments")
       .update({
         status: "paid",
 
-        stripe_connected_account_id:
-          payment.stripe_connected_account_id ||
-          connectedAccountId,
+        stripe_connected_account_id: stripeAccountId,
 
         stripe_checkout_session_id: session.id,
 
         stripe_payment_intent_id:
           payment.stripe_payment_intent_id ||
           paymentIntentId,
+
+        stripe_charge_id:
+          payment.stripe_charge_id || chargeId,
+
+        stripe_application_fee_id:
+          payment.stripe_application_fee_id || applicationFeeId,
 
         stripe_event_ids: getNextStripeEventIds(
           payment,
@@ -745,6 +804,47 @@ const markListingRequestPaymentPaidFromCheckoutSession =
       paymentType: payment.payment_type,
     });
   };
+
+// A paid payment whose charge handle never got recorded -- an earlier
+// webhook attempt that landed before this column was populated, or one
+// that raced with a failure between the two writes. Never regresses
+// paid_at, status or any other column; only fills the two Stripe ids.
+const backfillChargeDetailsForPayment = async ({
+  payment,
+  connectedAccountId,
+  paymentIntentId,
+}) => {
+  const stripeAccountId =
+    payment.stripe_connected_account_id || connectedAccountId;
+
+  const effectivePaymentIntentId =
+    payment.stripe_payment_intent_id || paymentIntentId;
+
+  const { chargeId, applicationFeeId } =
+    await getChargeDetailsFromPaymentIntent({
+      stripeClient: requireStripe(),
+      paymentIntentId: effectivePaymentIntentId,
+      stripeAccountId,
+    });
+
+  if (!chargeId) {
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("listing_request_payments")
+    .update({
+      stripe_charge_id: chargeId,
+      stripe_application_fee_id: applicationFeeId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", payment.id)
+    .is("stripe_charge_id", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
 
 const markListingRequestPaymentCancelledFromCheckoutSession =
   async ({ session, event }) => {
@@ -841,6 +941,161 @@ const markListingRequestPaymentFailedFromPaymentIntent =
     }
   };
 
+// Look up the internal payment row a Charge or Dispute webhook event is
+// about. Charges created from a PaymentIntent inherit its metadata, so the
+// same creatorhub_payment_id lookup used everywhere else usually works --
+// but a charge.refunded can arrive before checkout.session.completed has
+// had a chance to record stripe_charge_id on our row (Stripe does not
+// guarantee event order), so this also matches on the charge id itself for
+// any row that already has it.
+const getPaymentForStripeChargeEvent = async (chargeObjectOrId) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const chargeId =
+    typeof chargeObjectOrId === "string"
+      ? chargeObjectOrId
+      : chargeObjectOrId?.id || null;
+
+  const selectColumns = `
+    id,
+    payment_type,
+    status,
+    stripe_event_ids,
+    stripe_refund_id,
+    stripe_dispute_id,
+    refunded_at,
+    disputed_at
+  `;
+
+  if (chargeId) {
+    const { data, error } = await supabaseAdmin
+      .from("listing_request_payments")
+      .select(selectColumns)
+      .eq("stripe_charge_id", chargeId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (data) {
+      return data;
+    }
+  }
+
+  const paymentId =
+    typeof chargeObjectOrId === "object"
+      ? getPaymentIdFromStripeObject(chargeObjectOrId)
+      : "";
+
+  if (!paymentId) {
+    return null;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("listing_request_payments")
+    .select(selectColumns)
+    .eq("id", paymentId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+};
+
+// Recording only -- no status write. Refunds and disputes get a real,
+// derived status once the refund ledger lands (launch-scope.md section 6);
+// until then this just makes the fact visible on the payment row instead of
+// falling through processStripeWebhookEvent as "ignored" the way it does
+// today, which is the launch-blocking gap section 6 opens with.
+const recordChargeRefundedFromWebhook = async ({ charge, event }) => {
+  const payment = await getPaymentForStripeChargeEvent(charge);
+
+  if (!payment) {
+    return;
+  }
+
+  if ((payment.stripe_event_ids || []).includes(event.id)) {
+    return;
+  }
+
+  const latestRefundId =
+    charge.refunds?.data?.[0]?.id || payment.stripe_refund_id || null;
+
+  const { error } = await supabaseAdmin
+    .from("listing_request_payments")
+    .update({
+      stripe_refund_id: latestRefundId,
+      refunded_at: payment.refunded_at || getStripeEventTimestamp(event),
+      stripe_event_ids: getNextStripeEventIds(payment, event.id),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", payment.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+const recordChargeDisputeCreatedFromWebhook = async ({ dispute, event }) => {
+  const payment = await getPaymentForStripeChargeEvent(dispute.charge);
+
+  if (!payment) {
+    return;
+  }
+
+  if ((payment.stripe_event_ids || []).includes(event.id)) {
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("listing_request_payments")
+    .update({
+      stripe_dispute_id: dispute.id,
+      disputed_at: payment.disputed_at || getStripeEventTimestamp(event),
+      stripe_event_ids: getNextStripeEventIds(payment, event.id),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", payment.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+// Closed just records that the event was seen -- launch-scope.md section 6.1
+// scopes automated dispute response as out, and the outcome (won/lost, any
+// refund already issued) is read live from Stripe on the admin surface
+// rather than mirrored into a column here, so there is nothing derived to
+// get out of step in the meantime.
+const recordChargeDisputeClosedFromWebhook = async ({ dispute, event }) => {
+  const payment = await getPaymentForStripeChargeEvent(dispute.charge);
+
+  if (!payment) {
+    return;
+  }
+
+  if ((payment.stripe_event_ids || []).includes(event.id)) {
+    return;
+  }
+
+  const { error } = await supabaseAdmin
+    .from("listing_request_payments")
+    .update({
+      stripe_event_ids: getNextStripeEventIds(payment, event.id),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", payment.id);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
 const processStripeWebhookEvent = async (event) => {
   const stripeObject = event.data.object;
 
@@ -888,6 +1143,33 @@ const processStripeWebhookEvent = async (event) => {
   if (event.type === "payment_intent.payment_failed") {
     await markListingRequestPaymentFailedFromPaymentIntent({
       paymentIntent: stripeObject,
+      event,
+    });
+
+    return "processed";
+  }
+
+  if (event.type === "charge.refunded") {
+    await recordChargeRefundedFromWebhook({
+      charge: stripeObject,
+      event,
+    });
+
+    return "processed";
+  }
+
+  if (event.type === "charge.dispute.created") {
+    await recordChargeDisputeCreatedFromWebhook({
+      dispute: stripeObject,
+      event,
+    });
+
+    return "processed";
+  }
+
+  if (event.type === "charge.dispute.closed") {
+    await recordChargeDisputeClosedFromWebhook({
+      dispute: stripeObject,
       event,
     });
 
@@ -1028,10 +1310,18 @@ const createStripeConnectAccount = async ({
     metadata: {
       creatorhub_user_id: userId,
     },
+    // Do NOT set controller.fees.payer here. Confirmed live against Stripe's
+    // API (2026-09-22): for an Express account, Stripe rejects fees.payer =
+    // "account" outright -- "your platform must collect fees and be liable
+    // for negative balances or refunds and chargebacks." Express accounts
+    // require the platform to bear Stripe's processing fee; there is no
+    // account-creation parameter that shifts it to the creator. See
+    // launch-scope.md section 3.2 for what this means for the fee model.
     settings: {
       payouts: {
         schedule: {
-          interval: "manual",
+          interval: "daily",
+          delay_days: 14,
         },
       },
     },
@@ -1073,56 +1363,6 @@ const getCheckoutReturnUrl = (paymentId) =>
   `${APP_ORIGIN}${STRIPE_CHECKOUT_RETURN_PATH}?payment_id=${encodeURIComponent(
     paymentId,
   )}&session_id={CHECKOUT_SESSION_ID}`;
-
-const getListingRequestPaymentForCheckout = async (paymentId) => {
-  if (!supabaseAdmin) {
-    throw new Error("Supabase admin not configured");
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("listing_request_payments")
-    .select(
-      `
-      id,
-      listing_request_id,
-      related_entity_type,
-      related_entity_id,
-      payment_type,
-      status,
-      currency,
-      base_amount_cents,
-      creator_tip_cents,
-      buyer_service_fee_cents,
-      creator_platform_fee_cents,
-      platform_support_cents,
-      application_fee_cents,
-      total_checkout_cents,
-      buyer_service_fee_bps,
-      creator_platform_fee_bps,
-      buyer_service_fee_minimum_cents,
-      creator_platform_fee_minimum_cents,
-      payer_user_id,
-      creator_user_id,
-      stripe_connected_account_id,
-      stripe_checkout_session_id,
-      metadata,
-      created_at,
-      updated_at
-    `,
-    )
-    .eq("id", paymentId)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  if (!data?.id) {
-    throw new Error("Payment record was not found.");
-  }
-
-  return data;
-};
 
 const getReadyCreatorPaymentAccount = async (creatorUserId) => {
   if (!supabaseAdmin) {
@@ -1339,6 +1579,17 @@ const getOrCreateStripeAccountForEmbeddedConnect = async ({
     },
     metadata: {
       creatorhub_user_id: userId,
+    },
+    // Do NOT set controller.fees.payer here -- see the sibling
+    // accounts.create call in createStripeConnectAccount for why: Stripe
+    // rejects fees.payer = "account" for an Express account outright.
+    settings: {
+      payouts: {
+        schedule: {
+          interval: "daily",
+          delay_days: 14,
+        },
+      },
     },
   });
 
@@ -1798,7 +2049,19 @@ app.post("/api/stripe/checkout/session", async (req, res) => {
       return res.status(400).json({ error: "paymentId is required." });
     }
 
-    const payment = await getListingRequestPaymentForCheckout(paymentId);
+    // Re-derive base, fees and total from the schedule item and agreement
+    // this payment was created from, rather than trusting whatever the row
+    // currently says. Self-heals drift when found; raises if the recipient
+    // does not match the agreement (launch-scope.md section 11). Also doubles
+    // as the existence check for paymentId.
+    const { data: payment, error: recomputeError } = await supabaseAdmin.rpc(
+      "recompute_listing_request_payment_amounts",
+      { p_payment_id: paymentId },
+    );
+
+    if (recomputeError) {
+      throw new Error(recomputeError.message);
+    }
 
     assertCheckoutPaymentCanBeOpened({ payment, userId });
     await assertCheckoutPoliciesAccepted({ payment, userId });
