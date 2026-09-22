@@ -32,3 +32,6 @@ dist-ssr
 Claude outputs/
 claude/
 AGENTS.md
+
+# Supabase CLI scratch
+supabase/.temp/
