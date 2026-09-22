@@ -291,66 +291,43 @@ domestic card transaction**, charged on the *whole amount charged* — base plus
 fee plus any tip — not on the base alone. International cards and currency
 conversion add more.
 
-**Correction (2026-09-22), now confirmed rather than assumed — and the news is
-bad.** An earlier version of this section, and the brief this sprint started
-from, treated "direct charges on an Express account" as sufficient on its own
-to put this cost on the creator. It is not, and worse: **it cannot be made
-true while the platform uses Express accounts at all.**
+**Resolved 2026-09-22 — the creator does bear this, but not the way the
+product was built.** This went through three stages the same day, worth
+keeping for the record:
 
-What was checked, in order:
+1. **Assumed correct.** "Direct charges on an Express account" was treated as
+   sufficient on its own to put this on the creator.
+2. **Found wrong.** Retrieved the one existing connected account live: it was
+   created via the **old Accounts v1 API** (`stripeClient.accounts.create({
+   type: "express" })`), and Express accounts turn out to **require** the
+   platform to be the fee payer — confirmed by Stripe rejecting
+   `controller.fees.payer: "account"` outright for a v1 Express account:
+   *"your platform must collect fees and be liable for negative balances or
+   refunds and chargebacks."* There is no v1 setting that moves this to the
+   creator.
+3. **Fixed by migrating to Accounts v2.** The platform's own Connect settings
+   (Dashboard → Settings → Connect → Platform setup) were already configured
+   for **Accounts v2** with `defaults.responsibilities.fees_collector:
+   "stripe"` — the v2-native way of putting Stripe's processing fee on the
+   connected account. The code just wasn't creating v2 accounts. Rewrote
+   `api/server.js`'s account creation (`getOrCreateStripeAccountForEmbeddedConnect`)
+   to call `stripeClient.v2.core.accounts.create()` with
+   `fees_collector: "stripe"` / `losses_collector: "stripe"` / `dashboard:
+   "none"`, matching the platform config exactly. Verified live, end to end,
+   against Stripe's test API before trusting it: account creation, capability
+   status reads (`configuration.merchant.capabilities.card_payments.status`),
+   and — critically — that a **direct charge with `application_fee_amount`
+   still works unchanged** against a v2 account via the same `Stripe-Account`
+   header pattern every other Stripe call in this codebase already uses. The
+   old v1-only `/api/stripe/connect/start` route and its helpers were removed
+   as dead code in the same pass (zero callers, confirmed by grep).
 
-1. Retrieved the one existing connected account live from Stripe:
-   `controller.fees.payer` reads `"application_express"` — the platform is
-   billed, not the creator. Neither `accounts.create()` call in
-   `api/server.js` ever set `controller` or `fees_collector`, so every
-   account created so far got this by default, unconfigured.
-2. Attempted the fix Stripe support described — setting
-   `controller.fees.payer: "account"` explicitly at account creation — against
-   Stripe's real API in test mode. **Rejected**, because `type: "express"` and
-   `controller` cannot be passed together at all.
-3. Retried using `controller` alone (the account-creation shape Express
-   accounts actually resolve to underneath `type: "express"`, matching the
-   `controller` object read back in step 1) with `fees.payer: "account"`.
-   **Rejected again**, with Stripe's own validation message: *"When
-   `stripe_dashboard[type]=express`, your platform must collect fees and be
-   liable for negative balances or refunds and chargebacks."*
-4. Confirmed the platform-pays direction (`fees.payer: "application"`) is
-   accepted for an Express account, isolating the rejection to specifically
-   the creator-pays direction.
+**What this means for §3.3/§3.4:** the "clean 10%, no Stripe cost to the
+platform" framing is now actually true, as built — not just assumed. No
+numbers below need reworking.
 
-**So this is not a missing setting. It is a hard constraint of the Express
-account type**: Stripe requires the platform to be the fee payer for every
-Express-dashboard connected account, with no per-account override. The
-platform is, right now, paying the 2.9%+CA$0.30 on every charge that goes
-through — the opposite of what this section, §3.1, §3.3 and §3.4 all assume,
-and there is no code fix available while account type stays Express.
-
-**What would change it:** moving off Express accounts — most plausibly to
-Custom accounts, which do allow `fees.payer: "account"`. That is not a
-configuration change; Custom accounts have no Stripe-hosted dashboard, so the
-platform would own building whatever onboarding, payout and tax-information UI
-Express currently gets for free. This is a real architectural decision, not a
-Sprint 3 fix, and it is not made here — see §9.1/§9.2.
-
-**What this means for the numbers below and in §3.3/§3.4:** every one of them
-currently overstates Made for Stream's net by roughly the 2.9%+CA$0.30 per
-charge the platform is actually absorbing. On the CAD 100 example two
-paragraphs down, that is closer to 6.65 net (10.00 minus the 3.35 Stripe
-takes) than the "clean 10%" §3.3 currently states. **These sections need a
-real rework once a direction is chosen, not a numbers patch** — deliberately
-left unrevised rather than guessed at here.
-
-**One thing this does *not* resolve, flagged rather than assumed:** how this
-interacts with the separate "Stripe handles pricing" vs "you handle pricing"
-Connect-level choice in §3.4 (which governs the platform-level CA$2
-monthly-account and per-payout fees, confirmed absent under "Stripe handles
-pricing" earlier this same session). `controller.fees.payer` and that
-platform-level pricing model read as two different Stripe mechanisms, and
-nothing tested here confirms whether they compose independently or whether
-Express's forced `fees.payer: "application"` changes what "Stripe handles
-pricing" actually bills the platform for. Worth a direct question to Stripe
-support before trusting a combined number, rather than assuming the two
-findings simply add together.
+**One real cost of the fix, not a numbers problem:** the 14-day payout hold
+(§6.3) does not survive this migration unchanged. See §6.3's own correction.
 
 On a CAD 100 commission that is 2.9% × 105.00 + 0.30 = **3.35**, so the creator's
 total cost is 8.35 (5.00 to us, 3.35 to Stripe) while the buyer's is 5.00.
@@ -750,49 +727,65 @@ taken from funds that are still there.**
 This is the right first move, and it is more urgent than an earlier draft of this
 section believed.
 
-**Correction (2026-09-22): the "accidental manual hold" this section originally
-described does not cover the account-creation path the product actually uses.**
-There are two account-creation code paths in `api/server.js`:
+**Correction, superseded twice on 2026-09-22 — read this instead of the
+"14 days" decision line above.**
 
-| Path | Route | Sets a payout schedule? | Reachable from the product? |
-| --- | --- | --- | --- |
-| `createStripeConnectAccount` | `POST /api/stripe/connect/start` | Was `manual` | **No.** Nothing in `src/` calls this route — `useStripeConnectOnboarding.ts` defines request/response types for it but never wires up a mutation that calls it. Documented in `connect-onboarding.md` as a live surface; it is not. |
-| `getOrCreateStripeAccountForEmbeddedConnect` | `POST /api/stripe/connect/account-session` | Was **unset** | **Yes.** This is what `useStripeConnectAccountSession.ts` calls, and it is what every creator who has onboarded through Profile Settings' embedded flow actually went through. |
+**First finding:** the account-creation path every real creator actually went
+through (`getOrCreateStripeAccountForEmbeddedConnect`, live behind
+`POST /api/stripe/connect/account-session`) set **no payout schedule at all**.
+The dead `/connect/start` route (confirmed zero callers) was the only one that
+set `manual`. So any creator who onboarded before this session had payout
+timing on whatever Stripe's unconfigured default was — not the "safe
+accidental hold" this section originally assumed.
 
-So the account every real creator has is one Stripe created with **no explicit
-payout schedule at all** — not the disclosed-as-safe `manual` hold this section
-described. Depending on the platform's own Connect payout defaults (Settings →
-Connect → Payouts in the Stripe Dashboard, not verified here), that account may
-already be paying out automatically on whatever cadence Stripe defaults to,
-with **no hold whatsoever**. That is a real gap, not a documentation error with
-no consequence: if any creator has already onboarded live, their payout timing
-today is whatever Stripe's platform default is, unconfirmed, not the safe
-"accidental indefinite hold" this section previously assumed.
+**Second finding, on top of the first:** fixing that turned out to require
+migrating account creation to **Accounts v2** (§3.2's correction has the full
+story — the fee-payer fix and this one landed together, same root cause: the
+product was still creating v1 Express accounts). For v2 accounts, payout
+scheduling is not part of account creation at all — it is a **separate
+Balance Settings resource** (`stripeClient.balanceSettings.update(...)`,
+called with the account's own `Stripe-Account` header), and it draws a hard
+line the old `settings.payouts.schedule.delay_days` parameter never did:
+**`settlement_timing.delay_days_override` can only be changed on accounts
+where the platform itself owns fraud/dispute liability.** This platform's
+`losses_collector` is `"stripe"` — Stripe owns it, deliberately, for lower
+platform risk (§3.2) — so `delay_days_override` is rejected outright.
+Confirmed live: attempting it returns *"You cannot change
+`payments[settlement_timing][delay_days]` via API once an account has been
+activated."* Setting `interval: "daily"` alone is accepted; the delay itself
+cannot be pushed to 14.
 
-**Fixed alongside this decision**, both paths now set the same explicit
-schedule rather than one of them setting `manual` and the other setting nothing.
-The dead `/connect/start` path is left in place (documented, unreachable, now
-consistent) rather than removed in this pass — deleting it is a separate,
-smaller cleanup, tracked outside Sprint 3.
+**So the 14-day figure in this section's decision line does not hold, and
+nothing in this codebase can make it hold without also taking on the
+liability tradeoff described in §3.2.** What was actually built and verified
+live: `interval: "daily"`, delay left at Stripe's own default —
+**confirmed 7 days** on a Canadian test account, read back from the real
+Balance Settings response. That number is Stripe's default for this country
+in test mode, not a value this product chose or can currently guarantee
+across countries or in live mode; treat "7" as observed, not promised, and
+re-verify in live mode before publishing a number in the fee schedule.
 
-**Implementation:** set the schedule explicitly to **`daily` with
-`delay_days: 14`** on both account-creation paths (§6.3 above), rather than
-leaving the live path unset. Stripe then makes funds available 14 days after
-settlement and pays out on its own. 14 exceeds every country's minimum `delay_days`, so one value
-works globally. No payout code of our own, and no escrow.
+**Decided 2026-09-22 (same session that found this): keep `losses_collector:
+"stripe"` and accept whatever default Stripe assigns**, rather than taking on
+platform liability just to control the exact number. The rest of this
+section's reasoning (why an explicit, automatic schedule beats the
+undocumented default it replaces; what it covers and doesn't) still holds —
+only the specific day count changes, from a guaranteed 14 to an observed,
+per-account, not-currently-overridable default.
 
-**This reverses an earlier decision, and the reason is worth recording.** An
-earlier draft chose `weekly`, because under Model B each payout costs CA$0.25 and
-daily payouts could reach CA$7.50 a month per creator. **Model A removes per-payout
-fees entirely** — Stripe's own wording is that platforms letting Stripe bill
-connected accounts directly "do not incur additional account, payout volume, tax
-reporting, or per-payout fees".
+**Implementation, as actually shipped:** `setStripeConnectDailyPayoutSchedule`
+in `api/server.js` sets `interval: "daily"` via Balance Settings immediately
+after v2 account creation. No `delay_days` override is attempted. No payout
+code of our own, and no escrow.
 
-With the cost gone, the argument reverses. `daily` is better for creators (money
-arrives the day it releases rather than waiting up to six more), it is the
-configuration `delay_days` is actually designed for, and it avoids the weekly-anchor
-uncertainty that would otherwise need checking against Stripe. Weekly was the right
-answer to a cost that no longer exists.
+**This reverses an earlier decision** (`weekly`, chosen when Model B's
+per-payout fee made `daily` expensive) **for a different reason than
+originally planned.** Model A removing the per-payout fee is still true and
+still the reason `daily` beats `weekly` on cost — but the *specific number*
+this section promised (14 days) was never achievable the way it was
+described. `daily` at Stripe's default delay is still better for creators
+than an undisclosed default would have been; it just isn't the guaranteed
+14-day figure published earlier in this document.
 
 **This is not escrow, and the policy stays accurate.** The funds sit in the
 creator's own Stripe balance and belong to them; only the transfer to their bank is
@@ -807,12 +800,15 @@ It covers the **most common refund by far**: a buyer cancels before substantive 
 starts and gets a full refund under Refund Policy §3. Those happen within days.
 
 It does **not** cover several real cases, and it is worth being precise about them
-rather than assuming the risk is gone:
+rather than assuming the risk is gone. (Table below still says "14-day hold" for
+the cases it was written against — re-read with the corrected, shorter,
+not-currently-overridable delay from above; the *shape* of what's covered
+doesn't change, only how many days of buffer it actually buys.)
 
-| Case | Typical timing | Covered by a 14-day hold? |
+| Case | Typical timing | Covered by the hold? |
 | --- | --- | --- |
 | Cancellation before work starts | Days | **Yes** |
-| Dissatisfaction reported after delivery | Within 14 days of delivery (Refund Policy §6) | Only if the delivery is within ~14 days of the payment |
+| Dissatisfaction reported after delivery | Within 14 days of delivery (Refund Policy §6) | Only if the delivery is within the hold's actual (shorter than 14-day) window of the payment — narrower than originally planned |
 | Milestone project cancelled mid-way | Weeks to months after the starting payment | **No** — that payment released long ago |
 | Final balance refunded after approval | After the hold | **No** |
 | Chargeback | **Up to 120 days**, longer for some reason codes | **No**, and nothing will |
@@ -824,13 +820,18 @@ irrelevant.
 
 **So the hold reduces how often we front money; it does not remove the need to be
 able to.** The recovery mechanism below stays — it just becomes the exception rather
-than the routine path.
+than the routine path, and covers a slightly wider range of cases than planned now
+that the buffer itself is shorter than 14 days.
 
-**One creator-experience note.** 14 days is in line with the market, so it is not a
-competitive problem. But it lands hardest on a brand-new creator waiting on their
-first payment. Worth revisiting later with a shorter hold for creators with a clean
-history — Stripe supports per-account schedules, so that is a later tuning knob, not
-a redesign.
+**One creator-experience note, revised.** The original "14 days is in line
+with the market" claim assumed a number this platform cannot currently
+guarantee (see the correction above) — do not repeat it in creator-facing
+copy until the real, live-mode delay is confirmed. Whatever it turns out to
+be, it still lands hardest on a brand-new creator waiting on their first
+payment, and per-account schedule tuning remains a later knob, not a redesign
+— though tightening it further is moot until the platform takes on liability
+(§3.2), and loosening it isn't ours to control either way under the current
+configuration.
 
 
 ### 6.4 Instant payouts — considered and not offered
@@ -1088,17 +1089,18 @@ in profile settings, which is the correct treatment.
 | `[SUPPORT_EMAIL]`, `[PRIVACY_EMAIL]`, `[DMCA_AGENT_EMAIL]` | **inbox@madeforstream.com** for all three |
 | Geographic scope | **Global** — every country Stripe Connect supports for creators, unrestricted for buyers (§1) |
 | Currency scope | **Any major currency**, through the registry, enabled in waves (§1.1, §1.3) |
-| Creator payouts | **Held 14 days** after the charge — the live account-creation path set no schedule at all before this, so this is a new, explicit hold rather than a replacement for a safe accidental one (§6.3) |
+| Creator payouts | **Automatic daily payout, delay at Stripe's default** (confirmed 7 days on a CA test account) — the live account-creation path set no schedule at all before this. A guaranteed 14-day figure was planned and found unachievable under this platform's liability configuration; see §6.3 (§6.3) |
 | Refund funding | **Made for Stream funds the refund**, then recovers from the creator in-app (§6.5) |
 | Creator with an outstanding balance | Listings **blocked from new requests**; existing projects continue and their payments are diverted to the balance (§6.5) |
 | Recovery rate | **50% of each base payment** (§6.6) |
-| Stripe Connect pricing model | **Model A — "Stripe handles pricing".** Confirmed: the platform pays no CA$2 monthly account fee and no per-payout fee. **Not confirmed, and now believed false:** "Stripe bills the creator's connected account" for processing — Express accounts structurally require `fees.payer: "application"`, so the platform currently pays the 2.9%+CA$0.30 per charge, not the creator. See §3.2's 2026-09-22 correction and §9.2 (§3.4) |
+| Stripe Connect pricing model | **Model A — "Stripe handles pricing", via Accounts v2.** Confirmed: the platform pays no CA$2 monthly account fee, no per-payout fee, and (as of the 2026-09-22 v1→v2 migration) no processing fee — `fees_collector: "stripe"` puts the 2.9%+CA$0.30 on the connected account, verified live. See §3.2 (§3.4) |
+| Accounts API version | **v2** (`stripeClient.v2.core.accounts`), not v1 `type: "express"`. Matches the platform's own already-configured Connect settings (`fees_collector`/`losses_collector: "stripe"`, `dashboard: "none"`). The v1-only `/api/stripe/connect/start` route was dead code (zero callers) and was removed in the same migration (§3.2, §11) |
 | Fee rates | **5% buyer and 5% creator.** The buyer fee pays for agreements, milestones, change orders, delivery records and a defined refund path — what the competition does not have (§3, §3.5) |
 | Fee minimums | **None on either side** — Model A removed the cost they offset, and they only took from creators on small commissions (§3.1) |
 | Instalment floor | **5.00**, now protecting the creator from Stripe's flat 0.30 rather than the platform from a loss (§3.1) |
 | Per-user fee waivers | **Foundation only.** Rates resolved per user with a recorded reason, locked at agreement acceptance as a ceiling (§3.5, §3.6) |
 | Splitting Stripe's 2.9% onto buyers | **No** — it worsens the buyer-facing price and reads as a card surcharge, which the EU and UK prohibit (§3.2) |
-| Payout schedule | **Daily with `delay_days: 14`** — Model A removes the per-payout fee that made weekly cheaper (§6.3) |
+| Payout schedule | **Daily, delay at Stripe's default (not overridable to 14 days under `losses_collector: "stripe"`)** — Model A still removes the per-payout fee that made weekly cheaper; the guaranteed-14-days part of the original decision did not survive the v1→v2 migration (§6.3) |
 | Instant payouts | **Not offered.** The hold is the protection; an instant payout sells a way around it (§6.4) |
 | Tips and platform contributions | **Built for launch**, shipping alongside refunds (§4) |
 | Transactional email | **Ships at launch**, on Cloudflare Email Service (§7.1) |
@@ -1129,27 +1131,24 @@ decisions:
    before the first EU sale, since EU VAT applies from the first euro with no
    small-seller threshold.
 
-2. **Now a business/architecture decision, not a fact-finding question —
-   resolved as "the platform pays," not fixable in place.** §3.2 was raised
-   and closed as "already correct" at the start of this sprint (creator
-   pays), reopened the same day by Stripe support, and then settled
-   conclusively against Stripe's real API (2026-09-22): Express accounts
-   **require** `fees.payer: "application"` — the platform is billed Stripe's
-   2.9%+CA$0.30 on every charge, and there is no per-account setting that
-   moves it to the creator while account type stays Express. The only lever
-   that changes this is moving off Express (most plausibly to Custom
-   accounts), which means the platform building its own onboarding, payout
-   and tax-info UI in place of Stripe's Express dashboard — a real project,
-   not a config change. **Open:** stay on Express and absorb the fee as a
-   platform cost (§3.3/§3.4 need reworking to that basis), or scope a move to
-   Custom accounts. Neither is decided here.
+**Resolved 2026-09-22 (same day, three stages — see §3.2 for the full
+account).** Whether the creator or the platform pays Stripe's 2.9%+CA$0.30.
+Closed as "creator pays, already correct," reopened by Stripe support, found
+to be structurally false under the v1 Express accounts the code was actually
+creating, and fixed for real by migrating account creation to Accounts v2
+(`fees_collector: "stripe"`), matching the platform's own already-configured
+Connect settings. Verified live that a direct charge with
+`application_fee_amount` still works unchanged against a v2 account. No
+Custom-accounts migration needed — that was the right question for a wrong
+diagnosis (Express's hard constraint), and it dissolved once the actual
+account API version was the thing that got fixed.
 
-3. **How `controller.fees.payer` and the "Stripe handles pricing" Connect
-   model interact** — flagged, not resolved, at the end of §3.2's correction.
-   Two different Stripe mechanisms were each confirmed independently this
-   session; nothing confirms whether they compose additively for a combined
-   cost figure. Ask Stripe support directly before publishing a number that
-   depends on both.
+**A real cost of that same fix, not a business decision either — see §6.3:**
+the 14-day payout hold cannot be guaranteed under this platform's
+`losses_collector: "stripe"` configuration. Decided the same day: keep
+`losses_collector: "stripe"` (lower platform risk) and accept Stripe's
+default delay instead of a guaranteed 14 days. Confirmed 7 days on a Canadian
+test account in test mode — not yet reconfirmed live or for other countries.
 
 **Resolved 2026-09-22.** Whether Connect's own platform-level fees ($2/month per
 active connected account, 0.25%+$0.25 per payout) are billed to the platform under

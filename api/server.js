@@ -104,12 +104,6 @@ const STRIPE_KEY_CONFIG = getStripeKeyConfig();
 const STRIPE_KEY_MODE = STRIPE_KEY_CONFIG.mode;
 const STRIPE_SECRET_KEY = STRIPE_KEY_CONFIG.secretKey;
 const STRIPE_WEBHOOK_SECRET = STRIPE_KEY_CONFIG.webhookSecret;
-const STRIPE_CONNECT_RETURN_URL =
-  process.env.STRIPE_CONNECT_RETURN_URL ||
-  `${APP_ORIGIN}/settings/profile?stripe=return`;
-const STRIPE_CONNECT_REFRESH_URL =
-  process.env.STRIPE_CONNECT_REFRESH_URL ||
-  `${APP_ORIGIN}/settings/profile?stripe=refresh`;
 const STRIPE_CONNECT_SETUP_URL =
   process.env.STRIPE_CONNECT_SETUP_URL || "https://dashboard.stripe.com/connect";
 const STRIPE_CHECKOUT_RETURN_PATH =
@@ -1243,10 +1237,43 @@ const getExistingCreatorPaymentAccount = async (userId) => {
   return data;
 };
 
+// Reads the v2 core Account shape (configuration.merchant / .recipient
+// capability statuses, requirements) into the three flat booleans the rest
+// of the app -- and enforce_listing_payment_account_readiness's DB trigger
+// -- already understand. Kept as a pure function, separate from the upsert,
+// so the v1-to-v2 account migration (2026-09-22) touches exactly one place.
+//
+// card_payments / payouts status values observed live: "active" once
+// requirements clear, "restricted" while they don't. details_submitted is
+// derived from whether any requirement entries remain rather than from a
+// specific status string, since Stripe support and the docs never named one
+// meaning "fully clear" -- an empty entries list is unambiguous either way.
+const deriveCreatorPaymentAccountReadinessFromV2Account = (stripeAccount) => {
+  const cardPaymentsStatus =
+    stripeAccount?.configuration?.merchant?.capabilities?.card_payments
+      ?.status;
+
+  const payoutsStatus =
+    stripeAccount?.configuration?.recipient?.capabilities?.stripe_balance
+      ?.payouts?.status;
+
+  const requirementEntries = stripeAccount?.requirements?.entries;
+
+  const detailsSubmitted =
+    Array.isArray(requirementEntries) && requirementEntries.length === 0;
+
+  return {
+    chargesEnabled: cardPaymentsStatus === "active",
+    payoutsEnabled: payoutsStatus === "active",
+    detailsSubmitted,
+  };
+};
+
 const upsertCreatorPaymentAccount = async ({
   userId,
   stripeAccount,
-  fallbackCurrency,
+  country,
+  defaultCurrency,
   onboardingStartedAt,
 }) => {
   if (!supabaseAdmin) {
@@ -1255,20 +1282,20 @@ const upsertCreatorPaymentAccount = async ({
 
   const now = new Date().toISOString();
 
+  const { chargesEnabled, payoutsEnabled, detailsSubmitted } =
+    deriveCreatorPaymentAccountReadinessFromV2Account(stripeAccount);
+
   const patch = {
     user_id: userId,
     provider: "stripe",
     stripe_account_id: stripeAccount.id,
-    charges_enabled: Boolean(stripeAccount.charges_enabled),
-    payouts_enabled: Boolean(stripeAccount.payouts_enabled),
-    details_submitted: Boolean(stripeAccount.details_submitted),
-    country: normalizeCountryCode(stripeAccount.country),
-    default_currency: normalizeCurrencyCode(
-      stripeAccount.default_currency,
-      fallbackCurrency,
-    ),
+    charges_enabled: chargesEnabled,
+    payouts_enabled: payoutsEnabled,
+    details_submitted: detailsSubmitted,
+    country: normalizeCountryCode(country),
+    default_currency: normalizeCurrencyCode(defaultCurrency),
     onboarding_started_at: onboardingStartedAt,
-    onboarding_completed_at: stripeAccount.details_submitted ? now : null,
+    onboarding_completed_at: detailsSubmitted ? now : null,
     last_synced_at: now,
     updated_at: now,
   };
@@ -1290,51 +1317,57 @@ const upsertCreatorPaymentAccount = async ({
   return data;
 };
 
-const createStripeConnectAccount = async ({
+// The account already has an email on file as a Supabase auth user; v2
+// accounts require contact_email whenever a recipient configuration
+// (payouts) is requested, so this has to be resolved before account
+// creation rather than left blank.
+const getSupabaseUserEmail = async (userId) => {
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const email = data?.user?.email;
+
+  if (!email) {
+    throw new Error("This account has no email on file to connect Stripe payouts.");
+  }
+
+  return email;
+};
+
+// Payout timing (launch-scope.md section 6.3). Balance Settings is a
+// separate v2-era endpoint from account creation, addressed with the
+// account's own Stripe-Account header. Only interval is set: overriding
+// settlement_timing.delay_days_override is restricted to platforms that own
+// fraud/dispute liability, and this platform's defaults.responsibilities
+// deliberately leave losses_collector as "stripe" (2026-09-22 decision) --
+// confirmed live that delay_days_override is rejected under that
+// configuration ("You cannot change ... via API once an account has been
+// activated"), so the actual delay is whatever Stripe assigns for the
+// account's country rather than a guaranteed 14 days.
+const setStripeConnectDailyPayoutSchedule = async ({
   stripeClient,
-  userId,
-  country,
-  defaultCurrency,
-}) =>
-  stripeClient.accounts.create({
-    type: "express",
-    country,
-    capabilities: {
-      card_payments: {
-        requested: true,
-      },
-      transfers: {
-        requested: true,
-      },
-    },
-    metadata: {
-      creatorhub_user_id: userId,
-    },
-    // Do NOT set controller.fees.payer here. Confirmed live against Stripe's
-    // API (2026-09-22): for an Express account, Stripe rejects fees.payer =
-    // "account" outright -- "your platform must collect fees and be liable
-    // for negative balances or refunds and chargebacks." Express accounts
-    // require the platform to bear Stripe's processing fee; there is no
-    // account-creation parameter that shifts it to the creator. See
-    // launch-scope.md section 3.2 for what this means for the fee model.
-    settings: {
-      payouts: {
-        schedule: {
-          interval: "daily",
-          delay_days: 14,
+  accountId,
+}) => {
+  await stripeClient.balanceSettings.update(
+    {
+      payments: {
+        payouts: {
+          schedule: {
+            interval: "daily",
+          },
         },
       },
     },
-    default_currency: defaultCurrency,
-  });
-
-const getStripeConnectAccountLink = async ({ stripeClient, accountId }) =>
-  stripeClient.accountLinks.create({
-    account: accountId,
-    refresh_url: STRIPE_CONNECT_REFRESH_URL,
-    return_url: STRIPE_CONNECT_RETURN_URL,
-    type: "account_onboarding",
-  });
+    { stripeAccount: accountId },
+  );
+};
 
 const getStripeConnectSetupRequiredResponse = (message) => {
   if (!/signed up for Connect|dashboard\.stripe\.com\/connect/i.test(message)) {
@@ -1565,41 +1598,83 @@ const getOrCreateStripeAccountForEmbeddedConnect = async ({
     };
   }
 
-  const account = await stripeClient.accounts.create({
-    type: "express",
-    country,
-    default_currency: defaultCurrency,
-    capabilities: {
-      card_payments: {
-        requested: true,
+  // Accounts v2, not v1 type: "express" -- this platform's own Connect
+  // settings (Dashboard: Settings > Connect > Platform setup) are already
+  // configured for v2: fees_collector "stripe" (the connected account bears
+  // Stripe's 2.9%+0.30, not the platform) and losses_collector "stripe"
+  // (Stripe, not the platform, owns fraud/dispute/negative-balance
+  // liability). dashboard: "none" matches what's already built here --
+  // onboarding and account management happen entirely through the embedded
+  // components below, never a Stripe-hosted dashboard. See launch-scope.md
+  // section 3.2 for the full 2026-09-22 correction and how this was verified
+  // live against Stripe's API before being written here.
+  const contactEmail = await getSupabaseUserEmail(userId);
+
+  const account = await stripeClient.v2.core.accounts.create({
+    contact_email: contactEmail,
+    identity: {
+      country: country.toLowerCase(),
+    },
+    dashboard: "none",
+    defaults: {
+      currency: defaultCurrency,
+      responsibilities: {
+        fees_collector: "stripe",
+        losses_collector: "stripe",
       },
-      transfers: {
-        requested: true,
+    },
+    configuration: {
+      merchant: {
+        capabilities: {
+          card_payments: {
+            requested: true,
+          },
+        },
+      },
+      // "recipient" is what makes payouts to this account possible at all --
+      // confirmed live that Stripe requires contact_email the moment this is
+      // requested, which is why it's resolved above rather than left out.
+      recipient: {
+        capabilities: {
+          stripe_balance: {
+            stripe_transfers: {
+              requested: true,
+            },
+          },
+        },
       },
     },
     metadata: {
       creatorhub_user_id: userId,
     },
-    // Do NOT set controller.fees.payer here -- see the sibling
-    // accounts.create call in createStripeConnectAccount for why: Stripe
-    // rejects fees.payer = "account" for an Express account outright.
-    settings: {
-      payouts: {
-        schedule: {
-          interval: "daily",
-          delay_days: 14,
-        },
-      },
-    },
+    include: [
+      "configuration.merchant",
+      "configuration.recipient",
+      "requirements",
+    ],
   });
 
-  await upsertCreatorPaymentAccount({
+  await setStripeConnectDailyPayoutSchedule({
+    stripeClient,
+    accountId: account.id,
+  });
+
+  const upsertedAccount = await upsertCreatorPaymentAccount({
     userId,
     stripeAccount: account,
+    country,
+    defaultCurrency,
   });
 
   return {
-    account,
+    account: {
+      id: upsertedAccount.stripe_account_id,
+      country: upsertedAccount.country,
+      default_currency: upsertedAccount.default_currency,
+      charges_enabled: upsertedAccount.charges_enabled,
+      payouts_enabled: upsertedAccount.payouts_enabled,
+      details_submitted: upsertedAccount.details_submitted,
+    },
     existingAccount: null,
     wasCreated: true,
   };
@@ -1930,73 +2005,12 @@ app.get("/api/twitch/connect/callback", async (req, res) => {
   }
 });
 
-app.post("/api/stripe/connect/start", async (req, res) => {
-  try {
-    const stripeClient = requireStripe();
-    const userId = await requireSupabaseUserId(req);
-
-    await requireApprovedCreator(userId);
-
-    const country = normalizeCountryCode(req.body?.country);
-    const defaultCurrency = normalizeCurrencyCode(
-      req.body?.defaultCurrency,
-      "usd",
-    );
-
-    const existingAccount = await getExistingCreatorPaymentAccount(userId);
-
-    const stripeAccount = existingAccount?.stripe_account_id
-      ? await stripeClient.accounts.retrieve(existingAccount.stripe_account_id)
-      : await createStripeConnectAccount({
-        stripeClient,
-        userId,
-        country,
-        defaultCurrency,
-      });
-
-    const onboardingStartedAt =
-      existingAccount?.onboarding_started_at || new Date().toISOString();
-
-    const account = await upsertCreatorPaymentAccount({
-      userId,
-      stripeAccount,
-      fallbackCurrency: defaultCurrency,
-      onboardingStartedAt,
-    });
-
-    const accountLink = await getStripeConnectAccountLink({
-      stripeClient,
-      accountId: stripeAccount.id,
-    });
-
-    return res.json({
-      url: accountLink.url,
-      account: {
-        chargesEnabled: account.charges_enabled,
-        payoutsEnabled: account.payouts_enabled,
-        detailsSubmitted: account.details_submitted,
-        country: account.country,
-        defaultCurrency: account.default_currency,
-      },
-    });
-  } catch (err) {
-    const message = String(err?.message || err);
-    const connectSetupResponse =
-      getStripeConnectSetupRequiredResponse(message);
-
-    if (connectSetupResponse) {
-      return res
-        .status(connectSetupResponse.status)
-        .json(connectSetupResponse.body);
-    }
-
-    const status = /session|authorization|approved creator/i.test(message)
-      ? 401
-      : 400;
-
-    return res.status(status).json({ error: message });
-  }
-});
+// The old /api/stripe/connect/start (Stripe-hosted Account Link onboarding,
+// v1 accounts.create) was removed 2026-09-22 as part of the v1-to-v2 account
+// migration. It had no caller anywhere in src/ -- confirmed by grep, and by
+// useStripeConnectOnboarding.ts defining request/response types for a
+// "start" mutation that was never wired up. The live onboarding path is
+// POST /api/stripe/connect/account-session (embedded components), below.
 
 app.post("/api/stripe/connect/sync", async (req, res) => {
   try {
@@ -2011,14 +2025,22 @@ app.post("/api/stripe/connect/sync", async (req, res) => {
       });
     }
 
-    const stripeAccount = await stripeClient.accounts.retrieve(
+    const stripeAccount = await stripeClient.v2.core.accounts.retrieve(
       existingAccount.stripe_account_id,
+      {
+        include: [
+          "configuration.merchant",
+          "configuration.recipient",
+          "requirements",
+        ],
+      },
     );
 
     const account = await upsertCreatorPaymentAccount({
       userId,
       stripeAccount,
-      fallbackCurrency: existingAccount.default_currency,
+      country: existingAccount.country,
+      defaultCurrency: existingAccount.default_currency,
       onboardingStartedAt: existingAccount.onboarding_started_at,
     });
 
@@ -2275,10 +2297,10 @@ app.post("/api/stripe/connect/account-session", async (req, res) => {
     const stripeClient = requireStripe();
     const userId = await requireSupabaseUserId(req);
 
-    if (!stripeClient?.accounts?.create) {
+    if (!stripeClient?.v2?.core?.accounts?.create) {
       return res.status(500).json({
         error:
-          "Stripe accounts API is unavailable. Check the API Stripe package version and STRIPE_SECRET_KEY.",
+          "Stripe Accounts v2 API is unavailable. Check the API Stripe package version and STRIPE_SECRET_KEY.",
       });
     }
 
@@ -2324,7 +2346,17 @@ app.post("/api/stripe/connect/account-session", async (req, res) => {
     });
   } catch (err) {
     const message = String(err?.message || err);
-    const status = /session|authorization/i.test(message) ? 401 : 400;
+    const connectSetupResponse = getStripeConnectSetupRequiredResponse(message);
+
+    if (connectSetupResponse) {
+      return res
+        .status(connectSetupResponse.status)
+        .json(connectSetupResponse.body);
+    }
+
+    const status = /session|authorization|approved creator/i.test(message)
+      ? 401
+      : 400;
 
     return res.status(status).json({ error: message });
   }
