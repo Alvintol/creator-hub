@@ -390,3 +390,30 @@ rather than assuming today's rules.
 - **Non-USD currencies are unvalidated** end to end — see the note in `PAY-004`.
 - `one_time` is a valid `payment_type` in the schema with no workflow behind it.
   If one ever appears in production, it is unhandled and falls through to Tier 2.
+
+## Audit note: `revoke ... from public` does not lock a function down on Supabase
+
+`20260921_117` introduced two new internal helper functions and revoked their
+`EXECUTE` privilege "from public", following the pattern already used
+elsewhere in this codebase — including the pre-existing
+`ensure_listing_request_payment_for_schedule_item`. **That pattern does not
+work on Supabase.** The `anon` and `authenticated` roles are granted `EXECUTE`
+on new `public`-schema functions independently of the `PUBLIC` pseudo-role, so
+`revoke ... from public` leaves both roles able to call the function directly
+over PostgREST RPC.
+
+Confirmed live against `information_schema.role_routine_grants`: `anon` had
+`EXECUTE` on `resolve_listing_request_fee_rates`,
+`lock_listing_request_agreement_fee_rates`, and
+`ensure_listing_request_payment_for_schedule_item` after `117` was applied,
+including the pre-existing function that `117` only rewrote the body of.
+Fixed in `20260921_118_lock_down_fee_rpc_execute_grants.sql`, which revokes
+`EXECUTE` from `anon` and `authenticated` explicitly on all three. Verified
+the trigger-driven payment-creation flow is unaffected — every call path runs
+through `security definer` functions that execute as their owner regardless
+of who fired the triggering statement.
+
+**This is worth an audit beyond these three.** Any other `security definer`
+helper in this codebase that only does `revoke all ... from public` — without
+also revoking from or never granting to `anon`/`authenticated` — is likely
+exposed the same way. That audit has not been done.
