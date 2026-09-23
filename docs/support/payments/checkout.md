@@ -45,6 +45,7 @@ Two consequences that shape everything in this playbook:
 | "The fee is more than 5%" | [`PAY-008`](#pay-008--buyer-questions-the-service-fee) |
 | "Checkout won't open, says I need to accept something" | [`PAY-009`](#pay-009--checkout-refused-for-an-unaccepted-or-outdated-policy) |
 | "It says I'm not the buyer" | [`PAY-001`](#pay-001--wrong-user-attempting-checkout) |
+| "It asks for my billing country" / "Why is there a tax line?" | [`TAX-001`](tax.md#tax-001--checkout-refused-at-the-tax-step), [`TAX-006`](tax.md#tax-006--buyer-questions-the-tax-on-a-payment) — Sprint 7 tax step, see [`tax.md`](tax.md) |
 
 ---
 

@@ -6,11 +6,13 @@ import type { Stripe } from "@stripe/stripe-js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import CheckoutPolicyAcceptance from "../../components/legal/CheckoutPolicyAcceptance";
+import { getBillingCountryOptions } from "../../domain/payments/billingCountries";
 import {
   describeBuyerServiceFee,
   formatPaymentCents,
   getListingRequestPaymentTitle,
 } from "../../domain/payments/listingRequestPaymentDisplay";
+import { describePaymentTaxLine } from "../../domain/payments/listingRequestPaymentTax";
 import { useCreateListingRequestPaymentCheckout } from "../../hooks/payments/useCreateListingRequestPaymentCheckout";
 import { useListingRequestPayment } from "../../hooks/payments/useListingRequestPayments";
 import { useSetListingRequestPaymentTipAndSupport } from "../../hooks/payments/useSetListingRequestPaymentTipAndSupport";
@@ -40,6 +42,11 @@ const classes = {
   fieldInputWrap: "flex items-center gap-1 text-sm",
   fieldInput:
     "w-28 rounded-lg border border-zinc-300 px-2 py-1 text-right text-sm focus:border-zinc-500 focus:outline-none",
+  fieldSelect:
+    "w-56 rounded-lg border border-zinc-300 px-2 py-1 text-sm focus:border-zinc-500 focus:outline-none",
+  fieldText:
+    "w-32 rounded-lg border border-zinc-300 px-2 py-1 text-sm focus:border-zinc-500 focus:outline-none",
+  pendingAmount: "text-zinc-500",
 } as const;
 
 const getErrorMessage = (error: unknown): string =>
@@ -62,6 +69,14 @@ const ListingRequestPaymentCheckout = () => {
   const [extrasConfirmed, setExtrasConfirmed] = useState(false);
   const [extrasErrMsg, setExtrasErrMsg] = useState<string | null>(null);
 
+  // Sprint 7 (launch-scope.md section 12): the buyer's billing location,
+  // chosen before checkout. It is location evidence for tax and decides
+  // which jurisdiction's tax (if any) applies -- the API enforces that it
+  // is present, this only collects it.
+  const [billingCountry, setBillingCountry] = useState("");
+  const [billingPostalCode, setBillingPostalCode] = useState("");
+  const billingCountryOptions = useMemo(() => getBillingCountryOptions(), []);
+
   const parseAmountToCents = (value: string): number => {
     const trimmed = value.trim();
     if (!trimmed) return 0;
@@ -76,6 +91,11 @@ const ListingRequestPaymentCheckout = () => {
     if (!paymentId) return;
 
     setExtrasErrMsg(null);
+
+    if (!billingCountry) {
+      setExtrasErrMsg("Choose your billing country to continue.");
+      return;
+    }
 
     try {
       const creatorTipCents = parseAmountToCents(tipInput);
@@ -92,7 +112,7 @@ const ListingRequestPaymentCheckout = () => {
       setExtrasErrMsg(getErrorMessage(error));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paymentId, tipInput, supportInput, setTipAndSupport.mutateAsync]);
+  }, [paymentId, tipInput, supportInput, billingCountry, setTipAndSupport.mutateAsync]);
 
   // Stripe checkout opens only after the buyer has confirmed their tip and
   // contribution choice, then accepted the project terms and policies for
@@ -124,7 +144,13 @@ const ListingRequestPaymentCheckout = () => {
     setStripePromise(null);
 
     try {
-      const response = await createCheckout.mutateAsync({ paymentId });
+      const response = await createCheckout.mutateAsync({
+        paymentId,
+        billingCountry,
+        ...(billingPostalCode.trim()
+          ? { billingPostalCode: billingPostalCode.trim() }
+          : {}),
+      });
 
       setClientSecret(response.checkout.clientSecret);
       setStripePromise(
@@ -136,13 +162,15 @@ const ListingRequestPaymentCheckout = () => {
       startedPaymentIdRef.current = null;
       setErrMsg(getErrorMessage(error));
     }
-  }, [createCheckout.mutateAsync, paymentId]);
+  }, [createCheckout.mutateAsync, paymentId, billingCountry, billingPostalCode]);
 
   useEffect(() => {
     if (!policiesAccepted) return;
 
     void startCheckout();
   }, [policiesAccepted, startCheckout]);
+
+  const taxLine = payment ? describePaymentTaxLine(payment) : null;
 
   const checkoutOptions = useMemo(
     () => (clientSecret ? { clientSecret } : undefined),
@@ -195,6 +223,16 @@ const ListingRequestPaymentCheckout = () => {
               <div className={classes.amountRow}>
                 <dt>Made for Stream support</dt>
                 <dd>{formatPaymentCents(payment.platform_support_cents, payment.currency)}</dd>
+              </div>
+            )}
+            {taxLine && (
+              <div className={classes.amountRow}>
+                <dt>{taxLine.label}</dt>
+                <dd className={taxLine.pending ? classes.pendingAmount : undefined}>
+                  {taxLine.pending
+                    ? "Calculated before payment"
+                    : formatPaymentCents(payment.tax_cents, payment.currency)}
+                </dd>
               </div>
             )}
             <div className={classes.totalRow}>
@@ -268,6 +306,50 @@ const ListingRequestPaymentCheckout = () => {
                   onChange={(event) => setSupportInput(event.target.value)}
                 />
               </div>
+            </div>
+          </div>
+
+          <h2 className={`mt-6 ${classes.summaryTitle}`}>Billing location</h2>
+          <p className={classes.text}>
+            Used to work out whether tax applies to this payment. Any tax is
+            shown as its own line before you pay.
+          </p>
+
+          <div className="mt-4 space-y-3">
+            <div className={classes.fieldRow}>
+              <label className={classes.fieldLabel} htmlFor="billing-country">
+                Billing country
+              </label>
+              <select
+                id="billing-country"
+                className={classes.fieldSelect}
+                value={billingCountry}
+                onChange={(event) => setBillingCountry(event.target.value)}
+                required
+              >
+                <option value="">Choose a country</option>
+                {billingCountryOptions.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={classes.fieldRow}>
+              <label className={classes.fieldLabel} htmlFor="billing-postal-code">
+                Postal or ZIP code
+                <span className={classes.fieldHint}> — optional; used where tax depends on it</span>
+              </label>
+              <input
+                id="billing-postal-code"
+                className={classes.fieldText}
+                type="text"
+                autoComplete="postal-code"
+                maxLength={20}
+                value={billingPostalCode}
+                onChange={(event) => setBillingPostalCode(event.target.value)}
+              />
             </div>
           </div>
 

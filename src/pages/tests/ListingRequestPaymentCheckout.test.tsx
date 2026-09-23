@@ -65,6 +65,10 @@ describe("ListingRequestPaymentCheckout", () => {
       creator_tip_cents: 0,
       buyer_service_fee_cents: 500,
       platform_support_cents: 0,
+      tax_cents: 0,
+      tax_treatment: null,
+      tax_jurisdiction_country: null,
+      tax_jurisdiction_region: null,
       total_checkout_cents: 10500,
       metadata: {},
     };
@@ -82,6 +86,35 @@ describe("ListingRequestPaymentCheckout", () => {
     expect(screen.getByText("$100.00")).toBeInTheDocument();
     expect(screen.getByText("$5.00")).toBeInTheDocument();
     expect(screen.getByText("$105.00")).toBeInTheDocument();
+    // Sprint 7: tax is always its own line, even before it is known.
+    expect(screen.getByText("Calculated before payment")).toBeInTheDocument();
+  });
+
+  it("shows calculated tax as a separate line with its jurisdiction", () => {
+    mocks.payment = {
+      ...mocks.payment,
+      tax_cents: 2100,
+      tax_treatment: "calculated",
+      tax_jurisdiction_country: "GB",
+      total_checkout_cents: 12600,
+    };
+
+    renderCheckout();
+
+    expect(screen.getByText("Tax (GB)")).toBeInTheDocument();
+    expect(screen.getByText("$21.00")).toBeInTheDocument();
+    expect(screen.getByText("$126.00")).toBeInTheDocument();
+  });
+
+  it("requires a billing country before moving on to payment", async () => {
+    renderCheckout();
+
+    fireEvent.click(screen.getByRole("button", { name: "Continue to payment" }));
+
+    expect(
+      await screen.findByText("Choose your billing country to continue."),
+    ).toBeInTheDocument();
+    expect(mocks.setTipAndSupport).not.toHaveBeenCalled();
   });
 
   it("does not create a Stripe checkout session until the tip/contribution step and the policies are accepted", async () => {
@@ -90,18 +123,33 @@ describe("ListingRequestPaymentCheckout", () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(mocks.createCheckout).not.toHaveBeenCalled();
 
+    fireEvent.change(screen.getByLabelText("Billing country"), {
+      target: { value: "GB" },
+    });
+    fireEvent.change(screen.getByLabelText(/Postal or ZIP code/), {
+      target: { value: " SW1A 1AA " },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Continue to payment" }));
     await waitFor(() => expect(mocks.setTipAndSupport).toHaveBeenCalled());
 
     fireEvent.click(await screen.findByRole("button", { name: "Accept for request-1" }));
 
-    await waitFor(() => expect(mocks.createCheckout).toHaveBeenCalledWith({ paymentId: "payment-1" }));
+    await waitFor(() =>
+      expect(mocks.createCheckout).toHaveBeenCalledWith({
+        paymentId: "payment-1",
+        billingCountry: "GB",
+        billingPostalCode: "SW1A 1AA",
+      }),
+    );
     expect(await screen.findByText("Stripe embedded checkout")).toBeInTheDocument();
   });
 
   it("creates only one session when acceptance is reported more than once", async () => {
     renderCheckout();
 
+    fireEvent.change(screen.getByLabelText("Billing country"), {
+      target: { value: "CA" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Continue to payment" }));
 
     const accept = await screen.findByRole("button", { name: "Accept for request-1" });

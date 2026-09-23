@@ -8,8 +8,9 @@ Every item follows `AGENTS.md`: enforcement at the database and API rather than 
 UI alone, the next free migration number taken from `supabase/migrations/`, and a
 support playbook written or updated before the branch is ready.
 
-**Baselines to hold** (measured 2026-09-22, end of Sprint 6): **913 tests
-passing, eslint clean, tsc clean, `npx vite build` clean.** `AGENTS.md` still
+**Baselines to hold** (measured 2026-09-23, end of Sprint 7): **944 tests
+passing, eslint clean, tsc clean, `npx vite build` clean** (the >500 kB
+chunk-size warning predates Sprint 7). `AGENTS.md` still
 records the older 740 / 21 errors / 19 lines — those were cleaned up since and
 it is gitignored, so this file is the current reference.
 
@@ -825,31 +826,109 @@ has occurred yet).
 Its own sprint because the blocking work is a professional opinion, not a migration,
 and burying that inside an engineering sprint is how it gets skipped (§12).
 
-**Do first, in parallel with everything above**
+**Status (2026-09-23): plumbing built, collection OFF, advice gate still open.**
+Everything below is jurisdiction-neutral. `STRIPE_TAX_COLLECTION_COUNTRIES` ships
+empty, so every payment is recorded as `tax_treatment = 'not_collected'` with its
+billing country, and no tax is charged anywhere. Switching a country on needs the
+advice first, then a Stripe Tax registration on the platform account plus config.
+There is no code change (`docs/support/payments/tax.md`).
+
+**Do first, in parallel with everything above — STILL OPEN, blocking collection in
+any jurisdiction they cover**
 
 - [ ] Jurisdiction-specific advice on registration and remittance, at minimum for EU
       VAT and UK VAT. **EU VAT applies from the first euro** with no small-seller
       threshold for a non-established supplier, so this gates wave 2, not a later
       phase.
 - [ ] Decide which jurisdictions to register in and in what order.
-- [ ] Confirm whether our own fees — the buyer service fee and the platform
-      contribution — are separately taxable in each. This is a different question
-      from tax on the commission.
+- [ ] Confirm whether our own fees (the buyer service fee and the platform
+      contribution) are separately taxable in each. This is a different question
+      from tax on the commission. The tip's taxability is the same question. In the
+      build, each line's Stripe tax code is config with **no default**, so enabling
+      a country without all four set refuses checkout (`TAX-005`).
+- [ ] **New question for the advisor, found in this sprint:** can the platform be
+      the liable deemed supplier while the charge is a *direct charge* on the
+      creator's connected account? Stripe Tax does not support platform liability
+      on direct charges (Stripe's docs say so explicitly). The build therefore
+      calculates on the platform account with the Tax Calculation API and sweeps
+      tax into the application fee ("approach A", chosen 2026-09-23 so §3.4 Model A
+      and Sprints 3–5 stay intact). If the advice says that can't work, the
+      alternative is destination charges, which means reworking the payout hold,
+      refund ledger and recovery balances.
 
 **Product work**
 
-- [ ] Migration: `tax_cents` and jurisdiction on `listing_request_payments`, included
-      in `total_checkout_cents`. The table has **no tax field at all** today, while
-      Fee Schedule §6 already promises the payment record identifies tax separately.
-- [ ] Integrate Stripe Tax for calculation at checkout.
-- [ ] Capture and store buyer location evidence — EU VAT requires two
-      non-contradictory pieces.
-- [ ] Show tax separately before payment, as §6 already requires.
-- [ ] Proportional tax adjustment on refunds, per Refund Policy §8.
-- [ ] Store creator tax status and country from Connect onboarding, and apply reverse
-      charge on qualifying B2B supplies within the EU.
-- [ ] Rewrite Fee Schedule §6 (§10).
-- [ ] Playbook: new `payments/tax.md`.
+- [x] Migration: `tax_cents` and jurisdiction on `listing_request_payments`, included
+      in `total_checkout_cents`. `20260923_137`: per-line tax (`tax_on_base_cents`,
+      `_buyer_fee_`, `_tip_`, `_support_`) summing to `tax_cents`;
+      `tax_treatment`, `tax_jurisdiction_country/region`, Stripe calculation and
+      transaction ids. Tax is in both the total and the application-fee constraints.
+      `set_listing_request_payment_tax` recomputes both totals from the stored
+      lines and refuses a jurisdiction that doesn't match the buyer's recorded
+      billing country. `recompute_listing_request_payment_amounts` and
+      `set_listing_request_payment_tip_and_support` are re-created to clear stale
+      tax when amounts change. **The tip RPC rewrite also fixes a latent Sprint 5
+      bug:** since `20260922_129` it omitted `recovery_instalment_cents`, so setting
+      a tip on a payment carrying a recovery instalment violated
+      `listing_request_payments_check`. **Written, not applied**, and not
+      executed against a Postgres instance (none was available locally). This
+      follows Sprints 3–6's pattern of handing migrations over unapplied.
+- [x] Integrate Stripe Tax for calculation at checkout: `api/tax.js`, plus
+      `applyCheckoutTax` in `POST /api/stripe/checkout/session`. Tax is calculated
+      server-side before any session is created or reused. Every component,
+      including tax, is its own Checkout line, and `buildCheckoutLineItems` throws
+      if the lines don't add up to the stored total. The existing webhook
+      `amount_total` check then proves the stored `tax_cents` is what was charged.
+      Once paid, the calculation is committed as a Stripe Tax transaction on the
+      platform account. **Not exercised against real Stripe Tax** (test mode never
+      run, and collection is off).
+- [x] Capture and store buyer location evidence (EU VAT requires two
+      non-contradictory pieces). `listing_request_payment_tax_evidence` stores
+      country only, never IP or card data. Pre-payment evidence: declared billing
+      country, plus IP country if `TAX_IP_COUNTRY_HEADER` is set. Post-payment:
+      card-issuing country and Checkout billing country. The declared and
+      Checkout billing addresses are **one category**, so they can never count
+      as two pieces. `get_listing_request_payment_tax_evidence_status` classifies
+      each payment as `sufficient` / `insufficient` / `contradictory` (mirrored and
+      tested in `listingRequestPaymentTax.ts`). Not configured in production: an
+      IP geo header (Cloud Run sets none).
+- [x] Show tax separately before payment, as §6 already requires. There's a tax row
+      on the checkout summary ("Calculated before payment" until it's known), a
+      billing-country step before the policies, and a separate tax line in
+      Stripe Checkout.
+- [x] Proportional tax adjustment on refunds, per Refund Policy §8. This follows
+      `apply_refunded_listing_request_payment`'s cumulative-rounding pattern per
+      line: base and buyer-fee tax follow the cumulative base; tip and contribution
+      tax follow their own cumulative refunded amounts; a fully refunded line
+      returns the exact remainder. The same arithmetic exists in the SQL function,
+      `api/refundArithmetic.js` and the TS mirror. A 200-sequence randomized parity
+      test proves the JS and TS copies agree at every step and always close out to
+      exactly the original tax. The refund route adds tax to both the Stripe refund
+      and the application-fee reversal, re-reads the ledger row to check it matches,
+      and reverses the lines on the Stripe Tax transaction (`TAX-004` on failure).
+- [~] Store creator tax status and country from Connect onboarding, and apply reverse
+      charge on qualifying B2B supplies within the EU. **Half done.** Country was
+      already stored. `tax_entity_type` and `tax_id_types` (types only, never
+      numbers) are now stored from the v2 account's `identity`, but that payload
+      shape is unverified against a live account. **Reverse charge is not
+      applied.** It's blocked on the advice gate (who the supplier is). Once
+      that's answered the remaining engineering is small: collect the buyer's VAT
+      ID and pass it as `customer_details.tax_ids`, and Stripe Tax applies reverse
+      charge itself.
+- [~] Rewrite Fee Schedule §6 (§10). **Drafted** in `paymentTerms.ts`
+      (`2026-09-23-draft-1`; fingerprint recorded, `api/policyVersions.js` synced, so
+      buyers re-accept at checkout). It now says Made for Stream calculates, collects
+      and remits *where obliged*, shows tax as its own line, which location signals
+      are used and that only the country is kept, and that refunds adjust tax
+      proportionally. The final wording waits on the advice gate and Sprint 8's
+      non-draft cut.
+- [x] Playbook: new `payments/tax.md` (`TAX-001`–`TAX-006`, signal queries, known
+      gaps), indexed in `docs/support/README.md`, linked from `checkout.md` and
+      `refunds-and-disputes.md`.
+
+**Deploy order matters:** apply `20260923_137` **before** deploying the API or web
+app from this branch. The checkout page and route read the new columns and RPCs, so
+deploying the code first breaks checkout for everyone.
 
 ---
 

@@ -123,6 +123,128 @@ describe("computeCumulativeListingRequestPaymentRefund", () => {
   });
 });
 
+describe("computeCumulativeListingRequestPaymentRefund -- tax (Sprint 7)", () => {
+  // CAD 100 base, 5% fees, a 10.00 tip and 5.00 contribution, taxed at an
+  // awkward 13% on every line so the rounding is actually exercised:
+  // base 1300, buyer fee 65, tip 130, contribution 65.
+  const payment = {
+    base_amount_cents: 10000,
+    buyer_service_fee_cents: 500,
+    creator_platform_fee_cents: 500,
+    creator_tip_cents: 1000,
+    platform_support_cents: 500,
+    tax_on_base_cents: 1300,
+    tax_on_buyer_fee_cents: 65,
+    tax_on_tip_cents: 130,
+    tax_on_support_cents: 65,
+  };
+
+  const toLedgerRow = (
+    baseRefundCents: number,
+    result: ReturnType<typeof computeCumulativeListingRequestPaymentRefund>,
+    tipRefundCents = 0,
+    contributionRefundCents = 0,
+  ) => ({
+    base_refund_cents: baseRefundCents,
+    buyer_fee_refund_cents: result.thisBuyerFeeRefundCents,
+    creator_fee_reversal_cents: result.thisCreatorFeeReversalCents,
+    tip_refund_cents: tipRefundCents,
+    contribution_refund_cents: contributionRefundCents,
+    base_tax_refund_cents: result.thisBaseTaxRefundCents,
+    buyer_fee_tax_refund_cents: result.thisBuyerFeeTaxRefundCents,
+    tip_tax_refund_cents: result.thisTipTaxRefundCents,
+    support_tax_refund_cents: result.thisSupportTaxRefundCents,
+  });
+
+  it("returns every line's full tax on a single full refund", () => {
+    const result = computeCumulativeListingRequestPaymentRefund(payment, [], 10000, {
+      tipRefundCents: 1000,
+      contributionRefundCents: 500,
+    });
+
+    expect(result.thisBaseTaxRefundCents).toBe(1300);
+    expect(result.thisBuyerFeeTaxRefundCents).toBe(65);
+    expect(result.thisTipTaxRefundCents).toBe(130);
+    expect(result.thisSupportTaxRefundCents).toBe(65);
+    expect(result.thisTaxRefundCents).toBe(1560);
+  });
+
+  it("adjusts base and buyer-fee tax proportionally to the base refunded", () => {
+    const result = computeCumulativeListingRequestPaymentRefund(payment, [], 2500);
+
+    // 1300 * 0.25 = 325; 65 * 0.25 = 16.25 -> 16
+    expect(result.thisBaseTaxRefundCents).toBe(325);
+    expect(result.thisBuyerFeeTaxRefundCents).toBe(16);
+    // A partial base refund does not prorate the tip or contribution, so
+    // their tax is untouched too.
+    expect(result.thisTipTaxRefundCents).toBe(0);
+    expect(result.thisSupportTaxRefundCents).toBe(0);
+  });
+
+  it("returns exactly the original tax across repeated partial refunds -- no rounding drift", () => {
+    const refunds: ReturnType<typeof toLedgerRow>[] = [];
+    const bases = [3333, 3333, 1, 3333];
+
+    for (const base of bases) {
+      const result = computeCumulativeListingRequestPaymentRefund(payment, refunds, base);
+      refunds.push(toLedgerRow(base, result));
+    }
+
+    const sum = (key: keyof ReturnType<typeof toLedgerRow>) =>
+      refunds.reduce((total, row) => total + row[key], 0);
+
+    // Each step is cumulative: 3333 -> round(1300 * .3333) = 433,
+    // 6666 -> 867 (434 more), 6667 -> 867 (0 more), 10000 -> the exact rest.
+    expect(refunds.map((row) => row.base_tax_refund_cents)).toEqual([433, 434, 0, 433]);
+    expect(sum("base_tax_refund_cents")).toBe(payment.tax_on_base_cents);
+    expect(sum("buyer_fee_tax_refund_cents")).toBe(payment.tax_on_buyer_fee_cents);
+    expect(sum("buyer_fee_refund_cents")).toBe(payment.buyer_service_fee_cents);
+  });
+
+  it("adjusts tip and contribution tax by their own refunded amounts, cumulatively", () => {
+    const first = computeCumulativeListingRequestPaymentRefund(payment, [], 1000, {
+      tipRefundCents: 333,
+      contributionRefundCents: 250,
+    });
+
+    // 130 * 333/1000 = 43.29 -> 43; 65 * 250/500 = 32.5 -> 33
+    expect(first.thisTipTaxRefundCents).toBe(43);
+    expect(first.thisSupportTaxRefundCents).toBe(33);
+
+    const prior = [toLedgerRow(1000, first, 333, 250)];
+
+    const second = computeCumulativeListingRequestPaymentRefund(payment, prior, 1000, {
+      tipRefundCents: 333,
+    });
+
+    // cumulative tip 666 -> round(86.58) = 87, so 44 more
+    expect(second.thisTipTaxRefundCents).toBe(44);
+    expect(second.thisSupportTaxRefundCents).toBe(0);
+
+    prior.push(toLedgerRow(1000, second, 333, 0));
+
+    const last = computeCumulativeListingRequestPaymentRefund(payment, prior, 8000, {
+      tipRefundCents: 334,
+      contributionRefundCents: 250,
+    });
+
+    // Fully refunded lines return exactly what is left.
+    expect(last.thisTipTaxRefundCents).toBe(130 - 43 - 44);
+    expect(last.thisSupportTaxRefundCents).toBe(65 - 33);
+    expect(last.thisBaseTaxRefundCents + first.thisBaseTaxRefundCents + second.thisBaseTaxRefundCents).toBe(1300);
+  });
+
+  it("refunds no tax on a payment that had none (pre-Sprint 7 or not collected)", () => {
+    const result = computeCumulativeListingRequestPaymentRefund(
+      { base_amount_cents: 10000, buyer_service_fee_cents: 500, creator_platform_fee_cents: 500 },
+      [],
+      5000,
+    );
+
+    expect(result.thisTaxRefundCents).toBe(0);
+  });
+});
+
 describe("isTipOrContributionRefundWithinWindow", () => {
   const now = new Date("2026-09-22T00:00:00Z");
 
