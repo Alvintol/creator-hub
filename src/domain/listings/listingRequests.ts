@@ -3,12 +3,20 @@ export type ListingRequestStatus =
   | "accepted"
   | "completed"
   | "declined"
-  | "archived";
+  | "archived"
+  | "cancelled";
 
 export type ListingRequestListView =
   | "active"
   | "completed"
   | "archived";
+
+export type ListingRequestCancellationContext = {
+  buyer_user_id?: string | null;
+  creator_user_id?: string | null;
+  cancelled_by_user_id?: string | null;
+  cancellation_reason?: string | null;
+};
 
 export type ListingRequestStatusTone =
   | "review"
@@ -29,11 +37,12 @@ export const getListingRequestStatusesForView = (
     ? ["submitted", "accepted"]
     : view === "completed"
       ? ["completed"]
-      : ["declined", "archived"];
+      : ["declined", "archived", "cancelled"];
 
 export const getListingRequestStatusLabel = (
   status: ListingRequestStatus,
-  archiveContext?: ListingRequestArchiveContext
+  archiveContext?: ListingRequestArchiveContext,
+  cancellationContext?: ListingRequestCancellationContext
 ): string =>
   status === "submitted"
     ? "Under review"
@@ -43,17 +52,29 @@ export const getListingRequestStatusLabel = (
         ? "Completed"
         : status === "declined"
           ? "Declined"
-          : archiveContext?.archived_by_user_id &&
-            archiveContext.buyer_user_id &&
-            archiveContext.archived_by_user_id ===
-            archiveContext.buyer_user_id
-            ? "Cancelled by buyer"
+          : status === "cancelled"
+            ? cancellationContext?.cancelled_by_user_id &&
+              cancellationContext.buyer_user_id &&
+              cancellationContext.cancelled_by_user_id ===
+              cancellationContext.buyer_user_id
+              ? "Cancelled by buyer"
+              : cancellationContext?.cancelled_by_user_id &&
+                cancellationContext.creator_user_id &&
+                cancellationContext.cancelled_by_user_id ===
+                cancellationContext.creator_user_id
+                ? "Cancelled by creator"
+                : "Cancelled"
             : archiveContext?.archived_by_user_id &&
-              archiveContext.creator_user_id &&
+              archiveContext.buyer_user_id &&
               archiveContext.archived_by_user_id ===
-              archiveContext.creator_user_id
-              ? "Archived by creator"
-              : "Archived";
+              archiveContext.buyer_user_id
+              ? "Withdrawn by buyer"
+              : archiveContext?.archived_by_user_id &&
+                archiveContext.creator_user_id &&
+                archiveContext.archived_by_user_id ===
+                archiveContext.creator_user_id
+                ? "Archived by creator"
+                : "Archived";
 
 export const getListingRequestStatusTone = (
   status: ListingRequestStatus
@@ -63,13 +84,15 @@ export const getListingRequestStatusTone = (
     : status === "accepted" ||
       status === "completed"
       ? "success"
-      : status === "declined"
+      : status === "declined" ||
+        status === "cancelled"
         ? "danger"
         : "muted";
 
 export const getListingRequestStatusSummary = (
   status: ListingRequestStatus,
-  archiveContext?: ListingRequestArchiveContext
+  archiveContext?: ListingRequestArchiveContext,
+  cancellationContext?: ListingRequestCancellationContext
 ): string =>
   status === "submitted"
     ? "This request is currently under review by the creator."
@@ -79,17 +102,21 @@ export const getListingRequestStatusSummary = (
         ? "The buyer approved the final delivery and the project is complete."
         : status === "declined"
           ? "The creator has declined this request."
-          : archiveContext?.archived_by_user_id &&
-            archiveContext.buyer_user_id &&
-            archiveContext.archived_by_user_id ===
-            archiveContext.buyer_user_id
-            ? "The buyer cancelled this request."
+          : status === "cancelled"
+            ? cancellationContext?.cancellation_reason
+              ? `This request was cancelled: ${cancellationContext.cancellation_reason}`
+              : "This request has been cancelled."
             : archiveContext?.archived_by_user_id &&
-              archiveContext.creator_user_id &&
+              archiveContext.buyer_user_id &&
               archiveContext.archived_by_user_id ===
-              archiveContext.creator_user_id
-              ? "The creator archived this request."
-              : "This request has been archived.";
+              archiveContext.buyer_user_id
+              ? "The buyer withdrew this request."
+              : archiveContext?.archived_by_user_id &&
+                archiveContext.creator_user_id &&
+                archiveContext.archived_by_user_id ===
+                archiveContext.creator_user_id
+                ? "The creator archived this request."
+                : "This request has been archived.";
 
 export const canAcceptListingRequest = (
   status: ListingRequestStatus
@@ -102,3 +129,10 @@ export const canDeclineListingRequest = (
 export const canArchiveListingRequest = (
   status: ListingRequestStatus
 ): boolean => status === "submitted";
+
+// Sprint 4 (launch-scope.md section 5.1): the unilateral, pre-payment
+// cancellation path is only offered once a request is accepted -- an
+// unaccepted request is withdrawn (archived) or declined instead.
+export const canCancelListingRequestBeforePayment = (
+  status: ListingRequestStatus
+): boolean => status === "accepted";

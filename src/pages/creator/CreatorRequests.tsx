@@ -341,6 +341,7 @@ const CreatorRequests = ({
                       >
                         {getListingRequestStatusLabel(
                           item.request.status,
+                          item.request,
                           item.request
                         )}
                       </div>

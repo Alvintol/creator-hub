@@ -100,7 +100,7 @@ export type ListingRequestAgreementRow = {
   estimated_completion_at: string;
   adjusted_estimated_completion_at: string;
   late_delivery_grace_days: number;
-  included_revision_count: number;
+  included_revision_count: number | null;
   minimum_update_rule: "single_progress_update" | "weekly_updates";
   first_update_due_days: number | null;
   update_frequency_days: number | null;

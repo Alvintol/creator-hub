@@ -129,6 +129,7 @@ how it fails.
 | Requests | [`requests/milestones.md`](requests/milestones.md) |
 | Requests | [`requests/change-orders.md`](requests/change-orders.md) |
 | Requests | [`requests/final-delivery.md`](requests/final-delivery.md) |
+| Requests | [`requests/cancellation.md`](requests/cancellation.md) |
 | Messaging | [`messaging/conversations.md`](messaging/conversations.md) |
 | Messaging | [`messaging/moderation.md`](messaging/moderation.md) |
 | Payments | [`payments/checkout.md`](payments/checkout.md) |

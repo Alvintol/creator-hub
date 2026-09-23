@@ -8,7 +8,7 @@ Every item follows `AGENTS.md`: enforcement at the database and API rather than 
 UI alone, the next free migration number taken from `supabase/migrations/`, and a
 support playbook written or updated before the branch is ready.
 
-**Baselines to hold** (measured 2026-09-22, end of Sprint 3): **861 tests
+**Baselines to hold** (measured 2026-09-22, end of Sprint 4): **880 tests
 passing, eslint clean, tsc clean, `npx vite build` clean.** `AGENTS.md` still
 records the older 740 / 21 errors / 19 lines — those were cleaned up since and
 it is gitignored, so this file is the current reference.
@@ -399,27 +399,83 @@ never need platform funding; the charge handle is what a refund is issued agains
 
 ## Sprint 4 — Cancellation
 
-- [ ] Migration: add `cancelled` to `listing_requests_status_check`, with
+- [x] Migration: add `cancelled` to `listing_requests_status_check`, with
       `cancelled_at`, `cancelled_by_user_id` and `cancellation_reason`, plus the
       metadata check constraint matching the `completed` pattern in `20260611_093`.
-- [ ] `security definer` RPC `cancel_listing_request_before_payment` — the
+      Built in `20260922_122`. Also closes the conversation on cancellation using
+      `20260611_094`'s exact pattern (`closed_reason_code = 'not_moving_forward'`).
+- [x] `security definer` RPC `cancel_listing_request_before_payment` — the
       unilateral pre-payment path (§5.1). Writes the `cancelled` status that already
       exists on agreements, schedule items, milestones, change orders and final
-      deliveries.
-- [ ] Expire any open Stripe checkout session for payments the cancellation moves to
-      `cancelled`.
-- [ ] Migration + RPCs for the post-payment cancellation proposal (§5.2): propose
-      with a per-milestone earned-value statement, accept, dispute.
-- [ ] The three-business-day itemised cancellation statement deadline is recorded and
-      visible to both parties.
-- [ ] Workspace UI: cancellation entry points, the proposal and response screens, and
-      the "Next step" card understanding a cancelled request.
-- [ ] Migration: add structured `usage_rights` to the agreement (§5.3), snapshotted
-      at acceptance.
-- [ ] Migration: make `included_revision_count` nullable and apply the two-round
-      fallback when null (§5.4).
-- [ ] Playbook: new `requests/cancellation.md`; update `requests/request-lifecycle.md`
-      (`REQ-003` loses its "no cancellation workflow" gap) and `requests/agreements.md`.
+      deliveries. Built in `20260922_122`; scoped to `accepted` requests with no
+      payment in `paid`/`processing`/`refunded`/`partially_refunded`/`disputed`.
+- [x] Expire any open Stripe checkout session for payments the cancellation moves to
+      `cancelled`. Built as `POST /api/stripe/checkout/expire-cancelled-sessions` in
+      `api/server.js` (re-derives sessions to expire from the database rather than
+      trusting the client; called by both cancellation hooks; best-effort). See
+      `docs/support/requests/cancellation.md` `CAN-005` for the residual race this
+      does not fully close (a stale session completed before the expire call lands).
+- [x] Migration + RPCs for the post-payment cancellation proposal (§5.2): propose
+      with a per-milestone earned-value statement, accept, dispute. Built in
+      `20260922_124` — `propose_listing_request_cancellation`,
+      `submit_listing_request_cancellation_statement`,
+      `respond_listing_request_cancellation_proposal`, plus
+      `listing_request_cancellation_proposals` /
+      `_proposal_items` tables. The creator's itemised statement is the one binding
+      figure acceptance acts on (must cover every paid payment on the request);
+      on acceptance, unearned amounts are written to
+      `listing_request_cancellation_proposal_items.flagged_for_refund_at` for
+      Sprint 5's refund engine to consume — **no refund is issued by this sprint**.
+      A dispute is the Tier 2 support-queue signal itself (`status = 'disputed'`),
+      following `REF-001`'s no-separate-queue-table pattern; there is no admin
+      resolution UI yet (known gap, tracked in `cancellation.md`).
+- [x] The three-business-day itemised cancellation statement deadline is recorded and
+      visible to both parties. `statement_due_at = public.add_business_days(now(), 3)`,
+      set at proposal creation; shown in the "Next step" card and the cancellation
+      proposal panel.
+- [x] Workspace UI: cancellation entry points, the proposal and response screens, and
+      the "Next step" card understanding a cancelled request. Built:
+      `ListingRequestCancelBeforePaymentAction` and
+      `ListingRequestCancellationProposalPanel` components, wired into
+      `BuyerRequestDetails.tsx` and `CreatorRequestDetails.tsx` (both directions —
+      either party can open either flow); `AdminRequestDetails.tsx` gets read-only
+      visibility only, since admins cannot call these RPCs.
+      `src/domain/listings/requestWorkspace.ts` gained a `cancellationProposal`
+      input and next-step branches for `cancelled`, `disputed`,
+      `pending_creator_statement` and `pending_buyer_response`, all taking priority
+      over the ordinary workflow steps.
+- [x] Migration: add structured `usage_rights` to the agreement (§5.3), snapshotted
+      at acceptance. Built in `20260922_123` — `usage_rights_type` (enumerated,
+      nullable) and `usage_rights_qualifier` (free text). **Schema only**:
+      `create_listing_request_agreement` was not extended to accept or write these
+      columns, and no UI sets them, so every agreement's usage rights are `null`
+      today. Tracked as a known gap in `docs/support/requests/agreements.md` — the
+      agreement builder needs a follow-up pass before this is real.
+- [x] Migration: make `included_revision_count` nullable and apply the two-round
+      fallback when null (§5.4). Built in `20260922_123` (data untouched — an
+      existing `0` stays `0`, not reinterpreted). The fallback itself is
+      `getListingRequestIncludedRevisionCount` in
+      `src/domain/listings/listingRequestAgreements.ts`, used by
+      `ListingRequestAgreementSummary.tsx`. The agreement builder still always
+      writes a number today (no UI path to leave it blank), so `null` is reachable
+      in the schema but not yet in practice through the product's own UI.
+- [x] Playbook: new `requests/cancellation.md`; update `requests/request-lifecycle.md`
+      (lost its "no cancellation workflow" gap, gained a cross-reference) and
+      `requests/agreements.md` (fee-rate-locking section's neighbor now covers the
+      `cancelled` status becoming reachable and both new schema gaps, with their
+      real limitations spelled out above rather than assumed complete).
+
+**Verified:** `npx vitest run` (880 passing, up from 861 — no regressions),
+`npx tsc --noEmit` (clean), `npx eslint .` (clean), `npx vite build` (clean),
+`node --check api/server.js` (clean). New coverage: hook tests for
+`useCancelListingRequestBeforePayment`, `useProposeListingRequestCancellation`,
+`useRespondListingRequestCancellationProposal`; a component test for
+`ListingRequestCancelBeforePaymentAction`; domain tests for the new `cancelled`
+status, the `cancellationProposal`-aware next-step branches, and the
+revision-count fallback. **Not verified by this pass**: the SQL migrations
+were not applied against a live Supabase project (no project access in this
+session) — read carefully before applying, particularly the `for update` row
+locking and the constraint interactions in `20260922_124`.
 
 ---
 

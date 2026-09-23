@@ -45,6 +45,7 @@ import { useListingRequestMilestones } from '../../hooks/creatorRequests/useList
 import ListingRequestMilestoneSummary from '../../components/listingRequests/milestones/ListingRequestMilestoneSummary';
 import { useAdminConfirmListingRequestMilestonePayment } from '../../hooks/admin/useAdminConfirmListingRequestMilestonePayment';
 import ListingRequestMilestonePaymentAdminActions from '../../components/listingRequests/payments/ListingRequestMilestonePaymentAdminActions';
+import { useListingRequestCancellationProposal } from '../../hooks/creatorRequests/useListingRequestCancellationProposal';
 
 const classes = {
   page: "space-y-6",
@@ -87,6 +88,14 @@ const AdminRequestDetails = () => {
     useAdminConfirmListingRequestMilestonePayment();
 
   const agreement = agreementQuery.data ?? null;
+
+  const cancellationProposalQuery = useListingRequestCancellationProposal(
+    request?.status === "accepted" ? request?.id ?? null : null
+  );
+  const cancellationProposal = cancellationProposalQuery.data ?? null;
+  const isCancellationProposalOpen =
+    cancellationProposal?.status === "pending_creator_statement" ||
+    cancellationProposal?.status === "pending_buyer_response";
 
   const progressUpdatesQuery = useListingRequestProgressUpdates(
     agreement?.status === "buyer_accepted"
@@ -165,7 +174,10 @@ const AdminRequestDetails = () => {
   const changeOrders = changeOrdersQuery.data ?? [];
   const progressUpdates = progressUpdatesQuery.data ?? [];
   const agreementAccepted = agreement?.status === "buyer_accepted";
-  const requestReadOnly = request.status === "archived" || request.status === "declined";
+  const requestReadOnly =
+    request.status === "archived" ||
+    request.status === "declined" ||
+    request.status === "cancelled";
 
   const workspaceInput = {
     requestStatus: request.status,
@@ -173,6 +185,12 @@ const AdminRequestDetails = () => {
     milestones,
     changeOrders,
     finalDeliveries,
+    cancellationProposal: isCancellationProposalOpen
+      ? {
+          status: cancellationProposal!.status,
+          statement_due_at: cancellationProposal!.statement_due_at,
+        }
+      : null,
   };
 
   const nextStep = getRequestNextStep(workspaceInput);
@@ -372,7 +390,7 @@ const AdminRequestDetails = () => {
           eyebrow="Admin request review"
           title={snapshot.title}
           meta={meta}
-          statusLabel={getListingRequestStatusLabel(request.status, request)}
+          statusLabel={getListingRequestStatusLabel(request.status, request, request)}
           statusTone={getListingRequestStatusTone(request.status)}
           stages={getRequestStages(workspaceInput)}
           actions={
@@ -384,11 +402,14 @@ const AdminRequestDetails = () => {
             </Link>
           }
           notice={
-            (request.status === "declined" || request.status === "archived") && (
+            (request.status === "declined" ||
+              request.status === "archived" ||
+              request.status === "cancelled") && (
               <RequestStatusNotice
                 status={request.status}
                 reason={request.creator_status_reason}
                 archiveContext={request}
+                cancellationContext={request}
               />
             )
           }
@@ -413,7 +434,9 @@ const AdminRequestDetails = () => {
           requestReadOnlyMessage={
             request.status === "archived"
               ? "Archived requests are read-only."
-              : "Declined requests are read-only because the conversation has been ended."
+              : request.status === "cancelled"
+                ? "Cancelled requests are read-only."
+                : "Declined requests are read-only because the conversation has been ended."
           }
         />
       }

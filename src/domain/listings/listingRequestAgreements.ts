@@ -117,6 +117,18 @@ export const getListingRequestPaymentStructureLabel = (
       ? "Deposit + balance"
       : "Milestone payments";
 
+// Sprint 4 (launch-scope.md section 5.4): a null included_revision_count
+// means the agreement never stated a number, and Refund Policy section 5's
+// fallback is two rounds per separately priced deliverable. A stored 0
+// predates this migration and is left exactly as written -- it is not
+// treated as "not stated."
+export const DEFAULT_LISTING_REQUEST_INCLUDED_REVISION_COUNT = 2;
+
+export const getListingRequestIncludedRevisionCount = (
+  includedRevisionCount: number | null
+): number =>
+  includedRevisionCount ?? DEFAULT_LISTING_REQUEST_INCLUDED_REVISION_COUNT;
+
 export const getListingRequestPaymentTimingLabel = (
   timing: ListingRequestPaymentTiming
 ): string =>

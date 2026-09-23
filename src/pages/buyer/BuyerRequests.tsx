@@ -342,6 +342,7 @@ const BuyerRequests = ({
                       >
                         {getListingRequestStatusLabel(
                           item.request.status,
+                          item.request,
                           item.request
                         )}
                       </div>

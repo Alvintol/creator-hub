@@ -42,7 +42,10 @@ const fetchBuyerRequest = async (
     archived_at,
     archived_by_user_id,
     completed_at,
-    completed_by_user_id
+    completed_by_user_id,
+    cancelled_at,
+    cancelled_by_user_id,
+    cancellation_reason
   `)
     .eq("id", requestId)
     .eq("buyer_user_id", userId)

@@ -33,6 +33,9 @@ export type BuyerListingRequestRow = {
   archived_by_user_id: string | null;
   completed_at: string | null;
   completed_by_user_id: string | null;
+  cancelled_at: string | null;
+  cancelled_by_user_id: string | null;
+  cancellation_reason: string | null;
 };
 
 export type BuyerListingRequestProfile = {
@@ -147,7 +150,10 @@ const fetchMyBuyerRequests = async (
           archived_at,
           archived_by_user_id,
           completed_at,
-          completed_by_user_id
+          completed_by_user_id,
+          cancelled_at,
+          cancelled_by_user_id,
+          cancellation_reason
         )
       `,
       {

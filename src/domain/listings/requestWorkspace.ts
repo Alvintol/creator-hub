@@ -25,6 +25,12 @@ export type RequestWorkspaceSectionId =
   | "progress"
   | "snapshot";
 
+export type RequestWorkspaceCancellationProposalStatus =
+  | "pending_creator_statement"
+  | "pending_buyer_response"
+  | "accepted"
+  | "disputed";
+
 export type RequestWorkspaceInput = {
   requestStatus: ListingRequestStatus;
   agreement: {
@@ -47,6 +53,14 @@ export type RequestWorkspaceInput = {
     created_at?: string;
     version_number?: number;
   }>;
+  // Sprint 4 (launch-scope.md section 5.2): an open post-payment
+  // cancellation proposal takes priority over the ordinary workflow steps
+  // below -- neither party should be nudged to pay a milestone or submit
+  // delivery while a cancellation is being negotiated.
+  cancellationProposal?: {
+    status: RequestWorkspaceCancellationProposalStatus;
+    statement_due_at?: string | null;
+  } | null;
 };
 
 export type RequestStageState = "done" | "current" | "upcoming";
@@ -106,7 +120,11 @@ export const getRequestMilestoneProgress = (
 export const getRequestStages = (input: RequestWorkspaceInput): RequestStage[] => {
   const { requestStatus, agreement } = input;
 
-  if (requestStatus === "declined" || requestStatus === "archived") {
+  if (
+    requestStatus === "declined" ||
+    requestStatus === "archived" ||
+    requestStatus === "cancelled"
+  ) {
     return [];
   }
 
@@ -202,6 +220,71 @@ export const getRequestNextStep = (input: RequestWorkspaceInput): RequestNextSte
       waitingTitle: "Request archived",
       waitingDescription: "Archived requests are kept for your records and are read-only.",
     });
+  }
+
+  if (requestStatus === "cancelled") {
+    return step({
+      key: "cancelled",
+      owner: null,
+      tone: "closed",
+      actionTitle: "Request cancelled",
+      actionDescription: "This request was cancelled and is now read-only.",
+      waitingTitle: "Request cancelled",
+      waitingDescription: "This request was cancelled and is now read-only.",
+    });
+  }
+
+  if (input.cancellationProposal) {
+    const { cancellationProposal } = input;
+
+    if (cancellationProposal.status === "disputed") {
+      return step({
+        key: "cancellation-disputed",
+        owner: null,
+        tone: "closed",
+        actionTitle: "Cancellation under review",
+        actionDescription:
+          "The cancellation statement was disputed. Made for Stream will review and decide.",
+        waitingTitle: "Cancellation under review",
+        waitingDescription:
+          "The cancellation statement was disputed. Made for Stream will review and decide.",
+        sectionId: "request",
+      });
+    }
+
+    if (cancellationProposal.status === "pending_creator_statement") {
+      return step({
+        key: "submit-cancellation-statement",
+        owner: "creator",
+        tone: "action",
+        actionTitle: "Submit the cancellation statement",
+        actionDescription:
+          "A cancellation was proposed. Provide an itemised earned-value statement for each paid payment.",
+        actionLabel: "Open cancellation",
+        waitingTitle: "Waiting for the creator's cancellation statement",
+        waitingDescription: cancellationProposal.statement_due_at
+          ? `The creator has until ${new Date(
+              cancellationProposal.statement_due_at
+            ).toLocaleString()} to respond.`
+          : "The creator has three business days to respond.",
+        sectionId: "request",
+      });
+    }
+
+    if (cancellationProposal.status === "pending_buyer_response") {
+      return step({
+        key: "respond-cancellation-statement",
+        owner: "buyer",
+        tone: "action",
+        actionTitle: "Review the cancellation statement",
+        actionDescription:
+          "The creator itemised what they consider earned. Accept it or dispute it.",
+        actionLabel: "Review cancellation",
+        waitingTitle: "Waiting for the buyer to respond to the cancellation statement",
+        waitingDescription: "The project stays open until they accept or dispute it.",
+        sectionId: "request",
+      });
+    }
   }
 
   if (requestStatus === "completed") {
