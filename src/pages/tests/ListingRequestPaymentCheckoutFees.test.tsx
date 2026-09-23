@@ -20,6 +20,13 @@ vi.mock("../../hooks/payments/useCreateListingRequestPaymentCheckout", () => ({
   }),
 }));
 
+vi.mock("../../hooks/payments/useSetListingRequestPaymentTipAndSupport", () => ({
+  useSetListingRequestPaymentTipAndSupport: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+}));
+
 // The embedded Stripe checkout only mounts after policy acceptance, which this
 // test never performs -- the fee disclosure renders above it either way.
 vi.mock("@stripe/react-stripe-js", () => ({

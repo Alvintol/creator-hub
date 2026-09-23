@@ -22,6 +22,20 @@ vi.mock("../../hooks/payments/useCreatorPaymentAccount", () => ({
   getCreatorPaymentAccountIsReady: () => false,
 }));
 
+// Sprint 5: the recovery balance section renders nothing when there is no
+// outstanding balance, which is the case this file's tests are about.
+vi.mock("../../hooks/payments/useCreatorRecoveryBalance", () => ({
+  useCreatorRecoveryBalance: () => ({ data: null }),
+  useCreatorRecoveryEntries: () => ({ data: [] }),
+}));
+
+vi.mock("../../hooks/payments/useCreateCreatorRecoverySettlementCheckout", () => ({
+  useCreateCreatorRecoverySettlementCheckout: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+}));
+
 vi.mock("../../hooks/payments/useStripeConnectOnboarding", () => ({
   useSyncStripeConnectAccount: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));

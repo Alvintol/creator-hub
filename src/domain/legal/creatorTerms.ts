@@ -1,7 +1,7 @@
 // REVIEW DRAFT: placeholders are intentionally left in place until the
 // operating entity, brand and domain are finalized. Safe to keep live
 // pre-launch; must be resolved before public launch.
-export const creatorTermsVersion = "2026-09-20-draft-1";
+export const creatorTermsVersion = "2026-09-22-draft-1";
 
 export const creatorTermsSections = [
   {
@@ -33,6 +33,7 @@ export const creatorTermsSections = [
       "The Fee Schedule and Payment Terms sets the creator platform fee at 5% of each base payment, subject to its currency-specific minimum. Buyer fees are separately disclosed to the buyer. Tips are excluded from Made for Stream fees; optional platform support belongs to Made for Stream. Do not describe tips as exempt from Stripe costs or imply that support is paid to you.",
       "You are responsible for returning unearned or otherwise refundable creator proceeds and for transaction-related provider charges allocated to you by the applicable accepted terms. Made for Stream must reverse its refundable fee allocation. You must maintain sufficient funds or arrange lawful funding with Stripe to meet refunds and reversals; a payout already received does not cancel the obligation.",
       "If Made for Stream pays an amount properly attributable to your refundable proceeds or your disclosed provider obligations, it may request reimbursement with an itemised explanation, supporting transaction reference and a reasonable opportunity to dispute an error. Any set-off must be lawful, authorised and limited to substantiated amounts; this clause is not an unrestricted right to debit your bank account or shift Made for Stream's own errors or all platform liabilities to you. Stripe's actual loss allocation remains effective regardless of this clause.",
+      "Concretely, this reimbursement is recorded as a recovery balance: an itemised amount you owe, visible in your account settings with its full history. While a recovery balance is outstanding, buyers cannot send you new commission requests, but your existing projects and payments continue unaffected. It clears in one of three ways: automatically, by diverting up to 50% of the base amount of each of your subsequent payments until it reaches zero; by settling it directly at any time, by card; or, exceptionally, by Made for Stream writing it off as unrecoverable. None of this changes the underlying obligation described above — it is how that obligation is administered.",
       "Payout dates depend on settlement, verification, reserves and banking processes. Made for Stream does not provide escrow or guarantee a payout date. Keep your account requirements current and do not publish or reactivate paid listings while payment readiness is missing. Restrictions on new business do not excuse completing, cancelling or refunding existing projects."
     ]
   },

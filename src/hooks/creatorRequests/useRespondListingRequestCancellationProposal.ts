@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "../../lib/supabaseClient";
+import { drainFlaggedListingRequestRefunds } from "../payments/drainFlaggedListingRequestRefunds";
 import { expireCancelledCheckoutSessions } from "../payments/expireCancelledCheckoutSessions";
 import { useAuth } from "../../providers/AuthProvider";
 
@@ -64,6 +65,16 @@ export const useRespondListingRequestCancellationProposal = () => {
 
       if (result.payments_to_expire?.length) {
         await expireCancelledCheckoutSessions({
+          listingRequestId: input.requestId,
+          accessToken: session?.access_token,
+        });
+      }
+
+      // Sprint 5: an acceptance flags unearned prepaid amounts for refund
+      // (Sprint 4's cascade); drain that queue now rather than waiting on an
+      // admin to notice it.
+      if (result.status === "accepted") {
+        await drainFlaggedListingRequestRefunds({
           listingRequestId: input.requestId,
           accessToken: session?.access_token,
         });

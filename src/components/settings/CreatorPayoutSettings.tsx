@@ -33,6 +33,7 @@ import {
 import { useSyncStripeConnectAccount } from "../../hooks/payments/useStripeConnectOnboarding";
 import { getStripePublishableKey } from "../../lib/stripeClient";
 import { useAuth } from "../../providers/AuthProvider";
+import CreatorRecoveryBalanceSection from "./CreatorRecoveryBalanceSection";
 
 type CreatorPayoutSettingsProps = {
   isCreatorApproved: boolean;
@@ -313,6 +314,8 @@ const CreatorPayoutSettings = ({ isCreatorApproved }: CreatorPayoutSettingsProps
           </ConnectComponentsProvider>
         </div>
       )}
+
+      <CreatorRecoveryBalanceSection />
     </>
   );
 };

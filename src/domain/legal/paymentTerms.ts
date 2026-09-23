@@ -1,5 +1,5 @@
 // REVIEW DRAFT: resolve publication inputs and implement linked workflows before adoption.
-export const paymentTermsVersion = "2026-09-20-draft-1";
+export const paymentTermsVersion = "2026-09-22-draft-1";
 
 export const paymentTermsSections = [
   {
@@ -46,7 +46,8 @@ export const paymentTermsSections = [
       "Commission payments are processed as direct charges on the creator's Stripe connected account. Made for Stream collects its buyer and creator fees and any optional platform support through the payment arrangement. The creator is the supplier of the commissioned work. This description does not waive Made for Stream's own obligations or determine every tax or regulatory responsibility.",
       "Stripe processing, payout, conversion and dispute charges are separate from Made for Stream fees. The creator is responsible for those transaction-related charges to the extent charged to their connected account or expressly disclosed to and accepted by them. Made for Stream will not silently pass on a new category of platform expense. The allocation of liabilities between Stripe and Made for Stream remains governed by their actual agreement and account configuration.",
       "Payout timing depends on Stripe account status, settlement, verification, reserves and banking systems. A displayed estimate is not a guarantee. Payment confirmation, project acceptance and bank payout are separate events. Made for Stream does not provide escrow, a trust account or a promise that all funds are held pending acceptance.",
-      "Creators must complete required onboarding, keep information current and maintain payment readiness. We may pause new paid work if required capabilities are restricted; existing refund and support obligations continue."
+      "Creators must complete required onboarding, keep information current and maintain payment readiness. We may pause new paid work if required capabilities are restricted; existing refund and support obligations continue.",
+      "A short payout hold applies after each charge so refund funds are ordinarily still available if needed; its exact length is set by Stripe and is not a number Made for Stream guarantees. Where a refund exceeds what is available in a creator's Stripe balance, Made for Stream may fund the shortfall and recover it from the creator as described in the Creator Terms — while any amount is outstanding, new buyer requests to that creator are paused until it clears."
     ]
   },
   {

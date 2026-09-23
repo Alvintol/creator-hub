@@ -23,6 +23,32 @@ vi.mock("../../hooks/admin/useAdminRequest", () => ({
   useAdminRequest: mocks.useAdminRequest,
 }));
 
+// Sprint 5 additions to this page's "payments" section -- neither refund
+// panel is under test here, so both are given inert defaults matching the
+// common case (nothing refundable, no outstanding recovery balance).
+vi.mock("../../hooks/payments/useListingRequestPayments", () => ({
+  useListingRequestPayments: () => ({ data: [], isLoading: false }),
+}));
+
+vi.mock("../../hooks/admin/useAdminIssueListingRequestPaymentRefund", () => ({
+  useAdminIssueListingRequestPaymentRefund: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+}));
+
+vi.mock("../../hooks/payments/useCreatorRecoveryBalance", () => ({
+  useCreatorRecoveryBalance: () => ({ data: null }),
+  useCreatorRecoveryEntries: () => ({ data: [] }),
+}));
+
+vi.mock("../../hooks/admin/useAdminWriteOffCreatorRecoveryBalance", () => ({
+  useAdminWriteOffCreatorRecoveryBalance: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+}));
+
 vi.mock(
   "../../hooks/creatorRequests/useListingRequestCancellationProposal",
   () => ({

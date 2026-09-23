@@ -7,6 +7,7 @@ import ListingRequestPaymentCheckout from "../payments/ListingRequestPaymentChec
 const mocks = vi.hoisted(() => ({
   payment: null as Record<string, unknown> | null,
   createCheckout: vi.fn(),
+  setTipAndSupport: vi.fn(),
 }));
 
 vi.mock("../../hooks/payments/useListingRequestPayments", () => ({
@@ -15,6 +16,13 @@ vi.mock("../../hooks/payments/useListingRequestPayments", () => ({
 
 vi.mock("../../hooks/payments/useCreateListingRequestPaymentCheckout", () => ({
   useCreateListingRequestPaymentCheckout: () => ({ mutateAsync: mocks.createCheckout }),
+}));
+
+vi.mock("../../hooks/payments/useSetListingRequestPaymentTipAndSupport", () => ({
+  useSetListingRequestPaymentTipAndSupport: () => ({
+    mutateAsync: mocks.setTipAndSupport,
+    isPending: false,
+  }),
 }));
 
 vi.mock("../../lib/stripeClient", () => ({
@@ -64,6 +72,7 @@ describe("ListingRequestPaymentCheckout", () => {
       payment: { stripe_connected_account_id: "acct_123" },
       checkout: { clientSecret: "cs_secret" },
     });
+    mocks.setTipAndSupport.mockReset().mockResolvedValue({});
   });
 
   it("shows what the buyer is paying before checkout", () => {
@@ -75,13 +84,16 @@ describe("ListingRequestPaymentCheckout", () => {
     expect(screen.getByText("$105.00")).toBeInTheDocument();
   });
 
-  it("does not create a Stripe checkout session until the policies are accepted", async () => {
+  it("does not create a Stripe checkout session until the tip/contribution step and the policies are accepted", async () => {
     renderCheckout();
 
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(mocks.createCheckout).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Accept for request-1" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to payment" }));
+    await waitFor(() => expect(mocks.setTipAndSupport).toHaveBeenCalled());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Accept for request-1" }));
 
     await waitFor(() => expect(mocks.createCheckout).toHaveBeenCalledWith({ paymentId: "payment-1" }));
     expect(await screen.findByText("Stripe embedded checkout")).toBeInTheDocument();
@@ -90,7 +102,9 @@ describe("ListingRequestPaymentCheckout", () => {
   it("creates only one session when acceptance is reported more than once", async () => {
     renderCheckout();
 
-    const accept = screen.getByRole("button", { name: "Accept for request-1" });
+    fireEvent.click(screen.getByRole("button", { name: "Continue to payment" }));
+
+    const accept = await screen.findByRole("button", { name: "Accept for request-1" });
     fireEvent.click(accept);
     fireEvent.click(accept);
 

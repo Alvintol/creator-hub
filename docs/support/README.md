@@ -136,6 +136,7 @@ how it fails.
 | Payments | [`payments/webhooks.md`](payments/webhooks.md) |
 | Payments | [`payments/connect-onboarding.md`](payments/connect-onboarding.md) |
 | Payments | [`payments/refunds-and-disputes.md`](payments/refunds-and-disputes.md) |
+| Payments | [`payments/creator-recovery-balances.md`](payments/creator-recovery-balances.md) |
 | Discovery | [`discovery/twitch-live.md`](discovery/twitch-live.md) |
 
 Several playbooks record gaps that were product decisions rather than support

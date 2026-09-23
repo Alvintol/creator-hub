@@ -8,7 +8,7 @@ Every item follows `AGENTS.md`: enforcement at the database and API rather than 
 UI alone, the next free migration number taken from `supabase/migrations/`, and a
 support playbook written or updated before the branch is ready.
 
-**Baselines to hold** (measured 2026-09-22, end of Sprint 4): **880 tests
+**Baselines to hold** (measured 2026-09-22, end of Sprint 5): **899 tests
 passing, eslint clean, tsc clean, `npx vite build` clean.** `AGENTS.md` still
 records the older 740 / 21 errors / 19 lines — those were cleaned up since and
 it is gitignored, so this file is the current reference.
@@ -491,70 +491,158 @@ contribution at all.
 
 **Refund execution**
 
-- [ ] Migration: an **immutable refund ledger** — one row per Stripe refund with its
-      amount, the buyer and creator fees reversed with it, actor, reason and
-      timestamp. The existing columns are a single nullable `stripe_refund_id` and a
-      single `refunded_at`, with **no amount and no history**, so two partial refunds
-      against one payment have nowhere to go (§6.2). This lands *with* the refund
-      feature, not after it.
-- [ ] Derive `partially_refunded` and `refunded` from the sum of settled refunds
-      rather than writing them directly, so the status cannot drift from Stripe.
-- [ ] `security definer` RPC `apply_refunded_listing_request_payment`, following the
-      `apply_paid_listing_request_*` shape, writing the ledger row and deriving
-      status.
-- [ ] Proportional cumulative fee arithmetic per §6.2, using registry exponents, with
-      tests covering repeated partial refunds and the final rounding remainder.
-- [ ] Admin-only refund route: `stripe.refunds.create` on the connected account with
-      `refund_application_fee: true`.
-- [ ] Cascade the request per §6.7.
-- [ ] `charge.refunded` webhook branch now writes status, so a refund issued directly
-      in Stripe reconciles instead of diverging.
+- [x] Migration: an **immutable refund ledger** —
+      `listing_request_payment_refunds`, one row per Stripe refund with its
+      base/buyer-fee/creator-fee/tip/contribution amounts, actor, reason,
+      `initiated_via` and timestamp. Built in `20260922_125`.
+- [x] Derive `partially_refunded` and `refunded` from the sum of settled refunds
+      rather than writing them directly. `derive_listing_request_payment_refund_status`
+      (`20260922_125`), called from inside `apply_refunded_listing_request_payment`
+      in the same transaction as the ledger insert.
+- [x] `security definer` RPC `apply_refunded_listing_request_payment`
+      (`20260922_125`), following the `apply_paid_listing_request_*` shape —
+      idempotent on `stripe_refund_id`, writes the ledger row, derives status,
+      cascades the request, and closes Sprint 4's loop by setting
+      `refunded_at` on any covered `listing_request_cancellation_proposal_items` row.
+- [x] Proportional cumulative fee arithmetic per §6.2, mirrored in two places for
+      testability (the SQL function is the source of truth; `api/refundArithmetic.js`
+      is what the admin route uses before calling Stripe, and
+      `src/domain/payments/listingRequestPaymentRefunds.ts` is what the admin UI
+      preview uses) — both have vitest coverage of repeated partial refunds and the
+      final rounding remainder (`api/tests/refundArithmetic.test.js`,
+      `src/domain/tests/listingRequestPaymentRefunds.test.ts`).
+- [x] Admin-only refund route: `POST /api/stripe/refunds`
+      (`src/components/listingRequests/payments/ListingRequestPaymentAdminRefundPanel.tsx`
+      on `/admin/requests/:id`, not `/admin/payment-issues` — that page only lists
+      payments with an *existing* dispute or refund). **Deviates from the literal
+      "refund_application_fee: true" wording** in favour of two explicit calls
+      (`stripe.refunds.create` for the buyer's share, then the Application Fee
+      Refunds API for the creator-fee/contribution reversal) — see the comment
+      above the route for why: `refund_application_fee`'s automatic ratio is based
+      on the whole charge amount, not the base amount §6.2's cumulative arithmetic
+      needs exact control over.
+- [x] Cascade the request per §6.7, via one unified rule rather than one branch per
+      table row (see the comment in `apply_refunded_listing_request_payment`):
+      a milestone payment being refunded at all cancels that milestone, and the
+      request is cancelled once no payment on it remains `paid`/`partially_refunded`,
+      unless already `completed`.
+- [x] `charge.refunded` webhook branch now calls `apply_refunded_listing_request_payment`
+      (`initiated_via = 'webhook_external'`) instead of only recording a pointer, so a
+      refund issued directly in Stripe reconciles. Its base/fee split is a
+      best-effort attribution (the whole refund amount, since there is no stored
+      intent to split against) — documented in `refunds-and-disputes.md`.
 
 **Tips and platform contributions (§4)**
 
-- [ ] Tip and contribution controls on the checkout page, both defaulting to zero and
-      requiring affirmative selection per Fee Schedule §4.
-- [ ] API route recomputing `total_checkout_cents` and `application_fee_cents` and
-      reissuing the Stripe session. Verify the `updated_at` idempotency key rotates
-      as intended when the amount changes.
-- [ ] Confirm the schema's existing check constraints hold: a tip raises the total
-      but not the application fee; a contribution raises both.
-- [ ] Tips and contributions must not consume or count toward the monthly fee
-      minimum (§3.1).
-- [ ] A tip falls under the payout hold as creator money; a contribution does not.
-- [ ] Contribution refunds per Refund Policy §8 — returned in full on a full
-      cancellation, **not** prorated on a partial refund, requestable within 14 days
-      of the contribution or the cancellation whichever is later, and reviewable
-      outside that window when mistaken, duplicate or unauthorised. This is a
-      separate path with its own clock; give it its own tests.
+- [x] Tip and contribution controls on the checkout page
+      (`ListingRequestPaymentCheckout.tsx`), both defaulting to empty/zero and
+      gating the policy-acceptance step (and therefore Stripe Checkout) behind an
+      explicit "Continue to payment" click.
+- [x] `set_listing_request_payment_tip_and_support` RPC (`20260922_126`) writes the
+      amounts and recomputes `total_checkout_cents`/`application_fee_cents` in the
+      same statement. No separate "reissue" API route was needed: the existing
+      `POST /api/stripe/checkout/session` already calls
+      `recompute_listing_request_payment_amounts` (20260922_120, which turned out to
+      already preserve stored tip/support rather than zeroing them) before every
+      session creation, and its idempotency key is keyed on `updated_at`, which the
+      new RPC bumps — verified the RPC also resets `checkout_opened` back to
+      `requires_checkout` and clears the stale session id when the amount changes
+      after a session was already opened, the same self-heal
+      `recompute_listing_request_payment_amounts` does for drift.
+- [x] Confirmed the schema's existing check constraints hold: a tip raises the total
+      but not the application fee; a contribution raises both. Unchanged — the RPC
+      computes both sides itself rather than trusting the constraint alone.
+- [x] Tips and contributions do not consume or count toward any fee minimum —
+      §3.1 already removed the fee minimum entirely, and tips/contributions were
+      never part of the buyer/creator fee bps calculation to begin with.
+- [x] A tip falls under the payout hold as creator money (it was already part of
+      the connected account's balance, untouched by any Sprint 5 change); a
+      contribution is part of `application_fee_cents` and therefore reaches the
+      platform immediately, same as before.
+- [x] Contribution refunds per Refund Policy §8, built into the same refund ledger
+      rather than a separate table: `apply_refunded_listing_request_payment` never
+      auto-prorates `p_tip_refund_cents`/`p_contribution_refund_cents` on a partial
+      base refund, and enforces the 14-day-from-payment-or-cancellation window
+      (with a mistaken/duplicate/unauthorised override) only when the refund is
+      *not* a full-cancellation-style one. Window logic has its own tests in both
+      mirrors (`isTipOrContributionRefundWithinWindow` in
+      `listingRequestPaymentRefunds.test.ts`).
 
 **Platform-funded refunds (§6.5)**
 
-- [ ] Migration: `creator_recovery_balances` and a `creator_recovery_entries` ledger
-      — one debit when the platform funds a refund, one credit per recovery.
-- [ ] Refund path takes from the held balance first (§6.3), and only funds a
-      shortfall from the platform — opening a recovery balance — when the hold has
-      already released.
-- [ ] Add the outstanding-balance check to the `listing requests buyer insert` RLS
-      policy on `public.listing_requests`. This is the enforcement boundary — the UI
-      check is a courtesy on top of it.
-- [ ] Listing and creator-profile UI explain why a request cannot be sent, without
-      exposing the creator's financial detail to buyers.
-- [ ] Recovery on subsequent payments: raise `application_fee_amount` by the recovery
-      instalment, **capped at 50% of the base payment** (§6.6), respecting
-      `application_fee_cents < total_checkout_cents`.
-- [ ] Creator settings: balance visible, entry history, and a direct settlement path
-      (a platform charge on their card, not on the connected account).
-- [ ] Automatic release — the block lifts when the balance reaches zero, with no
-      admin action.
-- [ ] Admin write-off action for a balance that will never be recovered.
-- [ ] Tests covering the recovery cap, the partial recovery across several payments,
-      and the release.
-- [ ] Creator Terms and Fee Schedule §5 disclose the recovery obligation **before** a
-      creator can incur one.
-- [ ] Playbook: `payments/refunds-and-disputes.md` stops being a gap document;
-      `REF-001` and `REF-002` gain real resolutions, and recovery balances get their
-      own issues.
+- [x] Migration: `creator_recovery_balances` and `creator_recovery_entries`
+      (`20260922_127`) — one debit when the platform funds a refund shortfall, one
+      credit per recovery (diversion, direct settlement, or write-off), all through
+      `apply_creator_recovery_debit`/`apply_creator_recovery_credit`.
+- [x] Refund path takes from the held balance first, automatically: before
+      calling `stripe.refunds.create`, `issueListingRequestPaymentRefund`
+      checks the connected account's own available balance
+      (`stripe.balance.retrieve`) for the refund's currency. While the hold
+      is in effect there is normally enough available balance, so no top-up
+      happens. Once it is genuinely insufficient, the platform tops up the
+      account by exactly the shortfall (`stripe.transfers.create`) before
+      issuing the refund, then opens a recovery balance
+      (`apply_creator_recovery_debit`) for that same shortfall amount — never
+      the whole refund. This is the one path in this sprint that could not be
+      exercised against a real Stripe test-mode charge (see "Verified" below).
+- [x] Outstanding-balance check added to the `listing requests buyer insert` RLS
+      policy (`20260922_128`), via a shared boolean function
+      (`creator_has_outstanding_recovery_balance`) the buyer-facing UI also calls,
+      so the two can never disagree about whether a request would be blocked.
+- [x] Listing/request UI (`RequestListing.tsx`) shows a plain "Requests are paused
+      for this creator" message without exposing the balance.
+- [x] Recovery on subsequent payments: `resolve_listing_request_payment_recovery_instalment`
+      (`20260922_129`), folded into `application_fee_cents` in both
+      `ensure_listing_request_payment_for_schedule_item` and
+      `recompute_listing_request_payment_amounts` so the two can't diverge, capped at
+      `least(50% of base, outstanding balance)`. Applied to the balance once the
+      payment is marked paid (`apply_listing_request_payment_recovery_instalment`,
+      idempotent via `recovery_instalment_applied_at`).
+- [x] Creator settings (`CreatorRecoveryBalanceSection.tsx` in
+      `CreatorPayoutSettings.tsx`): balance visible, entry history, and a direct
+      settlement path — a plain (non-Connect) Stripe Checkout session on the
+      platform's own account (`POST /api/stripe/recovery/settlement-session`,
+      `creator_recovery_settlement_payments` table, `20260922_130`).
+- [x] Automatic release — `apply_creator_recovery_credit` floors `outstanding_cents`
+      at zero with no separate status column, so the RLS block lifts the moment it
+      reaches zero with no admin action.
+- [x] Admin write-off action (`admin_write_off_creator_recovery_balance`, callable
+      from `/admin/requests/:id`'s `CreatorRecoveryBalanceAdminPanel.tsx`).
+- [x] Tests: the cap and partial-recovery-across-several-payments logic is mirrored
+      in `src/domain/payments/creatorRecoveryBalance.ts`
+      (`resolveRecoveryInstalmentCents`) with its own suite
+      (`creatorRecoveryBalance.test.ts`) covering the 50% cap, a balance recovered
+      across three payments, and release at zero. The SQL functions themselves have
+      no automated test (no live-database test harness exists in this repo — see
+      Baselines note) and were only inspected, not applied or run.
+- [x] Creator Terms §4 and Fee Schedule §5 disclose the recovery mechanism
+      (concrete: blocked new requests, 50% diversion cap, direct settlement, admin
+      write-off) before a creator can incur one. Both documents' versions bumped
+      (`2026-09-22-draft-1`) with fingerprints recorded in
+      `policyVersionIntegrity.test.ts`; `api/policyVersions.js`'s
+      `payment_terms` entry bumped to match, per that file's own
+      keep-in-sync-by-hand warning.
+- [x] Playbooks: `payments/refunds-and-disputes.md` rewritten — `REF-001`/`REF-002`
+      have real resolutions, `status: partial` → `active`. New
+      `payments/creator-recovery-balances.md` (`REC-001`–`REC-004`).
+      `requests/cancellation.md` updated: `CAN-004` is now actionable (not
+      resolved-as-a-state), `CAN-005` is now closed automatically
+      (`refundStrayPaymentOnCancelledRequest`), new `CAN-006` for the
+      accepted-cancellation refund-drain follow-up call failing.
+
+**Verified:** `npx vitest run` (899 passing, up from 880 — 19 new: 9 refund/window
+arithmetic, 5 recovery-cap, 5 mirrored in `api/tests/refundArithmetic.test.js`),
+`npx tsc --noEmit` (clean), `npx eslint .` (clean),
+`npx vite build` (clean), `node --check api/server.js` and
+`node --check api/refundArithmetic.js` (clean). **Not verified by this pass**: the
+SQL migrations (`20260922_125`–`130`) were inspected against the live schema (exact
+current constraint names, existing table state) via read-only queries, but not
+applied — this repo's established pattern (Sprint 3/4 did the same) is to hand the
+migration files to the user rather than apply them from an agent session. The
+Stripe Application Fee Refunds API two-call approach, the platform-funded top-up
+path, and the settlement Checkout session have **not** been exercised against a
+real Stripe test-mode charge — there is no live traffic yet (per Sprint 4's own
+note), so there was nothing to test against.
 
 ---
 

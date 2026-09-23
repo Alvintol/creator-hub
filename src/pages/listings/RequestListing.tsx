@@ -14,6 +14,7 @@ import {
   type ListingRequestFormErrors,
 } from "../../domain/listings/listingRequestForm";
 import { useActiveListingRequestForListing } from "../../hooks/listings/useActiveListingRequestForListing";
+import { useCreatorHasOutstandingRecoveryBalance } from "../../hooks/listings/useCreatorHasOutstandingRecoveryBalance";
 
 const TITLE_MAX = 120;
 const DETAILS_MAX = 2000;
@@ -153,6 +154,9 @@ const RequestListing = () => {
   const { data, isLoading, error } = usePublicListing(id ?? null);
   const createRequestMutation = useCreateListingRequest();
   const activeRequestQuery = useActiveListingRequestForListing(id ?? null);
+  const recoveryBalanceQuery = useCreatorHasOutstandingRecoveryBalance(
+    data?.listing?.user_id ?? null,
+  );
 
   const [requestTitle, setRequestTitle] = useState("");
   const [requestDetails, setRequestDetails] = useState("");
@@ -285,6 +289,18 @@ const RequestListing = () => {
       >
         You already have an active request for this listing. Continue the conversation from
         your request page.
+      </StateCard>
+    );
+  }
+
+  if (recoveryBalanceQuery.data) {
+    return (
+      <StateCard
+        backTo={listingPath}
+        backLabel="Back to listing"
+        title="Requests are paused for this creator"
+      >
+        This creator can&rsquo;t accept new requests right now. Please check back later.
       </StateCard>
     );
   }

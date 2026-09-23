@@ -29,6 +29,8 @@ import RequestConversationThread from '../../components/listingRequests/conversa
 import ListingRequestSubmissionDetails from '../../components/listingRequests/core/ListingRequestSubmissionDetails';
 import ListingRequestFinalDeliverySummary from '../../components/listingRequests/finalDeliveries/ListingRequestFinalDeliverySummary';
 import ListingRequestAgreementAdminPaymentActions from '../../components/listingRequests/payments/ListingRequestAgreementAdminPaymentActions';
+import ListingRequestPaymentAdminRefundPanel from '../../components/listingRequests/payments/ListingRequestPaymentAdminRefundPanel';
+import CreatorRecoveryBalanceAdminPanel from '../../components/listingRequests/payments/CreatorRecoveryBalanceAdminPanel';
 import ListingRequestChangeOrderPaymentAdminActions from '../../components/listingRequests/payments/ListingRequestChangeOrderPaymentAdminActions';
 import ListingRequestFinalBalancePaymentAdminActions from '../../components/listingRequests/payments/ListingRequestFinalBalancePaymentAdminActions';
 import ListingRequestProgressUpdateScheduleCard from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateScheduleCard';
@@ -263,6 +265,9 @@ const AdminRequestDetails = () => {
               confirmFinalBalancePaymentMutation.mutateAsync({ paymentScheduleItemId })
             }
           />
+
+          <ListingRequestPaymentAdminRefundPanel listingRequestId={request.id} />
+          <CreatorRecoveryBalanceAdminPanel creatorUserId={request.creator_user_id} />
         </>
       ),
     },
