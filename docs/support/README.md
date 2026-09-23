@@ -132,6 +132,7 @@ how it fails.
 | Requests | [`requests/cancellation.md`](requests/cancellation.md) |
 | Messaging | [`messaging/conversations.md`](messaging/conversations.md) |
 | Messaging | [`messaging/moderation.md`](messaging/moderation.md) |
+| Messaging | [`messaging/transactional-email.md`](messaging/transactional-email.md) |
 | Payments | [`payments/checkout.md`](payments/checkout.md) |
 | Payments | [`payments/webhooks.md`](payments/webhooks.md) |
 | Payments | [`payments/connect-onboarding.md`](payments/connect-onboarding.md) |

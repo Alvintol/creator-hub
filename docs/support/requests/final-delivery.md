@@ -196,9 +196,11 @@ complete.
   documented path back. If a buyer approves in error, or the delivered work turns
   out to be wrong, the only remedy is a refund — and no refund path exists. See
   [`refunds-and-disputes.md`](../payments/refunds-and-disputes.md).
-- **No policy for a buyer who never responds to a delivery.** The creator has
-  finished the work and cannot close the project. See
-  [`request-lifecycle.md`](request-lifecycle.md) `REQ-003`.
+- **A buyer who never responds to a delivery** now has a documented, implemented
+  path — the creator sends a non-response notice, waits 7+7 days, then requests
+  administrative closure. See [`request-lifecycle.md`](request-lifecycle.md)
+  `REQ-003`. Not automatic: an admin has to act, and closure cancels the
+  unfinished delivery rather than treating it as approved.
 - **Delivery links are not verified.** Nothing checks that a link resolves, so a
   dead or revoked link is indistinguishable from a good one at approval time.
 - **No alerting for `FIN-004`.**

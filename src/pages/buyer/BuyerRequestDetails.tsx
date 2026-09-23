@@ -63,6 +63,7 @@ import { useRespondListingRequestCancellationProposal } from '../../hooks/creato
 import { useSubmitListingRequestCancellationStatement } from '../../hooks/creatorRequests/useSubmitListingRequestCancellationStatement';
 import ListingRequestCancelBeforePaymentAction from '../../components/listingRequests/core/ListingRequestCancelBeforePaymentAction';
 import ListingRequestCancellationProposalPanel from '../../components/listingRequests/core/ListingRequestCancellationProposalPanel';
+import NoticeAndClosurePanel from '../../components/listingRequests/core/NoticeAndClosurePanel';
 
 const classes = {
   page: "space-y-6",
@@ -425,6 +426,13 @@ const BuyerRequestDetails = () => {
               respondError={respondCancellationProposalMutation.error}
               onAccept={handleAcceptCancellationProposal}
               onDispute={handleDisputeCancellationProposal}
+            />
+          )}
+
+          {request.status === "accepted" && (
+            <NoticeAndClosurePanel
+              requestId={request.id}
+              currentUserId={request.buyer_user_id}
             />
           )}
 

@@ -58,6 +58,35 @@ vi.mock(
   })
 );
 
+vi.mock("../../hooks/creatorRequests/useListingRequestNotices", () => ({
+  useListingRequestNotices: () => ({ data: [], isLoading: false }),
+}));
+
+vi.mock("../../hooks/creatorRequests/useListingRequestEarlyReviewFlags", () => ({
+  useListingRequestEarlyReviewFlags: () => ({ data: [] }),
+}));
+
+vi.mock("../../hooks/creatorRequests/useSendListingRequestNotice", () => ({
+  useSendListingRequestFirstNotice: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
+  useSendListingRequestFinalNotice: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
+}));
+
+vi.mock("../../hooks/creatorRequests/useFlagListingRequestForEarlyReview", () => ({
+  useFlagListingRequestForEarlyReview: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
+}));
+
 vi.mock(
   "../../hooks/creatorRequests/useProposeListingRequestCancellation",
   () => ({

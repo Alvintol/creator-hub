@@ -11,6 +11,7 @@ import {
   ListingRequestStatus,
 } from "../../domain/listings/listingRequests";
 import { getListingRequestDisplayPreview, getListingRequestDisplayTitle } from '../../domain/listings/listings';
+import { useAdminStaleListingRequests } from "../../hooks/admin/useAdminStaleListingRequests";
 
 const classes = {
   page: "space-y-6",
@@ -133,6 +134,12 @@ const AdminRequests = () => {
     pageSize,
   });
 
+  // Sprint 6 checklist: "Staleness query surfaced in admin: requests not
+  // advanced in 14+ days with a pending action on one side." REQ-003's db
+  // signal (docs/support/requests/request-lifecycle.md).
+  const staleRequestsQuery = useAdminStaleListingRequests(14);
+  const staleRequests = staleRequestsQuery.data ?? [];
+
   const setField = <Key extends keyof AdminRequestsFilters>(
     key: Key,
     value: AdminRequestsFilters[Key]
@@ -163,6 +170,39 @@ const AdminRequests = () => {
           listing snapshots for dispute support.
         </p>
       </div>
+
+      {staleRequests.length > 0 && (
+        <div className={classes.card}>
+          <div className={classes.section}>
+            <h2 className={classes.sectionTitle}>
+              Stale requests ({staleRequests.length})
+            </h2>
+
+            <p className={classes.text}>
+              No activity in 14+ days on an active request. May need a
+              non-response notice.
+            </p>
+
+            <ul className="space-y-2 text-sm">
+              {staleRequests.map((item) => (
+                <li key={item.listing_request_id} className={classes.row}>
+                  <Link
+                    className={classes.btnOutline}
+                    to={`/admin/requests/${item.listing_request_id}`}
+                  >
+                    View request
+                  </Link>
+
+                  <span className={classes.textMuted}>
+                    {item.days_since_activity} days inactive
+                    {item.has_open_notice ? " · notice already open" : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
       <div className={classes.card}>
         <div className={classes.section}>

@@ -31,6 +31,7 @@ import ListingRequestFinalDeliverySummary from '../../components/listingRequests
 import ListingRequestAgreementAdminPaymentActions from '../../components/listingRequests/payments/ListingRequestAgreementAdminPaymentActions';
 import ListingRequestPaymentAdminRefundPanel from '../../components/listingRequests/payments/ListingRequestPaymentAdminRefundPanel';
 import CreatorRecoveryBalanceAdminPanel from '../../components/listingRequests/payments/CreatorRecoveryBalanceAdminPanel';
+import AdminNoticeClosurePanel from '../../components/listingRequests/core/AdminNoticeClosurePanel';
 import ListingRequestChangeOrderPaymentAdminActions from '../../components/listingRequests/payments/ListingRequestChangeOrderPaymentAdminActions';
 import ListingRequestFinalBalancePaymentAdminActions from '../../components/listingRequests/payments/ListingRequestFinalBalancePaymentAdminActions';
 import ListingRequestProgressUpdateScheduleCard from '../../components/listingRequests/progressUpdates/ListingRequestProgressUpdateScheduleCard';
@@ -268,6 +269,14 @@ const AdminRequestDetails = () => {
 
           <ListingRequestPaymentAdminRefundPanel listingRequestId={request.id} />
           <CreatorRecoveryBalanceAdminPanel creatorUserId={request.creator_user_id} />
+
+          {request.status === "accepted" && (
+            <AdminNoticeClosurePanel
+              requestId={request.id}
+              buyerUserId={request.buyer_user_id}
+              creatorUserId={request.creator_user_id}
+            />
+          )}
         </>
       ),
     },
