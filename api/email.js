@@ -9,17 +9,27 @@
 // section 7.1). Supabase's custom SMTP can point at the same credentials,
 // which is the whole point of consolidating on one provider.
 //
-// NOT VERIFIED END TO END. Sending is limited to addresses verified on the
-// Cloudflare account until send.madeforstream.com is onboarded as a sending
-// domain (a dashboard action -- see the Sprint 6 checklist and
-// docs/support/messaging/transactional-email.md), so nothing here has been
-// exercised against a real delivery. Every call site treats a send failure
-// as non-fatal to the workflow it's attached to.
+// Connection details confirmed against Cloudflare's own docs
+// (developers.cloudflare.com/email-service/api/send-emails/smtp/): the
+// endpoint is always smtp.mx.cloudflare.net:465 (implicit TLS -- Cloudflare
+// does not offer STARTTLS on 587), the username is always the literal
+// string "api_token", and the password is a Cloudflare API token scoped to
+// Account > Email Sending > Edit. None of that is account-specific
+// configuration; only EMAIL_SMTP_PASS (the token) is a real secret.
+//
+// Verified live 2026-09-23: send.madeforstream.com onboarded, Workers Paid
+// active, a real send through this module's sendTransactionalEmail was
+// accepted by Cloudflare's SMTP endpoint end to end. Not yet verified:
+// production volume (this was one test send, not domain warming) and the
+// bounce/complaint webhook's payload shape (POST /api/webhooks/email in
+// api/server.js) -- see docs/support/messaging/transactional-email.md.
+// Every call site treats a send failure as non-fatal to the workflow it's
+// attached to.
 
 import nodemailer from "nodemailer";
 
 const SMTP_HOST = process.env.EMAIL_SMTP_HOST || "";
-const SMTP_PORT = Number(process.env.EMAIL_SMTP_PORT || 587);
+const SMTP_PORT = Number(process.env.EMAIL_SMTP_PORT || 465);
 const SMTP_USER = process.env.EMAIL_SMTP_USER || "";
 const SMTP_PASS = process.env.EMAIL_SMTP_PASS || "";
 const EMAIL_FROM_ADDRESS =

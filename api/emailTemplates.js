@@ -3,7 +3,22 @@
 // plain (a wrapper + a heading + a paragraph or two + a link) rather than a
 // branded HTML layout -- there is no design system for transactional email
 // in this repo yet, and a plain, readable template beats an unfinished
-// branded one. Revisit once there's a reason to invest in one.
+// branded one.
+//
+// Branding is env-driven so it can be filled in later without touching this
+// file again: EMAIL_LOGO_URL (a hosted image -- do NOT inline a base64 logo,
+// it bloats the message and hurts spam scoring; host a small PNG/SVG
+// somewhere stable, e.g. alongside the marketing site or in object storage,
+// and point this at its URL), EMAIL_BRAND_NAME, EMAIL_SUPPORT_EMAIL,
+// EMAIL_SITE_URL, and EMAIL_COMPANY_ADDRESS (a real physical mailing
+// address -- deliberately blank by default rather than a placeholder,
+// because a fabricated address is worse than none; every line below that
+// depends on it just doesn't render until it's set).
+const BRAND_NAME = process.env.EMAIL_BRAND_NAME || "Made for Stream";
+const LOGO_URL = process.env.EMAIL_LOGO_URL || "";
+const SUPPORT_EMAIL = process.env.EMAIL_SUPPORT_EMAIL || "inbox@madeforstream.com";
+const SITE_URL = process.env.EMAIL_SITE_URL || "https://madeforstream.com";
+const COMPANY_ADDRESS = process.env.EMAIL_COMPANY_ADDRESS || "";
 
 const wrap = (title, bodyHtml, ctaUrl, ctaLabel) => `<!doctype html>
 <html>
@@ -13,6 +28,11 @@ const wrap = (title, bodyHtml, ctaUrl, ctaLabel) => `<!doctype html>
         <td align="center">
           <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;padding:32px;">
             <tr><td>
+              ${
+                LOGO_URL
+                  ? `<img src="${LOGO_URL}" alt="${BRAND_NAME}" height="28" style="display:block;margin:0 0 20px;border:0;" />`
+                  : `<p style="margin:0 0 20px;font-size:13px;font-weight:bold;letter-spacing:0.02em;color:#52525b;">${BRAND_NAME}</p>`
+              }
               <h1 style="font-size:18px;margin:0 0 16px;">${title}</h1>
               ${bodyHtml}
               ${
@@ -20,7 +40,11 @@ const wrap = (title, bodyHtml, ctaUrl, ctaLabel) => `<!doctype html>
                   ? `<p style="margin:24px 0 0;"><a href="${ctaUrl}" style="background:#18181b;color:#ffffff;padding:10px 18px;border-radius:6px;text-decoration:none;font-size:14px;">${ctaLabel}</a></p>`
                   : ""
               }
-              <p style="margin:32px 0 0;color:#71717a;font-size:12px;">Made for Stream</p>
+              <p style="margin:32px 0 0;color:#71717a;font-size:12px;line-height:1.6;">
+                ${BRAND_NAME}${COMPANY_ADDRESS ? ` &middot; ${COMPANY_ADDRESS}` : ""}<br />
+                Questions? <a href="mailto:${SUPPORT_EMAIL}" style="color:#71717a;">${SUPPORT_EMAIL}</a>
+                &middot; <a href="${SITE_URL}" style="color:#71717a;">${SITE_URL.replace(/^https?:\/\//, "")}</a>
+              </p>
             </td></tr>
           </table>
         </td>

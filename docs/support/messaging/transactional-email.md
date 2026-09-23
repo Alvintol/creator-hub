@@ -1,6 +1,6 @@
 ---
 feature: messaging/transactional-email
-status: partial
+status: active
 surfaces:
   - api/email.js
   - api/emailTemplates.js
@@ -19,13 +19,26 @@ notice, final notice, payout released — all sent over authenticated SMTP again
 Cloudflare Email Service from `api/email.js`. No Workers code is involved; the
 Express API sends directly.
 
-**Status: not verified end to end.** Sending is limited to addresses verified on
-the Cloudflare account until `send.madeforstream.com` is onboarded as a sending
-domain (Sprint 6 checklist) — a dashboard action, not code. Until that is done,
-every send outside the verified-address allowlist will fail, and this playbook's
-Tier 1 auto-fixes have not been exercised against a real delivery. Re-verify the
-bounce webhook's actual payload shape (`EMAIL-002` below) against Cloudflare's
-real format before trusting it in production.
+**Status: SMTP send path verified live, 2026-09-23.** `send.madeforstream.com` is
+onboarded, Workers Paid is active, and a real send through `api/email.js` against
+Cloudflare's SMTP endpoint was confirmed end to end (accepted with a provider
+message id). **Still not verified:** the bounce/complaint webhook
+(`POST /api/webhooks/email`, `EMAIL-002`) — its payload-parsing is still a
+best-effort guess and needs a real bounce to confirm the actual field names,
+since a successful send doesn't exercise that path. Domain warming (Sprint 6
+checklist) has also not started in earnest — this was a single test send, not
+production volume.
+
+**Connection details are fixed, not account-specific**, confirmed against
+Cloudflare's own docs: host `smtp.mx.cloudflare.net`, port `465` (implicit TLS —
+Cloudflare does not offer STARTTLS on 587), username always the literal string
+`api_token`. The only real secret is `EMAIL_SMTP_PASS`, a Cloudflare API token
+scoped to `Account > Email Sending > Edit`
+(`dash.cloudflare.com/profile/api-tokens` → Create Custom Token). **A useful
+pre-Workers-Paid test path:** a message to any address verified as an Email
+Routing destination sends and counts against no quota on any Cloudflare plan —
+verify your own inbox there to exercise a real send before paying for Workers
+Paid.
 
 **Why this playbook exists before the feature is fully live:** the non-response
 notice clock (`REQ-003` in
