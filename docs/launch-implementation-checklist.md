@@ -40,9 +40,15 @@ get published. Record each answer here as it is confirmed.
       the registry's `stripe_minimum_charge` column (Sprint 1).
 - [ ] Confirm international card and currency conversion surcharges, and who bears
       them, before enabling a currency outside CAD/USD.
-- [ ] Register the Connect **webhook endpoint** against the production API origin
+- [x] Register the Connect **webhook endpoint** against the production API origin
       once §11.1 is decided, and confirm the raw body reaches signature
-      verification intact.
+      verification intact. *Done 2026-09-22 as part of §11.1 — see Sprint 3
+      for what was built and verified live: classic `webhook_endpoints`
+      (test mode, `connect: true`) pointed at the deployed Cloud Run origin,
+      a real triggered event confirmed reaching it, and a manually-signed
+      request confirming signature verification against the real secret.
+      Live-mode registration is still open, deferred until `STRIPE_KEY_MODE`
+      flips to `prod`.*
 
 ---
 
@@ -197,14 +203,83 @@ these hold, and two of them were verified directly against the code.
       `payment_status` field itself is not re-fetched, since Stripe's own
       guidance treats that field on `checkout.session.completed` as
       authoritative as delivered.
-- [ ] Decide where `api/server.js` runs in production (§11.1). **Decided
-      2026-09-22: Docker.** Static hosting does not run Express, and the
-      Connect webhook needs a real HTTPS origin preserving the **raw body**
-      for signature verification. This gates registering the webhook endpoint
-      at all. **Held, explicitly, per the user**, and then the fee-payer item
-      it was waiting on resolved the same session (below) — re-offer building
-      Docker at the start of the next session rather than assuming the answer
-      is still "hold." Not started.
+- [x] Decide where `api/server.js` runs in production (§11.1). **Decided
+      2026-09-22: Docker, on Google Cloud Run.** Static hosting does not run
+      Express, and the Connect webhook needs a real HTTPS origin preserving
+      the **raw body** for signature verification.
+      **Platform choice, re-verified this session against current terms
+      rather than trusting an earlier draft's recommendation:** Fly.io's free
+      tier is gone (credit card required, ~$2-15+/month per always-on
+      machine); Railway disabled autoscaling entirely in May 2026, which
+      rules it out against "must not go down under volume." Cloud Run has a
+      real perpetual free tier (2M requests + 360K vCPU-seconds/month),
+      deploys straight from a Dockerfile, and autoscales both up (under load)
+      and to zero (idle) natively — confirmed with the user before treating
+      this as decided.
+      **Built:** `api/Dockerfile` (multi-stage, `node:24-alpine`, non-root
+      `node` user, `npm ci --omit=dev`, container `HEALTHCHECK` against
+      `GET /api/health`) and `api/.dockerignore` (excludes `.env` — production
+      config comes entirely from Cloud Run's env vars / Secret Manager,
+      `dotenv.config()` only fills values not already in `process.env`, so no
+      code change was needed for that part).
+      **CORS fixed in the same pass** (was a real limitation, not just a
+      Docker concern): `api/server.js` now reads a comma-separated
+      `APP_ORIGINS` env var, falling back to the single `APP_ORIGIN` value for
+      backward compatibility — adding a new allowed frontend origin (www +
+      apex, staging, a preview deploy) is now a platform env-var change, not a
+      code deploy. Origin-validation logic is unchanged (still rejects
+      anything not in the list).
+      **Verified live, locally (not yet against the deployed Cloud Run
+      origin — that step is the user's, see below):** ran `api/server.js`
+      directly (Docker isn't available in this session) on a throwaway port
+      with `APP_ORIGINS` set to two production-shaped origins — confirmed
+      both are allowed, `localhost:5173` still works, and an arbitrary origin
+      is rejected. Ran `stripe listen --forward-to` against the same running
+      process and `stripe trigger checkout.session.completed` — confirmed
+      Stripe's real signature verification and raw-body handling succeed
+      end to end through this exact code path (several event types returned
+      200; `checkout.session.completed` returned 400 only because the
+      fixture event carries no real Made for Stream payment id, which is
+      expected for a synthetic trigger, not a webhook/signature failure).
+      `npx vitest run` (861 tests), `npx tsc --noEmit`, `npx eslint .`,
+      `npx vite build` all still pass — confirmed after this change even
+      though it's `api/`-only.
+      **Deployed and verified live, same session, once the user had a
+      working `gcloud` on their machine.** Service:
+      `made-for-stream-api` on Cloud Run, region `us-central1`, URL
+      `https://made-for-stream-api-422533033771.us-central1.run.app`.
+      Verified directly (not "should work"): `GET /api/health` returns
+      `{"ok":true,...}`; CORS allows the two configured `APP_ORIGINS` values
+      and rejects an arbitrary origin; `/api/stripe/config` confirms the
+      Stripe secret key and webhook secret loaded correctly from Secret
+      Manager. **Webhook delivery proven two ways:** a real Stripe-triggered
+      `checkout.session.completed` event on a live connected test account
+      reached `/api/stripe/webhook` (confirmed via Cloud Run request logs —
+      `pending_webhooks: 1` on the Stripe event, then a `POST 400` in the
+      logs); and a manually HMAC-signed request against the real
+      `STRIPE_WEBHOOK_SECRET_DEV` value returned the exact expected
+      application error (`"Stripe checkout session is missing Made for
+      Stream payment metadata."`) rather than a signature failure —
+      proving raw-body preservation and signature verification both work
+      correctly through Cloud Run, and that the 400s seen from Stripe's own
+      triggered fixture events are the *correct* rejection of a synthetic
+      event with no real payment id, not a delivery or verification defect.
+      **The webhook endpoint that's actually live is a classic
+      `webhook_endpoints` object** (`stripe webhook_endpoints create
+      --connect=true`) — see `docs/support/payments/webhooks.md` for why:
+      Stripe's newer "Event destinations" UI looked correctly configured but
+      never routed a single event (`pending_webhooks: 0` on every trigger),
+      a real platform quirk worth knowing about before anyone tries that UI
+      again.
+      **Sprint 0.5's "register the Connect webhook endpoint" item is
+      satisfied by this** — see that line below.
+      **Still open:** only a live-mode (`STRIPE_WEBHOOK_SECRET_PROD`)
+      webhook endpoint, for whenever `STRIPE_KEY_MODE` flips to `prod` — the
+      secret exists in Secret Manager as a placeholder, ready for that
+      switch. The stale, non-functional "Event destinations" entry in the
+      Stripe Dashboard was left in place rather than deleted (an account
+      change outside this session's scope) — worth removing to avoid
+      confusion later.
 - [x] **Resolved, and it required a real code migration, not a config
       change.** `controller.fees.payer` on Express accounts (§3.2): confirmed
       live against Stripe's real API (2026-09-22) that Express accounts
