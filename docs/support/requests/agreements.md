@@ -199,6 +199,41 @@ falls back to the current resolved rate for those, which is the standard 5%.
 
 ---
 
+## `cancelled` is now a reachable agreement status
+
+`20260922_122` and `20260922_124` are the first migrations that actually
+write `listing_request_agreements.status = 'cancelled'` — the value existed
+in the check constraint since `20260524_069` but nothing set it before
+Sprint 4. See [`cancellation.md`](cancellation.md) for both paths. The
+domain layer (`src/domain/listings/requestWorkspace.ts`) already treated a
+cancelled agreement as "no active agreement" before this sprint (the
+`create-agreement` next step falls through to it); that fallback is now
+reachable in practice rather than dead code, and it is correct — a cancelled
+request has no next agreement to create.
+
+## Two schema gaps closed in Sprint 4
+
+**`usage_rights_type` / `usage_rights_qualifier`** (`20260922_123`,
+launch-scope.md §5.3): what the buyer keeps a licence to when a payment's
+earned value is retained. The columns exist and are nullable on every
+agreement, **but no RPC or UI writes them yet** — `create_listing_request_agreement`
+was not extended in this pass. Every agreement's usage rights are therefore
+`null` today, not just ones from before this migration. A support question
+about usage rights has no stored answer on any agreement until the
+agreement builder is extended to set them; fall back to `scope_summary` /
+`additional_cost_policy`'s free text and the conversation history.
+
+**`included_revision_count` is now nullable** (`20260922_123`,
+launch-scope.md §5.4): `null` means "not stated," and the product applies
+Refund Policy §5's two-round fallback. **A stored `0` was never touched by
+this migration** — it stays exactly what it was, which means a `0` on an
+agreement from before this migration is still ambiguous between "explicitly
+zero revisions" and "the old default that meant nothing." Do not assume
+either reading without checking the agreement's `created_at` against
+`20260922_123`'s date.
+
+---
+
 ## Known gaps
 
 - **Change orders modify agreed terms** but the interaction between an amended

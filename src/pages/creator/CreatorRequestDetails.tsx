@@ -5,6 +5,7 @@ import { useUpdateCreatorListingRequestStatus } from "../../hooks/creatorRequest
 import {
   canAcceptListingRequest,
   canArchiveListingRequest,
+  canCancelListingRequestBeforePayment,
   canDeclineListingRequest,
   getListingRequestStatusLabel,
   getListingRequestStatusTone,
@@ -69,6 +70,14 @@ import ListingRequestMilestoneSummary from '../../components/listingRequests/mil
 import { canSubmitListingRequestMilestone, getActiveListingRequestMilestone } from '../../domain/listings/listingRequestMilestones';
 import { canStartWorkForAcceptedRequest } from '../../domain/listings/listingRequestAgreements';
 import { canCreateListingRequestChangeOrder, getDraftListingRequestChangeOrder } from '../../domain/listings/listingRequestChangeOrders';
+import { useListingRequestPayments } from '../../hooks/payments/useListingRequestPayments';
+import { useCancelListingRequestBeforePayment } from '../../hooks/creatorRequests/useCancelListingRequestBeforePayment';
+import { useListingRequestCancellationProposal } from '../../hooks/creatorRequests/useListingRequestCancellationProposal';
+import { useProposeListingRequestCancellation } from '../../hooks/creatorRequests/useProposeListingRequestCancellation';
+import { useRespondListingRequestCancellationProposal } from '../../hooks/creatorRequests/useRespondListingRequestCancellationProposal';
+import { useSubmitListingRequestCancellationStatement } from '../../hooks/creatorRequests/useSubmitListingRequestCancellationStatement';
+import ListingRequestCancelBeforePaymentAction from '../../components/listingRequests/core/ListingRequestCancelBeforePaymentAction';
+import ListingRequestCancellationProposalPanel from '../../components/listingRequests/core/ListingRequestCancellationProposalPanel';
 
 const classes = {
   page: "space-y-6",
@@ -209,6 +218,95 @@ const CreatorRequestDetails = () => {
       milestoneRequestId
     );
 
+  const paymentsQuery = useListingRequestPayments(
+    agreement?.status === "buyer_accepted" ? request?.id ?? null : null
+  );
+  const paidPayments = (paymentsQuery.data ?? []).filter(
+    (payment) => payment.status === "paid"
+  );
+
+  const cancellationProposalQuery = useListingRequestCancellationProposal(
+    request?.status === "accepted" ? request?.id ?? null : null
+  );
+  const cancelBeforePaymentMutation = useCancelListingRequestBeforePayment();
+  const proposeCancellationMutation = useProposeListingRequestCancellation();
+  const submitCancellationStatementMutation =
+    useSubmitListingRequestCancellationStatement();
+  const respondCancellationProposalMutation =
+    useRespondListingRequestCancellationProposal();
+
+  const cancellationProposal = cancellationProposalQuery.data ?? null;
+  const isCancellationProposalOpen =
+    cancellationProposal?.status === "pending_creator_statement" ||
+    cancellationProposal?.status === "pending_buyer_response";
+
+  const handleCancelBeforePayment = async (reason: string) => {
+    if (!request) {
+      return;
+    }
+
+    await cancelBeforePaymentMutation.mutateAsync({
+      requestId: request.id,
+      reason,
+    });
+  };
+
+  const handleProposeCancellation = async (
+    reason: string,
+    items?: Parameters<
+      typeof proposeCancellationMutation.mutateAsync
+    >[0]["items"]
+  ) => {
+    if (!request) {
+      return;
+    }
+
+    await proposeCancellationMutation.mutateAsync({
+      requestId: request.id,
+      reason,
+      items,
+    });
+  };
+
+  const handleSubmitCancellationStatement = async (
+    items: Parameters<
+      typeof submitCancellationStatementMutation.mutateAsync
+    >[0]["items"]
+  ) => {
+    if (!cancellationProposal) {
+      return;
+    }
+
+    await submitCancellationStatementMutation.mutateAsync({
+      proposalId: cancellationProposal.id,
+      items,
+    });
+  };
+
+  const handleAcceptCancellationProposal = async () => {
+    if (!cancellationProposal || !request) {
+      return;
+    }
+
+    await respondCancellationProposalMutation.mutateAsync({
+      proposalId: cancellationProposal.id,
+      requestId: request.id,
+      response: "accepted",
+    });
+  };
+
+  const handleDisputeCancellationProposal = async (disputeReason: string) => {
+    if (!cancellationProposal || !request) {
+      return;
+    }
+
+    await respondCancellationProposalMutation.mutateAsync({
+      proposalId: cancellationProposal.id,
+      requestId: request.id,
+      response: "disputed",
+      disputeReason,
+    });
+  };
 
   const handleAcceptRequest = async () => {
     if (!request) return;
@@ -294,7 +392,7 @@ const CreatorRequestDetails = () => {
 
 
   const backTo =
-    request.status === "archived"
+    request.status === "archived" || request.status === "cancelled"
       ? "/creator/requests/archived"
       : request.status === "completed"
         ? "/creator/requests/completed"
@@ -353,7 +451,8 @@ const CreatorRequestDetails = () => {
   const requestReadOnly =
     request.status === "archived" ||
     request.status === "declined" ||
-    request.status === "completed";
+    request.status === "completed" ||
+    request.status === "cancelled";
 
   const milestones = milestonesQuery.data ?? [];
 
@@ -388,7 +487,9 @@ const CreatorRequestDetails = () => {
         ? "Declined requests are read-only because the conversation has been ended."
         : request.status === "completed"
           ? "Completed projects are read-only because the buyer approved the final delivery."
-          : undefined;
+          : request.status === "cancelled"
+            ? "Cancelled requests are read-only."
+            : undefined;
 
   const buyerLabel = buyerText(buyer, request.buyer_user_id);
   const agreementAccepted = agreement?.status === "buyer_accepted";
@@ -402,6 +503,12 @@ const CreatorRequestDetails = () => {
     milestones,
     changeOrders,
     finalDeliveries,
+    cancellationProposal: isCancellationProposalOpen
+      ? {
+          status: cancellationProposal!.status,
+          statement_due_at: cancellationProposal!.statement_due_at,
+        }
+      : null,
   };
 
   const nextStep = getRequestNextStep(workspaceInput);
@@ -439,9 +546,27 @@ const CreatorRequestDetails = () => {
       title: "Buyer request",
       summary: canRespondToRequest ? "Accept or decline" : "Brief, timeline, budget and references",
       ...flags("request"),
-      defaultOpen: request.status === "submitted",
+      defaultOpen: request.status === "submitted" || isCancellationProposalOpen,
       content: (
         <>
+          {request.status === "accepted" && paidPayments.length > 0 && (
+            <ListingRequestCancellationProposalPanel
+              viewer="creator"
+              paidPayments={paidPayments}
+              proposal={cancellationProposal}
+              isProposePending={proposeCancellationMutation.isPending}
+              proposeError={proposeCancellationMutation.error}
+              onPropose={handleProposeCancellation}
+              isSubmitStatementPending={submitCancellationStatementMutation.isPending}
+              submitStatementError={submitCancellationStatementMutation.error}
+              onSubmitStatement={handleSubmitCancellationStatement}
+              isRespondPending={respondCancellationProposalMutation.isPending}
+              respondError={respondCancellationProposalMutation.error}
+              onAccept={handleAcceptCancellationProposal}
+              onDispute={handleDisputeCancellationProposal}
+            />
+          )}
+
           <ListingRequestSubmissionDetails
             requestTitle={request.request_title}
             requestDetails={request.request_details}
@@ -802,6 +927,15 @@ const CreatorRequestDetails = () => {
         {updateStatusMutation.isPending ? "Updating…" : "Archive request"}
       </button>
     </ActionMenu>
+  ) : canCancelListingRequestBeforePayment(request.status) &&
+    paidPayments.length === 0 ? (
+    <ActionMenu>
+      <ListingRequestCancelBeforePaymentAction
+        isPending={cancelBeforePaymentMutation.isPending}
+        error={cancelBeforePaymentMutation.error}
+        onCancel={handleCancelBeforePayment}
+      />
+    </ActionMenu>
   ) : undefined;
 
   return (
@@ -813,16 +947,19 @@ const CreatorRequestDetails = () => {
           eyebrow="Listing request"
           title={snapshot.title}
           meta={meta}
-          statusLabel={getListingRequestStatusLabel(request.status, request)}
+          statusLabel={getListingRequestStatusLabel(request.status, request, request)}
           statusTone={getListingRequestStatusTone(request.status)}
           stages={getRequestStages(workspaceInput)}
           actions={manageMenu}
           notice={
-            (request.status === "declined" || request.status === "archived") && (
+            (request.status === "declined" ||
+              request.status === "archived" ||
+              request.status === "cancelled") && (
               <RequestStatusNotice
                 status={request.status}
                 reason={request.creator_status_reason}
                 archiveContext={request}
+                cancellationContext={request}
               />
             )
           }

@@ -22,6 +22,10 @@ buyer request -> creator acceptance -> project agreement -> buyer acceptance
 -> final delivery -> completion
 ```
 
+`cancelled` can terminate the sequence from `accepted` onward, once an
+agreement exists — before or after payment, by two different mechanisms. See
+[`cancellation.md`](cancellation.md).
+
 Almost every "not ready for…" error in this family means **something upstream in
 that sequence has not happened**. Diagnosing them is usually a matter of walking
 backwards to the first incomplete step rather than investigating the step that
@@ -41,6 +45,7 @@ outstanding.
 | "The other party has gone quiet" | [`REQ-003`](#req-003--unresponsive-participant) |
 | "I can't archive this" | [`REQ-002`](#req-002--action-attempted-by-the-wrong-party) |
 | "My request was declined and the chat is gone" | [`REQ-004`](#req-004--conversation-missing-for-a-declined-request) |
+| "I need to cancel this request" | [`cancellation.md`](cancellation.md) |
 
 ---
 
@@ -205,11 +210,6 @@ treat it as an integrity problem rather than a series of one-offs.
   notices and admin closure, `REQ-003` — but the notice records, the clock and the
   closure RPC do not exist. Tracked as Sprint 6 in
   [`../../launch-implementation-checklist.md`](../../launch-implementation-checklist.md).
-- **No cancellation workflow.** The rules are specified in
-  [`../../launch-scope.md`](../../launch-scope.md) §5 and there is still no
-  implementation: `cancelled` is a valid status on agreements, schedule items,
-  milestones, change orders and final deliveries, and **no RPC writes it on any of
-  them**. `listing_requests` has no such status at all. Sprint 4.
 - **No staleness alerting.** Nothing surfaces requests that have not moved.
 - **UI/database state disagreement** is the likely cause of most `REQ-001`
   reports and is not instrumented.

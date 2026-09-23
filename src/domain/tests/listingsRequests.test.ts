@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canAcceptListingRequest,
   canArchiveListingRequest,
+  canCancelListingRequestBeforePayment,
   canDeclineListingRequest,
   getListingRequestStatusesForView,
   getListingRequestStatusLabel,
@@ -26,7 +27,7 @@ describe("listing request status helpers", () => {
 
     expect(
       getListingRequestStatusesForView("archived")
-    ).toEqual(["declined", "archived"]);
+    ).toEqual(["declined", "archived", "cancelled"]);
   });
 
   it("maps statuses to the correct labels", () => {
@@ -49,6 +50,10 @@ describe("listing request status helpers", () => {
     expect(
       getListingRequestStatusLabel("archived")
     ).toBe("Archived");
+
+    expect(
+      getListingRequestStatusLabel("cancelled")
+    ).toBe("Cancelled");
   });
 
   it("maps archived labels with archive actor context", () => {
@@ -58,7 +63,7 @@ describe("listing request status helpers", () => {
         creator_user_id: "creator-1",
         archived_by_user_id: "buyer-1",
       })
-    ).toBe("Cancelled by buyer");
+    ).toBe("Withdrawn by buyer");
 
     expect(
       getListingRequestStatusLabel("archived", {
@@ -75,6 +80,44 @@ describe("listing request status helpers", () => {
         archived_by_user_id: null,
       })
     ).toBe("Archived");
+  });
+
+  it("maps cancelled labels with cancellation actor context", () => {
+    expect(
+      getListingRequestStatusLabel(
+        "cancelled",
+        undefined,
+        {
+          buyer_user_id: "buyer-1",
+          creator_user_id: "creator-1",
+          cancelled_by_user_id: "buyer-1",
+        }
+      )
+    ).toBe("Cancelled by buyer");
+
+    expect(
+      getListingRequestStatusLabel(
+        "cancelled",
+        undefined,
+        {
+          buyer_user_id: "buyer-1",
+          creator_user_id: "creator-1",
+          cancelled_by_user_id: "creator-1",
+        }
+      )
+    ).toBe("Cancelled by creator");
+
+    expect(
+      getListingRequestStatusLabel(
+        "cancelled",
+        undefined,
+        {
+          buyer_user_id: "buyer-1",
+          creator_user_id: "creator-1",
+          cancelled_by_user_id: null,
+        }
+      )
+    ).toBe("Cancelled");
   });
 
   it("maps statuses to the correct tones", () => {
@@ -97,6 +140,10 @@ describe("listing request status helpers", () => {
     expect(
       getListingRequestStatusTone("archived")
     ).toBe("muted");
+
+    expect(
+      getListingRequestStatusTone("cancelled")
+    ).toBe("danger");
   });
 
   it("maps statuses to the correct summaries", () => {
@@ -129,6 +176,12 @@ describe("listing request status helpers", () => {
     ).toBe(
       "This request has been archived."
     );
+
+    expect(
+      getListingRequestStatusSummary("cancelled")
+    ).toBe(
+      "This request has been cancelled."
+    );
   });
 
   it("maps archived summaries with archive actor context", () => {
@@ -138,7 +191,7 @@ describe("listing request status helpers", () => {
         creator_user_id: "creator-1",
         archived_by_user_id: "buyer-1",
       })
-    ).toBe("The buyer cancelled this request.");
+    ).toBe("The buyer withdrew this request.");
 
     expect(
       getListingRequestStatusSummary("archived", {
@@ -155,6 +208,36 @@ describe("listing request status helpers", () => {
         archived_by_user_id: null,
       })
     ).toBe("This request has been archived.");
+  });
+
+  it("includes the cancellation reason in the cancelled summary when present", () => {
+    expect(
+      getListingRequestStatusSummary(
+        "cancelled",
+        undefined,
+        { cancellation_reason: "Schedule no longer works for either side." }
+      )
+    ).toBe(
+      "This request was cancelled: Schedule no longer works for either side."
+    );
+  });
+
+  it("only allows unilateral pre-payment cancellation while accepted", () => {
+    expect(
+      canCancelListingRequestBeforePayment("accepted")
+    ).toBe(true);
+
+    expect(
+      canCancelListingRequestBeforePayment("submitted")
+    ).toBe(false);
+
+    expect(
+      canCancelListingRequestBeforePayment("completed")
+    ).toBe(false);
+
+    expect(
+      canCancelListingRequestBeforePayment("cancelled")
+    ).toBe(false);
   });
 
   it("only allows accept and decline while the request is submitted", () => {

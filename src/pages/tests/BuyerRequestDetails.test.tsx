@@ -21,7 +21,64 @@ const mocks = vi.hoisted(() => ({
   useListingRequestMilestoneSubmissions: vi.fn(),
   respondMilestone: vi.fn(),
   useListingRequestPayments: vi.fn(),
+  useListingRequestCancellationProposal: vi.fn(),
+  cancelBeforePayment: vi.fn(),
+  proposeCancellation: vi.fn(),
+  submitCancellationStatement: vi.fn(),
+  respondCancellationProposal: vi.fn(),
 }));
+
+vi.mock(
+  "../../hooks/creatorRequests/useCancelListingRequestBeforePayment",
+  () => ({
+    useCancelListingRequestBeforePayment: () => ({
+      mutateAsync: mocks.cancelBeforePayment,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestCancellationProposal",
+  () => ({
+    useListingRequestCancellationProposal:
+      mocks.useListingRequestCancellationProposal,
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useProposeListingRequestCancellation",
+  () => ({
+    useProposeListingRequestCancellation: () => ({
+      mutateAsync: mocks.proposeCancellation,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useSubmitListingRequestCancellationStatement",
+  () => ({
+    useSubmitListingRequestCancellationStatement: () => ({
+      mutateAsync: mocks.submitCancellationStatement,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
+
+vi.mock(
+  "../../hooks/creatorRequests/useRespondListingRequestCancellationProposal",
+  () => ({
+    useRespondListingRequestCancellationProposal: () => ({
+      mutateAsync: mocks.respondCancellationProposal,
+      isPending: false,
+      error: null,
+    }),
+  })
+);
 
 vi.mock(
   "../../hooks/creatorRequests/useBuyerRequest",
@@ -764,6 +821,12 @@ describe("<BuyerRequestDetails />", () => {
 
     mocks.useListingRequestPayments.mockReturnValue({
       data: [],
+      isLoading: false,
+      error: null,
+    });
+
+    mocks.useListingRequestCancellationProposal.mockReturnValue({
+      data: null,
       isLoading: false,
       error: null,
     });

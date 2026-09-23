@@ -4,6 +4,7 @@ import {
   getListingRequestAgreementStatusLabel,
   getListingRequestAgreementStatusSummary,
   getListingRequestBuyerHoldReasonLabel,
+  getListingRequestIncludedRevisionCount,
   getListingRequestPaymentStructureLabel,
   getListingRequestPaymentTimingLabel,
 } from "../../../domain/listings/listingRequestAgreements";
@@ -123,7 +124,12 @@ const AgreementDetails = ({ agreement }: { agreement: ListingRequestAgreementRow
               {formatMoney(agreement.deposit_amount, agreement.currency)}
             </TermRow>
           )}
-          <TermRow label="Included revisions">{agreement.included_revision_count}</TermRow>
+          <TermRow label="Included revisions">
+            {getListingRequestIncludedRevisionCount(agreement.included_revision_count)}
+            {agreement.included_revision_count === null && (
+              <span className={classes.text}> (not stated — default applied)</span>
+            )}
+          </TermRow>
           <TermRow label={adjustedDiffers ? "Adjusted completion" : "Estimated completion"}>
             {formatDate(agreement.adjusted_estimated_completion_at || agreement.estimated_completion_at)}
             {completedHoldDays > 0 && (

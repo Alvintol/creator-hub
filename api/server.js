@@ -2198,6 +2198,98 @@ app.post("/api/stripe/checkout/session", async (req, res) => {
   }
 });
 
+// Sprint 4 (launch-scope.md section 5.1 / 5.2): cancel_listing_request_before_payment
+// and respond_listing_request_cancellation_proposal (accepted) move any
+// requires_checkout / checkout_opened payment to status "cancelled" in the
+// database, but neither RPC can reach the Stripe API -- Postgres has no way
+// to call Stripe. This route is the other half: it expires the live
+// checkout session for every payment those RPCs already cancelled, so a
+// buyer with the old checkout page still open cannot complete it into a
+// payment_intent against a project that no longer exists. Always re-derives
+// which sessions to expire from the database rather than trusting
+// client-supplied Stripe ids, and is safe to call more than once --
+// expiring an already-expired or already-completed session just fails that
+// one entry, which is caught and reported rather than thrown.
+app.post(
+  "/api/stripe/checkout/expire-cancelled-sessions",
+  async (req, res) => {
+    try {
+      const stripeClient = requireStripe();
+      const userId = await requireSupabaseUserId(req);
+      const listingRequestId = String(
+        req.body?.listingRequestId || "",
+      ).trim();
+
+      if (!listingRequestId) {
+        return res
+          .status(400)
+          .json({ error: "listingRequestId is required." });
+      }
+
+      const { data: request, error: requestError } = await supabaseAdmin
+        .from("listing_requests")
+        .select("id, buyer_user_id, creator_user_id")
+        .eq("id", listingRequestId)
+        .maybeSingle();
+
+      if (requestError) {
+        throw new Error(requestError.message);
+      }
+
+      if (
+        !request ||
+        (request.buyer_user_id !== userId &&
+          request.creator_user_id !== userId)
+      ) {
+        return res
+          .status(404)
+          .json({ error: "Listing request not found or not accessible." });
+      }
+
+      const { data: payments, error: paymentsError } = await supabaseAdmin
+        .from("listing_request_payments")
+        .select(
+          "id, status, stripe_checkout_session_id, stripe_connected_account_id",
+        )
+        .eq("listing_request_id", listingRequestId)
+        .eq("status", "cancelled")
+        .not("stripe_checkout_session_id", "is", null)
+        .not("stripe_connected_account_id", "is", null);
+
+      if (paymentsError) {
+        throw new Error(paymentsError.message);
+      }
+
+      const expired = [];
+      const skipped = [];
+
+      for (const payment of payments || []) {
+        try {
+          await stripeClient.checkout.sessions.expire(
+            payment.stripe_checkout_session_id,
+            {},
+            { stripeAccount: payment.stripe_connected_account_id },
+          );
+
+          expired.push(payment.id);
+        } catch (err) {
+          skipped.push({
+            paymentId: payment.id,
+            reason: String(err?.message || err),
+          });
+        }
+      }
+
+      return res.json({ expired, skipped });
+    } catch (err) {
+      const message = String(err?.message || err);
+      const status = /session|authorization/i.test(message) ? 401 : 400;
+
+      return res.status(status).json({ error: message });
+    }
+  },
+);
+
 app.get("/api/stripe/checkout/session-status", async (req, res) => {
   try {
     const stripeClient = requireStripe();

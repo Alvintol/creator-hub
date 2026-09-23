@@ -145,7 +145,7 @@ describe("<AdminRequests />", () => {
     expect(screen.getByText("Legacy request message.")).toBeInTheDocument();
   });
 
-  it("labels buyer-cancelled archived requests for admin review", () => {
+  it("labels buyer-withdrawn archived requests for admin review", () => {
     mocks.useAdminRequests.mockReturnValue({
       data: {
         items: [
@@ -166,7 +166,7 @@ describe("<AdminRequests />", () => {
 
     renderPage();
 
-    expect(screen.getByText("Cancelled by buyer")).toBeInTheDocument();
+    expect(screen.getByText("Withdrawn by buyer")).toBeInTheDocument();
   });
 
   it("labels creator-archived requests for admin review", () => {

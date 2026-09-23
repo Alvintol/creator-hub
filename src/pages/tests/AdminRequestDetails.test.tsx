@@ -16,11 +16,20 @@ const mocks = vi.hoisted(() => ({
   useListingRequestMilestones: vi.fn(),
   useListingRequestMilestoneSubmissions: vi.fn(),
   confirmMilestonePayment: vi.fn(),
+  useListingRequestCancellationProposal: vi.fn(),
 }));
 
 vi.mock("../../hooks/admin/useAdminRequest", () => ({
   useAdminRequest: mocks.useAdminRequest,
 }));
+
+vi.mock(
+  "../../hooks/creatorRequests/useListingRequestCancellationProposal",
+  () => ({
+    useListingRequestCancellationProposal:
+      mocks.useListingRequestCancellationProposal,
+  })
+);
 
 vi.mock(
   "../../components/listingRequests/conversations/RequestConversationThread",
@@ -598,6 +607,12 @@ describe("<AdminRequestDetails />", () => {
     mocks.confirmMilestonePayment.mockResolvedValue(
       undefined
     );
+
+    mocks.useListingRequestCancellationProposal.mockReturnValue({
+      data: null,
+      isLoading: false,
+      error: null,
+    });
   });
 
   it("renders structured request details for admin review", () => {

@@ -110,6 +110,55 @@ describe("getRequestNextStep", () => {
       owner: null,
       tone: "done",
     });
+    expect(getRequestNextStep({ requestStatus: "cancelled", agreement: null })).toMatchObject({
+      key: "cancelled",
+      owner: null,
+      tone: "closed",
+    });
+  });
+
+  it("has no tracker for a cancelled request", () => {
+    expect(getRequestStages({ requestStatus: "cancelled", agreement: null })).toEqual([]);
+  });
+
+  it("prioritises an open cancellation proposal over the ordinary workflow", () => {
+    expect(
+      getRequestNextStep(
+        accepted({
+          cancellationProposal: { status: "pending_creator_statement", statement_due_at: null },
+        })
+      )
+    ).toMatchObject({
+      key: "submit-cancellation-statement",
+      owner: "creator",
+      tone: "action",
+      sectionId: "request",
+    });
+
+    expect(
+      getRequestNextStep(
+        accepted({
+          cancellationProposal: { status: "pending_buyer_response", statement_due_at: null },
+        })
+      )
+    ).toMatchObject({
+      key: "respond-cancellation-statement",
+      owner: "buyer",
+      tone: "action",
+      sectionId: "request",
+    });
+
+    expect(
+      getRequestNextStep(
+        accepted({
+          cancellationProposal: { status: "disputed", statement_due_at: null },
+        })
+      )
+    ).toMatchObject({
+      key: "cancellation-disputed",
+      owner: null,
+      tone: "closed",
+    });
   });
 
   it("walks the agreement lifecycle", () => {

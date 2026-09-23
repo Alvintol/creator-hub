@@ -8,6 +8,7 @@ import {
   getListingRequestAgreementStatusLabel,
   getListingRequestAgreementStatusSummary,
   getListingRequestBuyerHoldReasonLabel,
+  getListingRequestIncludedRevisionCount,
   getListingRequestPaymentStructureLabel,
   getListingRequestPaymentTimingLabel,
   getMinimumCreatorUpdateRule,
@@ -15,6 +16,12 @@ import {
 } from "../listings/listingRequestAgreements";
 
 describe("listing request agreement helpers", () => {
+  it("applies the two-round fallback when included_revision_count is not stated", () => {
+    expect(getListingRequestIncludedRevisionCount(null)).toBe(2);
+    expect(getListingRequestIncludedRevisionCount(0)).toBe(0);
+    expect(getListingRequestIncludedRevisionCount(5)).toBe(5);
+  });
+
   it("maps agreement statuses to labels", () => {
     expect(getListingRequestAgreementStatusLabel("draft")).toBe("Draft");
     expect(getListingRequestAgreementStatusLabel("sent")).toBe(

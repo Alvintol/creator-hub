@@ -202,7 +202,7 @@ describe("<BuyerRequests />", () => {
     ).toBeInTheDocument();
   });
 
-  it("labels buyer-cancelled archived requests", () => {
+  it("labels buyer-withdrawn archived requests", () => {
     mocks.useMyBuyerRequests.mockReturnValue({
       data: {
         items: [
@@ -234,7 +234,7 @@ describe("<BuyerRequests />", () => {
 
     expect(
       screen.getByText(
-        "Cancelled by buyer"
+        "Withdrawn by buyer"
       )
     ).toBeInTheDocument();
   });
