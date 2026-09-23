@@ -11,6 +11,13 @@ import { createClient } from "@supabase/supabase-js";
 import { CHECKOUT_POLICY_VERSIONS } from "./policyVersions.js";
 import { getMissingCheckoutPolicyTypes } from "./policyAcceptanceGuard.js";
 import { computeCumulativeRefund } from "./refundArithmetic.js";
+import { sendTransactionalEmail, suppressEmail } from "./email.js";
+import {
+  renderFinalNoticeEmail,
+  renderFirstNoticeEmail,
+  renderPaymentReceiptEmail,
+  renderPayoutReleasedEmail,
+} from "./emailTemplates.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -911,6 +918,12 @@ const markListingRequestPaymentPaidFromCheckoutSession =
       return;
     }
 
+    // Fire-and-forget: this is the first time this payment has been
+    // recorded as paid (the payment.status === "paid" branch above is the
+    // retry path and does not resend). Never awaited into the response --
+    // a slow or failing send must not delay confirming the payment.
+    sendPaymentReceiptEmailBestEffort({ payment });
+
     await applyPaidListingRequestPaymentWorkflow({
       paymentId: payment.id,
       paymentType: payment.payment_type,
@@ -955,6 +968,80 @@ const backfillChargeDetailsForPayment = async ({
 
   if (error) {
     throw new Error(error.message);
+  }
+};
+
+// Sprint 6 (launch-scope.md section 7.1): shared email helpers. Every call
+// site wraps these so a delivery failure never blocks the payment/workflow
+// it is attached to -- see api/email.js's own "never throws" contract for
+// sendTransactionalEmail; getListingRequestRecipientEmail is the one piece
+// here that can throw (no email on file), so it's caught at each call site.
+const getListingRequestUrl = (listingRequestId, viewer) =>
+  `${APP_ORIGIN}/${viewer}/requests/${listingRequestId}`;
+
+// Sprint 6 checklist: "Templates: payment receipt, ... The last is not
+// optional once the payout hold ships (§6.3)." A receipt only makes sense
+// for the buyer who paid, so this always resolves the payer's email, not
+// the creator's.
+const sendPaymentReceiptEmailBestEffort = async ({ payment }) => {
+  try {
+    const { data: request, error } = await supabaseAdmin
+      .from("listing_requests")
+      .select("id, buyer_user_id, request_title")
+      .eq("id", payment.listing_request_id)
+      .maybeSingle();
+
+    if (error || !request) {
+      return;
+    }
+
+    const email = await getSupabaseUserEmail(request.buyer_user_id);
+
+    const { subject, html, text } = renderPaymentReceiptEmail({
+      requestTitle: request.request_title || "your project",
+      amountCents: payment.total_checkout_cents ?? payment.base_amount_cents,
+      currency: payment.currency,
+      requestUrl: getListingRequestUrl(request.id, "buyer"),
+    });
+
+    await sendTransactionalEmail(supabaseAdmin, { to: email, subject, html, text });
+  } catch (err) {
+    console.error("sendPaymentReceiptEmailBestEffort failed:", err?.message || err);
+  }
+};
+
+const sendPayoutReleasedEmailBestEffort = async ({ payout, event }) => {
+  try {
+    const connectedAccountId = getStripeEventAccountId(event);
+
+    if (!connectedAccountId) {
+      return;
+    }
+
+    const { data: account, error } = await supabaseAdmin
+      .from("creator_payment_accounts")
+      .select("user_id")
+      .eq("stripe_account_id", connectedAccountId)
+      .maybeSingle();
+
+    if (error || !account) {
+      return;
+    }
+
+    const email = await getSupabaseUserEmail(account.user_id);
+
+    const { subject, html, text } = renderPayoutReleasedEmail({
+      amountCents: payout.amount,
+      currency: payout.currency,
+      arrivalDate: payout.arrival_date
+        ? new Date(payout.arrival_date * 1000).toLocaleDateString()
+        : null,
+      requestUrl: `${APP_ORIGIN}/settings/profile`,
+    });
+
+    await sendTransactionalEmail(supabaseAdmin, { to: email, subject, html, text });
+  } catch (err) {
+    console.error("sendPayoutReleasedEmailBestEffort failed:", err?.message || err);
   }
 };
 
@@ -1364,6 +1451,20 @@ const processStripeWebhookEvent = async (event) => {
       event,
     });
 
+    return "processed";
+  }
+
+  // Sprint 6 checklist: "Templates: ... payout released. The last is not
+  // optional once the payout hold ships (§6.3)." Section 6.3 found that the
+  // hold is Stripe's own account-level payout schedule, not something this
+  // app tracks or releases itself (docs/launch-scope.md section 6.3) -- so
+  // the only real signal that a payout has actually gone out is Stripe's
+  // own payout.paid event on the connected account. This requires the
+  // webhook endpoint to be receiving Connect (not just platform-account)
+  // events, which is a Stripe Dashboard setting the checklist flags as
+  // needing confirmation -- see docs/support/messaging/transactional-email.md.
+  if (event.type === "payout.paid") {
+    await sendPayoutReleasedEmailBestEffort({ payout: stripeObject, event });
     return "processed";
   }
 
@@ -2743,6 +2844,35 @@ app.post(
         throw new Error(itemsError.message);
       }
 
+      // Sprint 6 (launch-scope.md section 7): the creator-unresponsive
+      // administrative closure branch flags unearned amounts the same way
+      // Sprint 4's cancellation acceptance does, into its own table since
+      // a closure has no cancellation proposal to hang an item off.
+      const { data: closures, error: closuresError } = await supabaseAdmin
+        .from("listing_request_closures")
+        .select("id")
+        .eq("listing_request_id", listingRequestId);
+
+      if (closuresError) {
+        throw new Error(closuresError.message);
+      }
+
+      const closureIds = (closures || []).map((closure) => closure.id);
+
+      const { data: closureFlaggedItems, error: closureItemsError } =
+        closureIds.length
+          ? await supabaseAdmin
+              .from("listing_request_closure_refund_items")
+              .select("payment_id, unearned_amount_cents")
+              .in("closure_id", closureIds)
+              .not("flagged_for_refund_at", "is", null)
+              .is("refunded_at", null)
+          : { data: [], error: null };
+
+      if (closureItemsError) {
+        throw new Error(closureItemsError.message);
+      }
+
       const refunded = [];
       const skipped = [];
 
@@ -2769,6 +2899,29 @@ app.post(
         }
       }
 
+      for (const item of closureFlaggedItems || []) {
+        if (item.unearned_amount_cents <= 0) {
+          continue;
+        }
+
+        try {
+          await issueListingRequestPaymentRefund({
+            paymentId: item.payment_id,
+            baseRefundCents: item.unearned_amount_cents,
+            reason:
+              "Administrative closure (creator unresponsive): unearned prepaid amount flagged for refund.",
+            initiatedVia: "closure_cascade",
+          });
+
+          refunded.push(item.payment_id);
+        } catch (err) {
+          skipped.push({
+            paymentId: item.payment_id,
+            reason: String(err?.message || err),
+          });
+        }
+      }
+
       return res.json({ refunded, skipped });
     } catch (err) {
       const message = String(err?.message || err);
@@ -2778,6 +2931,184 @@ app.post(
     }
   },
 );
+
+// Sprint 6 (launch-scope.md section 7 / 7.1): the notice RPCs
+// (send_listing_request_first_notice / send_listing_request_final_notice,
+// 20260922_131) write the notice row directly from the frontend via
+// supabase.rpc, the same way Sprint 4's cancellation RPCs do -- they run as
+// the calling user (auth.uid()), not the service role, so the 7+7 day
+// clock's permission checks work correctly. A Postgres RPC cannot send an
+// email, so the frontend calls this immediately afterward with the new
+// notice's id, the same "write the DB state via RPC, then a best-effort
+// Express follow-up" pattern as the cancellation drain route above.
+app.post("/api/notices/:noticeId/send-email", async (req, res) => {
+  try {
+    const userId = await requireSupabaseUserId(req);
+    const noticeId = String(req.params.noticeId || "").trim();
+
+    if (!noticeId) {
+      return res.status(400).json({ error: "noticeId is required." });
+    }
+
+    const { data: notice, error: noticeError } = await supabaseAdmin
+      .from("listing_request_notices")
+      .select(
+        "id, listing_request_id, notice_type, sender_user_id, recipient_user_id, requested_action, expires_at, email_status",
+      )
+      .eq("id", noticeId)
+      .maybeSingle();
+
+    if (noticeError) {
+      throw new Error(noticeError.message);
+    }
+
+    if (!notice || notice.sender_user_id !== userId) {
+      return res
+        .status(404)
+        .json({ error: "Notice not found or not accessible." });
+    }
+
+    if (notice.email_status === "sent") {
+      return res.json({ status: "sent", alreadySent: true });
+    }
+
+    const { data: request, error: requestError } = await supabaseAdmin
+      .from("listing_requests")
+      .select("id, request_title, buyer_user_id")
+      .eq("id", notice.listing_request_id)
+      .maybeSingle();
+
+    if (requestError) {
+      throw new Error(requestError.message);
+    }
+
+    const recipientViewer =
+      request?.buyer_user_id === notice.recipient_user_id ? "buyer" : "creator";
+
+    const templateData = {
+      requestTitle: request?.request_title || "your project",
+      requestedAction: notice.requested_action,
+      expiresAt: notice.expires_at,
+      requestUrl: getListingRequestUrl(notice.listing_request_id, recipientViewer),
+    };
+
+    const { subject, html, text } =
+      notice.notice_type === "final"
+        ? renderFinalNoticeEmail(templateData)
+        : renderFirstNoticeEmail(templateData);
+
+    const attemptedAt = new Date().toISOString();
+    let result;
+
+    try {
+      const email = await getSupabaseUserEmail(notice.recipient_user_id);
+      result = await sendTransactionalEmail(supabaseAdmin, {
+        to: email,
+        subject,
+        html,
+        text,
+      });
+    } catch (err) {
+      result = {
+        status: "failed",
+        providerMessageId: null,
+        failedReason: String(err?.message || err),
+      };
+    }
+
+    const { error: updateError } = await supabaseAdmin
+      .from("listing_request_notices")
+      .update({
+        email_status: result.status,
+        email_provider_message_id: result.providerMessageId,
+        email_attempted_at: attemptedAt,
+        email_delivered_at: result.status === "sent" ? attemptedAt : null,
+        email_failed_reason: result.failedReason,
+      })
+      .eq("id", noticeId);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    return res.json({ status: result.status, failedReason: result.failedReason });
+  } catch (err) {
+    const message = String(err?.message || err);
+    const status = /session|authorization/i.test(message) ? 401 : 400;
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+// Sprint 6 (launch-scope.md section 7.1): "Suppression-list handling, so a
+// hard bounce does not silently restart a notice clock that nobody
+// received." Cloudflare Email Service's exact bounce/complaint webhook
+// payload could not be verified against real account configuration in this
+// session (the domain is not onboarded yet -- see the Sprint 6 checklist),
+// so this parses a handful of plausible field names defensively and drops
+// anything it cannot make sense of rather than guessing. **Re-verify the
+// actual field names against a real Cloudflare payload before relying on
+// this in production** -- see
+// docs/support/messaging/transactional-email.md.
+//
+// No signature verification implemented for the same reason (the signing
+// scheme cannot be confirmed without a real account). Treat this endpoint's
+// URL as unguessable-but-not-secret until that is added; it can only ever
+// suppress an email address or mark a notice bounced, neither of which
+// moves money.
+app.post("/api/webhooks/email", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const eventType = String(
+      body.type || body.event || body.EventType || "",
+    ).toLowerCase();
+    const email = String(
+      body.email || body.recipient || body.to || "",
+    ).trim();
+    const providerMessageId = String(
+      body.messageId || body.message_id || body.MessageID || "",
+    ).trim() || null;
+    const detail = String(body.reason || body.detail || "").trim() || null;
+
+    if (!email || !eventType) {
+      return res
+        .status(400)
+        .json({ error: "Unrecognised email webhook payload." });
+    }
+
+    const isBounce = /bounce|failed|undelivered/.test(eventType);
+    const isComplaint = /complaint|spam|abuse/.test(eventType);
+
+    if (isBounce || isComplaint) {
+      await suppressEmail(supabaseAdmin, {
+        email,
+        reason: isComplaint ? "complaint" : "hard_bounce",
+        detail,
+        sourceProviderMessageId: providerMessageId,
+      });
+
+      // Only correlate back to a specific notice when the provider gave us
+      // its message id -- recipient_user_id is a uuid, not an email
+      // address, so there is no other reliable join key here. Without a
+      // message id the suppression above still protects future sends;
+      // this specific notice's status just stays whatever it was.
+      if (providerMessageId) {
+        await supabaseAdmin
+          .from("listing_request_notices")
+          .update({
+            email_status: "bounced",
+            email_failed_reason: detail || eventType,
+          })
+          .eq("email_provider_message_id", providerMessageId)
+          .neq("email_status", "bounced");
+      }
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(400).json({ error: String(err?.message || err) });
+  }
+});
 
 // Sprint 5 (launch-scope.md section 6.5): "the creator can settle the
 // balance in the app at any time, by card." A straight Stripe Checkout

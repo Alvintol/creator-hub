@@ -3,7 +3,11 @@ feature: requests/request-lifecycle
 status: active
 surfaces:
   - public.listing_requests
+  - public.listing_request_notices
+  - public.listing_request_closures
+  - public.listing_request_early_review_flags
   - src/domain/listings/requestWorkspace.ts
+  - src/domain/listings/listingRequestNotices.ts
   - src/pages/buyer/ , src/pages/creator/ , src/pages/admin/
 unmatched_tier: 2
 ---
@@ -135,11 +139,13 @@ signals:
   - source: user_report
     match: "the other party has stopped responding"
   - source: db
-    match: "request has not advanced in 14+ days with a pending action on one side"
+    match: "admin_list_stale_listing_requests_checked() returns the request"
+    where: "public.admin_list_stale_listing_requests / admin_list_stale_listing_requests_checked (20260922_135)"
 auto_fix: none
-reason_not_automatable: "policy decided, not yet implemented; resolution affects money"
+reason_not_automatable: "who closes and on what branch is an administrator's judgement call, not a mechanical match -- see launch-scope.md section 7's \"who closes\" note"
 escalate_with:
-  - "which side is unresponsive and for how long"
+  - "the request's notice history (public.listing_request_notices) -- notice_type, sent_at, expires_at, answered_at, email_status"
+  - "which side sent the open notice, and whether a substantive (non-'system') conversation_messages reply exists after it"
   - "money already paid and its current state"
   - "what has been delivered so far"
 ```
@@ -148,31 +154,68 @@ escalate_with:
 deposit and went quiet.
 
 **What the user sees.** A project frozen indefinitely, often with money already
-paid into it, and no way to end it.
+paid into it, and no way to end it on their own.
 
-**Fix.** Handled by hand. **There is no automated path yet — but there is now a
-policy**, so cases should be resolved consistently with it rather than ad hoc:
+**Fix — Sprint 6 implemented the policy in full.** The 7+7 day notice clock and
+administrative closure now run in the database, not by hand:
 
-- The waiting party sends a clear project message stating what is needed.
-- **7 calendar days** without a substantive reply, then a **final notice** granting
-  **7 more**. An automated acknowledgement is not a reply.
-- After expiry, the waiting party may request **administrative closure**; an admin
-  executes it. Neither party may close unilaterally.
-- Unearned prepaid amounts stay refundable. Silence forfeits no deposit, completes
-  no milestone, authorises no charge and transfers no rights.
-- Earlier review without waiting where a promised essential deadline is missed,
-  there is credible fraud, or the creator says they cannot complete.
+- Either party sends a **first notice** stating what they need
+  (`send_listing_request_first_notice`,
+  `supabase/migrations/20260922_131_add_listing_request_notices.sql`) — logged
+  against the request and starting a server-side 7-day clock
+  (`listing_request_notices.expires_at`).
+- **7 calendar days** without a substantive reply, then the same party may send a
+  **final notice** (`send_listing_request_final_notice`), granting **7 more**.
+  The RPC refuses server-side if the first notice has not actually expired, or if
+  a substantive reply was received — a message with `message_type <> 'system'`
+  from the recipient (`listing_request_has_substantive_reply`). An automated
+  acknowledgement (`message_type = 'system'`) never counts.
+- After the final notice expires unanswered, the waiting party may ask for
+  **administrative closure**. An admin runs
+  `admin_close_listing_request_for_non_response`
+  (`supabase/migrations/20260922_133_add_listing_request_administrative_closure.sql`)
+  — it re-verifies every precondition itself (expired final notice, no
+  substantive reply, or an approved early-review flag) rather than trusting the
+  caller. **Neither party can close unilaterally** — the RPC is admin-only.
+  - **Buyer unresponsive:** unfinished work cancels. Unearned prepaid amounts
+    *remain refundable* through the ordinary admin refund route — not
+    auto-issued, since there is no itemised earned-value statement the way
+    Sprint 4's cancellation flow has.
+  - **Creator unresponsive:** unfinished work cancels **and** every
+    paid-but-unrefunded amount is flagged and refunded automatically, via
+    Sprint 5's `apply_refunded_listing_request_payment` (drained by
+    `POST /api/stripe/refunds/drain-flagged-for-request`, extended in Sprint 6
+    to also read `listing_request_closure_refund_items`) — "a creator who
+    retains payment must evidence earned value," and an unresponsive one has
+    evidenced none.
+  - Recorded as a `listing_request_closures` row: branch, reason, admin, and the
+    notice or early-review flag it was based on. **Not a finding that the work
+    delivered so far was satisfactory** (Refund Policy §6) — the system message
+    posted on closure says so explicitly.
+- **Early review** (`flag_listing_request_for_early_review` /
+  `admin_decide_listing_request_early_review`,
+  `20260922_132_add_listing_request_early_review_flags.sql`) lets either party
+  skip the wait for a missed essential deadline, credible fraud, or the creator
+  saying they cannot complete — but only by asking an admin to approve it, not by
+  closing anything directly.
 
-Sources: Refund Policy §7, and [`../../launch-scope.md`](../../launch-scope.md) §7
-for how it becomes operational.
+Sources: Refund Policy §7, [`../../launch-scope.md`](../../launch-scope.md) §7,
+and [`../messaging/transactional-email.md`](../messaging/transactional-email.md)
+for how each notice's delivery is tracked and what a failed send means for the
+clock (short answer: the clock still runs — see that playbook's `EMAIL-004`).
 
-**Still a launch gap on the product side.** The notice records, the clock, and the
-closure RPC do not exist. Until they do, the dates have to be tracked by hand and a
-closure is a manual admin action.
+**Escalate when:** the RPC refuses a closure the requester believes should be
+allowed (check the notice history and substantive-reply signal above before
+escalating further — it usually explains the refusal), or when a closure needs
+overriding after the fact (there is no reversal path; see
+[`../payments/refunds-and-disputes.md`](../payments/refunds-and-disputes.md) if
+money needs to move afterward).
 
-**Money impact.** Potentially significant. Deposits can sit indefinitely with no
-delivery and no refund route — and no refund route exists at all, see
-[`refunds-and-disputes.md`](../payments/refunds-and-disputes.md).
+**Money impact.** Handled per branch above. A creator-unresponsive closure moves
+real money (an automatic refund) — verify the drain route actually ran
+(`listing_request_closure_refund_items.refunded_at`) rather than assuming the RPC
+call alone moved it, the same caution as `CAN-006` in
+[`cancellation.md`](cancellation.md) for the equivalent Sprint 4 drain.
 
 ---
 
@@ -206,10 +249,12 @@ treat it as an integrity problem rather than a series of one-offs.
 
 ## Known gaps
 
-- **No abandonment *implementation*.** The policy is now decided — 7 + 7 day
-  notices and admin closure, `REQ-003` — but the notice records, the clock and the
-  closure RPC do not exist. Tracked as Sprint 6 in
-  [`../../launch-implementation-checklist.md`](../../launch-implementation-checklist.md).
-- **No staleness alerting.** Nothing surfaces requests that have not moved.
+- **No reversal path for an administrative closure.** `REQ-003`'s
+  `admin_close_listing_request_for_non_response` is one-way — if it turns out to
+  have been the wrong call (the "unresponsive" party actually replied but the
+  message was missed, for example), there is no undo RPC. Treat it as a data-fix
+  escalation, the same as any other terminal-status mistake.
+- **No retry UI for a failed notice email** — see `EMAIL-001` in
+  [`../messaging/transactional-email.md`](../messaging/transactional-email.md).
 - **UI/database state disagreement** is the likely cause of most `REQ-001`
   reports and is not instrumented.

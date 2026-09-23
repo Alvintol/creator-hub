@@ -49,6 +49,30 @@ vi.mock("../../hooks/admin/useAdminWriteOffCreatorRecoveryBalance", () => ({
   }),
 }));
 
+vi.mock("../../hooks/creatorRequests/useListingRequestNotices", () => ({
+  useListingRequestNotices: () => ({ data: [], isLoading: false }),
+}));
+
+vi.mock("../../hooks/creatorRequests/useListingRequestEarlyReviewFlags", () => ({
+  useListingRequestEarlyReviewFlags: () => ({ data: [] }),
+}));
+
+vi.mock("../../hooks/admin/useAdminDecideListingRequestEarlyReview", () => ({
+  useAdminDecideListingRequestEarlyReview: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
+}));
+
+vi.mock("../../hooks/admin/useAdminCloseListingRequestForNonResponse", () => ({
+  useAdminCloseListingRequestForNonResponse: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+    error: null,
+  }),
+}));
+
 vi.mock(
   "../../hooks/creatorRequests/useListingRequestCancellationProposal",
   () => ({

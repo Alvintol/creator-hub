@@ -183,5 +183,8 @@ a payment that never happened. Treat it as a last resort.
 - **Manual admin confirmation is still reachable in the admin UI** and is not
   labelled as break-glass, so nothing stops it being used as a routine fix.
 - **Link limit of 20** has not been validated against real deliverables.
-- **No policy for a milestone the buyer never responds to** — see
-  [`request-lifecycle.md`](request-lifecycle.md) `REQ-003`.
+- **A milestone the buyer never responds to** now has a documented, implemented
+  path via the same non-response notice and administrative closure flow as any
+  other stalled request — see [`request-lifecycle.md`](request-lifecycle.md)
+  `REQ-003`. It closes the request, not just the one milestone; there is no
+  milestone-scoped variant.

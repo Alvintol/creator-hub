@@ -12,6 +12,10 @@ vi.mock("../../hooks/admin/useAdminRequests", () => ({
   useAdminRequests: mocks.useAdminRequests,
 }));
 
+vi.mock("../../hooks/admin/useAdminStaleListingRequests", () => ({
+  useAdminStaleListingRequests: () => ({ data: [] }),
+}));
+
 const createRequestItem = (overrides = {}) => ({
   conversation: {
     id: "conversation-1",

@@ -8,7 +8,7 @@ Every item follows `AGENTS.md`: enforcement at the database and API rather than 
 UI alone, the next free migration number taken from `supabase/migrations/`, and a
 support playbook written or updated before the branch is ready.
 
-**Baselines to hold** (measured 2026-09-22, end of Sprint 5): **899 tests
+**Baselines to hold** (measured 2026-09-22, end of Sprint 6): **913 tests
 passing, eslint clean, tsc clean, `npx vite build` clean.** `AGENTS.md` still
 records the older 740 / 21 errors / 19 lines — those were cleaned up since and
 it is gitignored, so this file is the current reference.
@@ -651,44 +651,163 @@ note), so there was nothing to test against.
 Email ships here because the notices are its first real use, but the Supabase SMTP
 item is a live production gap and can be pulled forward on its own at any point.
 
-- [ ] Migration: notice records against a request — type (first / final), sender,
+- [x] Migration: notice records against a request — type (first / final), sender,
       what was requested, sent and expiry timestamps.
-- [ ] RPCs to send a first notice and a final notice, enforcing the 7 + 7 day clock
+      `public.listing_request_notices`
+      (`supabase/migrations/20260922_131_add_listing_request_notices.sql`), plus
+      delivery-outcome columns (`email_status`, `email_provider_message_id`,
+      `email_attempted_at`, `email_delivered_at`, `email_failed_reason`) in the
+      same table rather than a separate one, since each notice maps to exactly
+      one send attempt.
+- [x] RPCs to send a first notice and a final notice, enforcing the 7 + 7 day clock
       and refusing a final notice before the first has expired.
-- [ ] Administrative closure RPC — admin only, on a request with an expired final
+      `send_listing_request_first_notice` / `send_listing_request_final_notice`
+      (`20260922_131`) — both server-side: the final-notice RPC checks
+      `now() >= first_notice.expires_at` and re-checks for a substantive reply at
+      send time via `listing_request_has_substantive_reply`, not just at open
+      time. "Substantive" reuses `conversation_messages.message_type <> 'system'`
+      rather than adding a new concept — an automated acknowledgement is always
+      `'system'` in this schema (Sprint 4's cancellation messages confirmed the
+      convention).
+- [x] Administrative closure RPC — admin only, on a request with an expired final
       notice, recording the reason and cascading per §5.
-- [ ] Workspace UI: notice state, countdown, and the request-closure action for the
+      `admin_close_listing_request_for_non_response`
+      (`supabase/migrations/20260922_133_add_listing_request_administrative_closure.sql`)
+      — re-verifies every precondition itself (expired unanswered final notice
+      sent by the claimed waiting party, or an approved early-review flag) rather
+      than trusting the caller. Two branches per §7's table: `buyer_unresponsive`
+      cancels unfinished work only (unearned amounts stay refundable via the
+      ordinary admin route); `creator_unresponsive` also flags every
+      paid-but-unrefunded amount for automatic refund. Recorded in
+      `listing_request_closures`, one per request, with the branch, reason, admin,
+      and the notice or early-review flag it was based on. Explicitly not a
+      finding of satisfactory work (Refund Policy §6) — the closure's system
+      message says so.
+      **Early review** (§7's table) is a separate admin-approval entry point, not
+      a bypass flag on the closure RPC: `flag_listing_request_for_early_review` /
+      `admin_decide_listing_request_early_review`
+      (`20260922_132_add_listing_request_early_review_flags.sql`).
+      **Refund execution reuses Sprint 5's engine, not a parallel path**: the
+      `creator_unresponsive` branch writes to a new
+      `listing_request_closure_refund_items` table (same shape as Sprint 4's
+      `listing_request_cancellation_proposal_items`), and
+      `POST /api/stripe/refunds/drain-flagged-for-request` was extended to also
+      read it, calling the same `issueListingRequestPaymentRefund` ->
+      `apply_refunded_listing_request_payment` path. A new migration
+      (`20260922_136_close_closure_refund_loop.sql`) closes the refunded-at loop
+      for the new table the same way `20260922_125` already does for Sprint 4's —
+      this required a full `create or replace` of
+      `apply_refunded_listing_request_payment` since Postgres cannot patch a
+      single statement into an existing function body. A new `initiated_via`
+      value, `'closure_cascade'`, keeps this distinguishable from Sprint 4's
+      `'cancellation_cascade'` in the refund ledger.
+- [x] Workspace UI: notice state, countdown, and the request-closure action for the
       waiting party.
+      `src/components/listingRequests/core/NoticeAndClosurePanel.tsx` (buyer and
+      creator workspaces) and `AdminNoticeClosurePanel.tsx` (admin, with the
+      approve/decline early-review queue and the closure form itself). The
+      waiting party's "request closure" action posts a plain participant text
+      message (existing RLS already allows this) rather than a new RPC — closure
+      itself stays admin-only regardless of who asks. Notice-clock display logic
+      is mirrored in `src/domain/listings/listingRequestNotices.ts` with its own
+      test suite (`src/domain/tests/listingRequestNotices.test.ts`), the same
+      "SQL is truth, TS mirrors it for the UI" pattern as Sprint 5's refund
+      arithmetic.
 **Transactional email (§7.1)**
 
 - [ ] Enable Cloudflare Workers Paid and onboard `send.madeforstream.com` as the
       sending domain. Until a domain is onboarded, sending is limited to addresses
       verified on the account.
+      **Not done — dashboard/billing action, outside what an agent session can
+      do.** The code path (`api/email.js`) is written and ready for credentials;
+      nothing can be tested end to end until this is done. See
+      `docs/support/messaging/transactional-email.md`.
 - [ ] Confirm Email Routing for `inbox@madeforstream.com` on the root domain, and
       that Cloudflare manages the SPF and DKIM records for both directions.
-- [ ] Send from the Express API over the REST API or SMTP. **No Workers code
+      **Not done — same reason.**
+- [x] Send from the Express API over the REST API or SMTP. **No Workers code
       required** — do not introduce a Workers deployment just to send mail.
-- [ ] Templates: payment receipt, first notice, final notice, payout released. The
+      Sends over **authenticated SMTP** via `nodemailer`
+      (`api/email.js`, `api/package.json`), not the REST API — Cloudflare Email
+      Sending's REST contract is newer (Beta) and could not be verified against
+      real credentials in this session; SMTP is a stable, well-understood
+      protocol and the docs confirm both are supported. No Workers deployment
+      introduced.
+- [x] Templates: payment receipt, first notice, final notice, payout released. The
       last is not optional once the payout hold ships (§6.3).
+      `api/emailTemplates.js`. Wired at the natural trigger points: receipt from
+      `markListingRequestPaymentPaidFromCheckoutSession`'s fresh-write path
+      (`api/server.js`), first/final notice from the new
+      `POST /api/notices/:noticeId/send-email` route called right after the
+      sending RPC, payout-released from a new `payout.paid` Stripe webhook
+      handler. **§6.3 found the 14-day hold is Stripe's own account-level payout
+      schedule, not something this app tracks or releases itself** — so
+      `payout.paid` on the connected account is the only real signal available;
+      this requires the webhook endpoint to be receiving Connect events, which
+      needs confirming in the Stripe Dashboard (flagged in the playbook, not
+      confirmed here).
 - [ ] Point **Supabase custom SMTP** at the same provider and sending domain. Auth
       mail currently goes through Supabase's built-in service, which is rate-limited
       to a handful per hour and is not for production — this is a live gap
       independent of the rest of this sprint.
+      **Not done — Supabase dashboard action** (Project Settings → Auth → SMTP),
+      and it needs the same Cloudflare credentials the two items above produce.
+      Can be pulled forward once those exist, per this section's own note.
 - [ ] Warm the sending domain before launch. New accounts start on a conservative
       daily quota that scales with sending behaviour; launch day is the wrong time
       to discover the ceiling.
-- [ ] Record delivery outcomes against the notice records, so a disputed closure can
+      **Not done — depends on domain onboarding above; nothing to warm yet.**
+- [x] Record delivery outcomes against the notice records, so a disputed closure can
       show the notice was accepted for delivery.
-- [ ] Suppression-list handling, so a hard bounce does not silently restart a notice
+      `listing_request_notices.email_status` (`pending`/`sent`/`failed`/`bounced`)
+      plus `email_provider_message_id`/`email_attempted_at`/`email_delivered_at`/
+      `email_failed_reason`, set by `POST /api/notices/:noticeId/send-email`.
+      Distinguishable states: not-yet-sent (`pending`), accepted for delivery
+      (`sent`), and bounced (`bounced`) — see `EMAIL-003` in the new playbook for
+      how this feeds a disputed-closure investigation.
+- [x] Suppression-list handling, so a hard bounce does not silently restart a notice
       clock that nobody received.
-- [ ] Playbook: new `messaging/transactional-email.md` — bounced notice, unverified
+      `public.email_suppressions`
+      (`supabase/migrations/20260922_134_add_email_suppressions.sql`), checked
+      before every send (`isEmailSuppressed` in `api/email.js`) and written to by
+      a new best-effort `POST /api/webhooks/email` handler. **The clock itself is
+      never gated on suppression or delivery** — `sent_at`/`expires_at` are set by
+      the notice RPC regardless of what the email does afterward, deliberately
+      (an email outage must not be able to freeze the non-response process). The
+      tradeoff is weaker delivery evidence on a disputed closure, documented in
+      the playbook rather than silently accepted.
+- [x] Playbook: new `messaging/transactional-email.md` — bounced notice, unverified
       domain, quota exceeded, and what a failed notice means for the 7 + 7 clock.
-- [ ] Staleness query surfaced in admin: requests not advanced in 14+ days with a
+      Written with `status: partial` and an explicit "not verified end to end"
+      note — in particular, the bounce/complaint webhook's field-name parsing in
+      `POST /api/webhooks/email` is a best-effort guess that needs re-checking
+      against a real Cloudflare payload once the domain is onboarded.
+- [x] Staleness query surfaced in admin: requests not advanced in 14+ days with a
       pending action on one side.
-- [ ] Playbook: `REQ-003` in `requests/request-lifecycle.md` is rewritten from "no
+      `admin_list_stale_listing_requests_checked`
+      (`supabase/migrations/20260922_135_add_admin_stale_listing_requests.sql`),
+      surfaced at the top of `/admin/requests`
+      (`src/pages/admin/AdminRequests.tsx`). Approximated as "no request update
+      and no conversation message in 14+ days on an active request" rather than
+      re-deriving `requestWorkspace.ts`'s full whose-turn logic in SQL.
+- [x] Playbook: `REQ-003` in `requests/request-lifecycle.md` is rewritten from "no
       policy exists" to the documented procedure; update
       `requests/final-delivery.md` and `requests/milestones.md`, whose gaps both
       point at it.
+
+**Verified:** `npx vitest run` (913 passing, up from 899 — 14 new: the notice
+clock/substantive-reply/closure-state domain mirror), `npx tsc --noEmit`
+(clean), `npx eslint .` (clean), `npx vite build` (clean). **Not verified by
+this pass:** the new SQL migrations (`20260922_131`–`136`) were written against
+the live schema (columns, constraints and function signatures confirmed via
+read-only queries — Sprint 5's tables are themselves still unapplied, per that
+sprint's own note, so this sprint's migrations were checked by inspection only)
+but not applied, matching Sprint 3/4/5's established pattern of handing migration
+files to the user rather than applying them from an agent session. No
+transactional email has been sent to a real address — the Cloudflare sending
+domain is not onboarded (see above), so `api/email.js`'s SMTP path, the
+`payout.paid` webhook handler, and `POST /api/webhooks/email`'s bounce parsing
+are all unexercised against real infrastructure.
 
 ---
 
