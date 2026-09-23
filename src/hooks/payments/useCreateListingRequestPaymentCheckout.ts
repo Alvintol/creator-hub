@@ -3,6 +3,10 @@ import { useAuth } from "../../providers/AuthProvider";
 
 type CreateListingRequestPaymentCheckoutInput = {
   paymentId: string;
+  // Sprint 7: the buyer's declared billing location -- pre-payment tax
+  // location evidence, and what tax (if any) is calculated for.
+  billingCountry: string;
+  billingPostalCode?: string;
 };
 
 type ListingRequestPaymentCheckoutResponse = {
@@ -39,6 +43,8 @@ export const useCreateListingRequestPaymentCheckout = () => {
     mutationKey: ["createListingRequestPaymentCheckout", user?.id ?? null],
     mutationFn: async ({
       paymentId,
+      billingCountry,
+      billingPostalCode,
     }: CreateListingRequestPaymentCheckoutInput): Promise<ListingRequestPaymentCheckoutResponse> => {
       const token = session?.access_token;
 
@@ -52,7 +58,7 @@ export const useCreateListingRequestPaymentCheckout = () => {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ paymentId }),
+        body: JSON.stringify({ paymentId, billingCountry, billingPostalCode }),
       });
 
       return getJsonResponse<ListingRequestPaymentCheckoutResponse>(response);

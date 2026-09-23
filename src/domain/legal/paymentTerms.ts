@@ -1,5 +1,5 @@
 // REVIEW DRAFT: resolve publication inputs and implement linked workflows before adoption.
-export const paymentTermsVersion = "2026-09-22-draft-1";
+export const paymentTermsVersion = "2026-09-23-draft-1";
 
 export const paymentTermsSections = [
   {
@@ -53,9 +53,10 @@ export const paymentTermsSections = [
   {
     "title": "6. Taxes, exchange rates and receipts",
     "body": [
-      "Applicable taxes must be identified before payment. Creators are responsible for taxes and filings on their business income and supplies except where applicable law assigns collection or remittance to Made for Stream or another party. Made for Stream remains responsible for taxes legally imposed on its own services and any marketplace obligations that apply. This policy does not claim that all taxes are automatically collected.",
+      "Where applicable law obliges Made for Stream to collect and remit indirect tax on a payment, including as a marketplace or deemed supplier, Made for Stream calculates that tax at checkout, collects it with your payment and remits it. Any tax is shown as its own line before you pay. Where Made for Stream is not obliged to collect a tax, none is added. Creators remain responsible for taxes and filings on their own business income and supplies except where applicable law assigns collection or remittance to Made for Stream or another party, and Made for Stream remains responsible for taxes legally imposed on its own services.",
+      "To work out where tax applies, Made for Stream uses the billing country you choose at checkout and may also use the country associated with your IP address and the country of the card you pay with. Only the country is recorded for this purpose. Where a payment is refunded in whole or in part, tax attributable to the refunded amounts is adjusted in proportion.",
       "Payments and refunds are denominated in the transaction currency shown on the receipt. A bank or payment provider may convert that amount and apply its own rates or charges, so a converted refund can differ from the original converted debit. Made for Stream does not promise a particular external exchange rate.",
-      "The payment record must separately identify base price, buyer fee, creator tip, support contribution, tax and total. The creator's statement also identifies the creator fee and any available provider deductions. The seller's identity must be available before purchase."
+      "The payment record separately identifies base price, buyer fee, creator tip, support contribution, tax and total. The creator's statement also identifies the creator fee and any available provider deductions. The seller's identity must be available before purchase."
     ]
   },
   {

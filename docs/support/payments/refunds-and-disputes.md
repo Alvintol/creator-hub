@@ -45,6 +45,11 @@ admin-route refund whose split is already known and written synchronously
 before the webhook ever arrives). Spot-check an externally-issued refund's
 ledger row against Stripe directly before trusting its fee split.
 
+**Refunds also return tax (Sprint 7).** Tax on the refunded lines goes back
+with the refund and is reversed on the platform's Stripe Tax transaction. An
+externally issued refund gets no Stripe Tax reversal, so handle it as
+[`TAX-004`](tax.md#tax-004--refund-tax-not-reversed-or-ledger-mismatch).
+
 ## What exists and what does not
 
 **The database is ready.** `listing_request_payments` already has

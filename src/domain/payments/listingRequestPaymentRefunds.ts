@@ -1,10 +1,10 @@
 // Mirrors apply_refunded_listing_request_payment's arithmetic
-// (supabase/migrations/20260922_125_add_listing_request_payment_refund_ledger.sql)
-// exactly, so the admin refund UI can preview the effect of a refund before
-// it is issued. The database function is the source of truth for what
-// actually gets written -- this exists only for display, the same reason
-// describeBuyerServiceFee mirrors the fee bridge's arithmetic rather than
-// recomputing anything server-side.
+// (supabase/migrations/20260923_137_add_listing_request_payment_tax.sql,
+// originally 20260922_125) exactly, so the admin refund UI can preview the
+// effect of a refund before it is issued. The database function is the
+// source of truth for what actually gets written -- this exists only for
+// display, the same reason describeBuyerServiceFee mirrors the fee bridge's
+// arithmetic rather than recomputing anything server-side.
 //
 // Section 6.2 (launch-scope.md): the buyer fee and creator fee are refunded
 // / reversed cumulatively and proportionally to the base amount refunded so
@@ -14,17 +14,40 @@
 // base amount returns the exact remaining fee rather than the rounded
 // ratio, so the final partial refund always closes out any accumulated
 // rounding remainder.
+//
+// Sprint 7 (Refund Policy section 8): tax follows the same pattern per
+// line. Base and buyer-fee tax follow the cumulative base; tip and
+// contribution tax follow the cumulative tip / contribution refunded, since
+// those are refunded explicitly rather than prorated. Every tax field is
+// optional so payments and refunds from before Sprint 7 read as zero tax.
 
 export type ListingRequestPaymentRefundInput = {
   base_amount_cents: number;
   buyer_service_fee_cents: number;
   creator_platform_fee_cents: number;
+  creator_tip_cents?: number;
+  platform_support_cents?: number;
+  tax_on_base_cents?: number;
+  tax_on_buyer_fee_cents?: number;
+  tax_on_tip_cents?: number;
+  tax_on_support_cents?: number;
 };
 
 export type ListingRequestPaymentRefundState = {
   base_refund_cents: number;
   buyer_fee_refund_cents: number;
   creator_fee_reversal_cents: number;
+  tip_refund_cents?: number;
+  contribution_refund_cents?: number;
+  base_tax_refund_cents?: number;
+  buyer_fee_tax_refund_cents?: number;
+  tip_tax_refund_cents?: number;
+  support_tax_refund_cents?: number;
+};
+
+export type RefundExtras = {
+  tipRefundCents?: number;
+  contributionRefundCents?: number;
 };
 
 export type CumulativeRefundResult = {
@@ -33,22 +56,47 @@ export type CumulativeRefundResult = {
   creatorFeeReversalCumulativeCents: number;
   thisBuyerFeeRefundCents: number;
   thisCreatorFeeReversalCents: number;
+  thisBaseTaxRefundCents: number;
+  thisBuyerFeeTaxRefundCents: number;
+  thisTipTaxRefundCents: number;
+  thisSupportTaxRefundCents: number;
+  thisTaxRefundCents: number;
   isFinalRefund: boolean;
 };
 
 const sumBy = (
   refunds: ListingRequestPaymentRefundState[],
   key: keyof ListingRequestPaymentRefundState,
-): number => refunds.reduce((sum, refund) => sum + refund[key], 0);
+): number => refunds.reduce((sum, refund) => sum + (refund[key] ?? 0), 0);
 
 // Banker's-unaware "round half away from zero" matches Postgres's `round()`
 // on a numeric for the positive values this always operates on.
 const roundCents = (value: number): number => Math.round(value);
 
+// The cumulative share of `lineTax` owed once `cumulativeRefunded` of
+// `lineAmount` has been refunded -- the exact tax once the line is fully
+// refunded, never a rounded ratio.
+const cumulativeLineTax = (
+  lineTax: number | undefined,
+  lineAmount: number | undefined,
+  cumulativeRefunded: number,
+): number => {
+  if (!lineTax || !lineAmount) {
+    return 0;
+  }
+
+  if (cumulativeRefunded >= lineAmount) {
+    return lineTax;
+  }
+
+  return roundCents((lineTax * cumulativeRefunded) / lineAmount);
+};
+
 export const computeCumulativeListingRequestPaymentRefund = (
   payment: ListingRequestPaymentRefundInput,
   priorRefunds: ListingRequestPaymentRefundState[],
   baseRefundCents: number,
+  { tipRefundCents = 0, contributionRefundCents = 0 }: RefundExtras = {},
 ): CumulativeRefundResult => {
   if (baseRefundCents <= 0) {
     throw new Error("A refund must have a base amount greater than zero.");
@@ -85,6 +133,54 @@ export const computeCumulativeListingRequestPaymentRefund = (
           payment.base_amount_cents,
       );
 
+  const cumulativeTipRefunded =
+    sumBy(priorRefunds, "tip_refund_cents") + tipRefundCents;
+  const cumulativeContributionRefunded =
+    sumBy(priorRefunds, "contribution_refund_cents") + contributionRefundCents;
+
+  const thisTaxFor = (
+    cumulative: number,
+    key: keyof ListingRequestPaymentRefundState,
+  ): number => Math.max(cumulative - sumBy(priorRefunds, key), 0);
+
+  const thisBaseTaxRefundCents = thisTaxFor(
+    cumulativeLineTax(
+      payment.tax_on_base_cents,
+      payment.base_amount_cents,
+      cumulativeBaseRefundedCents,
+    ),
+    "base_tax_refund_cents",
+  );
+
+  // Buyer-fee tax follows the base, like the buyer fee itself.
+  const thisBuyerFeeTaxRefundCents = thisTaxFor(
+    isFinalRefund
+      ? (payment.tax_on_buyer_fee_cents ?? 0)
+      : roundCents(
+          ((payment.tax_on_buyer_fee_cents ?? 0) * cumulativeBaseRefundedCents) /
+            payment.base_amount_cents,
+        ),
+    "buyer_fee_tax_refund_cents",
+  );
+
+  const thisTipTaxRefundCents = thisTaxFor(
+    cumulativeLineTax(
+      payment.tax_on_tip_cents,
+      payment.creator_tip_cents,
+      cumulativeTipRefunded,
+    ),
+    "tip_tax_refund_cents",
+  );
+
+  const thisSupportTaxRefundCents = thisTaxFor(
+    cumulativeLineTax(
+      payment.tax_on_support_cents,
+      payment.platform_support_cents,
+      cumulativeContributionRefunded,
+    ),
+    "support_tax_refund_cents",
+  );
+
   return {
     cumulativeBaseRefundedCents,
     buyerFeeRefundCumulativeCents,
@@ -97,6 +193,15 @@ export const computeCumulativeListingRequestPaymentRefund = (
       creatorFeeReversalCumulativeCents - alreadyCreatorFeeReversed,
       0,
     ),
+    thisBaseTaxRefundCents,
+    thisBuyerFeeTaxRefundCents,
+    thisTipTaxRefundCents,
+    thisSupportTaxRefundCents,
+    thisTaxRefundCents:
+      thisBaseTaxRefundCents +
+      thisBuyerFeeTaxRefundCents +
+      thisTipTaxRefundCents +
+      thisSupportTaxRefundCents,
     isFinalRefund,
   };
 };

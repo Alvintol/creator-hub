@@ -13,6 +13,16 @@ import { getMissingCheckoutPolicyTypes } from "./policyAcceptanceGuard.js";
 import { computeCumulativeRefund } from "./refundArithmetic.js";
 import { sendTransactionalEmail, suppressEmail } from "./email.js";
 import {
+  buildCheckoutLineItems,
+  buildTaxCalculationLineItems,
+  buildTaxReversalLineItems,
+  decideTaxTreatment,
+  extractTaxLinesFromCalculation,
+  getIpCountryFromRequest,
+  normalizeTaxCountry,
+  parseTaxConfig,
+} from "./tax.js";
+import {
   renderFinalNoticeEmail,
   renderFirstNoticeEmail,
   renderPaymentReceiptEmail,
@@ -34,6 +44,11 @@ const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET || "";
 
 const TWITCH_REDIRECT_URI = process.env.TWITCH_REDIRECT_URI || "";
 const APP_ORIGIN = process.env.APP_ORIGIN || "http://localhost:5173";
+
+// Sprint 7 (launch-scope.md section 12). Collection is off until
+// STRIPE_TAX_COLLECTION_COUNTRIES lists a country -- see api/tax.js and
+// docs/support/payments/tax.md for why it ships empty.
+const TAX_CONFIG = parseTaxConfig(process.env);
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "";
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -453,7 +468,18 @@ const getChargeDetailsFromPaymentIntent = async ({
         : charge.application_fee?.id || null
       : null;
 
-  return { chargeId, applicationFeeId };
+  // Sprint 7: post-payment buyer location evidence (docs/support/payments/tax.md).
+  const cardCountry =
+    charge && typeof charge === "object"
+      ? normalizeTaxCountry(charge.payment_method_details?.card?.country)
+      : null;
+
+  const billingCountry =
+    charge && typeof charge === "object"
+      ? normalizeTaxCountry(charge.billing_details?.address?.country)
+      : null;
+
+  return { chargeId, applicationFeeId, cardCountry, billingCountry };
 };
 
 // Record every webhook before applying any business logic.
@@ -636,6 +662,10 @@ const getPaymentWithStripeEventIds = async (paymentId) => {
       stripe_payment_intent_id,
       stripe_charge_id,
       stripe_application_fee_id,
+      tax_cents,
+      tax_treatment,
+      stripe_tax_calculation_id,
+      stripe_tax_transaction_id,
       paid_at
     `,
     )
@@ -848,6 +878,8 @@ const markListingRequestPaymentPaidFromCheckoutSession =
         });
       }
 
+      await finalizePaidPaymentTaxBestEffort({ payment, chargeDetails: null });
+
       if (await isListingRequestCancelled(payment.listing_request_id)) {
         await refundStrayPaymentOnCancelledRequest({
           payment: await getPaymentWithStripeEventIds(payment.id),
@@ -867,12 +899,14 @@ const markListingRequestPaymentPaidFromCheckoutSession =
     const stripeAccountId =
       payment.stripe_connected_account_id || connectedAccountId;
 
-    const { chargeId, applicationFeeId } =
+    const chargeDetails =
       await getChargeDetailsFromPaymentIntent({
         stripeClient: requireStripe(),
         paymentIntentId,
         stripeAccountId,
       });
+
+    const { chargeId, applicationFeeId } = chargeDetails;
 
     const { error } = await supabaseAdmin
       .from("listing_request_payments")
@@ -910,6 +944,13 @@ const markListingRequestPaymentPaidFromCheckoutSession =
       throw new Error(error.message);
     }
 
+    // Before the stray-payment refund below, so a refund of a taxed payment
+    // always has a Stripe Tax transaction to reverse.
+    await finalizePaidPaymentTaxBestEffort({
+      payment: { ...payment, status: "paid" },
+      chargeDetails,
+    });
+
     if (await isListingRequestCancelled(payment.listing_request_id)) {
       await refundStrayPaymentOnCancelledRequest({
         payment: await getPaymentWithStripeEventIds(payment.id),
@@ -929,6 +970,91 @@ const markListingRequestPaymentPaidFromCheckoutSession =
       paymentType: payment.payment_type,
     });
   };
+
+// Sprint 7 (launch-scope.md section 12): once a payment is paid, record
+// the post-payment location evidence (card issuing country, Checkout
+// billing country) and, for a taxed payment, commit the Stripe Tax
+// calculation as a transaction on the platform account -- which is what
+// puts it in Stripe Tax's filing exports. Never throws: the payment is
+// already taken, and a failure here is a reconciliation item (TAX-003 /
+// TAX-002 in docs/support/payments/tax.md), not a reason to fail the
+// webhook and block the project workflow. chargeDetails is null on the
+// webhook retry path, which only retries the transaction.
+const finalizePaidPaymentTaxBestEffort = async ({ payment, chargeDetails }) => {
+  try {
+    const evidence = chargeDetails
+      ? [
+          [
+            "card_issuer",
+            chargeDetails.cardCountry,
+            "stripe_charge.payment_method_details.card.country",
+          ],
+          [
+            "billing_address_checkout",
+            chargeDetails.billingCountry,
+            "stripe_charge.billing_details.address.country",
+          ],
+        ]
+      : [];
+
+    for (const [evidenceType, country, source] of evidence) {
+      if (!country) {
+        continue;
+      }
+
+      const { error } = await supabaseAdmin.rpc(
+        "record_listing_request_payment_tax_evidence",
+        {
+          p_payment_id: payment.id,
+          p_evidence_type: evidenceType,
+          p_country_code: country,
+          p_source: source,
+        },
+      );
+
+      if (error) {
+        console.error(
+          `TAX-002: recording ${evidenceType} evidence failed for payment ${payment.id}: ${error.message}`,
+        );
+      }
+    }
+
+    if (
+      payment.tax_treatment !== "calculated" ||
+      !payment.stripe_tax_calculation_id ||
+      payment.stripe_tax_transaction_id
+    ) {
+      return;
+    }
+
+    // Platform account: no stripeAccount option (see api/tax.js).
+    const transaction = await requireStripe().tax.transactions.createFromCalculation(
+      {
+        calculation: payment.stripe_tax_calculation_id,
+        reference: payment.id,
+        metadata: { creatorhub_payment_id: payment.id },
+      },
+      { idempotencyKey: `tax_transaction_${payment.id}` },
+    );
+
+    const { error } = await supabaseAdmin.rpc(
+      "set_listing_request_payment_tax_transaction",
+      {
+        p_payment_id: payment.id,
+        p_stripe_tax_transaction_id: transaction.id,
+      },
+    );
+
+    if (error) {
+      throw new Error(error.message);
+    }
+  } catch (err) {
+    console.error(
+      `TAX-003: finalizing tax for payment ${payment.id} failed:`,
+      err?.message || err,
+    );
+  }
+};
 
 // A paid payment whose charge handle never got recorded -- an earlier
 // webhook attempt that landed before this column was populated, or one
@@ -1567,6 +1693,38 @@ const deriveCreatorPaymentAccountReadinessFromV2Account = (stripeAccount) => {
   };
 };
 
+// Which kinds of tax id Stripe collected at onboarding (the types only,
+// never the numbers) and the legal entity type. Whether that makes the
+// creator "registered" for a given regime -- and so whether EU reverse
+// charge applies -- is part of the Sprint 7 advice gate and is not derived
+// here. NOT VERIFIED against a live v2 account's identity payload: read
+// defensively, and store nothing if the shape is not what is expected.
+const deriveCreatorTaxStatusFromV2Account = (stripeAccount) => {
+  const identity = stripeAccount?.identity;
+
+  if (!identity || typeof identity !== "object") {
+    return {};
+  }
+
+  const idNumbers = identity.business_details?.id_numbers;
+
+  return {
+    tax_entity_type:
+      typeof identity.entity_type === "string" && identity.entity_type.trim()
+        ? identity.entity_type.trim().slice(0, 50)
+        : null,
+    tax_id_types: Array.isArray(idNumbers)
+      ? [
+          ...new Set(
+            idNumbers
+              .map((entry) => (typeof entry?.type === "string" ? entry.type : null))
+              .filter(Boolean),
+          ),
+        ]
+      : [],
+  };
+};
+
 const upsertCreatorPaymentAccount = async ({
   userId,
   stripeAccount,
@@ -1596,6 +1754,10 @@ const upsertCreatorPaymentAccount = async ({
     onboarding_completed_at: detailsSubmitted ? now : null,
     last_synced_at: now,
     updated_at: now,
+    // Sprint 7 (launch-scope.md section 12.2): creator tax status. Only
+    // written when Stripe returned the identity -- never cleared by a
+    // response that simply did not include it.
+    ...deriveCreatorTaxStatusFromV2Account(stripeAccount),
   };
 
   const { data, error } = await supabaseAdmin
@@ -1801,6 +1963,115 @@ const getStripePaymentMetadata = (payment) => ({
   related_entity_id: payment.related_entity_id || "",
 });
 
+// Sprint 7 (launch-scope.md section 12): records the buyer's pre-payment
+// location evidence, then either calculates tax with Stripe Tax (only for
+// a country in STRIPE_TAX_COLLECTION_COUNTRIES) or records that none is
+// collected. set_listing_request_payment_tax recomputes both totals from
+// the stored lines and refuses a jurisdiction that does not match the
+// buyer's recorded billing country -- the enforcement is there, not here.
+const recordTaxEvidence = async (paymentId, evidenceType, country, source) => {
+  const { error } = await supabaseAdmin.rpc(
+    "record_listing_request_payment_tax_evidence",
+    {
+      p_payment_id: paymentId,
+      p_evidence_type: evidenceType,
+      p_country_code: country,
+      p_source: source,
+    },
+  );
+
+  if (error) {
+    throw new Error(`Location evidence could not be recorded: ${error.message}`);
+  }
+};
+
+const applyCheckoutTax = async ({ stripeClient, payment, req }) => {
+  if (TAX_CONFIG.configError) {
+    throw new Error(TAX_CONFIG.configError);
+  }
+
+  const billingCountry = normalizeTaxCountry(req.body?.billingCountry);
+
+  if (!billingCountry) {
+    throw new Error("Choose your billing country before paying.");
+  }
+
+  const billingPostalCode =
+    String(req.body?.billingPostalCode || "").trim().slice(0, 20) || null;
+  const billingRegion =
+    String(req.body?.billingRegion || "").trim().toUpperCase().slice(0, 10) || null;
+
+  await recordTaxEvidence(
+    payment.id,
+    "billing_address_declared",
+    billingCountry,
+    "buyer_checkout_form",
+  );
+
+  const ipCountry = getIpCountryFromRequest(req, TAX_CONFIG.ipCountryHeader);
+
+  if (ipCountry) {
+    await recordTaxEvidence(
+      payment.id,
+      "ip_address",
+      ipCountry,
+      `request_header:${TAX_CONFIG.ipCountryHeader}`,
+    );
+  }
+
+  const taxTreatment = decideTaxTreatment(billingCountry, TAX_CONFIG);
+
+  let taxLines = {
+    tax_on_base_cents: 0,
+    tax_on_buyer_fee_cents: 0,
+    tax_on_tip_cents: 0,
+    tax_on_support_cents: 0,
+    jurisdictionRegion: billingRegion,
+  };
+  let calculationId = null;
+
+  if (taxTreatment === "calculated") {
+    // Platform account: no stripeAccount option (see api/tax.js for why).
+    const calculation = await stripeClient.tax.calculations.create({
+      currency: payment.currency,
+      line_items: buildTaxCalculationLineItems(payment, TAX_CONFIG.taxCodes),
+      customer_details: {
+        address: {
+          country: billingCountry,
+          ...(billingPostalCode ? { postal_code: billingPostalCode } : {}),
+          ...(billingRegion ? { state: billingRegion } : {}),
+        },
+        address_source: "billing",
+      },
+      expand: ["line_items"],
+    });
+
+    taxLines = extractTaxLinesFromCalculation(calculation);
+    calculationId = calculation.id;
+  }
+
+  const { data, error } = await supabaseAdmin.rpc(
+    "set_listing_request_payment_tax",
+    {
+      p_payment_id: payment.id,
+      p_tax_treatment: taxTreatment,
+      p_jurisdiction_country: billingCountry,
+      p_jurisdiction_region: taxLines.jurisdictionRegion,
+      p_tax_on_base_cents: taxLines.tax_on_base_cents,
+      p_tax_on_buyer_fee_cents: taxLines.tax_on_buyer_fee_cents,
+      p_tax_on_tip_cents: taxLines.tax_on_tip_cents,
+      p_tax_on_support_cents: taxLines.tax_on_support_cents,
+      p_stripe_tax_calculation_id: calculationId,
+    },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data;
+};
+
 // Stripe checkout sessions are single-use and cannot be recreated, so
 // reopening checkout for the same payment (a page refresh, a second
 // browser tab, the buyer navigating back) should reuse the still-open
@@ -1954,6 +2225,7 @@ const getOrCreateStripeAccountForEmbeddedConnect = async ({
     include: [
       "configuration.merchant",
       "configuration.recipient",
+      "identity",
       "requirements",
     ],
   });
@@ -2335,6 +2607,7 @@ app.post("/api/stripe/connect/sync", async (req, res) => {
         include: [
           "configuration.merchant",
           "configuration.recipient",
+          "identity",
           "requirements",
         ],
       },
@@ -2380,14 +2653,16 @@ app.post("/api/stripe/checkout/session", async (req, res) => {
     // currently says. Self-heals drift when found; raises if the recipient
     // does not match the agreement (launch-scope.md section 11). Also doubles
     // as the existence check for paymentId.
-    const { data: payment, error: recomputeError } = await supabaseAdmin.rpc(
-      "recompute_listing_request_payment_amounts",
-      { p_payment_id: paymentId },
-    );
+    const { data: recomputedPayment, error: recomputeError } =
+      await supabaseAdmin.rpc("recompute_listing_request_payment_amounts", {
+        p_payment_id: paymentId,
+      });
 
     if (recomputeError) {
       throw new Error(recomputeError.message);
     }
+
+    let payment = recomputedPayment;
 
     assertCheckoutPaymentCanBeOpened({ payment, userId });
     await assertCheckoutPoliciesAccepted({ payment, userId });
@@ -2403,6 +2678,12 @@ app.post("/api/stripe/checkout/session", async (req, res) => {
     ) {
       throw new Error("This payment is linked to a different Stripe account.");
     }
+
+    // Sprint 7: tax is determined after the amounts are recomputed (which
+    // clears stale tax) and before any session is reused or created, so the
+    // stored total -- which the webhook checks against amount_total -- is
+    // always the one Stripe charges.
+    payment = await applyCheckoutTax({ stripeClient, payment, req });
 
     const metadata = getStripePaymentMetadata(payment);
 
@@ -2433,19 +2714,18 @@ app.post("/api/stripe/checkout/session", async (req, res) => {
         ui_mode: "embedded_page",
         client_reference_id: payment.id,
         return_url: getCheckoutReturnUrl(payment.id),
-        line_items: [
-          {
-            price_data: {
-              currency: payment.currency,
-              unit_amount: payment.total_checkout_cents,
-              product_data: {
-                name: getPaymentCheckoutTitle(payment),
-                metadata,
-              },
-            },
-            quantity: 1,
-          },
-        ],
+        // Fee Schedule section 6: every component, tax included, is its
+        // own line so the buyer sees tax separately before paying.
+        line_items: buildCheckoutLineItems({
+          payment,
+          title: getPaymentCheckoutTitle(payment),
+          metadata,
+        }),
+        // A taxed payment needs Checkout's billing address as location
+        // evidence (docs/support/payments/tax.md).
+        ...(payment.tax_treatment === "calculated"
+          ? { billing_address_collection: "required" }
+          : {}),
         payment_intent_data: {
           application_fee_amount: payment.application_fee_cents,
           metadata,
@@ -2541,6 +2821,11 @@ const issueListingRequestPaymentRefund = async ({
       creator_platform_fee_cents,
       creator_tip_cents,
       platform_support_cents,
+      tax_on_base_cents,
+      tax_on_buyer_fee_cents,
+      tax_on_tip_cents,
+      tax_on_support_cents,
+      stripe_tax_transaction_id,
       creator_user_id,
       stripe_charge_id,
       stripe_application_fee_id,
@@ -2571,7 +2856,7 @@ const issueListingRequestPaymentRefund = async ({
   const { data: existingRefunds, error: refundsError } = await supabaseAdmin
     .from("listing_request_payment_refunds")
     .select(
-      "base_refund_cents, buyer_fee_refund_cents, creator_fee_reversal_cents, tip_refund_cents, contribution_refund_cents",
+      "base_refund_cents, buyer_fee_refund_cents, creator_fee_reversal_cents, tip_refund_cents, contribution_refund_cents, base_tax_refund_cents, buyer_fee_tax_refund_cents, tip_tax_refund_cents, support_tax_refund_cents",
     )
     .eq("payment_id", paymentId);
 
@@ -2598,14 +2883,24 @@ const issueListingRequestPaymentRefund = async ({
     );
   }
 
-  const { thisBuyerFeeRefund, thisCreatorFeeReversal } = computeCumulativeRefund(
+  const refundAmounts = computeCumulativeRefund(
     payment,
     existingRefunds,
     baseRefundCents,
+    { tipRefundCents, contributionRefundCents },
   );
 
+  const { thisBuyerFeeRefund, thisCreatorFeeReversal, thisTaxRefund } =
+    refundAmounts;
+
+  // Sprint 7: tax attributable to the refunded lines goes back to the buyer
+  // too (Refund Policy section 8).
   const stripeRefundAmount =
-    baseRefundCents + thisBuyerFeeRefund + tipRefundCents + contributionRefundCents;
+    baseRefundCents +
+    thisBuyerFeeRefund +
+    tipRefundCents +
+    contributionRefundCents +
+    thisTaxRefund;
 
   // Section 6.5: take from the held balance first, and only fund a
   // shortfall from the platform once it is genuinely insufficient (the hold
@@ -2655,8 +2950,13 @@ const issueListingRequestPaymentRefund = async ({
   // Contribution refunds also have to come back out of the application
   // fee -- a contribution is included in it (section 4), so returning one
   // needs the same connected-account top-up as a fee reversal does.
+  // Tax, like the contribution, reached the platform inside the application
+  // fee (api/tax.js), so returning it needs the same reversal.
   const applicationFeeRefundAmount =
-    thisBuyerFeeRefund + thisCreatorFeeReversal + contributionRefundCents;
+    thisBuyerFeeRefund +
+    thisCreatorFeeReversal +
+    contributionRefundCents +
+    thisTaxRefund;
 
   let applicationFeeRefundId = null;
 
@@ -2698,6 +2998,15 @@ const issueListingRequestPaymentRefund = async ({
 
   const refundResult = Array.isArray(result) ? result[0] : result;
 
+  if (payment.stripe_tax_transaction_id || thisTaxRefund > 0) {
+    await reverseRefundTaxBestEffort({
+      payment,
+      refundId: refundResult?.refund_id ?? null,
+      stripeRefundId: refund.id,
+      refundAmounts: { ...refundAmounts, baseRefundCents, tipRefundCents, contributionRefundCents },
+    });
+  }
+
   if (shortfallCents > 0) {
     const { error: recoveryDebitError } = await supabaseAdmin.rpc(
       "apply_creator_recovery_debit",
@@ -2721,6 +3030,87 @@ const issueListingRequestPaymentRefund = async ({
   }
 
   return refundResult;
+};
+
+// Sprint 7: after a refund is recorded, confirm the ledger's tax matches
+// what was just sent to Stripe (the SQL function and api/refundArithmetic.js
+// must never diverge), then reverse the refunded lines on the platform's
+// Stripe Tax transaction so the filing exports net it off. Never throws --
+// the money has already moved; a failure here is TAX-004 in
+// docs/support/payments/tax.md.
+const reverseRefundTaxBestEffort = async ({
+  payment,
+  refundId,
+  stripeRefundId,
+  refundAmounts,
+}) => {
+  try {
+    if (!refundId) {
+      throw new Error("the refund ledger row id was not returned");
+    }
+
+    const { data: ledgerRow, error: ledgerError } = await supabaseAdmin
+      .from("listing_request_payment_refunds")
+      .select(
+        "base_tax_refund_cents, buyer_fee_tax_refund_cents, tip_tax_refund_cents, support_tax_refund_cents",
+      )
+      .eq("id", refundId)
+      .maybeSingle();
+
+    if (ledgerError || !ledgerRow) {
+      throw new Error(ledgerError?.message || "refund ledger row not found");
+    }
+
+    if (
+      ledgerRow.base_tax_refund_cents !== refundAmounts.thisBaseTaxRefund ||
+      ledgerRow.buyer_fee_tax_refund_cents !== refundAmounts.thisBuyerFeeTaxRefund ||
+      ledgerRow.tip_tax_refund_cents !== refundAmounts.thisTipTaxRefund ||
+      ledgerRow.support_tax_refund_cents !== refundAmounts.thisSupportTaxRefund
+    ) {
+      throw new Error(
+        `ledger tax ${JSON.stringify(ledgerRow)} does not match the tax refunded through Stripe`,
+      );
+    }
+
+    if (!payment.stripe_tax_transaction_id || refundAmounts.thisTaxRefund === 0) {
+      return;
+    }
+
+    const stripeClient = requireStripe();
+
+    const originalLines = await stripeClient.tax.transactions.listLineItems(
+      payment.stripe_tax_transaction_id,
+      { limit: 10 },
+    );
+
+    const reversal = await stripeClient.tax.transactions.createReversal(
+      {
+        mode: "partial",
+        original_transaction: payment.stripe_tax_transaction_id,
+        reference: stripeRefundId,
+        line_items: buildTaxReversalLineItems(originalLines.data, refundAmounts),
+        metadata: {
+          creatorhub_payment_id: payment.id,
+          creatorhub_refund_id: refundId,
+        },
+      },
+      { idempotencyKey: `tax_reversal_${stripeRefundId}` },
+    );
+
+    const { error: reversalRecordError } = await supabaseAdmin.rpc(
+      "set_listing_request_payment_refund_tax_reversal",
+      { p_refund_id: refundId, p_stripe_tax_reversal_id: reversal.id },
+    );
+
+    if (reversalRecordError) {
+      throw new Error(reversalRecordError.message);
+    }
+  } catch (err) {
+    console.error(
+      `TAX-004: tax reversal for refund ${stripeRefundId} on payment ${payment.id} failed:`,
+      err?.message || err,
+    );
+  }
 };
 
 app.post("/api/stripe/refunds", async (req, res) => {

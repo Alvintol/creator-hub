@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
+import type { PaymentTaxDisplayInput } from "../../domain/payments/listingRequestPaymentTax";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../providers/AuthProvider";
 
@@ -122,7 +123,9 @@ export type ListingRequestPaymentSummary = Pick<
   | "platform_support_cents"
   | "total_checkout_cents"
   | "metadata"
->;
+> &
+  // Sprint 7: tax is shown as its own line before payment.
+  PaymentTaxDisplayInput;
 
 // One payment, as the buyer sees it before checkout. RLS limits this to the
 // payer, the creator and admins.
@@ -140,7 +143,7 @@ export const useListingRequestPayment = (paymentId?: string | null) => {
       const { data, error } = await supabase
         .from("listing_request_payments")
         .select(
-          "id, listing_request_id, payment_type, status, currency, base_amount_cents, creator_tip_cents, buyer_service_fee_cents, buyer_service_fee_bps, buyer_service_fee_minimum_cents, platform_support_cents, total_checkout_cents, metadata",
+          "id, listing_request_id, payment_type, status, currency, base_amount_cents, creator_tip_cents, buyer_service_fee_cents, buyer_service_fee_bps, buyer_service_fee_minimum_cents, platform_support_cents, tax_cents, tax_treatment, tax_jurisdiction_country, tax_jurisdiction_region, total_checkout_cents, metadata",
         )
         .eq("id", paymentId)
         .maybeSingle();
