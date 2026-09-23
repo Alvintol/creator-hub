@@ -1,25 +1,49 @@
 ---
 feature: payments/refunds-and-disputes
-status: partial
+status: active
 surfaces:
-  - public.listing_request_payments                          # stripe_charge_id, stripe_application_fee_id, stripe_refund_id, stripe_dispute_id, refunded_at, disputed_at now populated; status is not
-  - api/server.js                                             # markListingRequestPaymentPaidFromCheckoutSession, getChargeDetailsFromPaymentIntent, recordChargeRefundedFromWebhook, recordChargeDisputeCreatedFromWebhook, recordChargeDisputeClosedFromWebhook
+  - public.listing_request_payments                          # stripe_charge_id, stripe_application_fee_id, stripe_refund_id, stripe_dispute_id, refunded_at, disputed_at, status (now derived)
+  - public.listing_request_payment_refunds                    # the refund ledger
+  - public.apply_refunded_listing_request_payment()
+  - public.derive_listing_request_payment_refund_status()
+  - api/server.js                                             # POST /api/stripe/refunds, markListingRequestPaymentPaidFromCheckoutSession, recordChargeRefundedFromWebhook, refundStrayPaymentOnCancelledRequest
+  - api/refundArithmetic.js
   - src/pages/admin/AdminPaymentIssues.tsx                    # /admin/payment-issues
   - src/hooks/admin/useAdminPaymentIssues.ts
+  - src/components/listingRequests/payments/ListingRequestPaymentAdminRefundPanel.tsx  # on AdminRequestDetails.tsx
+  - src/hooks/admin/useAdminIssueListingRequestPaymentRefund.ts
 unmatched_tier: 2
 ---
 
 # Refunds and Disputes — Support Playbook
 
-> **No refund or dispute-response capability exists yet — that part of this
-> playbook still documents a gap.** What changed (Sprint 3, 2026-09-22): a
-> refund or dispute issued in Stripe is no longer invisible to Made for Stream.
-> The webhook now records it — the charge id, the refund id, the dispute id,
-> and when it happened — directly on the payment row. **The payment's `status`
-> column is still not updated by any of this.** A refunded payment still reads
-> `paid` in `status`; the new columns are the only place the refund is visible
-> until the ledger work below lands. Read status alongside the new columns, not
-> instead of them.
+Sprint 5 (`../../launch-scope.md` section 6) built the refund engine this
+playbook used to say did not exist. `status` is now **derived** from an
+immutable ledger (`listing_request_payment_refunds`) rather than written
+directly, so `refunded` / `partially_refunded` cannot drift from what Stripe
+actually did — read `status` on its own again; the "read the new columns
+instead of status" advice below is historical, describing the Sprint 3 gap
+this sprint closed.
+
+**Where to issue a refund.** `/admin/requests/:id`'s Payments section, once
+the payment is `paid` or `partially_refunded` — not `/admin/payment-issues`,
+which only lists payments Stripe has *already* recorded a refund or dispute
+against. The refund route (`POST /api/stripe/refunds`) computes the
+cumulative proportional buyer-fee refund and creator-fee reversal itself
+(section 6.2), refunds the buyer's share from the charge, and separately
+reverses the fee share via the Stripe Application Fee Refunds API — not
+`refund_application_fee: true`'s automatic ratio, which is computed against
+the whole charge amount (including any tip or contribution) rather than
+against the base amount the way section 6.2's cumulative arithmetic is. See
+the comment above the route in `api/server.js` for the full reasoning.
+
+**A refund issued by hand in Stripe still reconciles.** `charge.refunded`
+now calls the same `apply_refunded_listing_request_payment` RPC
+(`initiated_via = 'webhook_external'`), attributing the entire Stripe refund
+amount to the base (there is no stored intent to split it against, unlike an
+admin-route refund whose split is already known and written synchronously
+before the webhook ever arrives). Spot-check an externally-issued refund's
+ledger row against Stripe directly before trusting its fee split.
 
 ## What exists and what does not
 
@@ -69,16 +93,19 @@ recorded on the payment; the project workflow still runs as though nothing
 happened, because closing collection or freezing work on a disputed payment is
 also Sprint 5 scope (launch-scope.md §13, "Dispute opened").
 
-## Rules until this is built
+## Rules
 
-- **The agent may never write a refund or dispute status.** It is on the
-  forbidden list in [`agent-contract.md`](../agent-contract.md), and it stays
-  there until there is a sanctioned write path.
-- **The agent may never issue a refund.** Money movement is always human.
+- **The agent may never call `POST /api/stripe/refunds` or issue a refund in
+  the Stripe dashboard.** Money movement is always human. The route exists so
+  an admin can act quickly through the app, not so it can be automated.
+- **The agent may never hand-write `status`, `stripe_refund_id` or
+  `refunded_at` on `listing_request_payments`, nor insert directly into
+  `listing_request_payment_refunds`.** The only sanctioned write path is
+  `apply_refunded_listing_request_payment`, called by the admin route or by
+  the `charge.refunded` webhook. It is on the forbidden list in
+  [`agent-contract.md`](../agent-contract.md).
 - Every refund and dispute is **Tier 2 minimum**, and Tier 3 if more than one
   buyer is involved.
-- Record every manual refund somewhere durable outside the app, because the app
-  will not record it. Without that, reconciliation later is guesswork.
 
 ---
 
@@ -91,7 +118,7 @@ signals:
   - source: user_report
     match: "buyer requests a refund"
 auto_fix: none
-reason_not_automatable: "no refund workflow exists; money movement is always human"
+reason_not_automatable: "money movement is always human, even with a working refund route"
 escalate_with:
   - "payment id, amount, currency, payment_type"
   - "the request's current workflow stage and what was delivered"
@@ -101,32 +128,34 @@ escalate_with:
 
 **Cause.** Cancellation, dissatisfaction, non-delivery, or mutual agreement.
 
-**Fix.** Entirely manual, on the creator's connected account. Because these are
-direct charges, the refund comes out of the creator's balance — this is a
-conversation with the creator, not a unilateral platform action.
+**Fix.** An admin opens `/admin/requests/:id`, finds the payment in the
+Payments section, and issues the refund there. The route
+(`POST /api/stripe/refunds`, `useAdminIssueListingRequestPaymentRefund`)
+applies Refund Policy §8 automatically — the admin only chooses the base
+amount to refund and states a reason:
 
-**These now have a policy** — Refund Policy §8, with the arithmetic in
-[`../../launch-scope.md`](../../launch-scope.md) §6.2. Apply it rather than deciding
-case by case:
+- **Buyer service fee** — refunded in the same proportion as the base,
+  computed cumulatively against everything already refunded on this payment.
+- **Creator platform fee** — reversed in the same proportion, via the Stripe
+  Application Fee Refunds API. Made for Stream absorbs this.
+- **Partial delivery** — earned value per Refund Policy §4 is the admin's own
+  judgement call, same as always; the route does not decide *how much* base
+  to refund, only what happens to the fees once that figure is chosen.
+- Minimums are **not** recalculated on the remaining balance, and there is no
+  refund administration fee.
+- **Tips and contributions** are separate fields on the same form, never
+  auto-prorated on a partial refund (Refund Policy §8) — see
+  `docs/support/payments/creator-recovery-balances.md`'s sibling notes on the
+  14-day window, or just leave them at 0 for an ordinary partial refund.
 
-- **Buyer service fee** — refunded in the same proportion as the base.
-- **Creator platform fee** — reversed in the same proportion. Made for Stream
-  absorbs this; it does not come back automatically and has to be reversed
-  deliberately.
-- **Partial delivery** — earned value per Refund Policy §4: a completed conforming
-  milestone keeps its price, a partial one keeps only the documented value of
-  conforming work actually made available.
-- Minimums are **not** recalculated on the remaining balance, and there is no refund
-  administration fee.
-- For repeated partial refunds, compute the **cumulative** proportional fee refund
-  and subtract what has already been returned, so rounding cannot exceed the
-  original fee.
+**If the connected account's balance cannot cover the refund**, the route
+tops it up from the platform's own Stripe balance and opens a **creator
+recovery balance** instead of failing — see
+[`creator-recovery-balances.md`](creator-recovery-balances.md). This is
+automatic; no separate step is needed.
 
-**What is still missing is the implementation**, not the policy. Record every manual
-refund durably outside the app until it exists.
-
-**Money impact.** Direct. And the Made for Stream record will be wrong afterwards
-until this feature exists.
+**Money impact.** Direct, and now recorded exactly — `listing_request_payment_refunds`
+is the permanent record; nothing needs to be written down elsewhere.
 
 ---
 
@@ -140,16 +169,27 @@ signals:
     where: public.listing_request_payments
     match: "stripe_refund_id is not null AND status = 'paid'"
 auto_fix: none
-reason_not_automatable: "no sanctioned write path for refund status yet"
+reason_not_automatable: "the fee/tip/contribution split for an externally-issued refund is a best-effort attribution, not a known figure -- worth a human glance"
 escalate_with:
   - "the refund amount and whether it was full or partial (read from Stripe using stripe_charge_id)"
-  - "the Made for Stream payment it corresponds to"
+  - "the ledger row apply_refunded_listing_request_payment wrote (public.listing_request_payment_refunds where payment_id = ...), specifically initiated_via and the base/fee split"
   - "the request's current stage"
 ```
 
-**Cause.** Someone refunded in Stripe. The webhook now records `stripe_refund_id`
-and `refunded_at` on the payment (Sprint 3, 2026-09-22) — `status` is not
-written by that path, so it still reads `paid`.
+**Cause.** Someone refunded in Stripe directly rather than through
+`/admin/requests/:id`. The `charge.refunded` webhook now reconciles this
+automatically — `status` derives correctly and a ledger row is written with
+`initiated_via = 'webhook_external'`. This signal firing at all (`status`
+still `paid` with a `stripe_refund_id` set) means the webhook's own call to
+`apply_refunded_listing_request_payment` failed; check the API logs for the
+`charge.refunded: apply_refunded_listing_request_payment failed` line.
+
+**What still needs a human glance even when it worked.** An externally-issued
+refund has no stored intent to split against, so the webhook attributes the
+**entire** Stripe refund amount to `base_refund_cents` — it cannot know that
+some of it was actually a tip, a contribution, or fee. Spot-check the ledger
+row's split against what was actually refunded in Stripe before trusting it
+for reporting.
 
 **Detection.** Check `/admin/payment-issues` (filter: Refunded) first — it's
 the same query below as a page. Direct SQL, for anything the UI doesn't show:
@@ -163,16 +203,28 @@ where stripe_refund_id is not null
 order by refunded_at desc;
 ```
 
-A payment that reached `paid` **before** this shipped and was refunded before
-that has no `stripe_charge_id` to match against, so it will not show up here —
-see Known gaps.
+A payment that reached `paid` **before** the charge-id work shipped and was
+refunded before that has no `stripe_charge_id` to match against, so it will
+not show up here — see Known gaps.
 
-**Fix.** Manual reconciliation of `status` and whatever the request workflow
-should do next. Do not hand-write `status` to `refunded` — that is still the
-same "single nullable id, no history" ledger gap launch-scope.md §6.2
-describes, so it will not survive a second partial refund on the same payment.
-Fix the actual status derivation when the refund ledger (Sprint 5) lands
-instead of by hand here.
+**Fix.** First check the API logs for why the webhook's own call to
+`apply_refunded_listing_request_payment` failed (the query above should
+essentially never return rows if the webhook is healthy). Once the cause is
+fixed, replay it by hand:
+
+```sql
+select public.apply_refunded_listing_request_payment(
+  p_payment_id := '<payment id>',
+  p_base_refund_cents := <the Stripe refund's amount, in cents>,
+  p_stripe_refund_id := '<the Stripe refund id>',
+  p_reason := 'Manually reconciled after webhook failure.',
+  p_initiated_via := 'webhook_external'
+);
+```
+
+It is idempotent on `stripe_refund_id`, so re-running it is safe. **Never**
+hand-write `status`, `stripe_refund_id` or `refunded_at` directly — that
+bypasses the ledger and is exactly the drift this feature exists to prevent.
 
 **Money impact.** Already moved. The exposure is the wrong record, which affects
 what the request lets both parties do next.
@@ -261,77 +313,96 @@ the product reflects it automatically.
 
 ---
 
-## What building this feature requires
+## What building this feature required
 
-Recorded here so the work is specified before it starts. Items 1 and 2 shipped
-in Sprint 3 (2026-09-22); the rest is still Sprint 5.
+Recorded here for history. Items 1 and 2 shipped in Sprint 3 (2026-09-22);
+the rest shipped in Sprint 5 (launch-scope.md section 6).
 
-1. ~~**Populate `stripe_charge_id` and `stripe_application_fee_id`** on the
-   existing paid path.~~ **Done.** Fetched live from the PaymentIntent's
-   expanded `latest_charge` in `markListingRequestPaymentPaidFromCheckoutSession`
-   (`api/server.js`), with a self-healing backfill path
-   (`backfillChargeDetailsForPayment`) for a payment that reached `paid` before
-   this existed and is retried through the "already paid" branch. It does
-   **not** run a one-time bulk backfill over historical rows — see Known gaps.
+1. ~~**Populate `stripe_charge_id` and `stripe_application_fee_id`**~~ **Done**
+   (Sprint 3). Fetched live from the PaymentIntent's expanded `latest_charge`
+   in `markListingRequestPaymentPaidFromCheckoutSession` (`api/server.js`),
+   with a self-healing backfill path (`backfillChargeDetailsForPayment`).
 2. ~~**Handle `charge.refunded`, `charge.dispute.created`, `charge.dispute.closed`**~~
-   **Done**, recording only. `recordChargeRefundedFromWebhook`,
-   `recordChargeDisputeCreatedFromWebhook` and
-   `recordChargeDisputeClosedFromWebhook` in `api/server.js` write the Stripe
-   id and timestamp onto the matching payment and reuse the `stripe_event_ids`
-   idempotency pattern. They deliberately never write `status` — see "What
-   exists and what does not" above for why.
-3. **Add `security definer` RPCs** following the `apply_paid_listing_request_*`
-   shape, to write refund and dispute state and cascade the request.
-4. **Implement the fee policy** in `REF-001` — proportional, cumulative, rounded
-   once, minimums never recalculated. Decided in Refund Policy §8 and
-   [`../../launch-scope.md`](../../launch-scope.md) §6.2; no longer a blocker.
-5. **Decide what a refund does to the request.** Cancelled? Reverted to an
-   earlier stage? Milestone-specific refunds need this answered per stage —
-   launch-scope.md §6.7 already has the table.
-6. **Add the first server-side tests** for the new recording functions and for
-   the RPCs above once they exist. `api/server.js` still has close to no test
-   coverage; this feature should not be the code that continues that.
-7. ~~**Admin surface** for disputes and out-of-band refunds~~ **Done.**
-   `/admin/payment-issues` lists every payment with a `stripe_dispute_id` or
-   `stripe_refund_id` set, filterable by type, and flags per row when `status`
-   still reads `paid` — replacing the queries above for day-to-day use (they
-   remain useful for direct DB investigation).
-8. **Update this playbook again** once the ledger lands — replace the Tier 2
-   entries with Tier 1 auto-fixes where they qualify, and move the
-   reconciliation queries above into real alerting instead of a query run by
-   hand.
+   **Done** (Sprint 3 recording only, Sprint 5 made `charge.refunded` a real
+   reconciling write). `recordChargeRefundedFromWebhook` now calls
+   `apply_refunded_listing_request_payment`; the dispute handlers still only
+   record, per launch-scope.md section 6.1's "no automated dispute response."
+3. ~~**Add `security definer` RPCs**~~ **Done.**
+   `apply_refunded_listing_request_payment`
+   (`supabase/migrations/20260922_125_add_listing_request_payment_refund_ledger.sql`),
+   following the `apply_paid_listing_request_*` shape: writes one immutable
+   ledger row, derives `status`, and cascades the request per section 6.7.
+4. ~~**Implement the fee policy**~~ **Done.** Cumulative, proportional,
+   rounded once against the cumulative figure, with a final refund returning
+   the exact remainder rather than a third rounded ratio. Mirrored in JS in
+   two places for testability without a live database:
+   `api/refundArithmetic.js` (used by the admin route before calling Stripe)
+   and `src/domain/payments/listingRequestPaymentRefunds.ts` (used by the
+   admin UI preview) — both have their own vitest suites covering repeated
+   partial refunds and the rounding remainder.
+5. ~~**Decide what a refund does to the request**~~ **Done**, with one
+   simplification worth knowing: rather than separately encoding each row of
+   launch-scope.md section 6.7's table, `apply_refunded_listing_request_payment`
+   uses one rule — a milestone payment being refunded at all cancels that
+   milestone, and the request (with its agreement) is cancelled once no
+   payment on it remains `paid`/`partially_refunded`, *unless* the request is
+   already `completed` (never reverted). This covers every row of the table
+   correctly but does not literally branch on "is this the starting payment"
+   the way the table is laid out — read the function's comments if a refund's
+   cascade effect looks surprising.
+6. ~~**Add the first server-side tests**~~ **Done**, for the arithmetic
+   (`api/tests/refundArithmetic.test.js`). The route itself (Stripe calls,
+   admin auth) still has no integration test harness — `api/server.js` has no
+   test harness at all yet, same gap AGENTS.md calls out generally.
+7. ~~**Admin surface** for disputes and out-of-band refunds~~ **Done**
+   (Sprint 3 for visibility). Sprint 5 added the actual refund action:
+   `/admin/requests/:id`'s Payments section, not `/admin/payment-issues`
+   (which still only lists payments with an *existing* dispute or refund).
+8. **This playbook is updated** (this pass). Tier 2 entries stay Tier 2 —
+   issuing and reconciling a refund both still require a human decision, even
+   though the mechanism now works. What changed is that `REF-002`'s "escalate
+   with" now points at a working replay command instead of "wait for Sprint
+   5," and a whole new failure class (a blocked recovery balance) has its own
+   playbook.
 
 ---
 
 ## Known gaps
 
-- **No refund or dispute-response capability in the product.** Recording a
-  refund or dispute happened is not the same as acting on one — issuing a
-  refund, freezing collection, or closing a disputed request are all still
-  manual.
-- **`status` never reflects a refund or dispute.** `stripe_refund_id` /
-  `stripe_dispute_id` being set is the only signal; `status` keeps reading
-  `paid` until the ledger derives it for real (Sprint 5). REF-002 and REF-003's
-  detection queries exist because of this gap, not despite it.
-- **No bulk backfill has been run.** The self-healing backfill in
-  `backfillChargeDetailsForPayment` only fires when a payment already marked
-  `paid` is retried through a later webhook event (the "downstream workflow RPC
-  failed" retry path). A `paid` row that is never retried keeps a null
-  `stripe_charge_id` forever. As of 2026-09-22 there are zero `paid` rows in
-  production (no live traffic yet — see launch-scope.md), so there is nothing
-  to backfill today; this becomes a real gap the moment the first payment goes
-  through under the pre-fix code, and should be closed with a real backfill
-  script before that matters, not left to the retry path.
-- **The ledger cannot represent a partial refund.** One nullable `stripe_refund_id`,
-  one `refunded_at`, no refunded amount and no history — so two partial refunds
-  against one payment have nowhere to go. An immutable refund ledger has to land
-  with the feature. `recordChargeRefundedFromWebhook` stores only the *latest*
-  refund id from `charge.refunds.data[0]` for this reason — it is a pointer for
-  REF-002's detection query, not a history.
-- Nothing alerts on the new refund/dispute columns being set; the detection
-  queries above have to be run by hand until Sprint 6's staleness/alerting work
-  covers them too.
+- **No automated dispute response.** Launch scope (section 6.1) explicitly
+  keeps this out — `REF-003`/`REF-004` are still entirely manual by design,
+  not by omission.
+- **`CAN-005`** (`docs/support/requests/cancellation.md`) — a Stripe checkout
+  session completing after its request was already cancelled — is now closed
+  by this same refund engine: `refundStrayPaymentOnCancelledRequest` in
+  `api/server.js` fires automatically the moment such a payment is marked
+  paid, refunding everything and never unlocking work. It shows up in the
+  ledger as `initiated_via = 'system_auto_refund'`.
+- **`CAN-004`** (a disputed cancellation statement) still has no formal
+  "resolved" state — an admin's decision is now *actionable* (issue the
+  agreed refund from `/admin/requests/:id`), but the
+  `listing_request_cancellation_proposals` row stays `status = 'disputed'`
+  forever even after that refund is issued. Recording the decision itself is
+  still the same "outside the app" gap this playbook used to have for
+  refunds generally.
+- **An externally-issued refund's tip/fee split is a best-effort attribution**,
+  not a known figure — see `REF-002`.
+- **Dispute freezing/closing is still manual.** Recording that a dispute
+  exists (`stripe_dispute_id`, `disputed_at`) is not the same as acting on
+  one — freezing collection or closing a disputed request are still human
+  decisions, by design (see "No automated dispute response" above).
+- **No bulk backfill has been run** for `stripe_charge_id` on a `paid` row
+  that predates that column and is never retried through a later webhook
+  event. As of the last check there were zero `paid` rows in production (no
+  live traffic yet), so there was nothing to backfill; re-check before this
+  matters.
+- Nothing alerts on a new refund, dispute, or recovery-balance entry; the
+  detection queries above have to be run by hand until Sprint 6's
+  staleness/alerting work covers them too.
 
-The **fee-refund policy is decided** — Refund Policy §8 and
-[`../../launch-scope.md`](../../launch-scope.md) §6 — so "what this feature
-requires" above is a build specification rather than an open question.
+The fee-refund policy — Refund Policy §8 and
+[`../../launch-scope.md`](../../launch-scope.md) §6 — is now built exactly as
+specified, not approximated. See
+[`creator-recovery-balances.md`](creator-recovery-balances.md) for the
+platform-funded-refund half of section 6 (6.5–6.6), which is its own
+playbook rather than an extension of this one.

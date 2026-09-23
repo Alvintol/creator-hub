@@ -10,6 +10,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { CHECKOUT_POLICY_VERSIONS } from "./policyVersions.js";
 import { getMissingCheckoutPolicyTypes } from "./policyAcceptanceGuard.js";
+import { computeCumulativeRefund } from "./refundArithmetic.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -328,6 +329,35 @@ const requireSupabaseUserId = async (req) => {
   return data.user.id;
 };
 
+// Every existing admin write in this codebase goes through a security
+// definer RPC that checks admin_roles itself (see AdminPaymentIssues.tsx's
+// hooks). The refund route is the first admin action that has to call the
+// live Stripe API directly, which only api/server.js can do -- so it needs
+// its own admin check here rather than relying on an RPC's internal one.
+const requireAdminUserId = async (req) => {
+  const userId = await requireSupabaseUserId(req);
+
+  if (!supabaseAdmin) {
+    throw new Error("Supabase admin not configured");
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("admin_roles")
+    .select("profile_user_id")
+    .eq("profile_user_id", userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    throw new Error("Administrator access is required.");
+  }
+
+  return userId;
+};
+
 const requireStripe = () => {
   if (!stripe) {
     throw new Error(
@@ -555,6 +585,24 @@ const markStripeWebhookEventFailed = async (
 };
 
 // Load the internal payment row used by webhook processing.
+const isListingRequestCancelled = async (listingRequestId) => {
+  if (!listingRequestId) {
+    return false;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("listing_requests")
+    .select("status")
+    .eq("id", listingRequestId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data?.status === "cancelled";
+};
+
 const getPaymentWithStripeEventIds = async (paymentId) => {
   if (!supabaseAdmin) {
     throw new Error("Supabase admin not configured");
@@ -565,9 +613,15 @@ const getPaymentWithStripeEventIds = async (paymentId) => {
     .select(
       `
       id,
+      listing_request_id,
       payment_type,
       status,
       currency,
+      base_amount_cents,
+      creator_tip_cents,
+      buyer_service_fee_cents,
+      creator_platform_fee_cents,
+      platform_support_cents,
       total_checkout_cents,
       stripe_event_ids,
       stripe_connected_account_id,
@@ -612,18 +666,57 @@ const applyPaidListingRequestPaymentWorkflow = async ({
 
   const rpcName = workflowRpcByPaymentType[paymentType];
 
-  if (!rpcName) {
-    // one_time payments have no downstream project workflow to apply yet.
-    return;
+  if (rpcName) {
+    const { error } = await supabaseAdmin.rpc(rpcName, {
+      p_listing_request_payment_id: paymentId,
+    });
+
+    if (error) {
+      throw new Error(error.message);
+    }
   }
 
-  const { error } = await supabaseAdmin.rpc(rpcName, {
-    p_listing_request_payment_id: paymentId,
+  // Applies regardless of payment_type (including one_time, which has no
+  // project workflow above) -- section 6.6's recovery diversion is a
+  // property of the payment, not of what it unlocks.
+  const { error: recoveryError } = await supabaseAdmin.rpc(
+    "apply_listing_request_payment_recovery_instalment",
+    { p_payment_id: paymentId },
+  );
+
+  if (recoveryError) {
+    throw new Error(recoveryError.message);
+  }
+};
+
+// CAN-005 (docs/support/requests/cancellation.md): a database write cannot
+// reach the Stripe API, so cancellation only ever *expires* the live
+// checkout session as a second, best-effort call -- there is a real window
+// where a buyer who still had the old checkout page open completes payment
+// after the request was already cancelled. This closes it the way the
+// playbook's own "Known gaps" section says it should be closed: as a refund
+// case, not a webhook-handler guard that would otherwise silently drop a
+// real charge on the floor. Called instead of the normal project workflow
+// once a payment lands "paid" on an already-cancelled request -- refunds
+// everything (base, both fees, tip and contribution) and never unlocks any
+// work.
+// Defers to issueListingRequestPaymentRefund (defined further down this
+// file, but already initialized by the time any request handler actually
+// runs) rather than duplicating the Stripe calls here, so this path also
+// gets the held-balance-first / platform-top-up handling for free -- a
+// stray payment on a cancelled project is not exempt from the same
+// insufficient-balance case an ordinary admin refund can hit.
+const refundStrayPaymentOnCancelledRequest = async ({ payment }) => {
+  await issueListingRequestPaymentRefund({
+    paymentId: payment.id,
+    baseRefundCents: payment.base_amount_cents,
+    reason:
+      "Stripe checkout completed after the listing request was already cancelled (CAN-005).",
+    initiatedVia: "system_auto_refund",
+    tipRefundCents: payment.creator_tip_cents,
+    contributionRefundCents: payment.platform_support_cents,
+    tipContributionOverrideReason: "unauthorised",
   });
-
-  if (error) {
-    throw new Error(error.message);
-  }
 };
 
 const markListingRequestPaymentProcessingFromCheckoutSession =
@@ -748,6 +841,14 @@ const markListingRequestPaymentPaidFromCheckoutSession =
         });
       }
 
+      if (await isListingRequestCancelled(payment.listing_request_id)) {
+        await refundStrayPaymentOnCancelledRequest({
+          payment: await getPaymentWithStripeEventIds(payment.id),
+        });
+
+        return;
+      }
+
       await applyPaidListingRequestPaymentWorkflow({
         paymentId: payment.id,
         paymentType: payment.payment_type,
@@ -800,6 +901,14 @@ const markListingRequestPaymentPaidFromCheckoutSession =
 
     if (error) {
       throw new Error(error.message);
+    }
+
+    if (await isListingRequestCancelled(payment.listing_request_id)) {
+      await refundStrayPaymentOnCancelledRequest({
+        payment: await getPaymentWithStripeEventIds(payment.id),
+      });
+
+      return;
     }
 
     await applyPaidListingRequestPaymentWorkflow({
@@ -1010,11 +1119,22 @@ const getPaymentForStripeChargeEvent = async (chargeObjectOrId) => {
   return data;
 };
 
-// Recording only -- no status write. Refunds and disputes get a real,
-// derived status once the refund ledger lands (launch-scope.md section 6);
-// until then this just makes the fact visible on the payment row instead of
-// falling through processStripeWebhookEvent as "ignored" the way it does
-// today, which is the launch-blocking gap section 6 opens with.
+// Sprint 5: the refund ledger and apply_refunded_listing_request_payment
+// (launch-scope.md section 6.2) mean this can now do a real reconciling
+// write instead of only recording a pointer. Two cases:
+//
+//  - The refund was issued through this app's own admin route, which
+//    already called apply_refunded_listing_request_payment synchronously
+//    with the precise base/fee/tip/contribution split before this event
+//    ever arrived. The RPC's stripe_refund_id idempotency check makes this
+//    a no-op -- the ledger row already exists.
+//  - The refund was issued by hand in Stripe (REF-002's whole scenario).
+//    There is no stored intent to read a split from, so the entire refund
+//    amount is attributed to base -- a best-effort figure, not a known one.
+//    initiated_via = 'webhook_external' keeps this distinguishable in the
+//    ledger from a refund this app actually decided on, and the amount
+//    should be spot-checked against Stripe directly (same as REF-002 always
+//    recommended) rather than trusted as an exact fee split.
 const recordChargeRefundedFromWebhook = async ({ charge, event }) => {
   const payment = await getPaymentForStripeChargeEvent(charge);
 
@@ -1026,14 +1146,41 @@ const recordChargeRefundedFromWebhook = async ({ charge, event }) => {
     return;
   }
 
-  const latestRefundId =
-    charge.refunds?.data?.[0]?.id || payment.stripe_refund_id || null;
+  const latestRefund = charge.refunds?.data?.[0] || null;
+  const refundAmountCents =
+    typeof latestRefund?.amount === "number"
+      ? latestRefund.amount
+      : charge.amount_refunded;
+
+  if (latestRefund?.id && Number.isFinite(refundAmountCents) && refundAmountCents > 0) {
+    const { error: applyError } = await supabaseAdmin.rpc(
+      "apply_refunded_listing_request_payment",
+      {
+        p_payment_id: payment.id,
+        p_base_refund_cents: refundAmountCents,
+        p_stripe_refund_id: latestRefund.id,
+        p_reason: "Recorded from a Stripe charge.refunded event.",
+        p_initiated_via: "webhook_external",
+      },
+    );
+
+    // A refund this app already recorded (admin route or an earlier
+    // delivery of this same event) or one whose amount can no longer be
+    // applied (e.g. already fully refunded by other means) should not fail
+    // the whole webhook -- the event-id dedupe below still needs to write
+    // so a retry does not loop forever. Real, unexpected apply failures are
+    // still visible in the webhook_events processing log for REF-002-style
+    // investigation.
+    if (applyError) {
+      console.error(
+        `charge.refunded: apply_refunded_listing_request_payment failed for payment ${payment.id}: ${applyError.message}`,
+      );
+    }
+  }
 
   const { error } = await supabaseAdmin
     .from("listing_request_payments")
     .update({
-      stripe_refund_id: latestRefundId,
-      refunded_at: payment.refunded_at || getStripeEventTimestamp(event),
       stripe_event_ids: getNextStripeEventIds(payment, event.id),
       updated_at: new Date().toISOString(),
     })
@@ -1099,10 +1246,51 @@ const recordChargeDisputeClosedFromWebhook = async ({ dispute, event }) => {
   }
 };
 
+// A recovery settlement session carries creatorhub_recovery_settlement_id
+// instead of creatorhub_payment_id -- it is not a listing_request_payments
+// row at all, so it needs its own webhook path rather than going through
+// getPaymentIdFromStripeObject.
+const getRecoverySettlementIdFromStripeObject = (stripeObject) =>
+  typeof stripeObject?.metadata?.creatorhub_recovery_settlement_id ===
+    "string"
+    ? stripeObject.metadata.creatorhub_recovery_settlement_id
+    : null;
+
+const applyPaidCreatorRecoverySettlementFromCheckoutSession = async ({
+  session,
+}) => {
+  const settlementId = getRecoverySettlementIdFromStripeObject(session);
+
+  if (!settlementId) {
+    return false;
+  }
+
+  const { error } = await supabaseAdmin.rpc(
+    "apply_paid_creator_recovery_settlement",
+    { p_settlement_id: settlementId },
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return true;
+};
+
 const processStripeWebhookEvent = async (event) => {
   const stripeObject = event.data.object;
 
   if (event.type === "checkout.session.completed") {
+    if (getRecoverySettlementIdFromStripeObject(stripeObject)) {
+      if (stripeObject.payment_status === "paid") {
+        await applyPaidCreatorRecoverySettlementFromCheckoutSession({
+          session: stripeObject,
+        });
+      }
+
+      return "processed";
+    }
+
     if (stripeObject.payment_status === "paid") {
       await markListingRequestPaymentPaidFromCheckoutSession({
         session: stripeObject,
@@ -1405,6 +1593,12 @@ const getCheckoutReturnUrl = (paymentId) =>
   `${APP_ORIGIN}${STRIPE_CHECKOUT_RETURN_PATH}?payment_id=${encodeURIComponent(
     paymentId,
   )}&session_id={CHECKOUT_SESSION_ID}`;
+
+// Recovery balance settlement is a straight, non-Connect charge on the
+// creator's own card -- so it returns to their settings page rather than
+// the buyer-facing payment-return route above.
+const getRecoverySettlementReturnUrl = () =>
+  `${APP_ORIGIN}/settings?recovery_settlement=1`;
 
 const getReadyCreatorPaymentAccount = async (creatorUserId) => {
   if (!supabaseAdmin) {
@@ -2185,6 +2379,501 @@ app.post("/api/stripe/checkout/session", async (req, res) => {
 
     return res.json({
       payment: data,
+      checkout: {
+        sessionId: session.id,
+        clientSecret: session.client_secret,
+      },
+    });
+  } catch (err) {
+    const message = String(err?.message || err);
+    const status = /session|authorization/i.test(message) ? 401 : 400;
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+// Sprint 5 (launch-scope.md section 6.1): admin-only, full or partial refund
+// of any paid payment. The reversal of the application fee has to happen
+// atomically with the base refund, and the money sits on the creator's
+// connected account -- so this is the one place a refund is issued, not a
+// UI convenience wired to several.
+//
+// Two Stripe calls rather than a single refund_application_fee: true,
+// deliberately. refund_application_fee's automatic proportion is based on
+// (refund amount / original charge amount), which is not the same ratio
+// section 6.2's cumulative, bps-rounded arithmetic produces once tips,
+// support or prior partial refunds are in the mix -- and section 6.2
+// explicitly requires the cumulative figure, with a final refund returning
+// the exact rounding remainder. Explicitly refunding the buyer's fee share
+// as part of the charge refund, then reversing the buyer-fee-plus-creator-fee
+// share from the application fee directly (the Application Fee Refunds
+// API), gives byte-exact control matching the ledger instead of trusting
+// Stripe's own generic ratio.
+// Shared by the admin refund route and the cancellation-acceptance drain
+// route below -- both end up doing the same thing (refund a payment's
+// unearned amount and record it), differing only in who may trigger it and
+// how the base amount is decided. Throws on any failure; the caller decides
+// how to report it (a single 4xx for the admin route, a per-payment
+// skip-and-continue for the drain route so one bad payment does not block
+// the rest of the queue).
+const issueListingRequestPaymentRefund = async ({
+  paymentId,
+  baseRefundCents,
+  reason,
+  initiatedVia,
+  actorUserId = null,
+  tipRefundCents = 0,
+  contributionRefundCents = 0,
+  tipContributionOverrideReason = null,
+}) => {
+  const stripeClient = requireStripe();
+
+  const { data: payment, error: paymentError } = await supabaseAdmin
+    .from("listing_request_payments")
+    .select(
+      `
+      id,
+      status,
+      currency,
+      base_amount_cents,
+      buyer_service_fee_cents,
+      creator_platform_fee_cents,
+      creator_tip_cents,
+      platform_support_cents,
+      creator_user_id,
+      stripe_charge_id,
+      stripe_application_fee_id,
+      stripe_connected_account_id
+    `,
+    )
+    .eq("id", paymentId)
+    .maybeSingle();
+
+  if (paymentError) {
+    throw new Error(paymentError.message);
+  }
+
+  if (!payment) {
+    throw new Error("Payment not found.");
+  }
+
+  if (!["paid", "partially_refunded"].includes(payment.status)) {
+    throw new Error(
+      `This payment is not refundable (currently ${payment.status}).`,
+    );
+  }
+
+  if (!payment.stripe_charge_id || !payment.stripe_connected_account_id) {
+    throw new Error("This payment has no recorded Stripe charge to refund.");
+  }
+
+  const { data: existingRefunds, error: refundsError } = await supabaseAdmin
+    .from("listing_request_payment_refunds")
+    .select(
+      "base_refund_cents, buyer_fee_refund_cents, creator_fee_reversal_cents, tip_refund_cents, contribution_refund_cents",
+    )
+    .eq("payment_id", paymentId);
+
+  if (refundsError) {
+    throw new Error(refundsError.message);
+  }
+
+  const sumField = (field) =>
+    (existingRefunds || []).reduce((sum, row) => sum + row[field], 0);
+
+  const alreadyTipRefunded = sumField("tip_refund_cents");
+  const alreadyContributionRefunded = sumField("contribution_refund_cents");
+
+  if (alreadyTipRefunded + tipRefundCents > payment.creator_tip_cents) {
+    throw new Error("Tip refund would exceed the tip actually paid.");
+  }
+
+  if (
+    alreadyContributionRefunded + contributionRefundCents >
+    payment.platform_support_cents
+  ) {
+    throw new Error(
+      "Contribution refund would exceed the contribution actually paid.",
+    );
+  }
+
+  const { thisBuyerFeeRefund, thisCreatorFeeReversal } = computeCumulativeRefund(
+    payment,
+    existingRefunds,
+    baseRefundCents,
+  );
+
+  const stripeRefundAmount =
+    baseRefundCents + thisBuyerFeeRefund + tipRefundCents + contributionRefundCents;
+
+  // Section 6.5: take from the held balance first, and only fund a
+  // shortfall from the platform once it is genuinely insufficient (the hold
+  // has released and the creator has been paid out and spent it, or simply
+  // never had enough). Checking the connected account's own available
+  // balance up front -- rather than reacting to a Stripe error -- means
+  // "take from the held balance first" falls out naturally: while the hold
+  // is in effect there is normally plenty of available balance, so no
+  // top-up happens and shortfallCents stays 0.
+  const balance = await stripeClient.balance.retrieve(
+    {},
+    { stripeAccount: payment.stripe_connected_account_id },
+  );
+
+  const availableForCurrency = (balance.available || [])
+    .filter((entry) => entry.currency === payment.currency)
+    .reduce((sum, entry) => sum + entry.amount, 0);
+
+  const shortfallCents = Math.max(0, stripeRefundAmount - availableForCurrency);
+
+  if (shortfallCents > 0) {
+    await stripeClient.transfers.create({
+      amount: shortfallCents,
+      currency: payment.currency,
+      destination: payment.stripe_connected_account_id,
+      metadata: {
+        creatorhub_payment_id: payment.id,
+        creatorhub_reason: "recovery_balance_top_up",
+      },
+    });
+  }
+
+  const refund = await stripeClient.refunds.create(
+    {
+      charge: payment.stripe_charge_id,
+      amount: stripeRefundAmount,
+      reason: "requested_by_customer",
+      metadata: {
+        creatorhub_payment_id: payment.id,
+        creatorhub_refund_reason: reason,
+        creatorhub_actor_user_id: actorUserId || "",
+      },
+    },
+    { stripeAccount: payment.stripe_connected_account_id },
+  );
+
+  // Contribution refunds also have to come back out of the application
+  // fee -- a contribution is included in it (section 4), so returning one
+  // needs the same connected-account top-up as a fee reversal does.
+  const applicationFeeRefundAmount =
+    thisBuyerFeeRefund + thisCreatorFeeReversal + contributionRefundCents;
+
+  let applicationFeeRefundId = null;
+
+  if (applicationFeeRefundAmount > 0 && payment.stripe_application_fee_id) {
+    const applicationFeeRefund = await stripeClient.applicationFees.createRefund(
+      payment.stripe_application_fee_id,
+      { amount: applicationFeeRefundAmount },
+    );
+
+    applicationFeeRefundId = applicationFeeRefund.id;
+  }
+
+  const { data: result, error: applyError } = await supabaseAdmin.rpc(
+    "apply_refunded_listing_request_payment",
+    {
+      p_payment_id: payment.id,
+      p_base_refund_cents: baseRefundCents,
+      p_stripe_refund_id: refund.id,
+      p_reason: reason,
+      p_initiated_via: initiatedVia,
+      p_actor_user_id: actorUserId,
+      p_stripe_application_fee_refund_id: applicationFeeRefundId,
+      p_tip_refund_cents: tipRefundCents,
+      p_contribution_refund_cents: contributionRefundCents,
+      p_tip_contribution_override_reason: tipContributionOverrideReason,
+    },
+  );
+
+  if (applyError) {
+    // The Stripe refund has already happened at this point. This payment
+    // now needs manual reconciliation -- the next charge.refunded webhook
+    // delivery will also attempt (and likely also fail, for the same
+    // reason) rather than silently drop it, but this is exactly the
+    // REF-002 divergence until someone looks at it.
+    throw new Error(
+      `Stripe refund ${refund.id} succeeded but recording it failed: ${applyError.message}. This must be reconciled manually.`,
+    );
+  }
+
+  const refundResult = Array.isArray(result) ? result[0] : result;
+
+  if (shortfallCents > 0) {
+    const { error: recoveryDebitError } = await supabaseAdmin.rpc(
+      "apply_creator_recovery_debit",
+      {
+        p_creator_user_id: payment.creator_user_id,
+        p_amount_cents: shortfallCents,
+        p_currency: payment.currency,
+        p_reason: `Platform-funded shortfall on refund ${refund.id}.`,
+        p_related_refund_id: refundResult?.refund_id ?? null,
+      },
+    );
+
+    if (recoveryDebitError) {
+      // The refund and the Stripe-side top-up have both already happened.
+      // The creator's recovery balance is now understated until this is
+      // fixed by hand -- see docs/support/payments/creator-recovery-balances.md.
+      throw new Error(
+        `Refund ${refund.id} succeeded and the platform funded a ${shortfallCents}-cent shortfall, but opening the recovery balance failed: ${recoveryDebitError.message}. This must be reconciled manually.`,
+      );
+    }
+  }
+
+  return refundResult;
+};
+
+app.post("/api/stripe/refunds", async (req, res) => {
+  try {
+    const adminUserId = await requireAdminUserId(req);
+
+    const paymentId = String(req.body?.paymentId || "").trim();
+    const baseRefundCents = Math.round(Number(req.body?.baseRefundCents));
+    const reason = String(req.body?.reason || "").trim();
+    const tipRefundCents = Math.round(Number(req.body?.tipRefundCents || 0));
+    const contributionRefundCents = Math.round(
+      Number(req.body?.contributionRefundCents || 0),
+    );
+    const overrideReason = req.body?.tipContributionOverrideReason
+      ? String(req.body.tipContributionOverrideReason).trim()
+      : null;
+
+    if (!paymentId) {
+      return res.status(400).json({ error: "paymentId is required." });
+    }
+
+    if (!Number.isFinite(baseRefundCents) || baseRefundCents <= 0) {
+      return res
+        .status(400)
+        .json({ error: "baseRefundCents must be greater than zero." });
+    }
+
+    if (reason.length < 3) {
+      return res.status(400).json({ error: "A refund reason is required." });
+    }
+
+    const refund = await issueListingRequestPaymentRefund({
+      paymentId,
+      baseRefundCents,
+      reason,
+      initiatedVia: "admin",
+      actorUserId: adminUserId,
+      tipRefundCents,
+      contributionRefundCents,
+      tipContributionOverrideReason: overrideReason,
+    });
+
+    return res.json({ refund });
+  } catch (err) {
+    const message = String(err?.message || err);
+    const status = /session|authorization|administrator/i.test(message)
+      ? 401
+      : 400;
+
+    return res.status(status).json({ error: message });
+  }
+});
+
+// Sprint 5 (launch-scope.md section 6, and the Sprint 4 handoff note in
+// docs/support/requests/cancellation.md's Known gaps): an accepted
+// post-payment cancellation flags unearned amounts
+// (listing_request_cancellation_proposal_items.flagged_for_refund_at) but a
+// Postgres RPC cannot call Stripe, so nothing actually refunds them without
+// this. Fired as a best-effort follow-up by
+// useRespondListingRequestCancellationProposal immediately after an
+// acceptance, the same pattern expire-cancelled-sessions already uses for
+// the Stripe-side half of a DB-side cascade. Callable by either participant
+// on the request -- the amounts are already locked in by the accepted
+// statement, so there is no discretion left to gate behind an admin check.
+app.post(
+  "/api/stripe/refunds/drain-flagged-for-request",
+  async (req, res) => {
+    try {
+      const userId = await requireSupabaseUserId(req);
+      const listingRequestId = String(
+        req.body?.listingRequestId || "",
+      ).trim();
+
+      if (!listingRequestId) {
+        return res
+          .status(400)
+          .json({ error: "listingRequestId is required." });
+      }
+
+      const { data: request, error: requestError } = await supabaseAdmin
+        .from("listing_requests")
+        .select("id, buyer_user_id, creator_user_id")
+        .eq("id", listingRequestId)
+        .maybeSingle();
+
+      if (requestError) {
+        throw new Error(requestError.message);
+      }
+
+      if (
+        !request ||
+        (request.buyer_user_id !== userId && request.creator_user_id !== userId)
+      ) {
+        return res
+          .status(404)
+          .json({ error: "Listing request not found or not accessible." });
+      }
+
+      const { data: proposals, error: proposalsError } = await supabaseAdmin
+        .from("listing_request_cancellation_proposals")
+        .select("id")
+        .eq("listing_request_id", listingRequestId);
+
+      if (proposalsError) {
+        throw new Error(proposalsError.message);
+      }
+
+      const proposalIds = (proposals || []).map((proposal) => proposal.id);
+
+      const { data: flaggedItems, error: itemsError } = proposalIds.length
+        ? await supabaseAdmin
+            .from("listing_request_cancellation_proposal_items")
+            .select("payment_id, unearned_amount_cents")
+            .in("proposal_id", proposalIds)
+            .eq("is_operative", true)
+            .not("flagged_for_refund_at", "is", null)
+            .is("refunded_at", null)
+        : { data: [], error: null };
+
+      if (itemsError) {
+        throw new Error(itemsError.message);
+      }
+
+      const refunded = [];
+      const skipped = [];
+
+      for (const item of flaggedItems || []) {
+        if (item.unearned_amount_cents <= 0) {
+          continue;
+        }
+
+        try {
+          await issueListingRequestPaymentRefund({
+            paymentId: item.payment_id,
+            baseRefundCents: item.unearned_amount_cents,
+            reason:
+              "Cancellation accepted: unearned prepaid amount flagged for refund.",
+            initiatedVia: "cancellation_cascade",
+          });
+
+          refunded.push(item.payment_id);
+        } catch (err) {
+          skipped.push({
+            paymentId: item.payment_id,
+            reason: String(err?.message || err),
+          });
+        }
+      }
+
+      return res.json({ refunded, skipped });
+    } catch (err) {
+      const message = String(err?.message || err);
+      const status = /session|authorization/i.test(message) ? 401 : 400;
+
+      return res.status(status).json({ error: message });
+    }
+  },
+);
+
+// Sprint 5 (launch-scope.md section 6.5): "the creator can settle the
+// balance in the app at any time, by card." A straight Stripe Checkout
+// session on the platform's own account -- no stripeAccount header, no
+// application_fee_amount -- since this is the creator paying Made for
+// Stream back directly, not a marketplace transaction.
+app.post("/api/stripe/recovery/settlement-session", async (req, res) => {
+  try {
+    const stripeClient = requireStripe();
+    const userId = await requireSupabaseUserId(req);
+    const amountCents = Math.round(Number(req.body?.amountCents));
+
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      return res
+        .status(400)
+        .json({ error: "amountCents must be greater than zero." });
+    }
+
+    const { data: balance, error: balanceError } = await supabaseAdmin
+      .from("creator_recovery_balances")
+      .select("creator_user_id, currency, outstanding_cents")
+      .eq("creator_user_id", userId)
+      .maybeSingle();
+
+    if (balanceError) {
+      throw new Error(balanceError.message);
+    }
+
+    if (!balance || balance.outstanding_cents <= 0) {
+      return res
+        .status(400)
+        .json({ error: "You have no outstanding recovery balance." });
+    }
+
+    if (amountCents > balance.outstanding_cents) {
+      return res.status(400).json({
+        error: `You can settle at most ${balance.outstanding_cents} cents.`,
+      });
+    }
+
+    const { data: settlement, error: insertError } = await supabaseAdmin
+      .from("creator_recovery_settlement_payments")
+      .insert({
+        creator_user_id: userId,
+        amount_cents: amountCents,
+        currency: balance.currency,
+      })
+      .select("id, amount_cents, currency")
+      .single();
+
+    if (insertError) {
+      throw new Error(insertError.message);
+    }
+
+    const session = await stripeClient.checkout.sessions.create(
+      {
+        mode: "payment",
+        ui_mode: "embedded_page",
+        client_reference_id: settlement.id,
+        return_url: getRecoverySettlementReturnUrl(),
+        line_items: [
+          {
+            price_data: {
+              currency: settlement.currency,
+              unit_amount: settlement.amount_cents,
+              product_data: {
+                name: "Made for Stream recovery balance settlement",
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: {
+          creatorhub_recovery_settlement_id: settlement.id,
+        },
+      },
+      {
+        idempotencyKey: `recovery_settlement_${settlement.id}`,
+      },
+    );
+
+    const { error: updateError } = await supabaseAdmin
+      .from("creator_recovery_settlement_payments")
+      .update({
+        status: "checkout_opened",
+        stripe_checkout_session_id: session.id,
+        checkout_opened_at: new Date().toISOString(),
+      })
+      .eq("id", settlement.id);
+
+    if (updateError) {
+      throw new Error(updateError.message);
+    }
+
+    return res.json({
+      settlementId: settlement.id,
       checkout: {
         sessionId: session.id,
         clientSecret: session.client_secret,

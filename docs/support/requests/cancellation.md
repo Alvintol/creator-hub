@@ -44,6 +44,7 @@ workspace's "Next step" card renders as closed for everyone.
 | "It says I'm not allowed to do that" | [`CAN-003`](#can-003--wrong-party-or-not-signed-in) |
 | "The buyer disputed my cancellation statement" | [`CAN-004`](#can-004--dispute-opened-on-a-cancellation-statement) |
 | "A cancelled payment still shows paid / still got charged" | [`CAN-005`](#can-005--a-cancelled-payments-checkout-session-was-completed-anyway) |
+| "My cancellation was accepted but I never got my refund" | [`CAN-006`](#can-006--accepted-cancellations-flagged-refund-never-applied) |
 
 ---
 
@@ -212,14 +213,21 @@ as [`REF-001`](../payments/refunds-and-disputes.md#ref-001--refund-requested-by-
 query `public.listing_request_cancellation_proposals where status =
 'disputed'` for the current queue.
 
-**Fix.** Entirely manual, per Refund Policy §9. Made for Stream reviews the
-operative statement against the evidence (milestone submissions, delivery
-links, conversation history) and decides. **There is no admin action in the
-product yet to resolve a dispute** — recording the decision and its effect on
-the request is, for now, the same "record it durably outside the app" gap
-`REF-001` already has for refunds. Close this gap together with Sprint 5's
-refund engine, since a resolved dispute needs the same money-movement
-capability a refund does.
+**Fix.** The decision itself is still entirely manual, per Refund Policy §9 —
+Made for Stream reviews the operative statement against the evidence
+(milestone submissions, delivery links, conversation history) and decides.
+**What changed in Sprint 5:** that decision is now *actionable* —
+`/admin/requests/:id`'s Payments section has a refund panel
+(`ListingRequestPaymentAdminRefundPanel.tsx`) that can issue whatever refund
+the decision calls for, on any `paid`/`partially_refunded` payment, without
+needing the proposal's own acceptance flow. **There is still no formal
+"resolved" state for the dispute itself** — the
+`listing_request_cancellation_proposals` row stays `status = 'disputed'`
+forever, even after the decision is acted on. Record the decision and its
+reasoning in the conversation (a message on the request) until a real
+resolution state exists; see
+`docs/support/payments/refunds-and-disputes.md`'s Known gaps for the same
+note from the money side.
 
 **Money impact.** The disputed payments stay `paid` and undisturbed. Nothing
 is at risk from inaction, but the request itself is stuck — neither
@@ -267,45 +275,103 @@ request, or — from the other side — a `listing_request_payments` row reading
 `paid` against a `listing_requests` row reading `cancelled`, which is the
 data-integrity shape to search for.
 
-**Fix.** Manual. Confirm the charge against Stripe directly (it is real money
-— `stripe_charge_id` on the payment row). This is a refund case, handled the
-same way as [`REF-001`](../payments/refunds-and-disputes.md#ref-001--refund-requested-by-a-buyer):
-entirely manual on the creator's connected account, following Refund Policy
-§8's arithmetic. The request itself stays `cancelled` — do not try to revert
-it to `accepted` to "match" the stray payment, which would just create a
-second inconsistency (a project with no live agreement but an active
-payment).
+**Fix (Sprint 5): this is now automatic, not manual.**
+`markListingRequestPaymentPaidFromCheckoutSession` in `api/server.js` checks
+the linked request's status before applying any payment workflow; if it is
+already `cancelled`, it calls `refundStrayPaymentOnCancelledRequest` instead
+— a full refund of everything (base, both fees, tip and contribution) via
+the same refund engine as `REF-001`
+(`apply_refunded_listing_request_payment`, `initiated_via = 'system_auto_refund'`),
+and no project workflow ever runs. The request itself correctly stays
+`cancelled` — nothing tries to revert it to `accepted`.
+
+**If you still see this symptom**, the automatic refund itself failed
+(Stripe error, or the RPC raised) rather than never having run — check the
+API logs for `refundStrayPaymentOnCancelledRequest` / a thrown error around
+the payment's `paid_at`, then confirm the charge against Stripe directly
+(`stripe_charge_id` on the payment row) and, if still unrefunded, issue it by
+hand from `/admin/requests/:id`'s refund panel — the request itself stays
+`cancelled` regardless.
 
 **Money impact.** Direct. A real charge exists on a project both parties
 already agreed is cancelled.
 
 ---
 
+## `CAN-006` — Accepted cancellation's flagged refund never applied
+
+```yaml
+id: CAN-006
+tier: 2
+signals:
+  - source: db
+    match: "listing_request_cancellation_proposal_items.flagged_for_refund_at is not null and refunded_at is null and flagged_for_refund_at < now() - interval '10 minutes'"
+    where: "public.listing_request_cancellation_proposal_items"
+auto_fix: retry_drain_route
+params:
+  listingRequestId: "$.listing_request_id (via the item's proposal)"
+verify:
+  - "the item's refunded_at is now set"
+retry_limit: 1
+escalate_if:
+  - "the retry also fails, or fails with a Stripe error rather than a transient one"
+escalate_with:
+  - "the item's payment_id, unearned_amount_cents"
+  - "whatever error POST /api/stripe/refunds/drain-flagged-for-request returned"
+```
+
+**Cause.** `useRespondListingRequestCancellationProposal`'s follow-up call to
+`POST /api/stripe/refunds/drain-flagged-for-request` is best-effort — a
+network failure, a closed tab, or the payment's Stripe charge being
+otherwise unrefundable (see `apply_refunded_listing_request_payment`'s own
+guards) all leave the item flagged with no refund applied.
+
+**What the user sees.** The buyer accepted or received an accepted
+cancellation statement showing an unearned amount, but no refund shows up on
+their card and the payment still reads `paid` or `partially_refunded`
+instead of `refunded`.
+
+**Fix.** Retrying the same route is safe and usually sufficient — the drain
+route re-derives its own queue from the database rather than trusting
+anything cached, and `apply_refunded_listing_request_payment` is idempotent
+per Stripe refund. If it fails again with an actual Stripe error (not a
+network blip), escalate — the underlying payment may have a real problem
+(missing charge id, insufficient connected-account balance triggering the
+platform-funded-refund path unexpectedly, etc.) that needs a human to look
+at rather than a second automatic retry.
+
+**Money impact.** None yet if genuinely never applied — the money is still
+sitting where it always was. Once applied, it is the ordinary refund money
+impact (see `docs/support/payments/refunds-and-disputes.md`).
+
+---
+
 ## Known gaps
 
-- **No admin surface for resolving a `CAN-004` dispute.** The dispute is
-  recorded and queued; nothing in the product records or applies Made for
-  Stream's decision. This is the same shape as `REF-001`'s missing refund
-  implementation and should land together with it in Sprint 5.
-- **A `processing` payment (an async payment method, mid-flight) is not
+- **`CAN-004` still has no formal "resolved" state.** The refund engine makes
+  Made for Stream's decision actionable (see the entry above), but the
+  proposal row itself has no admin-facing "mark resolved" action — it stays
+  `status = 'disputed'` in the database even after money moves. Recording the
+  decision durably still means a message on the request's conversation, not
+  a structured field.
+- **A `processing` payment (an async payment method, mid-flight) is still not
   touched by either cancellation RPC.** `cancel_listing_request_before_payment`
   refuses to run at all if one exists; the post-payment acceptance cascade
   only cancels `requires_checkout` / `checkout_opened` rows. If that payment
-  later resolves to `paid`, it lands on an already-`cancelled` request the
-  same way `CAN-005` describes, for the same underlying reason (a webhook
-  event landing after the fact). Cards-only checkout (`launch-scope.md`
-  §1.6) makes this rare in practice, not impossible.
-- **`CAN-005`'s webhook-side guard does not exist yet.**
-  `markListingRequestPaymentPaidFromCheckoutSession` marks a payment `paid`
-  whenever Stripe confirms it, with no check against the linked request's
-  status. Closing this properly means deciding what should happen to money
-  Stripe already captured on a cancelled project — a refund-engine question,
-  not a webhook-handler one — so it is left as a documented gap rather than
-  a partial fix that would silently drop a real charge on the floor.
-- **No refund is actually issued by this sprint.** An accepted post-payment
-  cancellation flags unearned amounts
-  (`listing_request_cancellation_proposal_items.flagged_for_refund_at`) for
-  Sprint 5's refund engine to act on. Until that ships, a flagged amount is
-  a record of what is owed, not money that has moved — treat a buyer asking
-  "where's my refund" on an accepted cancellation as `REF-001`, not as this
-  playbook's problem.
+  later resolves to `paid`, it now hits the same `CAN-005` guard described
+  below (the fix is not specific to the checkout-session race) — Cards-only
+  checkout (`launch-scope.md` §1.6) makes an actual `processing` payment rare
+  in practice, not impossible.
+- **An accepted post-payment cancellation's flagged unearned amounts are
+  refunded via a best-effort follow-up call, not inside the acceptance
+  transaction itself.** `respond_listing_request_cancellation_proposal`
+  flags the amounts (Sprint 4); `useRespondListingRequestCancellationProposal`
+  then calls `POST /api/stripe/refunds/drain-flagged-for-request`
+  immediately afterward (Sprint 5), the same pattern
+  `expireCancelledCheckoutSessions` already uses. **If that follow-up call
+  fails or the buyer/creator closes the tab before it completes**, the
+  amounts stay flagged and unrefunded — query
+  `listing_request_cancellation_proposal_items where flagged_for_refund_at is
+  not null and refunded_at is null` to find them, and either retry the same
+  route or issue the refund by hand from `/admin/requests/:id` (which sets
+  `refunded_at` on the matching item as a side effect either way).

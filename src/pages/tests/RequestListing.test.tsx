@@ -31,6 +31,11 @@ vi.mock("../../hooks/listings/useActiveListingRequestForListing", () => ({
   useActiveListingRequestForListing: mocks.useActiveListingRequestForListing,
 }));
 
+// Sprint 5: none of this file's scenarios involve a blocked creator.
+vi.mock("../../hooks/listings/useCreatorHasOutstandingRecoveryBalance", () => ({
+  useCreatorHasOutstandingRecoveryBalance: () => ({ data: false }),
+}));
+
 const createListingData = (overrides = {}) => ({
   listing: {
     id: "listing-1",
