@@ -144,6 +144,36 @@ the API is down; the endpoint URL or signing secret is wrong after a config
 change; Stripe has disabled the endpoint after repeated failures; or a network
 path is broken.
 
+**Where the API runs (2026-09-22).** `api/server.js` is containerized
+(`api/Dockerfile`) and deployed to **Google Cloud Run**. `GET /api/health` is
+both the container's own `HEALTHCHECK` and the Cloud Run liveness probe, so a
+wedged instance is restarted by the platform before this entry's "API health
+check result" line is even filled in — check `gcloud run services describe
+<service> --region <region>` for current revision health, and `gcloud run
+services logs read <service> --region <region>` for request-level errors.
+Secrets (`STRIPE_WEBHOOK_SECRET_DEV`/`_PROD`, `SUPABASE_SERVICE_ROLE_KEY`,
+`OAUTH_STATE_SECRET`, `TWITCH_CLIENT_SECRET`, both Stripe secret keys) come
+from Secret Manager; rotating one requires `gcloud secrets versions add` **and**
+a redeploy to resolve the new version. Because the secret reference itself
+doesn't change (`SECRET:latest` before and after), a plain
+`gcloud run services update <service> --region <region>` with no flags is
+rejected as "no configuration change requested" — force the redeploy with
+`gcloud run services update <service> --region <region> --update-secrets=KEY=SECRET:latest`
+instead. Check whether a secret was rotated without this follow-up before
+assuming the config itself is wrong.
+
+**The webhook endpoint is registered via the classic `webhook_endpoints` API
+(`connect: true`), not Stripe's newer "Event destinations" UI (Workbench →
+Webhooks).** That UI was tried first (2026-09-22) and looked correctly
+configured — active, right URL, "Connected accounts" scope, the right seven
+events — but silently failed to route anything: every triggered event showed
+`pending_webhooks: 0`. The classic endpoint, created with
+`stripe webhook_endpoints create --connect=true`, worked immediately and is
+what's live today. If webhook delivery mysteriously stops and the Dashboard
+shows a destination that looks fine, check whether someone tried to
+"upgrade" it to the newer Event Destinations UI — that's the reproduction
+of this exact failure mode.
+
 **What the user sees.** Nothing. Payments keep succeeding, nothing advances.
 This is the failure mode that generates support tickets hours late.
 

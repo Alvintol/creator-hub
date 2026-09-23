@@ -28,6 +28,10 @@ dist-ssr
 *.local
 !.env.example
 
+# Scratch files used when writing secrets to disk to avoid shell escaping
+# issues (e.g. gcloud secrets create --data-file=s.tmp) -- never commit these.
+*.tmp
+
 # Local Claude Code / Cowork output, not part of the shipped app
 Claude outputs/
 claude/

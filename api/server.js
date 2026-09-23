@@ -109,13 +109,22 @@ const STRIPE_CONNECT_SETUP_URL =
 const STRIPE_CHECKOUT_RETURN_PATH =
   process.env.STRIPE_CHECKOUT_RETURN_PATH || "/payments/return";
 
+// APP_ORIGINS is a comma-separated list, for when the frontend is served
+// from more than one valid origin (www + apex, staging, a preview
+// deployment). Falls back to the single APP_ORIGIN value so existing
+// single-origin configuration keeps working unchanged.
+const APP_ORIGINS = String(process.env.APP_ORIGINS || APP_ORIGIN)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 const LOCAL_DEV_ORIGINS = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ];
 
 const ALLOWED_ORIGINS = Array.from(
-  new Set([APP_ORIGIN, ...LOCAL_DEV_ORIGINS].filter(Boolean)),
+  new Set([...APP_ORIGINS, ...LOCAL_DEV_ORIGINS].filter(Boolean)),
 );
 
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null;
