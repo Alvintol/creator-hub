@@ -715,24 +715,28 @@ item is a live production gap and can be pulled forward on its own at any point.
       arithmetic.
 **Transactional email (§7.1)**
 
-- [ ] Enable Cloudflare Workers Paid and onboard `send.madeforstream.com` as the
+- [x] Enable Cloudflare Workers Paid and onboard `send.madeforstream.com` as the
       sending domain. Until a domain is onboarded, sending is limited to addresses
       verified on the account.
-      **Not done — dashboard/billing action, outside what an agent session can
-      do.** The code path (`api/email.js`) is written and ready for credentials;
-      nothing can be tested end to end until this is done. See
-      `docs/support/messaging/transactional-email.md`.
-- [ ] Confirm Email Routing for `inbox@madeforstream.com` on the root domain, and
+      **Done by the user, 2026-09-23** (billing/dashboard action, not code).
+      Verified live: a real send through `api/email.js`'s
+      `sendTransactionalEmail` was accepted by
+      `smtp.mx.cloudflare.net:465` end to end (see
+      `docs/support/messaging/transactional-email.md`'s status line).
+- [x] Confirm Email Routing for `inbox@madeforstream.com` on the root domain, and
       that Cloudflare manages the SPF and DKIM records for both directions.
-      **Not done — same reason.**
+      **Done by the user, 2026-09-23.** `madeforstream.com`'s DNS shows the
+      Email-Routing-managed MX (`route1-3.mx.cloudflare.net`), SPF, and DKIM
+      records; the `inbox@madeforstream.com` custom address rule is verified.
 - [x] Send from the Express API over the REST API or SMTP. **No Workers code
       required** — do not introduce a Workers deployment just to send mail.
       Sends over **authenticated SMTP** via `nodemailer`
       (`api/email.js`, `api/package.json`), not the REST API — Cloudflare Email
-      Sending's REST contract is newer (Beta) and could not be verified against
-      real credentials in this session; SMTP is a stable, well-understood
-      protocol and the docs confirm both are supported. No Workers deployment
-      introduced.
+      Sending's REST contract is newer (Beta); SMTP is a stable, well-understood
+      protocol and the docs confirm both are supported. **Verified live
+      2026-09-23**: a real send was accepted by Cloudflare's SMTP endpoint
+      (`smtp.mx.cloudflare.net:465`, username `api_token`) end to end. No
+      Workers deployment introduced.
 - [x] Templates: payment receipt, first notice, final notice, payout released. The
       last is not optional once the payout hold ships (§6.3).
       `api/emailTemplates.js`. Wired at the natural trigger points: receipt from
@@ -756,7 +760,9 @@ item is a live production gap and can be pulled forward on its own at any point.
 - [ ] Warm the sending domain before launch. New accounts start on a conservative
       daily quota that scales with sending behaviour; launch day is the wrong time
       to discover the ceiling.
-      **Not done — depends on domain onboarding above; nothing to warm yet.**
+      **Not done — domain is onboarded but only a single test send has gone
+      out. Warming (gradually ramping real volume before launch) hasn't
+      started.**
 - [x] Record delivery outcomes against the notice records, so a disputed closure can
       show the notice was accepted for delivery.
       `listing_request_notices.email_status` (`pending`/`sent`/`failed`/`bounced`)
@@ -778,10 +784,11 @@ item is a live production gap and can be pulled forward on its own at any point.
       the playbook rather than silently accepted.
 - [x] Playbook: new `messaging/transactional-email.md` — bounced notice, unverified
       domain, quota exceeded, and what a failed notice means for the 7 + 7 clock.
-      Written with `status: partial` and an explicit "not verified end to end"
-      note — in particular, the bounce/complaint webhook's field-name parsing in
-      `POST /api/webhooks/email` is a best-effort guess that needs re-checking
-      against a real Cloudflare payload once the domain is onboarded.
+      Updated to `status: active` after the 2026-09-23 verified send; the
+      bounce/complaint webhook's field-name parsing in
+      `POST /api/webhooks/email` is still a best-effort guess (a successful
+      send doesn't exercise it) and needs re-checking against a real
+      Cloudflare bounce.
 - [x] Staleness query surfaced in admin: requests not advanced in 14+ days with a
       pending action on one side.
       `admin_list_stale_listing_requests_checked`
@@ -803,11 +810,13 @@ the live schema (columns, constraints and function signatures confirmed via
 read-only queries — Sprint 5's tables are themselves still unapplied, per that
 sprint's own note, so this sprint's migrations were checked by inspection only)
 but not applied, matching Sprint 3/4/5's established pattern of handing migration
-files to the user rather than applying them from an agent session. No
-transactional email has been sent to a real address — the Cloudflare sending
-domain is not onboarded (see above), so `api/email.js`'s SMTP path, the
-`payout.paid` webhook handler, and `POST /api/webhooks/email`'s bounce parsing
-are all unexercised against real infrastructure.
+files to the user rather than applying them from an agent session.
+**Addendum, 2026-09-23:** the user completed the Cloudflare/Supabase dashboard
+steps and `api/email.js`'s SMTP send path was verified live — a real message
+was accepted by `smtp.mx.cloudflare.net:465` end to end. Still unexercised
+against real infrastructure: the `payout.paid` webhook handler (no real payout
+has fired yet) and `POST /api/webhooks/email`'s bounce parsing (no real bounce
+has occurred yet).
 
 ---
 
@@ -898,3 +907,18 @@ so none of them is in the eight sprints above — but they should not be lost.
 - [ ] No versioned view of agreement terms over time, so which version applied when
       cannot be reconstructed for a dispute (`agreements.md`, `change-orders.md`).
 - [ ] `api/server.js` still has close to no test coverage.
+- [ ] **Rebrand assets — logos, favicons, site imagery.** The product rebranded
+      (2026-09-23) and needs new logo files, favicons, and site imagery
+      throughout. Cosmetic, not launch-blocking. Specific hooks already built
+      and waiting for real assets rather than requiring code changes later:
+      `api/emailTemplates.js` reads `EMAIL_LOGO_URL` (a hosted image URL —
+      logo falls back to a plain text wordmark until set),
+      `EMAIL_BRAND_NAME`, and `EMAIL_COMPANY_ADDRESS` (deliberately blank, not
+      a placeholder, until a real mailing address is decided) via env vars,
+      documented in `api/.env.example`. Once assets exist: drop the logo
+      somewhere stable (site `/public`, object storage) and set the env var;
+      no template code changes needed. Site favicon/imagery is a separate,
+      untracked piece of work outside `api/` — add it here when scoped.
+      Also revisit Cloudflare BIMI (`docs/support/messaging/transactional-email.md`)
+      once a final logo exists and DMARC is enforcing beyond `p=none` — BIMI
+      requires `p=quarantine`/`p=reject`, not the `p=none` currently live.
