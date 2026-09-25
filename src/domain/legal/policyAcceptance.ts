@@ -48,6 +48,19 @@ export const currentPolicyVersions: Record<PolicyType, string> = {
   early_service_request: refundPolicyVersion,
 };
 
+// Wording for the express request to start work early. Shown at agreement
+// acceptance, where the database requires it (20260923_138), and again at
+// checkout if the Refund Policy has changed since. One copy so the two can
+// never say different things.
+export const earlyServiceRequestHeading =
+  "Starting work before the cancellation period ends";
+
+export const earlyServiceRequestExplanation =
+  "If you are a consumer in the EU or UK, you may have 14 days to cancel this purchase. The creator can only begin work during that period if you ask them to.";
+
+export const earlyServiceRequestLabel =
+  "I expressly request that the creator begin work now, before any 14-day cancellation period I may have has ended. I understand that if I cancel during that period, I may have to pay for work already supplied, and that I will lose my right to cancel once the work has been fully completed.";
+
 export const signupPolicyTypes: PolicyType[] = ["terms", "privacy"];
 
 export const creatorActivationPolicyTypes: PolicyType[] = ["creator_terms"];

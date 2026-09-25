@@ -1,14 +1,10 @@
-// REVIEW DRAFT: placeholders ([OPERATOR_LEGAL_NAME], [SUPPORT_EMAIL], etc.)
-// are intentionally left in place until the operating entity, brand and
-// domain are finalized. Safe to keep live pre-launch; must be resolved
-// before public launch.
-export const termsVersion = "2026-09-20-draft-1";
+export const termsVersion = "2026-09-24";
 
 export const termsSections = [
   {
     "title": "1. Overview and operator",
     "body": [
-      "Made for Stream is an online marketplace and community for digital creator services and assets. It is operated by [OPERATOR_LEGAL_NAME], at [BUSINESS_POSTAL_ADDRESS]. General and legal enquiries: [SUPPORT_EMAIL]. Privacy enquiries: [PRIVACY_EMAIL].",
+      "Made for Stream is an online marketplace and community for digital creator services and assets. It is operated by Made for Stream (business number [BUSINESS_NUMBER]), P.O. Box 34086, Calgary RPO Westbrook, Alberta, Canada T3C 3W2. Help with accounts, listings or projects: support@madeforstream.com. Legal notices and enquiries: legal@madeforstream.com. Privacy enquiries: privacy@madeforstream.com.",
       "These Terms govern accounts, creator applications, listings, messaging, project agreements, payments and related services. Before creating an account or accepting a paid agreement, you must be shown these Terms and affirmatively accept the terms applicable to that activity. If you do not agree, do not create an account or enter a transaction."
     ]
   },
@@ -43,7 +39,7 @@ export const termsSections = [
   {
     "title": "6. Payments, pricing, refunds and disputes",
     "body": [
-      "The Fee Schedule and Payment Terms states Made for Stream's buyer service fee and creator platform fee, each currently 5% of the base payment with the currency-specific minimums listed there. Fees apply per successful instalment. Creator tips are excluded from Made for Stream fees, and optional Made for Stream support is separate and voluntary. Taxes and all mandatory charges must be disclosed before payment.",
+      "The Fee Schedule and Payment Terms states Made for Stream's buyer service fee and creator platform fee, each currently 5% of the base payment with no minimum fee, and the currencies a project may use and the minimum amount of each payment. Fees apply per successful instalment. Creator tips are excluded from Made for Stream fees, and optional Made for Stream support is separate and voluntary. Taxes and all mandatory charges must be disclosed before payment.",
       "Commission payments use Stripe Connect direct charges on the creator's connected account. Made for Stream's fees are collected through that arrangement. Stripe processes payments and applies its own conditions. Made for Stream does not provide escrow or guarantee that funds are held until completion.",
       "The Refund, Cancellation and Dispute Policy governs cancellation, deposits, earned milestone value, revisions, unresponsive parties, refunds and escalation. Buyers can cancel before substantive work for a full refund; after work begins, unearned amounts remain refundable under that policy. Neither a “no refunds” listing nor conversation closure overrides it. Internal review does not remove a right to a lawful bank dispute, consumer remedy or court proceeding."
     ]
@@ -74,7 +70,7 @@ export const termsSections = [
     "title": "10. Enforcement, suspension and account closure",
     "body": [
       "We may investigate credible misuse and take proportionate action, including requesting corrections, restricting visibility, removing content, pausing listings or messaging, suspending creator access or terminating an account. Urgent safety, fraud, legal or payment risks may require immediate action. Where lawful and appropriate, we provide a reason and a route to appeal under the Community Guidelines.",
-      "Restrictions or account closure do not automatically confiscate funds, release a party from a refund, erase legal records or transfer rights in unfinished work. We maintain a support route for resolving existing obligations. You may request account closure at [SUPPORT_EMAIL]. Closing your account deletes or anonymises your personal information as the Privacy Policy describes, but we keep a record of the versions of these Terms, our other policies and any project agreements you accepted, together with a copy of those documents, for the periods the Privacy Policy sets out."
+      "Restrictions or account closure do not automatically confiscate funds, release a party from a refund, erase legal records or transfer rights in unfinished work. We maintain a support route for resolving existing obligations. You may request account closure at support@madeforstream.com. Closing your account deletes or anonymises your personal information as the Privacy Policy describes, but we keep a record of the versions of these Terms, our other policies and any project agreements you accepted, together with a copy of those documents, for the periods the Privacy Policy sets out."
     ]
   },
   {
@@ -88,7 +84,7 @@ export const termsSections = [
     "title": "12. Global use and disputes",
     "body": [
       "The laws of Alberta, Canada govern these Terms, subject to any mandatory law applicable to you. Consumers retain non-waivable protections, local remedies and rights concerning governing law or jurisdiction. These Terms do not impose mandatory arbitration or require exclusive proceedings in Alberta where the law gives you another forum.",
-      "Contact [SUPPORT_EMAIL] to seek informal resolution. That option does not restrict urgent relief or extend a statutory or payment-provider deadline. Questions about a specific commission should use the refund policy's evidence and escalation process."
+      "Contact legal@madeforstream.com to seek informal resolution. That option does not restrict urgent relief or extend a statutory or payment-provider deadline. Questions about a specific commission should use the refund policy's evidence and escalation process."
     ]
   },
   {

@@ -65,6 +65,18 @@ change order is identical to the current agreement — there is nothing to accep
 
 ---
 
+## Change orders and the instalment floor
+
+A change order that raises the price becomes its own payment when the buyer
+accepts it (`20260608_086`). Since `20260923_138` that increase must be at least
+10.00 in the project's currency, checked **when the creator sends it** (trigger
+`listing_request_change_orders_enforce_instalment`) so the creator sees the
+refusal rather than the buyer. The message and fix are
+[`AGR-005`](agreements.md#agr-005--a-payment-is-below-the-instalment-floor). A
+change order with no price increase is never checked.
+
+---
+
 ## `CHG-002` — Request not ready for a change order
 
 ```yaml

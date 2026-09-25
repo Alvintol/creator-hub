@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { Link } from "react-router-dom";
 
 /**
  * Shared renderer for the `{ title, body: string[] }[]` shape used by every
@@ -48,22 +49,32 @@ const classes = {
   tableValue: "text-zinc-700",
 } as const;
 
-const URL_PATTERN = /(https?:\/\/[^\s)]+)/g;
+// External URLs, and site paths under /policies/ (e.g. the Service Provider
+// Register, which the Privacy Policy points to).
+const LINK_PATTERN = /^(https?:\/\/[^\s)]+|\/policies\/[a-z-]+)$/;
+const LINK_SPLIT_PATTERN = /(https?:\/\/[^\s)]+|\/policies\/[a-z-]+)/g;
 
-// Renders a paragraph, turning any bare URLs into real links.
+const linkClassName =
+  "font-semibold text-indigo-700 underline underline-offset-2 hover:text-indigo-900";
+
+// Renders a paragraph, turning any bare URLs and policy paths into real links.
 const LinkedText = ({ text }: { text: string }) => {
-  const parts = text.split(URL_PATTERN);
+  const parts = text.split(LINK_SPLIT_PATTERN);
 
   return (
     <>
       {parts.map((part, index) =>
-        URL_PATTERN.test(part) ? (
+        LINK_PATTERN.test(part) && part.startsWith("/") ? (
+          <Link key={index} to={part} className={linkClassName}>
+            {part}
+          </Link>
+        ) : LINK_PATTERN.test(part) ? (
           <a
             key={index}
             href={part}
             target="_blank"
             rel="noreferrer"
-            className="font-semibold text-indigo-700 underline underline-offset-2 hover:text-indigo-900"
+            className={linkClassName}
           >
             {part}
           </a>

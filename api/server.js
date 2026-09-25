@@ -10,6 +10,10 @@ import { createClient } from "@supabase/supabase-js";
 
 import { CHECKOUT_POLICY_VERSIONS } from "./policyVersions.js";
 import { getMissingCheckoutPolicyTypes } from "./policyAcceptanceGuard.js";
+import {
+  getUnsupportedCurrencyMessage,
+  isSupportedCurrency,
+} from "./supportedCurrencies.js";
 import { computeCumulativeRefund } from "./refundArithmetic.js";
 import { sendTransactionalEmail, suppressEmail } from "./email.js";
 import {
@@ -1903,6 +1907,12 @@ const assertCheckoutPaymentCanBeOpened = ({ payment, userId }) => {
 
   if (payment.base_amount_cents <= 0 || payment.total_checkout_cents <= 0) {
     throw new Error("This payment amount is invalid.");
+  }
+
+  // Backstop for public.supported_currencies (20260923_138), which refuses an
+  // unsupported currency when the agreement and schedule are written.
+  if (!isSupportedCurrency(payment.currency)) {
+    throw new Error(getUnsupportedCurrencyMessage(payment.currency));
   }
 
   if (payment.application_fee_cents >= payment.total_checkout_cents) {
@@ -3828,6 +3838,15 @@ app.post("/api/stripe/connect/account-session", async (req, res) => {
     const defaultCurrency = normalizeCurrencyCode(
       req.body?.defaultCurrency || "cad",
     );
+
+    // Projects can only be priced in a supported currency (20260923_138), so
+    // onboarding a creator whose default is anything else would set up
+    // listings that cannot be paid.
+    if (!isSupportedCurrency(defaultCurrency)) {
+      return res.status(400).json({
+        error: getUnsupportedCurrencyMessage(defaultCurrency),
+      });
+    }
 
     const { account, existingAccount, wasCreated } =
       await getOrCreateStripeAccountForEmbeddedConnect({

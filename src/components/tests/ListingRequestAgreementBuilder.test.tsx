@@ -210,6 +210,56 @@ describe("ListingRequestAgreementBuilder", () => {
     expect(onCreateAgreement).not.toHaveBeenCalled();
   });
 
+  it("refuses a deposit or remaining balance below the instalment floor before sending", () => {
+    const onCreateAgreement = vi.fn();
+
+    render(
+      <ListingRequestAgreementBuilder
+        request={createRequest()}
+        onCreateAgreement={onCreateAgreement}
+      />
+    );
+
+    fillValidAgreementForm();
+    fireEvent.change(screen.getByLabelText("Deposit amount"), {
+      target: { value: "294" },
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create and send agreement" })
+    );
+
+    expect(
+      screen.getByText(
+        "Remaining balance: Each payment in a project must be at least 10.00 CAD, and this one is 6.00 CAD. Combine it with another payment or raise its amount."
+      )
+    ).toBeInTheDocument();
+    expect(onCreateAgreement).not.toHaveBeenCalled();
+  });
+
+  it("refuses a currency that is not supported", () => {
+    const onCreateAgreement = vi.fn();
+
+    render(
+      <ListingRequestAgreementBuilder
+        request={createRequest()}
+        currency="jpy"
+        onCreateAgreement={onCreateAgreement}
+      />
+    );
+
+    fillValidAgreementForm();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create and send agreement" })
+    );
+
+    expect(
+      screen.getByText(/^Deposit: Payments in JPY are not supported yet/)
+    ).toBeInTheDocument();
+    expect(onCreateAgreement).not.toHaveBeenCalled();
+  });
+
   it("renders create error", () => {
     render(
       <ListingRequestAgreementBuilder

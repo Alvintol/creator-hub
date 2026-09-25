@@ -330,7 +330,10 @@ const BuyerRequestDetails = () => {
         ? "/requests/completed"
         : "/requests";
 
-  const handleAcceptAgreement = async (acknowledgementKeys: string[]) => {
+  const handleAcceptAgreement = async (
+    acknowledgementKeys: string[],
+    earlyServiceRequested: boolean,
+  ) => {
     if (!buyerVisibleAgreement || buyerVisibleAgreement.status !== "sent") {
       return;
     }
@@ -339,6 +342,7 @@ const BuyerRequestDetails = () => {
       agreementId: buyerVisibleAgreement.id,
       response: "buyer_accepted",
       acknowledgementKeys,
+      earlyServiceRequested,
     });
   };
 

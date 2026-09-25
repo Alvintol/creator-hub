@@ -8,7 +8,7 @@ Every item follows `AGENTS.md`: enforcement at the database and API rather than 
 UI alone, the next free migration number taken from `supabase/migrations/`, and a
 support playbook written or updated before the branch is ready.
 
-**Baselines to hold** (measured 2026-09-23, end of Sprint 7): **944 tests
+**Baselines to hold** (measured 2026-09-24, end of Sprint 8): **988 tests
 passing, eslint clean, tsc clean, `npx vite build` clean** (the >500 kB
 chunk-size warning predates Sprint 7). `AGENTS.md` still
 records the older 740 / 21 errors / 19 lines — those were cleaned up since and
@@ -54,6 +54,16 @@ get published. Record each answer here as it is confirmed.
 ---
 
 ## Sprint 1 — The currency registry
+
+> **Partly overtaken (2026-09-23).** The fee minimums were removed and rates
+> resolved per user in `20260921_117`. Sprint 8's `20260923_138` added a first
+> cut of `supported_currencies` (code, exponent fixed at 2, per-currency
+> `minimum_instalment_minor_units`, enabled), enforced at agreement, schedule
+> item and change order, and in the API. The payout-settings currency is now a
+> picker. Still open: the exponent work (`* 100` in the bridge and
+> `formatPaymentCents`), `amount_multiple`, `stripe_minimum_charge`,
+> `supported_countries`, the country picker and foreign keys. The boxes below
+> are left as they were.
 
 Global availability rests entirely on this. Three places in the product assume a
 currency has exactly 100 minor units, and until that assumption is gone, enabling a
@@ -934,33 +944,150 @@ deploying the code first breaks checkout for everyone.
 
 ## Sprint 8 — Policy publication and launch gates
 
-- [ ] Apply the §10 policy edits across `src/domain/legal/`: **Made for Stream** as
-      the entity, `inbox@madeforstream.com` replacing all three email placeholders,
-      currencies stated, both fee minimums removed and the 5.00 instalment floor
-      added, the payout hold and the recovery obligation disclosed, tips and
-      contributions described as the shipping feature they now are.
-- [ ] Cut non-draft policy versions and remove every `// REVIEW DRAFT` marker.
-      Version bumps re-trigger acceptance automatically, which is the intended
-      behaviour.
-- [ ] Express-consent-to-immediate-start capture at agreement acceptance (§1.5),
-      recorded through `policy_acceptances`. **Required, not optional, now that EU
-      and UK buyers are in scope.**
-- [ ] Enforce the instalment floors at agreement send and schedule item creation,
-      with the plain-language message, and quote the agreement's fee estimate as a
-      maximum (§3.1).
-- [ ] **Publish the Service Provider Register** (§7.2) — Supabase, Stripe,
-      Cloudflare and Google Fonts, each with its function and processing locations,
-      routed and styled like the other legal pages. The privacy policy references it
-      three times and says the published version must include it; it does not exist.
-- [ ] Name Cloudflare in Privacy Policy §4 alongside Supabase and Stripe.
-- [ ] Register a DMCA designated agent with the US Copyright Office (§9.1).
-- [ ] Full end-to-end rehearsal in test mode, in at least three currencies including
-      one non-CAD/USD: request → agreement → starting payment → milestone → change
-      order → final delivery → completion, then again down the cancellation, refund,
-      payout-hold and recovery-balance paths — including a second payment in the same
-      month, to prove the minimum is charged once.
-- [ ] Verify `npx vitest run`, `npx tsc --noEmit`, `npx eslint .`, `npx vite build`
-      against the recorded baselines.
+**Status (2026-09-24): code built and verified; DMCA agent registered.** Not done,
+and not code: the end-to-end rehearsal (written as
+[`launch-rehearsal-runbook.md`](launch-rehearsal-runbook.md), not run), the pending
+business number, and anything that waits on the Sprint 7 tax advice. Decisions taken with the user this sprint:
+the operator is **Made for Stream, P.O. Box 34086, Calgary RPO Westbrook, Alberta,
+Canada T3C 3W2**; the instalment floor is **10.00 in every currency** (replacing
+§3.1's 5.00); projects may be priced in **CAD, USD and the two-decimal wave 2
+majors**; Fee Schedule §6 gets **interim wording** until the advice lands.
+**2026-09-24:** the DMCA agent was registered and published; each purpose gets its
+own `@madeforstream.com` address (all forwarded to one inbox); and the business
+number is published as `[BUSINESS_NUMBER]` while its registration is pending.
+
+**Built and verified**
+
+- [x] §10 policy edits across `src/domain/legal/`. Made for Stream named as the
+      operator, with the P.O. Box. The email placeholders are replaced by
+      per-purpose addresses (2026-09-24): `support@` (accounts, projects, account
+      closure, lost in-app access), `legal@` (legal notices, informal dispute
+      resolution, trademark / impersonation / publicity complaints), `privacy@`
+      (privacy, cookies, the register), `copyright@` (the DMCA agent),
+      `disputes@` (refund and dispute requests, Refund §9), `safety@` (content
+      reports, Community Guidelines) and `appeals@` (moderation and account-sanction
+      appeals). `legalPublication.test.ts` refuses any other address. Fee Schedule
+      §1: minimum columns gone, enabled currencies listed. §2 rewritten: no
+      minimum fee, the 10.00 floor, and the agreement estimate as a maximum. §3
+      examples reworked, including the two-instalment one (now the same total as
+      one payment). §4 describes tips and contributions as available at checkout.
+      §5 discloses the hold and recovery, including the 50% diversion. §6 is
+      interim (no tax is currently added; if that changes, the schedule is updated
+      and re-accepted first). Creator Terms §4: no minimum, the floor, and the
+      payout hold. ToS §6 and Refund §8 lose their minimum references. Refund §1
+      says the early-start request is captured at agreement acceptance.
+      **The payout hold is disclosed as Stripe-set and not guaranteed, not as
+      §10's "14-day hold":** §6.3 found 14 days unachievable under
+      `losses_collector: "stripe"`.
+- [x] Non-draft versions cut for every policy: creator terms and fee schedule at
+      `2026-09-23`; terms, privacy, refund, cookie, community guidelines and
+      copyright at `2026-09-24` (re-cut for the addresses, the DMCA agent and the
+      business-number line). `// REVIEW DRAFT` is removed from all of them. Fingerprints are recorded in
+      `policyVersionIntegrity.test.ts`, and `api/policyVersions.js` is synced
+      (`checkoutPolicyVersionsSync.test.ts` passes). **Every user re-accepts**:
+      signup policies at next sign-in, creator terms at activation, and all three
+      checkout policies at next checkout.
+      **Copyright Policy §2** publishes the agent exactly as registered with the
+      US Copyright Office (2026-09-24): Made for Stream, P.O. Box 34086, Calgary
+      RPO Westbrook, Calgary, Alberta T3C 3W2, Canada, +1 403-609-9839,
+      `copyright@madeforstream.com`. `legalPublication.test.ts` pins those lines,
+      so a change to one side fails until the other matches.
+      **One placeholder remains by decision:** `[BUSINESS_NUMBER]` in Terms §1 and
+      Privacy §1. It shows as bracketed text on the live pages until filled, and
+      filling it bumps Terms and Privacy again (every user re-accepts).
+- [x] Cookie Policy §7 **Storage Register** written. It was not on this list, but
+      §7 said the published version must include it. Built from the source:
+      Supabase session key, pending policy acceptance, cookie choices, theme, and
+      Stripe.js's `__stripe_mid` / `__stripe_sid`. **Not browser-verified against
+      the deployed site** (the browser pane could not reach it). That check is step
+      0 of the runbook.
+- [x] Express request to start early, at agreement acceptance (§1.5).
+      `20260923_138`: `respond_listing_request_agreement` takes
+      `p_early_service_request_version`, writes the `early_service_request` row to
+      `policy_acceptances` in the same transaction, and refuses acceptance without
+      it. The three-argument signature is dropped, and a trigger refuses any other
+      route to `buyer_accepted` without the row. The UI is its own checkbox under
+      the acknowledgements; the wording is shared with checkout, which now asks
+      again only if the Refund Policy changed. Playbook: `AGR-007`.
+- [x] Instalment floor at agreement send and schedule-item creation, at the
+      database (§3.1), with a plain-language message naming the floor, the amount
+      and what to do. `20260923_138` adds `supported_currencies` (a first cut of
+      Sprint 1's registry: two-decimal only, enforced by a check constraint) and
+      `assert_listing_request_instalment_allowed`. Triggers cover schedule-item
+      insert and amount/currency changes, agreement send (draft → sent re-checks
+      every item), agreement currency, and change-order send. The payment
+      bridge's 5.00 check is left as a backstop so already-accepted schedules keep
+      their terms (Fee Schedule §8). The API refuses unsupported currencies at
+      checkout and at connect account-session. The payout-settings currency is now
+      a picker. The builder shows the floor message before submit. The agreement
+      summary quotes fees **as a maximum**. Playbooks: `AGR-005`, `AGR-006`,
+      change-orders, `PAY-004`, `CON-005`, and a tax.md known gap.
+- [x] **Service Provider Register published** at `/policies/service-providers`
+      (`serviceProviderRegister.ts`), rendered like the other policies and listed
+      on `/legal`. Entries: Supabase (US, Oregon), **Google Cloud** (Cloud Run,
+      US, Iowa; missing from the original list but it runs the API), Stripe
+      including Stripe Tax, and Cloudflare (DNS, inbound routing, outbound email).
+      **Google Fonts is listed as not used**: fonts are self-hosted via
+      `@fontsource`, so no request goes to Google. Privacy Policy links to the
+      register from §4 and §11 (real router links; `LinkedText` now links
+      `/policies/...` paths).
+- [x] Privacy Policy §4 names Cloudflare alongside Supabase, Google Cloud and
+      Stripe. **Sprint 7's processing is now covered:** §2 adds tax location
+      evidence (countries only), §8 retains it with financial records, and §4 and
+      the register name Stripe Tax "where tax is calculated". "Draft service model"
+      becomes "current service model".
+- [x] Baselines: **988 tests passing** (944 + 44 new), `tsc` clean, `eslint`
+      clean, `vite build` clean (the >500 kB chunk warning predates Sprint 7).
+
+**Migration `20260923_138`: written, not applied.** Verified against **PGlite**
+(in-process Postgres 17) with stub tables for the columns it touches: 27
+behavioural checks, including every refusal, legacy rows still settleable, the
+consent row rolling back when acceptance fails, one remaining RPC signature, and a
+clean re-run. That is not the real schema. **Apply it together with the web
+deploy** (see the runbook's step 0).
+
+**User actions (not code, not done)**
+
+- [x] **DMCA designated agent registered** with the US Copyright Office
+      (2026-09-24, by the user) and published in Copyright Policy §2. **Renew by
+      2029-09-24**: a designation lapses after three years, and the safe harbour
+      with it. Any change to the agent's details needs an amendment there and a
+      matching Copyright Policy version.
+- [ ] **Business number** (registration pending). Replace `[BUSINESS_NUMBER]` in
+      `termsOfService.ts` and `privacyPolicy.ts`, bump both versions, record the
+      fingerprints, and drop the allowance in `legalPublication.test.ts`.
+- [ ] **Cloudflare Email Routing rules** for `support@`, `legal@`, `privacy@`,
+      `copyright@`, `disputes@`, `safety@` and `appeals@` madeforstream.com, all
+      forwarding to the existing destination. **Before the web deploy**, because
+      the published policies name them. Keep the existing `inbox@` rule.
+- [ ] **Cloud Run env:** set `EMAIL_SUPPORT_EMAIL=support@madeforstream.com` (the
+      code default changed, but a set env var wins) and `EMAIL_COMPANY_ADDRESS` to
+      the P.O. Box line in `api/.env.example`, so receipt footers carry it.
+- [ ] **Run the rehearsal** in [`launch-rehearsal-runbook.md`](launch-rehearsal-runbook.md)
+      (CAD, USD, EUR). Written, **not run**. It includes the Storage Register
+      browser check.
+- [ ] **Confirm processor terms are in place** before relying on the register as
+      a GDPR sub-processor disclosure. Stripe's, Cloudflare's and Google Cloud's
+      data processing terms are part of their standard agreements. Check whether
+      Supabase's DPA needs to be requested and signed from its dashboard. None of
+      this was verified in this sprint.
+- [ ] **Ask counsel whether an EU/UK representative is required** (GDPR Art. 27 /
+      UK GDPR). Buyers are unrestricted by country from launch, whatever currency
+      the creator sells in. Privacy §11 still says the representative's details
+      must be added before offering on that basis.
+- [ ] Confirm whether the site itself is served through Cloudflare (Pages or
+      proxy). The register lists Cloudflare for DNS and email only.
+
+**Waiting on the Sprint 7 tax advice**
+
+- [ ] Fee Schedule §6 final wording. The interim text says no tax is added today;
+      switching a country on requires rewriting §6 and a version bump **before**
+      the first taxed payment (the file's header comment says so).
+- [ ] **Live sales in EUR, GBP and the other wave 2 currencies.** They are
+      *enabled* (decided 2026-09-23), so nothing in the product stops a live EUR
+      sale. EU VAT applies from the first sale. The runbook's EUR run is test mode
+      only and does not clear this.
+- [ ] Reverse charge, and the IP geo header (both tracked in `payments/tax.md`).
 
 ---
 

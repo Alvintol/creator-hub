@@ -16,7 +16,7 @@
 // depends on it just doesn't render until it's set).
 const BRAND_NAME = process.env.EMAIL_BRAND_NAME || "Made for Stream";
 const LOGO_URL = process.env.EMAIL_LOGO_URL || "";
-const SUPPORT_EMAIL = process.env.EMAIL_SUPPORT_EMAIL || "inbox@madeforstream.com";
+const SUPPORT_EMAIL = process.env.EMAIL_SUPPORT_EMAIL || "support@madeforstream.com";
 const SITE_URL = process.env.EMAIL_SITE_URL || "https://madeforstream.com";
 const COMPANY_ADDRESS = process.env.EMAIL_COMPANY_ADDRESS || "";
 

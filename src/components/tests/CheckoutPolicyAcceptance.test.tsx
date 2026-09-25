@@ -82,6 +82,36 @@ describe("CheckoutPolicyAcceptance", () => {
     expect(getContinueButton()).toBeEnabled();
   });
 
+  it("does not ask again for an early start already requested at agreement acceptance", async () => {
+    mocks.acceptances = [
+      {
+        policy_type: "early_service_request",
+        policy_version: refundPolicyVersion,
+        related_listing_request_id: "request-1",
+        accepted_at: "2026-09-23T00:00:00Z",
+      },
+    ];
+    renderAcceptance();
+
+    expect(
+      screen.queryByRole("checkbox", { name: /I expressly request that the creator begin work now/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(getTermsCheckbox());
+    expect(getContinueButton()).toBeEnabled();
+    fireEvent.click(getContinueButton());
+
+    await waitFor(() =>
+      expect(mocks.record).toHaveBeenCalledWith({
+        policies: [
+          { policyType: "refund", policyVersion: refundPolicyVersion },
+          { policyType: "payment_terms", policyVersion: paymentTermsVersion },
+        ],
+        relatedListingRequestId: "request-1",
+      }),
+    );
+  });
+
   it("records each policy against the listing request, then continues", async () => {
     const onAccepted = renderAcceptance();
 

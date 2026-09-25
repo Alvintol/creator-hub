@@ -158,8 +158,42 @@ describe("<ListingRequestAgreementBuyerActions />", () => {
         "agreement:additional_cost_policy",
         "agreement:change_orders",
         "agreement:final_release_payment",
-      ]);
+      ], true);
     });
+  });
+
+  it("keeps accepting disabled until the buyer separately asks for an early start", () => {
+    render(
+      <ListingRequestAgreementBuyerActions
+        agreement={agreement}
+        isPending={false}
+        error={null}
+        onAccept={onAccept}
+        onDecline={onDecline}
+      />
+    );
+
+    const earlyStart = screen.getByRole("checkbox", {
+      name: /I expressly request that the creator begin work now/,
+    });
+
+    screen
+      .getAllByRole("checkbox")
+      .filter((checkbox) => checkbox !== earlyStart)
+      .forEach((checkbox) => {
+        fireEvent.click(checkbox);
+      });
+
+    const acceptButton = screen.getByRole("button", {
+      name: "Accept project agreement",
+    });
+
+    expect(earlyStart).not.toBeChecked();
+    expect(acceptButton).toBeDisabled();
+
+    fireEvent.click(earlyStart);
+
+    expect(acceptButton).toBeEnabled();
   });
 
   it("lets the buyer decline without checking acknowledgements", async () => {

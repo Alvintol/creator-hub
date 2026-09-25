@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   checkoutPolicyTypes,
+  earlyServiceRequestExplanation,
+  earlyServiceRequestHeading,
+  earlyServiceRequestLabel,
   getLatestAcceptedAt,
   getMissingPolicyTypes,
   toCurrentPolicyAcceptances,
@@ -42,6 +45,8 @@ const formatAcceptedDate = (value: string): string =>
 //
 // The early-start request is deliberately its own checkbox with its own
 // wording, never folded into the general agreement (Refund Policy section 1).
+// It is first recorded when the buyer accepts the agreement (20260923_138),
+// so here it only reappears if the Refund Policy has changed since.
 const CheckoutPolicyAcceptance = (props: CheckoutPolicyAcceptanceProps) => {
   const { listingRequestId, onAccepted } = props;
 
@@ -86,6 +91,7 @@ const CheckoutPolicyAcceptance = (props: CheckoutPolicyAcceptanceProps) => {
   }
 
   const isBusy = acceptancesQuery.isLoading || recordAcceptances.isPending;
+  const needsEarlyStartRequest = missingPolicyTypes.includes("early_service_request");
 
   const onContinue = async () => {
     setErrMsg(null);
@@ -134,13 +140,10 @@ const CheckoutPolicyAcceptance = (props: CheckoutPolicyAcceptanceProps) => {
         </PolicyAcceptanceCheckbox>
       </div>
 
+      {needsEarlyStartRequest && (
       <div className={classes.group}>
-        <h2 className={classes.heading}>Starting work before the cancellation period ends</h2>
-        <p className={classes.text}>
-          If you are a consumer in the EU or UK, you may have 14 days to cancel
-          this purchase. The creator can only begin work during that period if
-          you ask them to.
-        </p>
+        <h2 className={classes.heading}>{earlyServiceRequestHeading}</h2>
+        <p className={classes.text}>{earlyServiceRequestExplanation}</p>
 
         <PolicyAcceptanceCheckbox
           id="checkout-early-service-request"
@@ -148,19 +151,20 @@ const CheckoutPolicyAcceptance = (props: CheckoutPolicyAcceptanceProps) => {
           onChange={setEarlyStartRequested}
           disabled={isBusy}
         >
-          I expressly request that the creator begin work now, before any
-          14-day cancellation period I may have has ended. I understand that
-          if I cancel during that period, I may have to pay for work already
-          supplied, and that I will lose my right to cancel once the work has
-          been fully completed.
+          {earlyServiceRequestLabel}
         </PolicyAcceptanceCheckbox>
       </div>
+      )}
 
       <div className={classes.row}>
         <button
           className={classes.button}
           type="button"
-          disabled={!termsAgreed || !earlyStartRequested || isBusy}
+          disabled={
+            !termsAgreed ||
+            (needsEarlyStartRequest && !earlyStartRequested) ||
+            isBusy
+          }
           onClick={() => void onContinue()}
         >
           {recordAcceptances.isPending ? "Saving…" : "Continue to payment"}

@@ -981,6 +981,7 @@ describe("<BuyerRequestDetails />", () => {
           "agreement:change_orders",
           "agreement:final_release_payment",
         ],
+        earlyServiceRequested: true,
       });
     });
   });
