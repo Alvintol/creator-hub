@@ -17,6 +17,7 @@ surfaces:
   - api/server.js  # applyCheckoutTax, finalizePaidPaymentTaxBestEffort, reverseRefundTaxBestEffort
   - src/pages/payments/ListingRequestPaymentCheckout.tsx
   - src/domain/payments/listingRequestPaymentTax.ts
+  - public.list_ops_alerts()  # tax_evidence_insufficient, tax_transaction_missing, tax_reversal_missing, paid_wave2_currency (20260924_139)
 unmatched_tier: 2
 ---
 
@@ -73,6 +74,7 @@ the session: that makes the creator's account the liable party.
 | (internal) A taxed payment has no Stripe Tax transaction | [`TAX-003`](#tax-003--taxed-payment-missing-its-stripe-tax-transaction) |
 | (internal) A refund returned tax but Stripe Tax was not reversed, or the ledger tax disagrees | [`TAX-004`](#tax-004--refund-tax-not-reversed-or-ledger-mismatch) |
 | (internal) Every checkout fails with "Tax collection is enabled but …" | [`TAX-005`](#tax-005--tax-configuration-incomplete) |
+| (internal) Ops alert: a sale was paid in a currency other than CAD or USD | [`TAX-007`](#tax-007--paid-sale-in-a-currency-whose-tax-advice-is-open) |
 
 ---
 
@@ -164,7 +166,8 @@ Before payment there is usually only one category, because the IP header
 is not configured today. The card country recorded after payment is
 normally what makes the evidence sufficient.
 
-Signal query (run periodically. Not alerted yet; see Known gaps):
+Signal query. Alerted hourly since Sprint 9: `list_ops_alerts()` emails ops as `tax_evidence_insufficient` (TAX-002), once, then daily while it stays open. See [`operations/alerting.md`](../operations/alerting.md).
+
 
 ```sql
 select p.id, p.paid_at, p.tax_jurisdiction_country, s.*
@@ -213,6 +216,7 @@ with `tax.transactions.createFromCalculation` on the platform account.
 This is what puts the sale in Stripe Tax's filing exports. The step never
 fails the webhook, so a failure only shows up in the log and in the query
 below. A webhook redelivery retries it, and so does the paid-retry branch.
+Alerted hourly since Sprint 9: `list_ops_alerts()` emails ops as `tax_transaction_missing` (TAX-003), once, then daily while it stays open. See [`operations/alerting.md`](../operations/alerting.md).
 
 ```sql
 select id, paid_at, stripe_tax_calculation_id
@@ -275,6 +279,9 @@ select r.id, r.payment_id, r.stripe_refund_id, r.tax_refund_cents
 from public.listing_request_payment_refunds r
 where r.tax_refund_cents > 0 and r.stripe_tax_reversal_id is null;
 ```
+
+Alerted hourly since Sprint 9: `list_ops_alerts()` emails ops as `tax_reversal_missing` (TAX-004), once, then daily while it stays open. See [`operations/alerting.md`](../operations/alerting.md). The
+alert waits an hour after the refund, so an in-flight reversal isn't reported.
 
 **What the user sees.** Nothing. The buyer got the right refund.
 
@@ -355,15 +362,57 @@ handled yet (see Known gaps: reverse charge). Escalate.
 
 ---
 
+## `TAX-007` — Paid sale in a currency whose tax advice is open
+
+```yaml
+id: TAX-007
+tier: 2
+signals:
+  - source: alert
+    match: "paid_wave2_currency (TAX-007)"
+    where: "public.list_ops_alerts(), emailed by POST /api/internal/ops/alerts/run"
+  - source: db
+    match: "currency not in ('cad', 'usd') and paid_at is not null"
+    where: "public.listing_request_payments"
+auto_fix: none
+reason_not_automatable: "whether and where to register for VAT/GST is the open tax advice, not a support action"
+escalate_with:
+  - "payment id, currency, paid_at, and the buyer's billing country (tax_jurisdiction_country)"
+  - "how many such payments there are so far"
+```
+
+**Cause.** `20260923_138` enables EUR, GBP and the other two-decimal majors
+alongside CAD and USD (decided 2026-09-23), before the tax advice is in.
+Nothing stops a live EUR or GBP sale while collection is off everywhere, and
+EU VAT applies from the first sale with no small-seller threshold.
+
+```sql
+select id, currency, status, paid_at, tax_jurisdiction_country
+from public.listing_request_payments
+where currency not in ('cad', 'usd') and paid_at is not null
+order by paid_at;
+```
+
+The alert covers every status a paid payment can reach (refunded, disputed),
+not just `paid`. It's emailed **once per payment and never repeated**, since
+these rows never clear on their own.
+
+**What the user sees.** Nothing. This is internal.
+
+**Fix.** Take the first one as the prompt to chase the tax advice. The
+payment itself is fine; don't refund or alter it. Record the count for
+whoever is advising.
+
+**Money impact.** Possible tax liability on the sale that isn't being
+collected or filed.
+
+---
+
 ## Known gaps
 
-- **Wave 2 currencies are enabled before the advice.** `20260923_138` enables
-  EUR, GBP and the other two-decimal majors alongside CAD and USD (decided
-  2026-09-23). Nothing here stops a live EUR or GBP sale while collection is off
-  everywhere, and EU VAT applies from the first sale with no small-seller
-  threshold. Until the advice is in, watch for paid non-CAD/USD payments and
-  treat the first one as the prompt to chase it:
-  `select id, currency, paid_at from public.listing_request_payments where currency not in ('cad', 'usd') and status = 'paid' order by paid_at;`
+- **Wave 2 currencies are enabled before the advice.** Tracked as
+  [`TAX-007`](#tax-007--paid-sale-in-a-currency-whose-tax-advice-is-open), which
+  alerts on the first paid non-CAD/USD sale.
 
 - **The advice gate is open.** Collection is off everywhere. Nothing here
   decides which jurisdictions Made for Stream must register in, whether
@@ -389,8 +438,6 @@ handled yet (see Known gaps: reverse charge). Escalate.
   proxy that sets a geo header, such as Cloudflare's `cf-ipcountry`. The
   API on Cloud Run gets none by default, so the card country recorded
   after payment is the second piece of evidence.
-- **No alerting** on the `TAX-002`/`TAX-003`/`TAX-004` queries. Same gap
-  as `PAY-005`/`CHG-003` in the carried list.
 - **Tax on the creator's platform fee (commission)** is a separate
   question from everything above and isn't modelled.
 - **Never exercised against real Stripe Tax.** Migration

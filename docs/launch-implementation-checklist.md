@@ -8,7 +8,7 @@ Every item follows `AGENTS.md`: enforcement at the database and API rather than 
 UI alone, the next free migration number taken from `supabase/migrations/`, and a
 support playbook written or updated before the branch is ready.
 
-**Baselines to hold** (measured 2026-09-24, end of Sprint 8): **988 tests
+**Baselines to hold** (measured 2026-09-24, end of Sprint 9): **1039 tests
 passing, eslint clean, tsc clean, `npx vite build` clean** (the >500 kB
 chunk-size warning predates Sprint 7). `AGENTS.md` still
 records the older 740 / 21 errors / 19 lines — those were cleaned up since and
@@ -1091,18 +1091,172 @@ deploy** (see the runbook's step 0).
 
 ---
 
+## Sprint 9 — Stripe account state and operational alerting
+
+**Status (2026-09-24): code built and verified; migration `20260924_139` written,
+not applied; nothing registered or scheduled yet.** Three carried items move
+here: account-state handling, the scheduled resync, and alerting. Decisions
+taken with the user this sprint: alerts go to **`ops@madeforstream.com`**; the
+Cloud Scheduler jobs and Stripe event destination are **user actions** (exact
+steps below), not created from an agent session; the migration is handed over,
+not applied. The launch rehearsal had **not been run** when this sprint started,
+so no rehearsal defects came first.
+
+**Built and verified**
+
+- [x] **Accounts v2 account events.** `POST /api/stripe/account-events`
+      receives thin events on their own destination and signing secret
+      (`STRIPE_ACCOUNT_EVENTS_WEBHOOK_SECRET_DEV`/`_PROD`), verified with the
+      SDK's `parseEventNotification` (stripe-node 22.6.1). Handled:
+      `v2.core.account[requirements].updated`,
+      `v2.core.account[configuration.merchant].capability_status_updated`,
+      `…[configuration.recipient].capability_status_updated` and
+      `v2.core.account.closed`. Event names were checked against Stripe's event
+      type list, and the delivery scope against the Accounts v2 migration guide:
+      v2 account events for connected accounts come from **"Your account"**, not
+      "Connected accounts". The handler confirms the event with
+      `stripe.v2.core.events.retrieve`, re-reads the account with
+      `v2.core.accounts.retrieve`, and never takes state from the payload.
+      Deduplicated through `stripe_webhook_events`. Playbook: `CON-003`, `CON-006`.
+- [x] **One mapping.** `api/connectAccountState.js`
+      (`buildCreatorPaymentAccountPatch`) is the only v2 Account →
+      `creator_payment_accounts` mapping. The settings sync, onboarding, the
+      event handler and the resync all go through it
+      (`resyncCreatorPaymentAccountFromStripe` for the three re-reads). The old
+      in-file derive functions are gone. It also records
+      `requirements_due_count` / `requirements_past_due_count` for `CON-004`,
+      treats a closed account as never ready, and stops bumping
+      `onboarding_completed_at` on every sync.
+- [x] **Cannot move backwards.** `20260924_139` adds
+      `stripe_state_observed_at`, stamped just before each Stripe read, and the
+      trigger `guard_creator_payment_account_state_order` keeps the recorded
+      state unless a write is strictly newer. It also sets `readiness_lost_at`
+      on a ready → not-ready change.
+- [x] **Restricted accounts stop new paid work** through the same
+      `has_ready_creator_payment_account` check that gates publishing:
+      `assert_creator_ready_for_paid_work` runs on request submit, agreement
+      sent/accepted (total > 0), and price-increasing change order
+      sent/accepted. Drafts, cancellations, other change orders and payments
+      already owed are untouched, and checkout already refuses at the API
+      (`PAY-003`). **Live listings are not unpublished:** that stays a business
+      decision (`CON-003`). The buyer request form maps the new message
+      (`listingRequestErrors.ts`). Other flows show the database message as-is.
+      Playbook: `CON-007`.
+- [x] **Scheduled resync** (the backstop): `POST /api/internal/ops/connect-resync`
+      re-reads rows never synced or older than 6 h, stalest first, up to
+      `OPS_RESYNC_BATCH_SIZE` (default 100). Per-account failures log `CON-006`
+      and the run continues. Runs on Cloud Scheduler hitting the Cloud Run API,
+      authenticated with a bearer secret (`OPS_CRON_SECRET`, 32+ characters,
+      constant-time compare; unset refuses everything).
+- [x] **Alerting.** `list_ops_alerts()` (service-role only) returns one row per
+      open alert, each naming its playbook issue: `PAY-005` stuck payment,
+      `CHG-003` missing change-order payment, `REQ-003` Sprint 6 staleness,
+      `TAX-002`/`003`/`004`, **`TAX-007`** (new: paid non-CAD/USD sale while the
+      advice is open, sent once only), **`CON-003`** (lost readiness with live
+      listings) and **`CON-006`** (mirror not refreshed in 48 h).
+      `POST /api/internal/ops/alerts/run` emails a digest through `api/email.js`
+      to `OPS_ALERT_EMAIL`: once when a subject is new, then daily while it
+      stays open. A failed send is retried next run and returns 502.
+      `ops_alert_notifications` holds this state. PAY-005's email threshold is
+      deliberately later than the agent's 30-minute signal (25 h
+      `checkout_opened`, 7 days `processing`). New playbook:
+      [`support/operations/alerting.md`](support/operations/alerting.md)
+      (`OPS-001`–`003`).
+- [x] Playbooks: `connect-onboarding.md` (mirror section, `CON-001`, `CON-003`,
+      new `CON-006` and `CON-007`, Known gaps rewritten), `tax.md` (`TAX-007`,
+      alert notes), `checkout.md` (`PAY-005`), `change-orders.md` (`CHG-003` now
+      has its query, and its gap is closed), `request-lifecycle.md` (`REQ-003`),
+      `agent-contract.md` and `agent.config.yaml` (`resync_connect_account`'s
+      idempotency argument), and the support index. `api/.env.example` lists the
+      new variables.
+
+**How it was verified**
+
+- `npx vitest run`: **1039 passing** (988 + 51 new).
+  `api/tests/connectAccountState.test.js` covers the mapping, closed accounts,
+  requirement counts, event classification (only the account id is taken from a
+  notification), identical output for every writer, and resync selection.
+  `api/tests/opsAlerts.test.js` checks the registry against
+  `list_ops_alerts()` branch for branch, checks every alert's playbook issue
+  exists, checks every column the alert SQL names against the schema, and covers
+  the digest plan (new, reminder, once-only, retry after a failed send,
+  resolved, unknown ids), the rendering and the auth check. One frontend test
+  covers the `CON-007` message. `tsc`, `eslint` and `vite build` are clean.
+- **The alert SQL was run read-only against the live project** for every branch
+  that uses existing columns (all but the two `CON` branches). It returned one
+  real `REQ-003` hit and nothing else. The live project has **no
+  `creator_payment_accounts` rows yet**.
+- **Migration `20260924_139` against PGlite** (in-process Postgres, with stub
+  tables shaped from the live `information_schema` and the live
+  `has_ready_creator_payment_account`): 40 checks, all passing. They cover:
+  applies and re-runs cleanly; an older (09:00) observation after a newer one
+  (10:00) changes nothing; a replay at the same time changes nothing; a newer
+  restriction applies and sets `readiness_lost_at`; a late "ready" event after
+  the restriction cannot un-restrict; a write with no new timestamp cannot flip
+  readiness; every paid-work refusal and every allowed path; all nine alerts
+  fire with the right issue; `CHG-003` clears once the payment exists; and
+  privileges (client roles cannot call `list_ops_alerts` or the gate, or read
+  the state table). **The ordering guarantee is tested in PGlite, not in the
+  vitest suite**, because PGlite is not a repo dependency. Adding it as a
+  devDependency would bring the check into CI. The script is not in the repo.
+- **The API was run locally with Supabase unset:** the ops routes return 401
+  without the secret or with a wrong one, and log `OPS-002`. With the secret,
+  they reach their own failure paths. The SDK was checked directly:
+  `parseEventNotification` accepts a correctly signed thin payload, refuses a
+  wrong secret, and refuses a v1 snapshot event. The classifier resolves its
+  account id.
+- **Not exercised:** a real Stripe thin event delivery, a real v2 account in
+  `restricted` (the requirement-count shape follows the SDK's types), a real
+  scheduled run, and a real alert email to `ops@`.
+
+**User actions (not code, not done)**
+
+- [ ] **Apply `20260924_139`** with the API deploy that contains this sprint
+      (the API selects the new columns, so deploy after applying). Until then
+      `list_ops_alerts` does not exist and the alerts job answers 500 (`OPS-001`).
+- [ ] **Stripe event destination for account events**, once per mode (test
+      first). Workbench → Webhooks → **Create an event destination**. **Events
+      from: Your account.** Payload style **Thin**. Events:
+      `v2.core.account[requirements].updated`,
+      `v2.core.account[configuration.merchant].capability_status_updated`,
+      `v2.core.account[configuration.recipient].capability_status_updated`,
+      `v2.core.account.closed`. Destination: webhook endpoint
+      `https://made-for-stream-api-422533033771.us-central1.run.app/api/stripe/account-events`.
+      Copy the signing secret into Secret Manager as
+      `STRIPE_ACCOUNT_EVENTS_WEBHOOK_SECRET_DEV` (`_PROD` for live) and expose it
+      to Cloud Run (`--update-secrets`). **Caution:** `webhooks.md` records that
+      this UI once looked right but routed nothing (2026-09-22). If a test
+      account change shows no delivery, create it through the API instead
+      (`POST /v2/core/event_destinations` with `event_payload: "thin"`,
+      `type: "webhook_endpoint"`, the events above, the URL, and
+      `include: ["webhook_endpoint.signing_secret"]`). Classic
+      `webhook_endpoints` cannot carry thin events. Then check that a
+      `v2.core.account%` row appears in `stripe_webhook_events` as `processed`.
+- [ ] **Cloud Scheduler jobs** `mfs-connect-resync` (`15 * * * *`) and
+      `mfs-ops-alerts` (`45 * * * *`), both `POST` with
+      `Authorization: Bearer $OPS_CRON_SECRET`. The exact `gcloud` commands are
+      in `support/operations/alerting.md` → Setup. Two jobs fit in the free
+      three per billing account, then $0.10/job/month.
+- [ ] **Env and secrets on Cloud Run:** `OPS_CRON_SECRET` (new Secret Manager
+      secret, 32+ random characters), `OPS_ALERT_EMAIL=ops@madeforstream.com`,
+      `STRIPE_ACCOUNT_EVENTS_WEBHOOK_SECRET_DEV` (and `_PROD` later). Optional:
+      `OPS_RESYNC_BATCH_SIZE`, `OPS_PLAYBOOK_BASE_URL`.
+- [ ] **Cloudflare Email Routing rule for `ops@madeforstream.com`**, forwarding
+      to the shared inbox like Sprint 8's purpose addresses.
+- [ ] **Force-run both jobs once** and check for `200`. The alerts job should
+      email the current `REQ-003` hit, which confirms delivery end to end.
+
+---
+
 ## Carried, not launch-blocking
 
 Real gaps the playbooks already record. None of them stops a buyer paying a creator,
 so none of them is in the eight sprints above — but they should not be lost.
 
-- [ ] `account.updated` webhook handling — the largest gap in
-      `connect-onboarding.md`. Readiness is checked at publish time and never again.
-      **Global scope raises this**: verification requirements and capability
-      restrictions vary by country, so a stale mirror gets wrong more often.
-- [ ] Scheduled resync of `creator_payment_accounts`.
-- [ ] Alerting for the stuck-payment query in `PAY-005`, the mismatch query in
-      `CHG-003`, and the staleness query from Sprint 6.
+- [x] ~~Account-state handling, scheduled resync, and alerting for `PAY-005`,
+      `CHG-003` and the Sprint 6 staleness query~~ — built in Sprint 9 (with the
+      `TAX-002`–`004` and wave 2 currency alerts). The registration and
+      scheduling are user actions listed there.
 - [ ] Fix the `processing` state — buyer copy, creator SLA, reminders, reconciliation
       that understands a legitimately slow payment. This is the prerequisite for
       local payment methods (§1.6), which matter a lot in several European markets.
@@ -1112,7 +1266,9 @@ so none of them is in the eight sprints above — but they should not be lost.
       `AGR-001` totals checks may not reconcile afterwards (`change-orders.md`).
 - [ ] No versioned view of agreement terms over time, so which version applied when
       cannot be reconstructed for a dispute (`agreements.md`, `change-orders.md`).
-- [ ] `api/server.js` still has close to no test coverage.
+- [ ] `api/server.js` still has close to no test coverage. Sprint 9 kept its new
+      logic in tested pure modules (`connectAccountState.js`, `opsAlerts.js`),
+      but the route handlers themselves are still untested.
 - [ ] **Rebrand assets — logos, favicons, site imagery.** The product rebranded
       (2026-09-23) and needs new logo files, favicons, and site imagery
       throughout. Cosmetic, not launch-blocking. Specific hooks already built

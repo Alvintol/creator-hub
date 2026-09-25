@@ -50,7 +50,7 @@ whitelist:
     input: user_id
     reads: [stripe.accounts]
     writes: [creator_payment_accounts]
-    idempotent_by: full overwrite from Stripe truth
+    idempotent_by: fresh Stripe read stamped with stripe_state_observed_at; the database keeps the newer observation (20260924_139)
     verify: creator_payment_accounts.last_synced_at advanced
     retry_limit: 2
     escalate_if_result: creator loses readiness while holding active listings

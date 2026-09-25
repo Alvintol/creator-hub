@@ -32,6 +32,12 @@ export const getCreateListingRequestErrorMessage = (
     return "This listing is no longer available for buyer requests.";
   }
 
+  // CON-007 (20260924_139): the creator's payout account is not ready, so
+  // the database refuses new paid work. Its message is written for buyers.
+  if (message.includes("cannot take new paid work")) {
+    return "This creator can't take new paid work right now because their payout account needs attention. Please try again later.";
+  }
+
   // Constraint names from the structured request field migration.
   if (joinedText.includes("listing_requests_request_title_check")) {
     return "Request summary must be between 3 and 120 characters.";

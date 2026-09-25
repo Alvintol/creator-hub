@@ -65,6 +65,18 @@ describe("listing request error helpers", () => {
     ).toBe("This listing could not be found or is no longer available.");
   });
 
+  it("explains a refusal because the creator's payout account is not ready (CON-007)", () => {
+    expect(
+      getCreateListingRequestErrorMessage({
+        code: "23514",
+        message:
+          "This creator cannot take new paid work right now because their payout account needs attention. Please try again later.",
+      })
+    ).toBe(
+      "This creator can't take new paid work right now because their payout account needs attention. Please try again later."
+    );
+  });
+
   it("returns safe generic copy for unknown errors", () => {
     expect(
       getCreateListingRequestErrorMessage({

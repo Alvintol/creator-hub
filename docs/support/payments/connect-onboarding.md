@@ -2,10 +2,15 @@
 feature: payments/connect-onboarding
 status: active
 surfaces:
-  - api/server.js                                    # POST /api/stripe/connect/sync, POST /api/stripe/connect/account-session, getOrCreateStripeAccountForEmbeddedConnect, setStripeConnectDailyPayoutSchedule, deriveCreatorPaymentAccountReadinessFromV2Account
+  - api/server.js                                    # POST /api/stripe/connect/sync, POST /api/stripe/connect/account-session, POST /api/stripe/account-events, POST /api/internal/ops/connect-resync, getOrCreateStripeAccountForEmbeddedConnect, setStripeConnectDailyPayoutSchedule, upsertCreatorPaymentAccount, resyncCreatorPaymentAccountFromStripe
+  - api/connectAccountState.js                       # the one v2 Account -> mirror mapping, event classification, resync selection
   - src/hooks/payments/useStripeConnectAccountSession.ts
-  - public.creator_payment_accounts
+  - public.creator_payment_accounts                  # stripe_state_observed_at, readiness_lost_at, requirements_due_count, requirements_past_due_count (20260924_139)
+  - public.stripe_webhook_events                     # thin account events are deduplicated here too
+  - public.guard_creator_payment_account_state_order()
+  - public.assert_creator_ready_for_paid_work()
   - supabase/migrations/20260622_107_require_payment_account_for_active_listings.sql
+  - supabase/migrations/20260924_139_add_connect_account_state_and_ops_alerts.sql
 unmatched_tier: 2
 ---
 
@@ -31,15 +36,35 @@ unmatched_tier: 2
 Creators must connect a Stripe account before they can publish an active listing
 or receive a payment. Made for Stream keeps a mirror of each creator's account state
 in `creator_payment_accounts` — `charges_enabled`, `payouts_enabled`,
-`details_submitted` — and a database trigger blocks publishing when that mirror
-says the creator is not ready.
+`details_submitted` — and database triggers use it: publishing needs a ready
+account, and so does starting new paid work (see
+[`CON-007`](#con-007--new-paid-work-refused-because-the-account-is-not-ready)).
 
-**The mirror is the weak point of this whole feature.** Nothing refreshes it
-automatically. It updates only when the creator loads their settings page and the
-client calls the sync endpoint. Stripe sends `account.updated` when an account's
-capabilities change, and Made for Stream currently ignores that event entirely.
+**The mirror is the weak point of this whole feature.** Since Sprint 9
+(`20260924_139`) three things keep it current, all through one mapping
+(`buildCreatorPaymentAccountPatch` in `api/connectAccountState.js`):
 
-So the mirror drifts in both directions, and both are bad:
+1. **Account events.** `POST /api/stripe/account-events` receives Stripe's
+   Accounts v2 **thin events** — `v2.core.account[requirements].updated`,
+   `v2.core.account[configuration.merchant].capability_status_updated`,
+   `v2.core.account[configuration.recipient].capability_status_updated` and
+   `v2.core.account.closed` — from their own event destination. It confirms the
+   event with `stripe.v2.core.events.retrieve`, then re-reads the account. It
+   never takes state from the event itself.
+2. **The hourly resync.** `POST /api/internal/ops/connect-resync`, called by
+   Cloud Scheduler, re-reads every row not synced in 6 hours (up to
+   `OPS_RESYNC_BATCH_SIZE`, default 100, per run).
+3. **The settings page**, as before.
+
+**Ordering.** Every write carries `stripe_state_observed_at`, taken just before
+the Stripe read. `guard_creator_payment_account_state_order` keeps the recorded
+state when a write is not strictly newer. A replayed, duplicated or late event
+only ever causes a fresh read, and a slow read that lands after a newer one is
+ignored. A manual `update` that doesn't advance `stripe_state_observed_at`
+cannot change readiness either. Use the resync, not SQL.
+
+Before Sprint 9 the mirror drifted in both directions. If events stop, it still can,
+and both directions are bad:
 
 - **Stale-stale:** the creator finished onboarding, we still think they have not.
   They cannot publish; buyers are told they cannot accept payments.
@@ -57,6 +82,8 @@ Most of this playbook is about that drift.
 | "Buyers say I can't accept payments" | [`CON-001`](#con-001--creator-finished-onboarding-but-is-still-blocked), [`CON-003`](#con-003--stripe-restricted-an-account-and-we-did-not-notice) |
 | "Stripe is asking for more documents" | [`CON-004`](#con-004--stripe-requires-additional-verification) |
 | "I can't start Stripe onboarding at all" | [`CON-002`](#con-002--creator-is-not-approved-yet) |
+| "It says the creator can't take new paid work" / "It says my payout account needs attention" | [`CON-007`](#con-007--new-paid-work-refused-because-the-account-is-not-ready) |
+| (internal) Mirror rows not refreshed in 48 hours | [`CON-006`](#con-006--payment-account-mirror-is-not-being-refreshed) |
 
 ---
 
@@ -87,9 +114,11 @@ escalate_if:
   - "no Stripe account exists for this user"               # -> CON-002
 ```
 
-**Cause.** Our mirror is stale. The creator completed onboarding in Stripe but
-nothing told us. Because only the settings page triggers a sync, a creator who
-finishes onboarding and navigates away can stay blocked indefinitely.
+**Cause.** Our mirror is stale. The creator completed onboarding in Stripe and
+the update has not reached us yet. With account events delivered this lasts
+seconds, and the hourly resync bounds it at about 7 hours. Longer than that
+means events and the resync are both failing: see
+[`CON-006`](#con-006--payment-account-mirror-is-not-being-refreshed).
 
 **What the user sees.** They completed everything Stripe asked for, and
 Made for Stream still behaves as though they have not. From their side this looks like
@@ -146,11 +175,15 @@ even though each individual case is working as designed.
 id: CON-003
 tier: 2
 signals:
-  - source: stripe
-    match: "account.updated with charges_enabled false or requirements.disabled_reason set"
+  - source: api
+    match: "/CON-003: creator payment account acct_\\w+ lost readiness/"
+    where: "resyncCreatorPaymentAccountFromStripe (api/server.js), server logs"
+  - source: alert
+    match: "payment_account_lost_readiness (CON-003)"
+    where: "public.list_ops_alerts(), emailed by POST /api/internal/ops/alerts/run"
   - source: db
     where: public.creator_payment_accounts
-    match: "charges_enabled = true AND last_synced_at < now() - interval '7 days'"
+    match: "readiness_lost_at IS NOT NULL AND NOT (charges_enabled AND payouts_enabled AND details_submitted)"
 auto_fix: none
 reason_not_automatable: "the resync is safe, but removing a creator's live listings is a business decision"
 escalate_with:
@@ -161,26 +194,46 @@ escalate_with:
 ```
 
 **Cause.** Stripe restricted or disabled the account — verification lapsed, a
-document expired, or risk review. `account.updated` is **not handled**, so
-nothing updates our mirror and nothing alerts. The creator keeps live listings
-and buyers keep opening checkouts that fail at
-[`PAY-003`](checkout.md#pay-003--creator-cannot-accept-payments-yet).
+document expired, or risk review. Since Sprint 9 the account event (or the
+hourly resync) records it: the flags go false, `readiness_lost_at` is set, the
+API logs the `CON-003` line, and the hourly alert run emails ops while the
+creator still has live listings.
 
-**What the user sees.** Buyers see a creator who cannot accept payments. The
-creator often does not know anything is wrong until a buyer tells them.
+Recording it stops **new** paid work at the database
+([`CON-007`](#con-007--new-paid-work-refused-because-the-account-is-not-ready)):
+no new requests, agreements or price-increasing change orders can be sent or
+accepted, and checkout refuses at
+[`PAY-003`](checkout.md#pay-003--creator-cannot-accept-payments-yet). What it
+does **not** do is unpublish listings or cancel work in flight.
 
-**Fix.** Re-sync to record reality, then decide what to do about the listings.
-The agent may run the resync, but the consequence — a creator losing readiness
-while holding live listings — is an escalation, because unpublishing someone's
-listings is a business call with real consequences for them.
+**Query.**
+
+```sql
+select a.user_id, a.stripe_account_id, a.readiness_lost_at,
+       a.charges_enabled, a.payouts_enabled, a.details_submitted,
+       a.requirements_due_count, a.requirements_past_due_count
+from public.creator_payment_accounts a
+where a.readiness_lost_at is not null
+  and not (a.charges_enabled and a.payouts_enabled and a.details_submitted);
+```
+
+**What the user sees.** Buyers find they can't request, accept or pay for new work,
+and see the `CON-007` message. The creator sees the creator-side `CON-007`
+message when they try to send an agreement.
+
+**Fix.** Tell the creator exactly what Stripe needs (`CON-004`), then decide what
+to do about the listings. Unpublishing someone's listings is a business decision
+with real consequences for them, so this stays an escalation. The agent may run
+the resync to confirm the state is current.
 
 **Money impact.** In-flight projects with outstanding payments are stuck. If the
 restriction affects payouts rather than charges, money may be captured and
 unpayable, which is worse and needs urgent attention.
 
-**Why this is a launch blocker.** Without `account.updated` handling, the only
-thing standing between a restricted creator and a broken buyer experience is
-somebody noticing. That does not scale past a handful of creators.
+**Why this was a launch blocker.** Without account events, the only thing
+standing between a restricted creator and a broken buyer experience was somebody
+noticing. Sprint 9 closed that. It is only as good as event delivery and the
+resync (`CON-006`).
 
 ---
 
@@ -252,25 +305,115 @@ needs a stale client or a direct API call.
 
 ---
 
+---
+
+## `CON-006` — Payment account mirror is not being refreshed
+
+```yaml
+id: CON-006
+tier: 2
+signals:
+  - source: alert
+    match: "payment_account_mirror_stale (CON-006)"
+    where: "public.list_ops_alerts(): last_synced_at is null or older than 48 hours"
+  - source: api
+    match: "/CON-006: scheduled resync of creator payment account acct_\\w+ failed: /"
+    where: "POST /api/internal/ops/connect-resync, server logs"
+  - source: api
+    match: "/CON-006: scheduled resync failed: /"
+    where: "POST /api/internal/ops/connect-resync, server logs"
+  - source: api
+    match: "/CON-006: account event evt_\\w+ did not match its notification\\./"
+    where: "POST /api/stripe/account-events"
+  - source: db
+    where: public.stripe_webhook_events
+    match: "event_type like 'v2.core.account%' and processing_status = 'failed'"
+auto_fix: none
+reason_not_automatable: "the cause is infrastructure (scheduler, secret, Stripe key, destination), not a row"
+escalate_with:
+  - "the Cloud Scheduler job's last run status and HTTP code"
+  - "recent CON-006 log lines"
+  - "failed v2.core.account% rows in stripe_webhook_events with error_message"
+```
+
+**Cause.** One of these:
+
+- The `connect-resync` Cloud Scheduler job is paused, deleted or getting `401`
+  (`OPS-002` in [`operations/alerting.md`](../operations/alerting.md)).
+- Stripe reads are failing, for example a rotated key or a closed account.
+  Each failing account logs its own line and the run carries on.
+- Account events are failing. The destination is disabled, the
+  `STRIPE_ACCOUNT_EVENTS_WEBHOOK_SECRET_*` doesn't match, or events are rejected.
+  Stripe's dashboard shows delivery failures on the destination.
+
+Healthy, the resync touches every row at least every 7 hours, so 48 hours means
+something has been failing for about two days.
+
+**What the user sees.** Nothing until a creator's real state changes. Then it's
+`CON-001` or `CON-003`.
+
+**Fix.** Check the scheduler job first, then the log lines. Run the job by
+hand from Cloud Scheduler ("Force run") and confirm the response's `refreshed`
+count. A single account failing on every run with `No such account` or
+similar has been closed or removed at Stripe. Escalate with its row.
+
+**Money impact.** Indirect: readiness decisions are made on stale data.
+
+---
+
+## `CON-007` — New paid work refused because the account is not ready
+
+```yaml
+id: CON-007
+tier: 2
+signals:
+  - source: db
+    match: "Your payout account needs attention before you can send paid work. Open Settings and finish what Stripe is asking for, then try again."
+    where: "assert_creator_ready_for_paid_work (20260924_139) -- agreement sent, price-increasing change order sent"
+  - source: db
+    match: "This creator cannot take new paid work right now because their payout account needs attention. Please try again later."
+    where: "assert_creator_ready_for_paid_work (20260924_139) -- request submitted, agreement accepted, price-increasing change order accepted"
+auto_fix: none
+reason_not_automatable: "working as designed; only the creator can satisfy Stripe"
+escalate_with:
+  - "the creator's creator_payment_accounts row (flags, requirement counts, readiness_lost_at, last_synced_at)"
+  - "whether a resync changes it"
+```
+
+**Cause.** The same readiness check that gates publishing
+(`has_ready_creator_payment_account`) now also gates the moments new paid work
+starts: submitting a request, sending or accepting an agreement with a total
+above zero, and sending or accepting a change order that raises the price.
+Drafts, cancellations, price-neutral or price-lowering change orders, and
+payments already owed on accepted work are not affected.
+
+**What the user sees.** A buyer or creator gets one of the two messages above
+when they try to go ahead.
+
+**Fix.** Run the resync (`resync_connect_account`) in case the mirror is
+stale (`CON-001`). If Stripe really does have the account restricted, it's
+`CON-004` for the creator: tell them specifically what's outstanding. Tell the
+buyer the creator is sorting out their payout account.
+
+**Money impact.** None. This refusal is what keeps money out of an account
+that can't take it.
+
+---
+
 ## Known gaps
 
-- **No account-requirement-change webhook is handled.** This is the single
-  largest gap in this feature. Everything in `CON-003` is currently detected
-  by a human noticing. For v2 accounts (since 2026-09-22) the equivalent is
-  not `account.updated` but a **thin event** —
-  `v2.core.account[requirements].updated` and
-  `v2.core.account[configuration.merchant].capability_status_updated` —
-  requiring a separate event destination in the Stripe Dashboard (Developers
-  → Webhooks → thin events) and `stripe.v2.core.events.retrieve(thinEvent.id)`
-  to fetch the full payload. Registering it is gated on §11.1 (where
-  `api/server.js` runs in production) the same as the main webhook — not
-  built in this session.
-- **No scheduled resync.** Nothing refreshes `creator_payment_accounts` on a
-  timer, so a creator who never revisits settings has a mirror that is as old as
-  their last visit.
-- **No staleness alerting.** The queries in `CON-001` and `CON-003` are written
-  here but nothing runs them.
-- **Readiness is checked at publish time, not continuously.** The trigger fires
-  on insert and update of `listings`. A creator who becomes unready *after*
-  publishing keeps their listings live, and nothing re-checks.
+- **The account-events destination is a Dashboard step.** Until it exists in
+  each Stripe mode (Workbench → Webhooks → Create event destination,
+  **Events from: Your account**, payload style **Thin**), only the hourly resync
+  and the settings page refresh the mirror. Registering it is a user action,
+  tracked in the launch checklist's Sprint 9 section.
+- **Live listings stay live when readiness is lost.** New paid work is refused
+  (`CON-007`) and ops is alerted (`CON-003`), but unpublishing is a business
+  decision and remains manual.
+- **Work already accepted keeps its payment rows.** A milestone or balance
+  that falls due after the account is restricted is created as usual, and
+  checkout refuses it (`PAY-003`) until the account recovers.
+- **The requirement counts are unverified against a live restricted v2
+  account.** They read `requirements.entries[].minimum_deadline.status` and
+  `awaiting_action_from` as the SDK types describe.
 - Non-US, non-USD onboarding is untested end to end.

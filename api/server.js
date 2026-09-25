@@ -27,6 +27,18 @@ import {
   parseTaxConfig,
 } from "./tax.js";
 import {
+  CONNECT_ACCOUNT_RETRIEVE_INCLUDE,
+  buildCreatorPaymentAccountPatch,
+  classifyConnectAccountEvent,
+  didCreatorPaymentAccountLoseReadiness,
+  selectAccountsForResync,
+} from "./connectAccountState.js";
+import {
+  isAuthorizedOpsRequest,
+  planOpsAlertDigest,
+  renderOpsAlertDigest,
+} from "./opsAlerts.js";
+import {
   renderFinalNoticeEmail,
   renderFirstNoticeEmail,
   renderPaymentReceiptEmail,
@@ -107,6 +119,13 @@ const getStripeKeyConfig = () => {
       ? process.env.STRIPE_WEBHOOK_SECRET_PROD || ""
       : process.env.STRIPE_WEBHOOK_SECRET_DEV || "";
 
+  // Sprint 9: the v2 thin-event destination (Accounts v2 state changes) is a
+  // separate Stripe event destination with its own signing secret.
+  const accountEventsWebhookSecret =
+    mode === "prod"
+      ? process.env.STRIPE_ACCOUNT_EVENTS_WEBHOOK_SECRET_PROD || ""
+      : process.env.STRIPE_ACCOUNT_EVENTS_WEBHOOK_SECRET_DEV || "";
+
   const detectedSecretKeyMode = getStripeSecretKeyMode(secretKey);
 
   if (
@@ -123,6 +142,7 @@ const getStripeKeyConfig = () => {
     mode,
     secretKey,
     webhookSecret,
+    accountEventsWebhookSecret,
   };
 };
 
@@ -131,6 +151,19 @@ const STRIPE_KEY_CONFIG = getStripeKeyConfig();
 const STRIPE_KEY_MODE = STRIPE_KEY_CONFIG.mode;
 const STRIPE_SECRET_KEY = STRIPE_KEY_CONFIG.secretKey;
 const STRIPE_WEBHOOK_SECRET = STRIPE_KEY_CONFIG.webhookSecret;
+const STRIPE_ACCOUNT_EVENTS_WEBHOOK_SECRET =
+  STRIPE_KEY_CONFIG.accountEventsWebhookSecret;
+
+// Sprint 9: Cloud Scheduler authenticates to /api/internal/ops/* with this
+// bearer secret (at least 32 characters; unset refuses every call).
+// OPS_ALERT_EMAIL receives the alert digest. See
+// docs/support/operations/alerting.md.
+const OPS_CRON_SECRET = process.env.OPS_CRON_SECRET || "";
+const OPS_ALERT_EMAIL = process.env.OPS_ALERT_EMAIL || "ops@madeforstream.com";
+const OPS_RESYNC_BATCH_SIZE = Math.min(
+  Math.max(Number(process.env.OPS_RESYNC_BATCH_SIZE) || 100, 1),
+  500,
+);
 const STRIPE_CONNECT_SETUP_URL =
   process.env.STRIPE_CONNECT_SETUP_URL || "https://dashboard.stripe.com/connect";
 const STRIPE_CHECKOUT_RETURN_PATH =
@@ -216,6 +249,115 @@ app.post(
       await markStripeWebhookEventProcessed(webhookEventId, processingStatus);
 
       return res.json({ received: true, status: processingStatus });
+    } catch (err) {
+      const message = String(err?.message || err);
+
+      await markStripeWebhookEventFailed(webhookEventId, message);
+
+      return res.status(400).json({
+        error: message,
+      });
+    }
+  },
+);
+
+// Sprint 9: Stripe Accounts v2 state changes arrive as thin events on their
+// own event destination ("Events from: Your account"), signed with
+// STRIPE_ACCOUNT_EVENTS_WEBHOOK_SECRET_*. The notification only names the
+// account; the handler fetches the event (to confirm it) and then the
+// account's current state, so the order and number of deliveries do not
+// matter. Deduplicated through stripe_webhook_events like the v1 webhook.
+// Playbook: docs/support/payments/connect-onboarding.md (CON-003, CON-006).
+app.post(
+  "/api/stripe/account-events",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    let webhookEventId = null;
+
+    try {
+      const stripeClient = requireStripe();
+
+      if (!STRIPE_ACCOUNT_EVENTS_WEBHOOK_SECRET) {
+        throw new Error(
+          `Stripe ${STRIPE_KEY_MODE} account events webhook secret is not configured.`,
+        );
+      }
+
+      const notification = stripeClient.parseEventNotification(
+        req.body,
+        req.headers["stripe-signature"],
+        STRIPE_ACCOUNT_EVENTS_WEBHOOK_SECRET,
+      );
+
+      if (!supabaseAdmin) {
+        throw new Error("Supabase admin not configured");
+      }
+
+      const decision = classifyConnectAccountEvent(notification);
+
+      const recordedEvent = await recordStripeWebhookEventStart({
+        id: notification.id,
+        object: "v2.core.event",
+        type: notification.type,
+        created: notification.created,
+        livemode: notification.livemode,
+        related_object: notification.related_object ?? null,
+        account: decision.stripeAccountId ?? null,
+      });
+
+      if (!recordedEvent.shouldProcess) {
+        return res.json({
+          received: true,
+          duplicate: true,
+          status: "already_processed",
+        });
+      }
+
+      webhookEventId = recordedEvent.id;
+
+      if (decision.action !== "resync") {
+        await markStripeWebhookEventProcessed(webhookEventId, "ignored");
+        return res.json({ received: true, status: "ignored" });
+      }
+
+      const event = await stripeClient.v2.core.events.retrieve(notification.id);
+
+      if (
+        event?.type !== notification.type ||
+        event?.related_object?.id !== decision.stripeAccountId
+      ) {
+        throw new Error(
+          `CON-006: account event ${notification.id} did not match its notification.`,
+        );
+      }
+
+      const { data: existing, error } = await supabaseAdmin
+        .from("creator_payment_accounts")
+        .select("*")
+        .eq("provider", "stripe")
+        .eq("stripe_account_id", decision.stripeAccountId)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      // Not one of ours, or not recorded yet: onboarding writes the row
+      // right after creating the account, and the resync covers any gap.
+      if (!existing) {
+        await markStripeWebhookEventProcessed(webhookEventId, "ignored");
+        return res.json({ received: true, status: "ignored" });
+      }
+
+      await resyncCreatorPaymentAccountFromStripe({
+        stripeClient,
+        existing,
+        source: notification.type,
+      });
+
+      await markStripeWebhookEventProcessed(webhookEventId, "processed");
+
+      return res.json({ received: true, status: "processed" });
     } catch (err) {
       const message = String(err?.message || err);
 
@@ -1665,104 +1807,34 @@ const getExistingCreatorPaymentAccount = async (userId) => {
   return data;
 };
 
-// Reads the v2 core Account shape (configuration.merchant / .recipient
-// capability statuses, requirements) into the three flat booleans the rest
-// of the app -- and enforce_listing_payment_account_readiness's DB trigger
-// -- already understand. Kept as a pure function, separate from the upsert,
-// so the v1-to-v2 account migration (2026-09-22) touches exactly one place.
-//
-// card_payments / payouts status values observed live: "active" once
-// requirements clear, "restricted" while they don't. details_submitted is
-// derived from whether any requirement entries remain rather than from a
-// specific status string, since Stripe support and the docs never named one
-// meaning "fully clear" -- an empty entries list is unambiguous either way.
-const deriveCreatorPaymentAccountReadinessFromV2Account = (stripeAccount) => {
-  const cardPaymentsStatus =
-    stripeAccount?.configuration?.merchant?.capabilities?.card_payments
-      ?.status;
-
-  const payoutsStatus =
-    stripeAccount?.configuration?.recipient?.capabilities?.stripe_balance
-      ?.payouts?.status;
-
-  const requirementEntries = stripeAccount?.requirements?.entries;
-
-  const detailsSubmitted =
-    Array.isArray(requirementEntries) && requirementEntries.length === 0;
-
-  return {
-    chargesEnabled: cardPaymentsStatus === "active",
-    payoutsEnabled: payoutsStatus === "active",
-    detailsSubmitted,
-  };
-};
-
-// Which kinds of tax id Stripe collected at onboarding (the types only,
-// never the numbers) and the legal entity type. Whether that makes the
-// creator "registered" for a given regime -- and so whether EU reverse
-// charge applies -- is part of the Sprint 7 advice gate and is not derived
-// here. NOT VERIFIED against a live v2 account's identity payload: read
-// defensively, and store nothing if the shape is not what is expected.
-const deriveCreatorTaxStatusFromV2Account = (stripeAccount) => {
-  const identity = stripeAccount?.identity;
-
-  if (!identity || typeof identity !== "object") {
-    return {};
-  }
-
-  const idNumbers = identity.business_details?.id_numbers;
-
-  return {
-    tax_entity_type:
-      typeof identity.entity_type === "string" && identity.entity_type.trim()
-        ? identity.entity_type.trim().slice(0, 50)
-        : null,
-    tax_id_types: Array.isArray(idNumbers)
-      ? [
-          ...new Set(
-            idNumbers
-              .map((entry) => (typeof entry?.type === "string" ? entry.type : null))
-              .filter(Boolean),
-          ),
-        ]
-      : [],
-  };
-};
-
+// Every write to creator_payment_accounts goes through
+// buildCreatorPaymentAccountPatch (api/connectAccountState.js) -- the one
+// mapping from a v2 Account shared by the settings sync, onboarding, the
+// thin-event handler and the scheduled resync. `observedAt` must be taken
+// before the Stripe read that produced `stripeAccount`: the database
+// (20260924_139) keeps the newer observation when two writes race.
 const upsertCreatorPaymentAccount = async ({
   userId,
   stripeAccount,
   country,
   defaultCurrency,
   onboardingStartedAt,
+  observedAt,
+  existing = null,
 }) => {
   if (!supabaseAdmin) {
     throw new Error("Supabase admin not configured");
   }
 
-  const now = new Date().toISOString();
-
-  const { chargesEnabled, payoutsEnabled, detailsSubmitted } =
-    deriveCreatorPaymentAccountReadinessFromV2Account(stripeAccount);
-
-  const patch = {
-    user_id: userId,
-    provider: "stripe",
-    stripe_account_id: stripeAccount.id,
-    charges_enabled: chargesEnabled,
-    payouts_enabled: payoutsEnabled,
-    details_submitted: detailsSubmitted,
+  const patch = buildCreatorPaymentAccountPatch({
+    userId,
+    stripeAccount,
     country: normalizeCountryCode(country),
-    default_currency: normalizeCurrencyCode(defaultCurrency),
-    onboarding_started_at: onboardingStartedAt,
-    onboarding_completed_at: detailsSubmitted ? now : null,
-    last_synced_at: now,
-    updated_at: now,
-    // Sprint 7 (launch-scope.md section 12.2): creator tax status. Only
-    // written when Stripe returned the identity -- never cleared by a
-    // response that simply did not include it.
-    ...deriveCreatorTaxStatusFromV2Account(stripeAccount),
-  };
+    defaultCurrency: normalizeCurrencyCode(defaultCurrency),
+    onboardingStartedAt,
+    observedAt,
+    existing,
+  });
 
   const { data, error } = await supabaseAdmin
     .from("creator_payment_accounts")
@@ -1770,7 +1842,7 @@ const upsertCreatorPaymentAccount = async ({
       onConflict: "user_id,provider",
     })
     .select(
-      "id, user_id, provider, stripe_account_id, charges_enabled, payouts_enabled, details_submitted, country, default_currency, onboarding_started_at, onboarding_completed_at, last_synced_at",
+      "id, user_id, provider, stripe_account_id, charges_enabled, payouts_enabled, details_submitted, country, default_currency, onboarding_started_at, onboarding_completed_at, last_synced_at, stripe_state_observed_at, readiness_lost_at, requirements_due_count, requirements_past_due_count",
     )
     .single();
 
@@ -1779,6 +1851,44 @@ const upsertCreatorPaymentAccount = async ({
   }
 
   return data;
+};
+
+// Re-reads one creator's account from Stripe and records it. Used by the
+// settings sync, the thin-event handler and the scheduled resync, so all
+// three record exactly the same thing. A replayed or late event only ever
+// triggers a fresh read, and the database refuses an older read that lands
+// after a newer one, so nothing here can move an account backwards.
+const resyncCreatorPaymentAccountFromStripe = async ({
+  stripeClient,
+  existing,
+  source,
+}) => {
+  const observedAt = new Date().toISOString();
+
+  const stripeAccount = await stripeClient.v2.core.accounts.retrieve(
+    existing.stripe_account_id,
+    { include: CONNECT_ACCOUNT_RETRIEVE_INCLUDE },
+  );
+
+  const account = await upsertCreatorPaymentAccount({
+    userId: existing.user_id,
+    stripeAccount,
+    country: existing.country,
+    defaultCurrency: existing.default_currency,
+    onboardingStartedAt: existing.onboarding_started_at,
+    observedAt,
+    existing,
+  });
+
+  // CON-003's API signal. The hourly alert run emails it while the creator
+  // still has live listings.
+  if (didCreatorPaymentAccountLoseReadiness(existing, account)) {
+    console.warn(
+      `CON-003: creator payment account ${existing.stripe_account_id} lost readiness (source=${source}, charges_enabled=${account.charges_enabled}, payouts_enabled=${account.payouts_enabled}, details_submitted=${account.details_submitted}, requirements_past_due=${account.requirements_past_due_count})`,
+    );
+  }
+
+  return account;
 };
 
 // The account already has an email on file as a Supabase auth user; v2
@@ -2195,6 +2305,8 @@ const getOrCreateStripeAccountForEmbeddedConnect = async ({
   // live against Stripe's API before being written here.
   const contactEmail = await getSupabaseUserEmail(userId);
 
+  const observedAt = new Date().toISOString();
+
   const account = await stripeClient.v2.core.accounts.create({
     contact_email: contactEmail,
     identity: {
@@ -2232,12 +2344,7 @@ const getOrCreateStripeAccountForEmbeddedConnect = async ({
     metadata: {
       creatorhub_user_id: userId,
     },
-    include: [
-      "configuration.merchant",
-      "configuration.recipient",
-      "identity",
-      "requirements",
-    ],
+    include: CONNECT_ACCOUNT_RETRIEVE_INCLUDE,
   });
 
   await setStripeConnectDailyPayoutSchedule({
@@ -2250,6 +2357,7 @@ const getOrCreateStripeAccountForEmbeddedConnect = async ({
     stripeAccount: account,
     country,
     defaultCurrency,
+    observedAt,
   });
 
   return {
@@ -2611,24 +2719,10 @@ app.post("/api/stripe/connect/sync", async (req, res) => {
       });
     }
 
-    const stripeAccount = await stripeClient.v2.core.accounts.retrieve(
-      existingAccount.stripe_account_id,
-      {
-        include: [
-          "configuration.merchant",
-          "configuration.recipient",
-          "identity",
-          "requirements",
-        ],
-      },
-    );
-
-    const account = await upsertCreatorPaymentAccount({
-      userId,
-      stripeAccount,
-      country: existingAccount.country,
-      defaultCurrency: existingAccount.default_currency,
-      onboardingStartedAt: existingAccount.onboarding_started_at,
+    const account = await resyncCreatorPaymentAccountFromStripe({
+      stripeClient,
+      existing: existingAccount,
+      source: "settings_sync",
     });
 
     return res.json({
@@ -3810,6 +3904,193 @@ app.get("/api/stripe/checkout/session-status", async (req, res) => {
     const status = /session|authorization/i.test(message) ? 401 : 400;
 
     return res.status(status).json({ error: message });
+  }
+});
+
+// Sprint 9: scheduled jobs. Cloud Scheduler calls these hourly with
+// "Authorization: Bearer $OPS_CRON_SECRET". Both are safe to run twice.
+// Playbook: docs/support/operations/alerting.md.
+const OPS_PLAYBOOK_BASE_URL =
+  process.env.OPS_PLAYBOOK_BASE_URL ||
+  "https://github.com/Alvintol/creator-hub/blob/main";
+
+const rejectUnauthorizedOpsRequest = (req, res) => {
+  if (
+    isAuthorizedOpsRequest(
+      req.headers.authorization,
+      OPS_CRON_SECRET,
+      crypto.timingSafeEqual,
+    )
+  ) {
+    return false;
+  }
+
+  console.warn(`OPS-002: ops request to ${req.path} was not authorized.`);
+  res.status(401).json({ error: "Not authorized." });
+  return true;
+};
+
+// Backstop for missed thin events: re-reads the stalest mirror rows (never
+// synced, or older than 6 hours), up to OPS_RESYNC_BATCH_SIZE per run.
+app.post("/api/internal/ops/connect-resync", async (req, res) => {
+  if (rejectUnauthorizedOpsRequest(req, res)) {
+    return;
+  }
+
+  try {
+    const stripeClient = requireStripe();
+
+    if (!supabaseAdmin) {
+      throw new Error("Supabase admin not configured");
+    }
+
+    const { data: rows, error } = await supabaseAdmin
+      .from("creator_payment_accounts")
+      .select("*")
+      .eq("provider", "stripe")
+      .order("last_synced_at", { ascending: true, nullsFirst: true })
+      .limit(OPS_RESYNC_BATCH_SIZE * 2);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const selected = selectAccountsForResync(rows, {
+      limit: OPS_RESYNC_BATCH_SIZE,
+    });
+
+    let refreshed = 0;
+    let lostReadiness = 0;
+    let failed = 0;
+
+    for (const existing of selected) {
+      try {
+        const account = await resyncCreatorPaymentAccountFromStripe({
+          stripeClient,
+          existing,
+          source: "scheduled_resync",
+        });
+
+        refreshed += 1;
+
+        if (didCreatorPaymentAccountLoseReadiness(existing, account)) {
+          lostReadiness += 1;
+        }
+      } catch (err) {
+        failed += 1;
+        console.error(
+          `CON-006: scheduled resync of creator payment account ${existing.stripe_account_id} failed: ${String(err?.message || err)}`,
+        );
+      }
+    }
+
+    return res.status(failed > 0 && refreshed === 0 ? 502 : 200).json({
+      selected: selected.length,
+      refreshed,
+      lostReadiness,
+      failed,
+    });
+  } catch (err) {
+    const message = String(err?.message || err);
+    console.error(`CON-006: scheduled resync failed: ${message}`);
+    return res.status(500).json({ error: message });
+  }
+});
+
+// Runs list_ops_alerts() and emails OPS_ALERT_EMAIL when something is new,
+// or daily while it stays open. A failed send returns 502, so the Cloud
+// Scheduler job shows the failure, and the next run tries again.
+app.post("/api/internal/ops/alerts/run", async (req, res) => {
+  if (rejectUnauthorizedOpsRequest(req, res)) {
+    return;
+  }
+
+  try {
+    if (!supabaseAdmin) {
+      throw new Error("Supabase admin not configured");
+    }
+
+    const { data: rows, error: alertsError } =
+      await supabaseAdmin.rpc("list_ops_alerts");
+
+    if (alertsError) {
+      throw new Error(alertsError.message);
+    }
+
+    const { data: state, error: stateError } = await supabaseAdmin
+      .from("ops_alert_notifications")
+      .select("alert_id, subject_id, playbook_issue, first_seen_at, last_notified_at");
+
+    if (stateError) {
+      throw new Error(stateError.message);
+    }
+
+    const plan = planOpsAlertDigest({ rows, state });
+
+    if (plan.unknown.length > 0) {
+      console.error(
+        `OPS-003: list_ops_alerts returned unregistered alert ids: ${plan.unknown.join(", ")}`,
+      );
+    }
+
+    let emailStatus = "not_needed";
+
+    if (plan.send) {
+      const { subject, text, html } = renderOpsAlertDigest({
+        rows: plan.rows,
+        repoUrl: OPS_PLAYBOOK_BASE_URL,
+      });
+
+      const result = await sendTransactionalEmail(supabaseAdmin, {
+        to: OPS_ALERT_EMAIL,
+        subject,
+        html,
+        text,
+      });
+
+      emailStatus = result.status;
+
+      if (result.status !== "sent") {
+        console.error(
+          `OPS-001: alert digest to ${OPS_ALERT_EMAIL} failed: ${result.failedReason}`,
+        );
+      }
+    }
+
+    const emailFailed = plan.send && emailStatus !== "sent";
+    const writes = emailFailed ? plan.pending : plan.upserts;
+
+    if (writes.length > 0) {
+      const { error } = await supabaseAdmin
+        .from("ops_alert_notifications")
+        .upsert(writes, { onConflict: "alert_id,subject_id" });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
+
+    for (const resolved of plan.deletes) {
+      const { error } = await supabaseAdmin
+        .from("ops_alert_notifications")
+        .delete()
+        .match(resolved);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
+
+    return res.status(emailFailed ? 502 : 200).json({
+      open: Array.isArray(rows) ? rows.length : 0,
+      emailed: plan.send ? plan.rows.length : 0,
+      resolved: plan.deletes.length,
+      emailStatus,
+    });
+  } catch (err) {
+    const message = String(err?.message || err);
+    console.error(`OPS-001: alert run failed: ${message}`);
+    return res.status(500).json({ error: message });
   }
 });
 

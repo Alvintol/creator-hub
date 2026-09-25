@@ -140,6 +140,7 @@ how it fails.
 | Payments | [`payments/creator-recovery-balances.md`](payments/creator-recovery-balances.md) |
 | Payments | [`payments/tax.md`](payments/tax.md) |
 | Discovery | [`discovery/twitch-live.md`](discovery/twitch-live.md) |
+| Operations | [`operations/alerting.md`](operations/alerting.md) — scheduled jobs and ops alerts |
 
 Several playbooks record gaps that were product decisions rather than support
 problems — cancellation, refunds, abandonment, currency scope. **Those decisions are
