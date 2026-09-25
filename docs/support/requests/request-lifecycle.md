@@ -153,6 +153,8 @@ escalate_with:
 **Cause.** A buyer who stopped responding to a delivery, or a creator who took a
 deposit and went quiet.
 
+Alerted hourly since Sprint 9: `list_ops_alerts()` emails ops as `stale_request` (REQ-003), once, then daily while it stays open. See [`operations/alerting.md`](../operations/alerting.md).
+
 **What the user sees.** A project frozen indefinitely, often with money already
 paid into it, and no way to end it on their own.
 

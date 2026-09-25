@@ -56,6 +56,12 @@ Refreshes one creator's `creator_payment_accounts` row from Stripe.
   behaviour. But if the resync causes a creator to lose readiness while they
   have live listings, that is a Tier 2 escalation, because the business
   consequence needs a human.
+- **Idempotency (since `20260924_139`):** the same code path as the settings
+  sync, the v2 account-event handler and the hourly scheduled resync
+  (`resyncCreatorPaymentAccountFromStripe`, mapping in
+  `api/connectAccountState.js`). Each write carries `stripe_state_observed_at`,
+  taken before the Stripe read, and the database keeps whichever observation
+  is newer. Running it twice, or racing an event, cannot record older state.
 
 ### `reapply_payment_workflow`
 

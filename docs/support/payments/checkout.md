@@ -274,6 +274,14 @@ and is a security matter, not a stuck payment.
 **Money impact.** Possibly captured and unrecorded. Until reconciled, we do not
 know whether this buyer has paid.
 
+**Alerting (since Sprint 9).** `list_ops_alerts()` emails ops as
+`stuck_payment` (PAY-005), but only past the point where the payment can't be
+normal: `checkout_opened` for **25 hours** (Stripe Checkout sessions expire
+after 24, so the expiry or payment webhook was missed) or `processing` for
+**7 days**. The 30-minute signal above is for the agent. Emailing every
+abandoned checkout would bury the real ones. See
+[`operations/alerting.md`](../operations/alerting.md).
+
 ---
 
 ## `PAY-006` — Buyer reports a duplicate charge

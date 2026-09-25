@@ -138,6 +138,24 @@ whether the record is merely incomplete or actively inconsistent.
 **Money impact.** Direct. The creator may deliver expanded scope with no
 mechanism to be paid for it.
 
+**Query.** The payment is created in two hops, so both are checked:
+
+```sql
+select co.id, co.listing_request_id, co.price_delta, co.buyer_accepted_at
+from public.listing_request_change_orders co
+where co.status = 'buyer_accepted'
+  and co.changes_price
+  and co.price_delta > 0
+  and not exists (
+    select 1
+    from public.listing_request_payment_schedule_items si
+    join public.listing_request_payments p on p.payment_schedule_item_id = si.id
+    where si.change_order_id = co.id
+  );
+```
+
+Alerted hourly since Sprint 9: `list_ops_alerts()` emails ops as `change_order_payment_missing` (CHG-003), once, then daily while it stays open. See [`operations/alerting.md`](../operations/alerting.md).
+
 ---
 
 ## `CHG-004` — Change-order payment confirmation restricted
@@ -174,7 +192,10 @@ order.
   change does to already-created milestone schedule items is not specified
   anywhere, and `AGR-001` totals checks may or may not still reconcile
   afterwards. Worth resolving before launch.
-- **No alerting for `CHG-003`.** The mismatch query exists here only.
+- **`CHG-003` alerting runs through `list_ops_alerts()`** (Sprint 9), which
+  reports an accepted price-increasing change order with no schedule item or no
+  payment 15 minutes after acceptance. The detail says which is missing
+  (`has_schedule_item`).
 - **Declined change orders** have no documented effect on the project's state.
 - **No versioned view of terms over time**, so which version applied when is not
   reconstructable for a dispute.
