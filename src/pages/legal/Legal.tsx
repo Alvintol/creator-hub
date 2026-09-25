@@ -95,6 +95,14 @@ const Legal = () => {
             </div>
           </Link>
 
+          <Link className={classes.linkCard} to="/policies/service-providers">
+            <div className={classes.linkTitle}>Service Provider Register</div>
+            <div className={classes.linkText}>
+              The providers that process personal information for Made for
+              Stream, and where.
+            </div>
+          </Link>
+
           <Link className={classes.linkCard} to="/policies/community">
             <div className={classes.linkTitle}>Community Guidelines</div>
             <div className={classes.linkText}>

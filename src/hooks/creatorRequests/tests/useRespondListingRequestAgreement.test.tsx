@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useRespondListingRequestAgreement } from "../useRespondListingRequestAgreement";
+import { currentPolicyVersions } from "../../../domain/legal/policyAcceptance";
 
 const mocks = vi.hoisted(() => ({
   useAuth: vi.fn(),
@@ -81,6 +82,7 @@ describe("useRespondListingRequestAgreement", () => {
           "agreement:scope_summary",
           "agreement:payment_schedule",
         ],
+        earlyServiceRequested: true,
       });
     });
 
@@ -93,6 +95,7 @@ describe("useRespondListingRequestAgreement", () => {
           "agreement:scope_summary",
           "agreement:payment_schedule",
         ],
+        p_early_service_request_version: currentPolicyVersions.early_service_request,
       }
     );
 
@@ -141,7 +144,29 @@ describe("useRespondListingRequestAgreement", () => {
         p_agreement_id: "agreement-1",
         p_response: "buyer_declined",
         p_acknowledgement_keys: [],
+        p_early_service_request_version: null,
       }
+    );
+  });
+
+  it("sends no early-start version when the buyer has not asked for an early start, so the database refuses acceptance", async () => {
+    const { wrapper } = createWrapper();
+
+    const { result } = renderHook(() => useRespondListingRequestAgreement(), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        agreementId: "agreement-1",
+        response: "buyer_accepted",
+        acknowledgementKeys: [],
+      });
+    });
+
+    expect(mocks.rpc).toHaveBeenCalledWith(
+      "respond_listing_request_agreement",
+      expect.objectContaining({ p_early_service_request_version: null }),
     );
   });
 

@@ -191,10 +191,13 @@ escalate_with:
   - "the agreement or milestone amount this was derived from"
 ```
 
-**Cause — almost always the instalment floor.** Every payment must be at least
-**5.00**, enforced when the payment row is created (`20260921_117`). Below that
-Stripe's flat 0.30 is most of what the creator would receive, so the floor
-protects them rather than us.
+**Cause — almost always the instalment floor.** Since `20260923_138` the floor
+is **10.00** and is enforced much earlier, when the agreement, a schedule item or
+a change order is written ([`AGR-005`](../requests/agreements.md#agr-005--a-payment-is-below-the-instalment-floor)).
+The **5.00** check here, applied when the payment row is created
+(`20260921_117`), is now only a backstop that keeps schedules accepted before
+`20260923_138` payable. Reaching it with a new agreement means a schedule item
+bypassed the trigger, which is worth escalating.
 
 The message names the amount, so "Each payment must be at least 5.00 CAD" needs
 no investigation: the agreement or milestone amount is too small and has to
@@ -218,17 +221,14 @@ conversation between buyer and creator — not something to patch in the databas
 
 **Money impact.** None charged. The project is blocked at this payment.
 
-**Note for non-CAD/USD work.** These minimums are **minor-unit** integers — `100`
-and `150` — applied to whatever currency the payment carries. That is correct for
-CAD and USD, which is why both work today and why the fee schedule can name each
-separately. It is wrong for any currency with a different minor-unit convention: in
-JPY those are ¥100 and ¥150, and the bridge's `round(amount * 100)` conversion
-overstates a JPY amount by a hundredfold. Stripe's own minimum charge also differs
-per currency.
-
-Do not enable another currency without working through that. The plan for doing so
-is the currency registry in
-[`../../launch-scope.md`](../../launch-scope.md) §1.1.
+**Currencies.** Payments can only be in a currency enabled in
+`public.supported_currencies` (`20260923_138`): CAD, USD and the two-decimal
+wave 2 majors. The API refuses any other at checkout with
+[`AGR-006`](../requests/agreements.md#agr-006--the-projects-currency-is-not-supported)'s
+message. The bridge still converts with `round(amount * 100)`, which is why zero-
+and three-decimal currencies (JPY, KWD) are refused outright: in JPY it would
+overstate an amount a hundredfold. Enabling one needs the exponent work in
+[`../../launch-scope.md`](../../launch-scope.md) §1.1 first.
 
 ---
 
@@ -406,7 +406,13 @@ escalate_with:
 **Cause.** `assertCheckoutPoliciesAccepted` checks `policy_acceptances` for the
 buyer, scoped to this listing request, for every policy `api/policyVersions.js`
 requires — currently `refund`, `payment_terms` and `early_service_request` — at
-their exact current version. It runs on **every** call to
+their exact current version. Since `20260923_138` the `early_service_request` row
+is first written when the buyer accepts the agreement
+([`AGR-007`](../requests/agreements.md#agr-007--acceptance-refused-without-the-early-start-request)),
+so checkout shows that box again only if the Refund Policy version changed
+since. **Every policy was re-versioned on 2026-09-23/24 (Sprint 8)**, so every
+buyer with a project in flight re-accepts all three at their next checkout.
+That is expected, not this issue. It runs on **every** call to
 `POST /api/stripe/checkout/session`, including a reused session, because an
 acceptance of an older version does not satisfy a newer one.
 

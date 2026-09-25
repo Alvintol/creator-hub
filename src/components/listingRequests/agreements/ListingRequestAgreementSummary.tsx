@@ -7,6 +7,8 @@ import {
   getListingRequestIncludedRevisionCount,
   getListingRequestPaymentStructureLabel,
   getListingRequestPaymentTimingLabel,
+  getMaximumAgreementFeeAmount,
+  STANDARD_FEE_BPS,
 } from "../../../domain/listings/listingRequestAgreements";
 import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
 
@@ -105,6 +107,7 @@ const AgreementDetails = ({ agreement }: { agreement: ListingRequestAgreementRow
     agreement.adjusted_estimated_completion_at !== agreement.estimated_completion_at;
   const checklist = sortedBySortOrder(agreement.listing_request_agreement_items);
   const schedule = sortedBySortOrder(agreement.listing_request_payment_schedule_items);
+  const maximumFee = formatMoney(getMaximumAgreementFeeAmount(schedule), agreement.currency);
   const policies = [
     agreement.additional_cost_policy,
     agreement.revision_policy,
@@ -202,6 +205,11 @@ const AgreementDetails = ({ agreement }: { agreement: ListingRequestAgreementRow
           </ul>
         ) : (
           <p className={classes.text}>No payment schedule items listed.</p>
+        )}
+        {schedule.length > 0 && (
+          <p className={classes.text}>
+            {`Estimated Made for Stream fees: the buyer service fee is at most ${maximumFee}, and so is the creator platform fee (each ${STANDARD_FEE_BPS / 100}% of every payment, rounded up to the cent). These are maximums — a fee can be lower, never higher. Tips, contributions and any tax are separate.`}
+          </p>
         )}
       </Group>
 

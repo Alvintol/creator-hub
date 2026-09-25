@@ -4,6 +4,7 @@ import type {
   ListingRequestAgreementStatus,
   ListingRequestStartingPaymentStatus,
 } from "../../domain/listings/listingRequestAgreements";
+import { currentPolicyVersions } from "../../domain/legal/policyAcceptance";
 import { supabase } from "../../lib/supabaseClient";
 import { useAuth } from "../../providers/AuthProvider";
 
@@ -14,6 +15,8 @@ type RespondListingRequestAgreementInput = {
     "buyer_accepted" | "buyer_declined"
   >;
   acknowledgementKeys?: string[];
+  // Required to accept: the database refuses acceptance without it.
+  earlyServiceRequested?: boolean;
 };
 
 type RespondedAgreementRow = {
@@ -38,6 +41,10 @@ export const useRespondListingRequestAgreement = () => {
           p_agreement_id: input.agreementId,
           p_response: input.response,
           p_acknowledgement_keys: input.acknowledgementKeys ?? [],
+          p_early_service_request_version:
+            input.response === "buyer_accepted" && input.earlyServiceRequested
+              ? currentPolicyVersions.early_service_request
+              : null,
         }
       );
 

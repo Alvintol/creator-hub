@@ -1,5 +1,7 @@
-// REVIEW DRAFT: resolve publication inputs and implement linked workflows before adoption.
-export const copyrightPolicyVersion = "2026-09-20-draft-1";
+// Section 2's agent details must match the US Copyright Office's DMCA
+// Designated Agent Directory entry exactly (registered 2026-09-24). Change
+// both together, and renew the registration every three years.
+export const copyrightPolicyVersion = "2026-09-24";
 
 export const copyrightPolicySections = [
   {
@@ -13,13 +15,13 @@ export const copyrightPolicySections = [
     "title": "2. Copyright agent and contact",
     "body": [
       "Send copyright notices and counter-notices to our designated copyright agent:",
-      "- Agent name or designated role: [DMCA_AGENT_NAME]",
-      "- Organisation: [DMCA_AGENT_ORGANISATION]",
-      "- Postal address: [DMCA_AGENT_POSTAL_ADDRESS]",
-      "- Telephone: [DMCA_AGENT_PHONE]",
-      "- Email: [DMCA_AGENT_EMAIL]",
-      "- Service provider legal name: [OPERATOR_LEGAL_NAME]",
-      "Use the subject “Copyright notice” or “Copyright counter-notice.” Ordinary support and payment issues belong at [SUPPORT_EMAIL]. We do not require a Made for Stream account to submit a copyright notice. An in-app content report can alert us to an issue but is not necessarily a complete legal notice."
+      "- Agent name or designated role: Made for Stream",
+      "- Organisation: Made for Stream",
+      "- Postal address: P.O. Box 34086, Calgary RPO Westbrook, Calgary, Alberta T3C 3W2, Canada",
+      "- Telephone: +1 403-609-9839",
+      "- Email: copyright@madeforstream.com",
+      "- Service provider legal name: Made for Stream",
+      "This agent is registered in the US Copyright Office's DMCA Designated Agent Directory. Use the subject “Copyright notice” or “Copyright counter-notice.” Ordinary support and payment issues belong at support@madeforstream.com. We do not require a Made for Stream account to submit a copyright notice. An in-app content report can alert us to an issue but is not necessarily a complete legal notice."
     ]
   },
   {
@@ -63,13 +65,13 @@ export const copyrightPolicySections = [
     "body": [
       "Made for Stream terminates accounts of repeat infringers in appropriate circumstances and reasonably implements this policy. We consider the reliability, number and seriousness of incidents, counter-notices, retractions, court orders and evidence of abuse. A notice that is withdrawn or successfully challenged is reassessed rather than mechanically treated as a proven infringement.",
       "Serious or deliberate infringement may justify immediate restrictions or termination; there is no entitlement to a fixed number of warnings. Ban evasion or reposting removed material to defeat a restriction is prohibited. We accommodate and do not interfere with applicable standard technical measures under 17 U.S.C. § 512(i).",
-      "You may request review of an account sanction at [SUPPORT_EMAIL] within 14 days, explaining any error or new evidence. That review does not replace a statutory counter-notice or extend court deadlines."
+      "You may request review of an account sanction at appeals@madeforstream.com within 14 days, explaining any error or new evidence. That review does not replace a statutory counter-notice or extend court deadlines."
     ]
   },
   {
     "title": "8. Other rights and transactions",
     "body": [
-      "For trademark, impersonation, privacy or publicity complaints, contact [SUPPORT_EMAIL] with the relevant rights, material locations and explanation. Do not submit a sworn copyright claim for a right you do not hold. We assess notices under the law that applies; the US DMCA procedure does not displace Canadian or other mandatory legal obligations.",
+      "For trademark, impersonation, privacy or publicity complaints, contact legal@madeforstream.com with the relevant rights, material locations and explanation. Do not submit a sworn copyright claim for a right you do not hold. We assess notices under the law that applies; the US DMCA procedure does not displace Canadian or other mandatory legal obligations.",
       "A takedown may affect an active project. Payment remedies are handled under the Refund, Cancellation and Dispute Policy. A copyright notice alone does not automatically entitle either party to all project funds, and a payment refund does not settle the copyright dispute."
     ]
   }

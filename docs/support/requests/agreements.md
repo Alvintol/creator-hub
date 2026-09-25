@@ -7,6 +7,15 @@ surfaces:
   - public.listing_request_payment_schedule_items
   - supabase/migrations/20260921_117_per_user_fee_rates_and_no_minimums.sql
   - public.resolve_listing_request_fee_rates
+  - supabase/migrations/20260923_138_add_supported_currencies_instalment_floor_and_early_start_consent.sql
+  - public.supported_currencies
+  - public.assert_listing_request_instalment_allowed
+  - public.respond_listing_request_agreement
+  - public.policy_acceptances
+  - src/components/listingRequests/agreements/ListingRequestAgreementBuyerActions.tsx
+  - src/components/listingRequests/agreements/ListingRequestAgreementBuilder.tsx
+  - src/domain/payments/supportedCurrencies.ts
+  - api/supportedCurrencies.js
 unmatched_tier: 2
 ---
 
@@ -28,7 +37,10 @@ payments later. **Errors in this playbook are therefore money errors in waiting.
 | "I can't send the agreement" | [`AGR-001`](#agr-001--agreement-totals-do-not-reconcile), [`AGR-002`](#agr-002--agreement-not-in-a-sendable-state) |
 | "The buyer can't accept it" | [`AGR-003`](#agr-003--required-confirmations-not-acknowledged) |
 | "Milestone amounts are rejected" | [`AGR-001`](#agr-001--agreement-totals-do-not-reconcile) |
-| "It says the amount is too small" | [`PAY-004`](../payments/checkout.md#pay-004--payment-amount-or-fee-setup-is-invalid) |
+| "It says each payment must be at least 10.00" | [`AGR-005`](#agr-005--a-payment-is-below-the-instalment-floor) |
+| "It says the currency is not supported" | [`AGR-006`](#agr-006--the-projects-currency-is-not-supported) |
+| "The buyer can't accept: it asks to confirm an early start" | [`AGR-007`](#agr-007--acceptance-refused-without-the-early-start-request) |
+| "It says the amount is too small" at checkout | [`PAY-004`](../payments/checkout.md#pay-004--payment-amount-or-fee-setup-is-invalid) |
 
 ---
 
@@ -173,6 +185,146 @@ create a schedule item to satisfy the error.
 
 **Money impact.** Blocked payment. If it recurs, it is a data-integrity issue and
 belongs at Tier 3.
+
+---
+
+## `AGR-005` — A payment is below the instalment floor
+
+```yaml
+id: AGR-005
+tier: 1
+signals:
+  - source: db
+    match: "Each payment in a project must be at least % %, and this one is % %. Combine it with another payment or raise its amount."
+auto_fix: none
+reason_not_automatable: "explanation, not a fault; the amounts are the parties' to change"
+```
+
+**Cause.** Since `20260923_138` every payment in a project must be at least
+**10.00** in the project's currency
+(`public.supported_currencies.minimum_instalment_minor_units`, 1000 for every
+currency today). `public.assert_listing_request_instalment_allowed` raises this
+when:
+
+- a schedule item is created or its amount changes (trigger
+  `listing_request_schedule_items_enforce_instalment`), so creating an agreement
+  directly as `sent` is refused here;
+- a draft agreement is sent (trigger
+  `listing_request_agreements_enforce_instalments` re-checks every schedule
+  item);
+- a change order carrying a price increase is sent
+  (`listing_request_change_orders_enforce_instalment`); see
+  [`change-orders.md`](change-orders.md).
+
+The agreement builder shows the same message before submitting, prefixed
+"Deposit:", "Remaining balance:" or the milestone's title, so a creator normally
+sees it without the database ever refusing.
+
+**What the user sees.** The message itself. It names the floor and the offending
+amount, and says what to do.
+
+**Fix.** Explain it: the creator combines the small payment with another one
+(fewer milestones, a larger deposit) or raises it. The floor protects the
+creator from Stripe's flat per-payment charge, which the creator bears under
+Model A. Do not lower the floor for one project: it is a single row per currency,
+so changing it changes it for everyone.
+
+**Not affected.** Schedules accepted before `20260923_138` keep working. The
+trigger ignores status-only updates, and the payment bridge's own backstop still
+uses the old 5.00 (`PAY-004`). Waived and cancelled items are never checked.
+
+**Money impact.** None. Nothing has been charged.
+
+---
+
+## `AGR-006` — The project's currency is not supported
+
+```yaml
+id: AGR-006
+tier: 1
+signals:
+  - source: db
+    match: "Payments in % are not supported yet. Price the project in a currency listed in the Fee Schedule."
+  - source: api
+    match: "are not supported yet. Price the project in a currency listed in the Fee Schedule."
+auto_fix: none
+reason_not_automatable: "explanation; enabling a currency is a product decision and a migration"
+```
+
+**Cause.** The agreement, a schedule item, a payment at checkout, or a creator's
+default currency at onboarding is not an enabled row in
+`public.supported_currencies`. Enabled today: CAD, USD, EUR, GBP, AUD, NZD, CHF,
+SGD, SEK, NOK, DKK, PLN, MXN, BRL, HKD, the two-decimal majors. Zero- and
+three-decimal currencies (JPY, KRW, KWD, ...) are refused by a check constraint,
+because the payment bridge still converts with `* 100` (`launch-scope.md` §1.1).
+
+The same list lives in `api/supportedCurrencies.js` (the checkout backstop, and
+`POST /api/stripe/connect/account-session`) and
+`src/domain/payments/supportedCurrencies.ts` (forms, and the payout-settings
+currency picker). `supportedCurrenciesSync.test.ts` keeps all three aligned.
+
+**Fix.** The creator prices the project in a supported currency. A creator whose
+Stripe default currency is unsupported can still sell in one their account can
+settle. Adding a currency means a migration row plus both code copies, and, for
+any currency beyond CAD/USD, clearing the tax gate first
+([`../payments/tax.md`](../payments/tax.md)).
+
+**Money impact.** None.
+
+---
+
+## `AGR-007` — Acceptance refused without the early-start request
+
+```yaml
+id: AGR-007
+tier: 2
+signals:
+  - source: db
+    match: "Confirm that you want the creator to start work before any cancellation period ends, then accept the agreement."
+auto_fix: none
+reason_not_automatable: "the request is the buyer's own act; nobody may give it for them"
+escalate_with:
+  - "the agreement id and listing_request_id"
+  - "policy_acceptances rows for the buyer with policy_type = 'early_service_request' and that listing_request_id"
+```
+
+**Cause.** Since `20260923_138`, accepting an agreement requires the buyer's
+express request that work start before any EU/UK 14-day cancellation period ends
+(Refund Policy §1, `launch-scope.md` §1.5). The buyer ticks a separate box below
+the acknowledgements. `respond_listing_request_agreement` receives the Refund
+Policy version as `p_early_service_request_version`, writes the
+`early_service_request` row to `policy_acceptances` in the same transaction, and
+refuses acceptance without it. The old three-argument signature was dropped, and
+trigger `listing_request_agreements_require_early_start_request` refuses any
+other route to `buyer_accepted` without that row.
+
+**What the user sees.** The accept button stays disabled until the box is
+ticked. The message itself appears only if something calls the RPC without the
+version. After the deploy, the likely cause is an old cached web build.
+
+**Fix.** The buyer ticks the box and accepts. **Never insert the row for them.**
+As with `AGR-003`, a consent the buyer did not give is worse than none, because
+it looks like evidence. If a buyer does not want work to start early, the honest
+answer is that the project cannot start until the 14 days have passed, and the
+product does not support that yet: escalate rather than work around it.
+
+**Checkout.** The same request stays in checkout's gate, at the current Refund
+Policy version. If the Refund Policy changes after acceptance, checkout asks for
+it again; otherwise the box does not reappear there.
+
+**Money impact.** None at acceptance. Later it decides whether the earned-value
+refund rules can be relied on for an EU/UK consumer.
+
+---
+
+## Fee estimates are maximums
+
+The agreement summary shows the estimated Made for Stream fees for the schedule
+(`getMaximumAgreementFeeAmount`: 5% of each item rounded up to the cent, then
+summed, with waived and cancelled items excluded). It is labelled a **maximum**
+because the rate is locked at acceptance as a ceiling (below). If a user says the
+estimate was wrong, check whether they were charged *more* than it: that would be
+a defect. Being charged less is a waiver working as intended.
 
 ---
 

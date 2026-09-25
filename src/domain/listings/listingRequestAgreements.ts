@@ -293,3 +293,24 @@ export const areRequiredAgreementAcknowledgementsChecked = (input: {
     checkedSet.has(acknowledgement.key)
   );
 };
+// The standard Made for Stream rate on each side, in basis points. A rate is
+// resolved per user and locked at agreement acceptance as a ceiling that can
+// only be lowered (launch-scope.md sections 3.5-3.6), so fees worked out at
+// this rate are the most an agreement can cost -- which is why the agreement
+// quotes them as a maximum (Fee Schedule section 2).
+export const STANDARD_FEE_BPS = 500;
+
+// Mirrors ensure_listing_request_payment_for_schedule_item: each instalment's
+// fee is rounded up to the cent on its own, then summed. Waived and cancelled
+// items are never charged.
+export const getMaximumAgreementFeeAmount = (
+  scheduleItems: ReadonlyArray<{ amount: number; status: string }>,
+  feeBps: number = STANDARD_FEE_BPS,
+): number =>
+  scheduleItems
+    .filter((item) => item.status !== "waived" && item.status !== "cancelled")
+    .reduce(
+      (totalCents, item) =>
+        totalCents + Math.ceil((Math.round(item.amount * 100) * feeBps) / 10000),
+      0,
+    ) / 100;

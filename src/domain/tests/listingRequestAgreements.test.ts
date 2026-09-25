@@ -11,8 +11,10 @@ import {
   getListingRequestIncludedRevisionCount,
   getListingRequestPaymentStructureLabel,
   getListingRequestPaymentTimingLabel,
+  getMaximumAgreementFeeAmount,
   getMinimumCreatorUpdateRule,
   getRequiredListingRequestAgreementAcknowledgements,
+  STANDARD_FEE_BPS,
 } from "../listings/listingRequestAgreements";
 
 describe("listing request agreement helpers", () => {
@@ -319,5 +321,31 @@ describe("listing request agreement acknowledgement helpers", () => {
           .filter((key) => key !== "agreement:payment_schedule"),
       })
     ).toBe(false);
+  });
+});
+describe("getMaximumAgreementFeeAmount", () => {
+  it("rounds each instalment's 5% up to the cent before summing, like the payment bridge", () => {
+    // 10.01 -> 50.05 cents -> 51; 33.33 -> 166.65 -> 167; total 2.18
+    expect(
+      getMaximumAgreementFeeAmount([
+        { amount: 10.01, status: "payment_required" },
+        { amount: 33.33, status: "pending" },
+      ]),
+    ).toBe(2.18);
+  });
+
+  it("ignores waived and cancelled items, which are never charged", () => {
+    expect(
+      getMaximumAgreementFeeAmount([
+        { amount: 100, status: "pending" },
+        { amount: 50, status: "waived" },
+        { amount: 50, status: "cancelled" },
+      ]),
+    ).toBe(5);
+  });
+
+  it("uses the standard 5% rate, which a locked rate can only lower", () => {
+    expect(STANDARD_FEE_BPS).toBe(500);
+    expect(getMaximumAgreementFeeAmount([{ amount: 100, status: "pending" }], 250)).toBe(2.5);
   });
 });

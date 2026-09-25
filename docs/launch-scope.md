@@ -280,6 +280,13 @@ payment — and the creator bears it under Model A.
 keeps 86% of the base, which is a defensible worst case. The earlier 10.00 figure
 was set against the platform's break-even under Model B, which no longer exists.
 
+**Superseded 2026-09-23 (Sprint 8): 10.00 flat, in every enabled currency.**
+Chosen over per-currency purchasing-power values for simplicity. At 10.00 in CAD
+the creator keeps about 89% of the base (the table above). It stays above Stripe's minimum charge
+in every enabled currency (MXN's is 10.00). In the weaker enabled currencies
+(SEK, NOK, DKK, MXN, BRL, HKD, PLN) it is well below CA$5 in value. Enforced by
+`supported_currencies` (`20260923_138`).
+
 Per-currency values come from the registry (§1.1), set at roughly equivalent
 purchasing power rather than converted at spot. Validate at agreement send time and
 again at schedule item creation, with a real message, and leave the `PAY-004` guard
@@ -1086,9 +1093,9 @@ in profile settings, which is the correct treatment.
 | Question | Decision |
 | --- | --- |
 | Legal entity | **Made for Stream** |
-| `[SUPPORT_EMAIL]`, `[PRIVACY_EMAIL]`, `[DMCA_AGENT_EMAIL]` | **inbox@madeforstream.com** for all three |
+| `[SUPPORT_EMAIL]`, `[PRIVACY_EMAIL]`, `[DMCA_AGENT_EMAIL]` | **inbox@madeforstream.com** for all three. *Superseded 2026-09-24:* one address per purpose (`support@`, `legal@`, `privacy@`, `copyright@`, `disputes@`, `safety@`, `appeals@`), all forwarded to the same inbox |
 | Geographic scope | **Global** — every country Stripe Connect supports for creators, unrestricted for buyers (§1) |
-| Currency scope | **Any major currency**, through the registry, enabled in waves (§1.1, §1.3) |
+| Currency scope | **Any major currency**, through the registry, enabled in waves (§1.1, §1.3). **Enabled 2026-09-23:** CAD, USD and the two-decimal wave 2 majors (EUR, GBP, AUD, NZD, CHF, SGD, SEK, NOK, DKK, PLN, MXN, BRL, HKD). Enabled is not cleared for live sales: EU/UK VAT still waits on the §12.3 advice |
 | Creator payouts | **Automatic daily payout, delay at Stripe's default** (confirmed 7 days on a CA test account) — the live account-creation path set no schedule at all before this. A guaranteed 14-day figure was planned and found unachievable under this platform's liability configuration; see §6.3 (§6.3) |
 | Refund funding | **Made for Stream funds the refund**, then recovers from the creator in-app (§6.5) |
 | Creator with an outstanding balance | Listings **blocked from new requests**; existing projects continue and their payments are diverted to the balance (§6.5) |
@@ -1097,7 +1104,7 @@ in profile settings, which is the correct treatment.
 | Accounts API version | **v2** (`stripeClient.v2.core.accounts`), not v1 `type: "express"`. Matches the platform's own already-configured Connect settings (`fees_collector`/`losses_collector: "stripe"`, `dashboard: "none"`). The v1-only `/api/stripe/connect/start` route was dead code (zero callers) and was removed in the same migration (§3.2, §11) |
 | Fee rates | **5% buyer and 5% creator.** The buyer fee pays for agreements, milestones, change orders, delivery records and a defined refund path — what the competition does not have (§3, §3.5) |
 | Fee minimums | **None on either side** — Model A removed the cost they offset, and they only took from creators on small commissions (§3.1) |
-| Instalment floor | **5.00**, now protecting the creator from Stripe's flat 0.30 rather than the platform from a loss (§3.1) |
+| Instalment floor | **10.00 in every enabled currency** (changed from 5.00 on 2026-09-23), protecting the creator from Stripe's flat per-payment charge rather than the platform from a loss (§3.1) |
 | Per-user fee waivers | **Foundation only.** Rates resolved per user with a recorded reason, locked at agreement acceptance as a ceiling (§3.5, §3.6) |
 | Splitting Stripe's 2.9% onto buyers | **No** — it worsens the buyer-facing price and reads as a card surcharge, which the EU and UK prohibit (§3.2) |
 | Payout schedule | **Daily, delay at Stripe's default (not overridable to 14 days under `losses_collector: "stripe"`)** — Model A still removes the per-payout fee that made weekly cheaper; the guaranteed-14-days part of the original decision did not survive the v1→v2 migration (§6.3) |
@@ -1181,7 +1188,7 @@ block Sprint 3.
 | Fee Schedule §1 | **Remove both minimum rows.** Fees are a flat 5% each side with no minimum (§3.1) — the "Minimum per successful base payment" column disappears. Publish the enabled currency list, which §1 already requires before a currency may be enabled. |
 | Fee Schedule §2 | Rewrite. "Each separately collected instalment can incur a minimum, so splitting a project can cost more than one payment" is now false — with no minimums, splitting costs the same. Add the 5.00 instalment floor and state that the agreement's fee estimate is a maximum (§3.5). |
 | Fee Schedule §3 | **Rework every worked example.** All six apply minimums that no longer exist. The two-instalment example, which exists specifically to show the minimum compounding, has to go or be replaced. |
-| Fee Schedule §5 | Disclose the 14-day payout hold and the daily release schedule (§6.3) — the existing "payout timing depends on..." language does not cover a delay we impose. Add that where a refund exceeds the creator's available balance, Made for Stream funds it and recovers from the creator, including by applying it to subsequent payments (§6.5). Both are new creator obligations and must be disclosed before they can be incurred. Confirm §5's existing statement that the creator bears Stripe's charges — under Model A it is true as written (§3.4). |
+| Fee Schedule §5 | *(Published 2026-09-23 as a Stripe-set hold with no guaranteed length, per §6.3, not 14 days.)* Disclose the 14-day payout hold and the daily release schedule (§6.3) — the existing "payout timing depends on..." language does not cover a delay we impose. Add that where a refund exceeds the creator's available balance, Made for Stream funds it and recovers from the creator, including by applying it to subsequent payments (§6.5). Both are new creator obligations and must be disclosed before they can be incurred. Confirm §5's existing statement that the creator bears Stripe's charges — under Model A it is true as written (§3.4). |
 | Fee Schedule §4 | Keep the tip and contribution rows — they are being built (§4). |
 | Fee Schedule §6 | Rewrite for §12. The current "does not claim that all taxes are automatically collected" becomes a statement that Made for Stream calculates, collects and remits where obliged, and identifies tax separately on the payment record — which also requires the missing `tax_cents` column. |
 | Creator Terms | Add the recovery balance: what creates one, that new requests are blocked while it is outstanding, how it is recovered at 50% of each payment, and how it is settled directly. Add the payout hold. |

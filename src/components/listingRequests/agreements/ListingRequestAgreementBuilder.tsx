@@ -15,6 +15,8 @@ import type { ListingRequestRow } from '../../../hooks/creatorRequests/useMyCrea
 
 import type { CreateListingRequestAgreementInput } from '../../../hooks/creatorRequests/useCreateListingRequestAgreement';
 
+import { getInstalmentFloorMessage } from '../../../domain/payments/supportedCurrencies';
+
 import ListingRequestMilestonePlanEditor from '../milestones/ListingRequestMilestonePlanEditor';
 type ListingRequestAgreementBuilderProps = {
   request: Pick<ListingRequestRow, "id" | "status"> | null;
@@ -133,7 +135,10 @@ const parseWholeNumber = (value: string): number =>
 const getIsoFromDateInput = (dateInput: string): string =>
   new Date(`${dateInput}T12:00:00.000Z`).toISOString();
 
-const validateForm = (form: BuilderFormState): BuilderValidationErrors => {
+const validateForm = (
+  form: BuilderFormState,
+  currency: string,
+): BuilderValidationErrors => {
   const errors: BuilderValidationErrors = {};
   const totalAmount = parsePositiveNumber(form.totalAmount);
   const depositAmount = parsePositiveNumber(form.depositAmount);
@@ -179,6 +184,46 @@ const validateForm = (form: BuilderFormState): BuilderValidationErrors => {
     if (!milestoneValidation.isValid) {
       errors.milestones =
         milestoneValidation.errors;
+    }
+  }
+
+  // The instalment floor and supported currencies are enforced by the
+  // database (20260923_138); checking here says so before sending.
+  if (!errors.totalAmount && form.paymentStructure === "full_prepayment") {
+    const floorMessage = getInstalmentFloorMessage(totalAmount, currency);
+    if (floorMessage) errors.totalAmount = floorMessage;
+  }
+
+  if (
+    !errors.totalAmount &&
+    !errors.depositAmount &&
+    form.paymentStructure === "deposit_balance"
+  ) {
+    const depositMessage = getInstalmentFloorMessage(depositAmount, currency);
+    const balanceMessage = getInstalmentFloorMessage(
+      totalAmount - depositAmount,
+      currency,
+    );
+
+    if (depositMessage) {
+      errors.depositAmount = `Deposit: ${depositMessage}`;
+    } else if (balanceMessage) {
+      errors.depositAmount = `Remaining balance: ${balanceMessage}`;
+    }
+  }
+
+  if (!errors.milestones && form.paymentStructure === "milestone_payments") {
+    const milestoneFloorErrors = form.milestones
+      .map((milestone) => {
+        const floorMessage = getInstalmentFloorMessage(milestone.amount, currency);
+        return floorMessage
+          ? `${milestone.title.trim() || "Milestone"}: ${floorMessage}`
+          : null;
+      })
+      .filter((message): message is string => message !== null);
+
+    if (milestoneFloorErrors.length > 0) {
+      errors.milestones = milestoneFloorErrors;
     }
   }
 
@@ -334,7 +379,7 @@ const ListingRequestAgreementBuilder = ({
   const handleSubmit: SubmitEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
 
-    const nextErrors = validateForm(form);
+    const nextErrors = validateForm(form, currency);
     setValidationErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {

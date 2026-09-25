@@ -1,5 +1,4 @@
-// REVIEW DRAFT: resolve publication inputs and implement linked workflows before adoption.
-export const communityGuidelinesVersion = "2026-09-20-draft-1";
+export const communityGuidelinesVersion = "2026-09-24";
 
 export const communityGuidelinesSections = [
   {
@@ -52,9 +51,9 @@ export const communityGuidelinesSections = [
   {
     "title": "6. Reporting, moderation and appeals",
     "body": [
-      "Use the report option where available, or email [SUPPORT_EMAIL] with the URL or project ID, the rule involved and a concise explanation. For suspected child exploitation, report the location without downloading, forwarding or attaching the material. For immediate danger, use the appropriate emergency service; Made for Stream support is not an emergency response service.",
+      "Use the report option where available, or email safety@madeforstream.com with the URL or project ID, the rule involved and a concise explanation. For suspected child exploitation, report the location without downloading, forwarding or attaching the material. For immediate danger, use the appropriate emergency service; Made for Stream support is not an emergency response service.",
       "We may request edits, change visibility, remove content, pause listings or messaging, restrict payments where authorised, or suspend or terminate an account. Serious safety risks can require immediate action. We consider context, severity, repeated conduct and the reliability of evidence. Linked accounts are trust signals, not an exemption from these standards.",
-      "Where lawful and appropriate, we explain the reason for an action and how to request review. Appeal to [SUPPORT_EMAIL] within 14 days with the decision reference, the error you believe occurred and any new evidence. Copyright counter-notices follow their separate legal process. We do not promise a different reviewer when a sole operator handles support.",
+      "Where lawful and appropriate, we explain the reason for an action and how to request review. Appeal to appeals@madeforstream.com within 14 days with the decision reference, the error you believe occurred and any new evidence. Copyright counter-notices follow their separate legal process. We do not promise a different reviewer when a sole operator handles support.",
       "Account restrictions do not automatically forfeit money, erase records or end refund rights. We preserve an appropriate support route for existing projects. Do not evade restrictions by opening another account or reposting prohibited material."
     ]
   }

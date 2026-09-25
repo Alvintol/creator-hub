@@ -357,6 +357,14 @@ handled yet (see Known gaps: reverse charge). Escalate.
 
 ## Known gaps
 
+- **Wave 2 currencies are enabled before the advice.** `20260923_138` enables
+  EUR, GBP and the other two-decimal majors alongside CAD and USD (decided
+  2026-09-23). Nothing here stops a live EUR or GBP sale while collection is off
+  everywhere, and EU VAT applies from the first sale with no small-seller
+  threshold. Until the advice is in, watch for paid non-CAD/USD payments and
+  treat the first one as the prompt to chase it:
+  `select id, currency, paid_at from public.listing_request_payments where currency not in ('cad', 'usd') and status = 'paid' order by paid_at;`
+
 - **The advice gate is open.** Collection is off everywhere. Nothing here
   decides which jurisdictions Made for Stream must register in, whether
   the fees, tip and contribution are separately taxable, or whether the

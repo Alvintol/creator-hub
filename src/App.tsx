@@ -44,6 +44,7 @@ import Listing from "./pages/listings/Listing";
 import RequestListing from "./pages/listings/RequestListing";
 import CommunityGuidelines from "./pages/legal/CommunityGuidelines";
 import CookiePolicy from "./pages/legal/CookiePolicy";
+import ServiceProviderRegister from "./pages/legal/ServiceProviderRegister";
 import CopyrightPolicy from "./pages/legal/CopyrightPolicy";
 import CreatorTerms from "./pages/legal/CreatorTerms";
 import FeeSchedule from "./pages/legal/FeeSchedule";
@@ -85,18 +86,17 @@ const App = () => {
             element={<CreatorTerms />}
           />
           {/*
-            Draft policies (2026-09-17-draft-1), now linked from Legal.tsx.
-            All eight legal documents still contain bracketed placeholders
-            ([OPERATOR_LEGAL_NAME], [SUPPORT_EMAIL], [DMCA_AGENT_*], etc.) —
-            left in deliberately while brand/domain/entity are unsettled and
-            the site is pre-launch. Every placeholder must be resolved
-            before public launch. See the legal-documentation review notes
-            and objectives doc for the full pre-launch checklist.
+            Published policies. Terms and Privacy still carry a
+            [BUSINESS_NUMBER] placeholder while the registration is pending.
           */}
           <Route path="/policies/refunds" element={<RefundPolicy />} />
           <Route path="/policies/copyright" element={<CopyrightPolicy />} />
           <Route path="/policies/fees" element={<FeeSchedule />} />
           <Route path="/policies/cookies" element={<CookiePolicy />} />
+          <Route
+            path="/policies/service-providers"
+            element={<ServiceProviderRegister />}
+          />
           <Route
             path="/policies/community"
             element={<CommunityGuidelines />}

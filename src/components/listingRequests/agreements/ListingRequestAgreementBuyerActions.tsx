@@ -4,13 +4,22 @@ import {
   areRequiredAgreementAcknowledgementsChecked,
   getRequiredListingRequestAgreementAcknowledgements,
 } from "../../../domain/listings/listingRequestAgreements";
+import {
+  earlyServiceRequestExplanation,
+  earlyServiceRequestHeading,
+  earlyServiceRequestLabel,
+} from "../../../domain/legal/policyAcceptance";
 import type { ListingRequestAgreementRow } from "../../../hooks/creatorRequests/useListingRequestAgreement";
+import PolicyAcceptanceCheckbox from "../../legal/PolicyAcceptanceCheckbox";
 
 type ListingRequestAgreementBuyerActionsProps = {
   agreement: ListingRequestAgreementRow | null;
   isPending: boolean;
   error: unknown;
-  onAccept: (acknowledgementKeys: string[]) => Promise<void> | void;
+  onAccept: (
+    acknowledgementKeys: string[],
+    earlyServiceRequested: boolean,
+  ) => Promise<void> | void;
   onDecline: () => Promise<void> | void;
 };
 
@@ -19,6 +28,8 @@ const classes = {
   section: "space-y-4",
   header: "space-y-1",
   title: "font-display text-base font-extrabold tracking-tight",
+  subtitle: "font-display text-sm font-extrabold tracking-tight",
+  consent: "space-y-2",
   text: "text-sm text-zinc-600",
   checklist: "space-y-3",
   checkboxRow:
@@ -49,6 +60,7 @@ const ListingRequestAgreementBuyerActions = ({
   const [checkedAcknowledgementKeys, setCheckedAcknowledgementKeys] = useState<
     string[]
   >([]);
+  const [earlyServiceRequested, setEarlyServiceRequested] = useState(false);
 
   const requiredAcknowledgements = useMemo(
     () =>
@@ -77,11 +89,11 @@ const ListingRequestAgreementBuyerActions = ({
   };
 
   const handleAccept = async () => {
-    if (!hasCheckedAllRequiredAcknowledgements) {
+    if (!hasCheckedAllRequiredAcknowledgements || !earlyServiceRequested) {
       return;
     }
 
-    await onAccept(checkedAcknowledgementKeys);
+    await onAccept(checkedAcknowledgementKeys, earlyServiceRequested);
   };
 
   const handleDecline = async () => {
@@ -135,11 +147,30 @@ const ListingRequestAgreementBuyerActions = ({
           })}
         </div>
 
+        {/* Its own checkbox and wording, never folded into the acknowledgements
+            above (Refund Policy section 1, launch-scope.md section 1.5). */}
+        <div className={classes.consent}>
+          <h3 className={classes.subtitle}>{earlyServiceRequestHeading}</h3>
+          <p className={classes.text}>{earlyServiceRequestExplanation}</p>
+          <PolicyAcceptanceCheckbox
+            id="agreement-early-service-request"
+            checked={earlyServiceRequested}
+            onChange={setEarlyServiceRequested}
+            disabled={isPending}
+          >
+            {earlyServiceRequestLabel}
+          </PolicyAcceptanceCheckbox>
+        </div>
+
         <div className={classes.row}>
           <button
             className={classes.btnPrimary}
             type="button"
-            disabled={isPending || !hasCheckedAllRequiredAcknowledgements}
+            disabled={
+              isPending ||
+              !hasCheckedAllRequiredAcknowledgements ||
+              !earlyServiceRequested
+            }
             onClick={() => void handleAccept()}
           >
             {isPending ? "Saving response…" : "Accept project agreement"}

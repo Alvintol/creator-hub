@@ -1,5 +1,4 @@
-// REVIEW DRAFT: resolve publication inputs and implement linked workflows before adoption.
-export const cookiePolicyVersion = "2026-09-20-draft-1";
+export const cookiePolicyVersion = "2026-09-24";
 
 export const cookiePolicySections = [
   {
@@ -51,13 +50,19 @@ export const cookiePolicySections = [
     "title": "6. Browser controls, contact and updates",
     "body": [
       "Browser settings can block or clear storage. Blocking necessary session or payment storage can prevent sign-in or checkout. Use Made for Stream's category controls for optional choices without disabling all browser storage.",
-      "Contact [PRIVACY_EMAIL] with privacy or storage questions. Material changes are described before affected optional processing begins; a new purpose is not automatically covered by a previous choice."
+      "Contact privacy@madeforstream.com with privacy or storage questions. Material changes are described before affected optional processing begins; a new purpose is not automatically covered by a previous choice."
     ]
   },
   {
     "title": "7. Storage Register",
     "body": [
-      "The published version must contain the verified register for the deployed service. Each entry identifies the provider, exact storage key or cookie name, domain, purpose, category, duration and how to control it. The draft audit register and the facts still requiring browser verification are supplied separately in the implementation notes. They must not be presented as a completed production inventory."
+      "This is the browser storage Made for Stream's site uses. No analytics, advertising or optional external media is in use, so Cookie settings currently has no optional category to switch on. You can remove any entry through your browser settings; removing necessary storage can sign you out or interrupt a payment.",
+      "Name: sb-itbgxxczuazwroniiyot-auth-token; Provider: Made for Stream, using Supabase; Type: Local storage on madeforstream.com; Purpose: Keeps you signed in and refreshes your session; Category: Authentication and account security; Duration: Until you sign out or clear it",
+      "Name: creatorhub.pendingPolicyAcceptance; Provider: Made for Stream; Type: Local storage on madeforstream.com; Purpose: Holds the Terms and Privacy Policy versions you accepted while your account is created, so they can be recorded; Category: Authentication and account security; Duration: Removed once recorded",
+      "Name: creatorhub.cookiePreferences; Provider: Made for Stream; Type: Local storage on madeforstream.com; Purpose: Remembers your Cookie settings choice and the policy version it applied to; Category: Privacy-choice storage; Duration: Up to six months",
+      "Name: creatorhub-theme; Provider: Made for Stream; Type: Local storage on madeforstream.com; Purpose: Remembers a light or dark theme you chose; Category: Optional preferences, stored only when you choose a theme; Duration: Until you change or clear it",
+      "Name: __stripe_mid and __stripe_sid; Provider: Stripe; Type: Cookies on madeforstream.com, set by Stripe.js; Purpose: Fraud prevention for a payment or creator onboarding you start; Category: Payment and fraud prevention; Duration: One year and 30 minutes respectively",
+      "Stripe.js loads only on the checkout and payout-settings pages. Stripe's own pages and embedded onboarding can use further storage on Stripe's domains, governed by Stripe's Privacy Policy (https://stripe.com/privacy)."
     ]
   }
 ] as const;

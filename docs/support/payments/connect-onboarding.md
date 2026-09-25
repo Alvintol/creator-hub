@@ -240,14 +240,15 @@ a user error.
 
 **What the user sees.** Onboarding or sync fails with an opaque error.
 
-**Fix.** Manual investigation. Note that Made for Stream's fee minimums are
-**minor-unit**-denominated, so they are correct for CAD and USD and wrong for a
-currency with a different minor-unit convention. A creator onboarding outside
-CAD/USD raises a question well beyond this error — see the currency note in
-[`checkout.md`](checkout.md) `PAY-004`.
+**Fix.** Manual investigation.
 
-**Money impact.** None yet, but a creator in an unvalidated currency who does get
-through is a genuine risk to fee correctness.
+**Money impact.** None yet.
+
+**Unsupported but valid currency.** Since `20260923_138` the account-session
+route also refuses a well-formed currency that is not enabled, with HTTP 400 and
+[`AGR-006`](../requests/agreements.md#agr-006--the-projects-currency-is-not-supported)'s
+message. The payout-settings form now offers only enabled currencies, so this
+needs a stale client or a direct API call.
 
 ---
 

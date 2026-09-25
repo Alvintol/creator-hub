@@ -24,6 +24,10 @@ import {
 } from "../../hooks/legal/usePolicyAcceptances";
 import PolicyAcceptanceCheckbox from "../legal/PolicyAcceptanceCheckbox";
 import {
+  isSupportedCurrency,
+  SUPPORTED_CURRENCY_CODES,
+} from "../../domain/payments/supportedCurrencies";
+import {
   createStripeConnectAccountSession,
 } from "../../hooks/payments/useStripeConnectAccountSession";
 import {
@@ -261,13 +265,20 @@ const CreatorPayoutSettings = ({ isCreatorApproved }: CreatorPayoutSettingsProps
 
         <label className={classes.field}>
           <span className={classes.label}>Currency</span>
-          <input
+          <select
             className={classes.input}
-            maxLength={3}
             value={defaultCurrency}
-            onChange={(event) => setDefaultCurrency(event.target.value.toLowerCase())}
-            placeholder="cad"
-          />
+            onChange={(event) => setDefaultCurrency(event.target.value)}
+          >
+            {!isSupportedCurrency(defaultCurrency) && (
+              <option value={defaultCurrency}>{defaultCurrency.toUpperCase()} (not supported)</option>
+            )}
+            {SUPPORTED_CURRENCY_CODES.map((code) => (
+              <option key={code} value={code}>
+                {code.toUpperCase()}
+              </option>
+            ))}
+          </select>
         </label>
 
         <div className={classes.actions}>
